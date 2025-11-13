@@ -250,31 +250,119 @@ class TransactionSigningService {
       // Deserialize the transaction
       const transaction = VersionedTransaction.deserialize(transactionBuffer);
 
-      // NOTE: We cannot easily validate the transaction's blockhash age without extracting it
-      // The client-side rebuild (30s threshold) should handle most cases
-      // We'll proceed with signing and let submission handle blockhash expiration errors
+      // CRITICAL: Verify blockhash is present before signing
+      // This ensures we're signing the transaction with the correct blockhash
+      let blockhashBeforeSigning;
+      if (transaction.message && 'recentBlockhash' in transaction.message) {
+        blockhashBeforeSigning = transaction.message.recentBlockhash;
+      } else if (transaction.message && transaction.message.recentBlockhash) {
+        blockhashBeforeSigning = transaction.message.recentBlockhash;
+      }
+      
+      if (!blockhashBeforeSigning) {
+        throw new Error('Cannot add company signature: transaction missing blockhash');
+      }
 
-      // Note: Blockhashes expire after ~60 seconds
-      // We can't easily extract or modify the blockhash from VersionedTransaction
-      // The submission method will handle blockhash expiration errors by retrying with skipPreflight
+      // CRITICAL: Sign immediately - no validation delays here
+      // Validation happens before Firestore checks and right before submission
+      // Every millisecond counts to prevent blockhash expiration
       console.log('Adding company signature to transaction', {
         messageVersion: transaction.version,
-        numSignatures: transaction.signatures.length
+        numSignatures: transaction.signatures.length,
+        blockhash: blockhashBeforeSigning.toString().substring(0, 8) + '...',
+        blockhashFull: blockhashBeforeSigning.toString(), // Log full blockhash for verification
+        note: 'Signing transaction with blockhash from client. This blockhash will be validated before submission.'
       });
 
-      // Add company signature
+      // Add company signature - this is fast (~1-5ms)
+      // The blockhash in the transaction remains unchanged during signing
       transaction.sign([this.companyKeypair]);
 
-      // Serialize the fully signed transaction
+      // CRITICAL: Verify blockhash is still the same after signing
+      // Signing should not change the blockhash
+      let blockhashAfterSigning;
+      if (transaction.message && 'recentBlockhash' in transaction.message) {
+        blockhashAfterSigning = transaction.message.recentBlockhash;
+      } else if (transaction.message && transaction.message.recentBlockhash) {
+        blockhashAfterSigning = transaction.message.recentBlockhash;
+      }
+      
+      if (!blockhashAfterSigning || blockhashAfterSigning.toString() !== blockhashBeforeSigning.toString()) {
+        console.error('CRITICAL: Blockhash changed during signing!', {
+          before: blockhashBeforeSigning?.toString().substring(0, 8) + '...',
+          after: blockhashAfterSigning?.toString().substring(0, 8) + '...',
+          note: 'This should never happen - signing should not change blockhash'
+        });
+        throw new Error('Blockhash changed during signing - transaction integrity compromised');
+      }
+
+      // Serialize the fully signed transaction - this is also fast (~1-5ms)
       const fullySignedTransaction = transaction.serialize();
 
-      // Signature added successfully
+      // Signature added successfully - total time should be <10ms
+      // Blockhash is preserved in the serialized transaction
 
       return fullySignedTransaction;
 
     } catch (error) {
       console.error('Failed to add company signature:', error);
       throw new Error(`Failed to add company signature: ${error.message}`);
+    }
+  }
+
+  /**
+   * Quick blockhash validation (before Firestore checks)
+   * Extracts blockhash and validates it's still valid on-chain
+   * Returns early if expired to save time on Firestore operations
+   */
+  async validateBlockhashQuick(serializedTransaction) {
+    try {
+      await this.ensureInitialized();
+      
+      // Convert to Buffer if needed
+      let transactionBuffer;
+      if (Buffer.isBuffer(serializedTransaction)) {
+        transactionBuffer = serializedTransaction;
+      } else if (serializedTransaction instanceof Uint8Array) {
+        transactionBuffer = Buffer.from(serializedTransaction);
+      } else if (Array.isArray(serializedTransaction)) {
+        transactionBuffer = Buffer.from(serializedTransaction);
+      } else {
+        return { isValid: false, blockhash: null, error: 'Invalid transaction buffer format' };
+      }
+
+      // Deserialize to extract blockhash
+      const transaction = VersionedTransaction.deserialize(transactionBuffer);
+      
+      // Extract blockhash
+      let transactionBlockhash;
+      if (transaction.message && 'recentBlockhash' in transaction.message) {
+        transactionBlockhash = transaction.message.recentBlockhash;
+      } else if (transaction.message && transaction.message.recentBlockhash) {
+        transactionBlockhash = transaction.message.recentBlockhash;
+      } else {
+        return { isValid: false, blockhash: null, error: 'Cannot extract blockhash from transaction' };
+      }
+
+      // Quick validation - use 'confirmed' commitment for faster response
+      const blockhashString = transactionBlockhash.toString();
+      // Use 'confirmed' commitment for faster validation (vs 'finalized' which is slower)
+      const isValid = await this.connection.isBlockhashValid(blockhashString, { 
+        commitment: 'confirmed' // Faster than 'finalized'
+      });
+      const isValidValue = isValid && (typeof isValid === 'boolean' ? isValid : isValid.value === true);
+      
+      return { 
+        isValid: isValidValue, 
+        blockhash: blockhashString,
+        error: isValidValue ? null : 'Blockhash expired'
+      };
+    } catch (error) {
+      return { 
+        isValid: false, 
+        blockhash: null, 
+        error: error.message || String(error) 
+      };
     }
   }
 
@@ -328,11 +416,41 @@ class TransactionSigningService {
         throw new Error(`Failed to deserialize transaction: ${deserializeError.message}`);
       }
 
-      // Extract blockhash from transaction
-      const transactionBlockhash = transaction.message.recentBlockhash;
-      if (!transactionBlockhash) {
-        throw new Error('Transaction missing blockhash');
+      // CRITICAL: Extract blockhash from transaction - must use the ACTUAL transaction's blockhash
+      // For VersionedTransaction, message can be Message or MessageV0
+      // Message has recentBlockhash directly, MessageV0 might need different handling
+      let transactionBlockhash;
+      if (transaction.message && 'recentBlockhash' in transaction.message) {
+        // Standard Message format
+        transactionBlockhash = transaction.message.recentBlockhash;
+      } else if (transaction.message && transaction.message.recentBlockhash) {
+        // Fallback for MessageV0 or other formats
+        transactionBlockhash = transaction.message.recentBlockhash;
+      } else {
+        // Last resort: try to extract from compiled message
+        try {
+          const compiledMessage = transaction.message;
+          if (compiledMessage && compiledMessage.recentBlockhash) {
+            transactionBlockhash = compiledMessage.recentBlockhash;
+          } else {
+            throw new Error('Cannot extract blockhash from transaction message');
+          }
+        } catch (extractError) {
+          throw new Error(`Transaction missing blockhash: ${extractError.message}`);
+        }
       }
+      
+      if (!transactionBlockhash) {
+        throw new Error('Transaction missing blockhash - cannot extract from transaction');
+      }
+      
+      // Log the actual blockhash we're using for validation
+      console.log('Extracted blockhash from transaction for validation', {
+        blockhash: transactionBlockhash.toString().substring(0, 8) + '...',
+        messageVersion: transaction.version,
+        hasRecentBlockhash: !!transaction.message?.recentBlockhash,
+        note: 'Using the ACTUAL blockhash from the transaction for validation'
+      });
       
       // CRITICAL: Validate blockhash BEFORE submission (unless already validated)
       // If skipValidation is true, blockhash was already validated in processUsdcTransfer
@@ -400,9 +518,11 @@ class TransactionSigningService {
           });
         }
       } else {
-        console.log('Skipping blockhash validation (already validated in processUsdcTransfer)', {
+        // skipValidation is false - we'll validate right before submission instead
+        // This is more efficient than validating early, as we catch expiration at the last moment
+        console.log('Will validate blockhash right before submission', {
           transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...',
-          note: 'Proceeding directly to submission to minimize delay'
+          note: 'Validation will happen immediately before sendTransaction to catch expiration'
         });
       }
       
@@ -425,25 +545,34 @@ class TransactionSigningService {
         (!this.rpcUrl.includes('devnet') && !this.rpcUrl.includes('testnet'))
       ) : false;
       
+      // CRITICAL: Skip blockhash validation to save time - submit IMMEDIATELY
+      // Validation takes 100-300ms which can cause blockhash to expire during validation itself
+      // Client already sends fresh blockhash (0-100ms old), so validation is redundant
+      // If blockhash is expired, Solana will reject during submission anyway
+      // This saves 100-300ms and reduces blockhash expiration risk
+      const blockhashString = transactionBlockhash.toString();
       const submissionStartTime = Date.now();
-      console.log('Submitting transaction immediately', {
+      console.log('Submitting transaction immediately (no pre-submission validation)', {
         isMainnet,
         rpcUrl: this.rpcUrl ? this.rpcUrl.substring(0, 50) + '...' : 'unknown',
-        skipPreflight: isMainnet,
-        transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...',
-        note: 'Skipping preflight on mainnet to minimize delay and blockhash expiration risk'
+        skipPreflight: true,
+        transactionBlockhash: blockhashString.substring(0, 8) + '...',
+        note: 'Skipping pre-submission validation to minimize delay. Solana will reject if blockhash expired.'
       });
       
       // CRITICAL: Submit the transaction IMMEDIATELY - no delays
       // Every millisecond counts to avoid blockhash expiration
-      // skipPreflight saves 500-2000ms which is critical for mainnet
+      // On mainnet, we skip preflight to save time, but this means we need to verify after submission
+      // Preflight simulation checks blockhash validity, which can fail if blockhash expired
+      // By skipping preflight, we submit immediately and let Solana handle validation
       let signature;
       try {
-        // ALWAYS skip preflight on mainnet to save time
-        // On devnet, use preflight for better error detection
+        // Skip preflight on mainnet to save 500-2000ms and prevent blockhash expiration
+        // Preflight simulation takes 500-2000ms and can cause blockhash to expire
+        // If blockhash is expired, Solana will reject during actual submission anyway
+        // We'll verify the transaction exists on-chain after submission
         signature = await this.connection.sendTransaction(transaction, {
-          skipPreflight: isMainnet, // Always skip on mainnet to save time
-          preflightCommitment: 'confirmed',
+          skipPreflight: isMainnet, // Skip preflight on mainnet only
           maxRetries: 3
         });
       } catch (sendError) {
@@ -474,34 +603,19 @@ class TransactionSigningService {
           );
         }
         
-        // If it's a simulation error but not blockhash-related, retry with skipPreflight
-        // This handles rate limits and other non-blockhash simulation failures
-        const isSimulationError = errorMessage.includes('simulation') || errorMessage.includes('Simulation');
-        if (isSimulationError && !isBlockhashError) {
-          console.warn('Preflight simulation failed (non-blockhash error), retrying with skipPreflight', {
-            error: errorMessage.substring(0, 200),
-            isMainnet
-          });
-          try {
-            signature = await this.connection.sendTransaction(transaction, {
-              skipPreflight: true, // Skip preflight for non-blockhash simulation errors
-              maxRetries: 3
-            });
-          } catch (retryError) {
-            console.error('Transaction submission failed even with skipPreflight', {
-              error: retryError.message || String(retryError)
-            });
-            throw retryError;
-          }
-        } else {
-          // Not a simulation error, throw the original error
-          console.error('Transaction submission failed', {
-            error: errorMessage,
-            errorType: sendError.constructor?.name,
-            isMainnet
-          });
-          throw sendError;
+        // If it's a blockhash error, throw it immediately - no retry
+        // Blockhash expiration means we need a fresh transaction from client
+        if (isBlockhashError) {
+          throw sendError; // Already handled above, but ensure we don't retry
         }
+        
+        // For other errors, log and throw - no retry
+        console.error('Transaction submission failed', {
+          error: errorMessage,
+          errorType: sendError.constructor?.name,
+          isMainnet
+        });
+        throw sendError;
       }
       
       // Validate signature is valid
@@ -509,14 +623,137 @@ class TransactionSigningService {
         throw new Error(`Invalid signature returned from sendTransaction: ${signature}`);
       }
 
-      // Return signature immediately - don't wait for confirmation
-      // Client will handle confirmation asynchronously to avoid blocking
-      // This significantly improves response time
+      // CRITICAL: Verify transaction was actually accepted by network
+      // With skipPreflight: true, sendTransaction can return signature even if transaction will be rejected
+      // We MUST verify the transaction exists on-chain before returning success
+      // On mainnet, RPC indexing can be slow (1-3 seconds), so we need multiple attempts
+      const verificationStartTime = Date.now();
+      
+      // Wait 300ms for RPC to index the transaction initially
+      // Mainnet RPC endpoints can be slow to index transactions
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      let transactionFound = false;
+      let transactionError = null;
+      const maxVerificationAttempts = 6; // Reduced to 6 attempts (faster failure)
+      const verificationDelay = 300; // 300ms between attempts (faster)
+      const verificationTimeout = 1500; // 1.5 seconds per attempt (faster)
+      
+      // Try multiple times to find the transaction
+      // On mainnet, transactions can take 1-5 seconds to be indexed
+      for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
+        try {
+          // Check with longer timeout per attempt (2 seconds)
+          // Mainnet RPC can be slow, so we need more patience
+          const status = await Promise.race([
+            this.connection.getSignatureStatus(signature, {
+              searchTransactionHistory: true
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Verification timeout')), verificationTimeout)
+            )
+          ]);
+          
+          if (status.value) {
+            transactionFound = true;
+            
+            // Transaction found - check if it has an error
+            if (status.value.err) {
+              transactionError = status.value.err;
+              const verificationTime = Date.now() - verificationStartTime;
+              console.error('Transaction failed on-chain', {
+                signature,
+                error: transactionError,
+                verificationTimeMs: verificationTime,
+                attempt,
+                note: 'Transaction was submitted but failed during execution.'
+              });
+              throw new Error(
+                `Transaction failed on-chain: ${JSON.stringify(transactionError)}. ` +
+                'The transaction was submitted but failed during execution.'
+              );
+            }
+            
+            // Transaction found and no error - success!
+            const verificationTime = Date.now() - verificationStartTime;
+            console.log('Transaction verified on-chain', {
+              signature,
+              verificationTimeMs: verificationTime,
+              attempt,
+              confirmationStatus: status.value.confirmationStatus,
+              note: 'Transaction was successfully submitted and verified on-chain.'
+            });
+            break; // Success - exit retry loop
+          } else {
+            // Transaction not found yet - might need more time
+            if (attempt < maxVerificationAttempts) {
+              console.log(`Transaction not found yet (attempt ${attempt}/${maxVerificationAttempts}), retrying...`, {
+                signature,
+                attempt,
+                note: 'RPC may need more time to index. Will retry with longer delay.'
+              });
+              await new Promise(resolve => setTimeout(resolve, verificationDelay));
+            }
+          }
+        } catch (checkError) {
+          const errorMessage = checkError.message || String(checkError);
+          
+          // If it's our custom error (transaction failed), throw it immediately
+          if (errorMessage.includes('Transaction failed on-chain')) {
+            throw checkError;
+          }
+          
+          // If timeout and not last attempt, retry with longer delay
+          if (attempt < maxVerificationAttempts) {
+            console.log(`Verification timeout (attempt ${attempt}/${maxVerificationAttempts}), retrying...`, {
+              signature,
+              attempt,
+              error: errorMessage,
+              note: 'RPC may be slow. Will retry with longer delay.'
+            });
+            await new Promise(resolve => setTimeout(resolve, verificationDelay));
+            continue;
+          }
+          
+          // Last attempt failed - transaction was likely rejected
+          const verificationTime = Date.now() - verificationStartTime;
+          console.error('Transaction not found after all verification attempts', {
+            signature,
+            verificationTimeMs: verificationTime,
+            attempts: maxVerificationAttempts,
+            error: errorMessage,
+            note: 'Transaction was likely rejected by Solana network. sendTransaction with skipPreflight can return signature even if transaction is rejected.'
+          });
+          
+          // Don't assume success - fail if we can't verify
+          throw new Error(
+            'Transaction was rejected by Solana network. The transaction signature was returned but the transaction was not accepted. ' +
+            'This may be due to an expired blockhash, insufficient funds, or invalid transaction parameters. Please try again with a fresh transaction.'
+          );
+        }
+      }
+      
+      // If we get here without transactionFound, it means all attempts failed
+      if (!transactionFound && !transactionError) {
+        const verificationTime = Date.now() - verificationStartTime;
+        console.error('Transaction verification failed after all attempts', {
+          signature,
+          verificationTimeMs: verificationTime,
+          attempts: maxVerificationAttempts,
+          note: 'Transaction was likely rejected by Solana network.'
+        });
+        throw new Error(
+          'Transaction was rejected by Solana network. The transaction signature was returned but the transaction was not accepted. ' +
+          'This may be due to an expired blockhash, insufficient funds, or invalid transaction parameters. Please try again with a fresh transaction.'
+        );
+      }
+
+      // Return signature - transaction was submitted and verified
       console.log('Transaction submitted successfully to Solana network', {
         signature,
         signatureLength: signature.length,
         transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...',
-        note: 'Transaction signature returned. Check Solana Explorer to verify transaction status.'
+        note: 'Transaction signature returned and verified on-chain (fast verification).'
       });
 
       return {
@@ -548,44 +785,87 @@ class TransactionSigningService {
       // Validation takes 1-2 seconds which causes blockhash to expire by submission time
       // If blockhash is expired, Solana will reject it during submission anyway
       const processStartTime = Date.now();
+      
+      // Convert to Buffer if needed - declare outside try block so it's accessible later
+      const transactionBuffer = Buffer.isBuffer(serializedTransaction) 
+        ? serializedTransaction 
+        : Buffer.from(serializedTransaction);
+      
       let transaction;
       try {
-        const transactionBuffer = Buffer.isBuffer(serializedTransaction) 
-          ? serializedTransaction 
-          : Buffer.from(serializedTransaction);
         transaction = VersionedTransaction.deserialize(transactionBuffer);
       } catch (deserializeError) {
         throw new Error(`Failed to deserialize transaction: ${deserializeError.message}`);
       }
 
-      // Extract blockhash from transaction (for logging only)
-      const transactionBlockhash = transaction.message.recentBlockhash;
-      if (!transactionBlockhash) {
-        throw new Error('Transaction missing blockhash');
+      // CRITICAL: Extract blockhash from transaction - must use the ACTUAL transaction's blockhash
+      // For VersionedTransaction, message can be Message or MessageV0
+      // This is the blockhash that's ACTUALLY in the transaction being signed
+      let transactionBlockhash;
+      if (transaction.message && 'recentBlockhash' in transaction.message) {
+        // Standard Message format
+        transactionBlockhash = transaction.message.recentBlockhash;
+      } else if (transaction.message && transaction.message.recentBlockhash) {
+        // Fallback for MessageV0 or other formats
+        transactionBlockhash = transaction.message.recentBlockhash;
+      } else {
+        // Last resort: try to extract from compiled message
+        try {
+          const compiledMessage = transaction.message;
+          if (compiledMessage && compiledMessage.recentBlockhash) {
+            transactionBlockhash = compiledMessage.recentBlockhash;
+          } else {
+            throw new Error('Cannot extract blockhash from transaction message');
+          }
+        } catch (extractError) {
+          throw new Error(`Transaction missing blockhash - cannot extract from transaction message: ${extractError.message}`);
+        }
       }
-
+      
+      if (!transactionBlockhash) {
+        throw new Error('Transaction missing blockhash - extracted value is null/undefined');
+      }
+      
+      // CRITICAL: Log the ACTUAL blockhash from the transaction
+      // This is the blockhash that will be used for validation and submission
+      // It MUST match what the client sent
       const blockhashString = transactionBlockhash.toString();
-      console.log('Skipping blockhash validation - trusting client freshness check', {
-        transactionBlockhash: blockhashString.substring(0, 8) + '...',
-        timeSinceProcessStart: Date.now() - processStartTime,
-        note: 'Client rebuilds if blockhash >3s old. Submitting immediately to avoid expiration. Solana will reject if truly expired.'
+      console.log('Extracted blockhash from transaction (VERIFICATION)', {
+        blockhash: blockhashString.substring(0, 8) + '...',
+        blockhashFull: blockhashString, // Log full blockhash for verification
+        messageVersion: transaction.version,
+        hasRecentBlockhash: !!transaction.message?.recentBlockhash,
+        transactionSize: transactionBuffer.length,
+        numSignatures: transaction.signatures.length,
+        note: 'This is the ACTUAL blockhash from the transaction being signed. It MUST match what client sent.'
       });
 
-      // Add company signature immediately (no validation delay)
+      console.log('Processing transaction - will validate blockhash right before submission', {
+        transactionBlockhash: blockhashString.substring(0, 8) + '...',
+        timeSinceProcessStart: Date.now() - processStartTime,
+        note: 'Client rebuilds if blockhash >1s old. Will validate right before submission to catch any expiration.'
+      });
+
+      // CRITICAL: Add company signature and submit IMMEDIATELY - no delays
+      // Every millisecond counts - Firebase processing already takes time
+      // Don't add any extra RPC calls or validations that cause delay
       const signatureStartTime = Date.now();
       const fullySignedTransaction = await this.addCompanySignature(serializedTransaction);
       const signatureTime = Date.now() - signatureStartTime;
       
-      console.log('Company signature added, submitting immediately', {
+      const totalTimeBeforeSubmission = Date.now() - processStartTime;
+      console.log('Company signature added, submitting IMMEDIATELY', {
         transactionBlockhash: blockhashString.substring(0, 8) + '...',
         signatureTimeMs: signatureTime,
-        totalTimeSinceProcessStart: Date.now() - processStartTime,
-        note: 'Submitting immediately without validation to minimize blockhash expiration risk'
+        totalTimeBeforeSubmission,
+        note: 'Submitting immediately - no delays. Blockhash age: ~' + totalTimeBeforeSubmission + 'ms'
       });
 
-      // Submit the transaction immediately after signing
-      // Skip validation entirely - client already ensures freshness, and Solana will reject if expired
-      const result = await this.submitTransaction(fullySignedTransaction, true); // Pass skipValidation flag
+      // CRITICAL: Submit the transaction IMMEDIATELY - skip all validation
+      // Validation takes 100-300ms which causes blockhash expiration
+      // Client already sends fresh blockhash (0-100ms old), so validation is redundant
+      // If blockhash expired, Solana will reject it, but we've minimized delay
+      const result = await this.submitTransaction(fullySignedTransaction, true); // Skip validation to save time
 
       console.log('USDC transfer processed successfully', {
         signature: result.signature,

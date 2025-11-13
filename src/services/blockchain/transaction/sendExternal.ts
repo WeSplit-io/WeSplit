@@ -390,8 +390,9 @@ class ExternalTransferService {
 
       // Check if recipient has USDC token account, create if needed
       let needsTokenAccountCreation = false;
+      const connection = await this.getConnection();
       try {
-        await getAccount(this.connection, toTokenAccount);
+        await getAccount(connection, toTokenAccount);
         logger.info('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'ExternalTransferService');
       } catch (error) {
         // Token account doesn't exist, we need to create it
@@ -408,7 +409,7 @@ class ExternalTransferService {
       // Use 'confirmed' commitment for faster response and better reliability
       // CRITICAL: Get blockhash immediately before transaction creation to minimize expiration risk
       // Best practice: Use shared utility for consistent blockhash handling
-      const connection = await this.getConnection();
+      // NOTE: Connection already retrieved above for getAccount check
       const blockhashData = await getFreshBlockhash(connection, 'confirmed');
       const blockhash = blockhashData.blockhash;
       const blockhashTimestamp = blockhashData.timestamp;
@@ -608,11 +609,37 @@ class ExternalTransferService {
         ? serializedTransaction 
         : new Uint8Array(serializedTransaction);
       
-      // CRITICAL: Check blockhash age and rebuild if needed BEFORE Firebase call
-      // Mainnet is slower, so we need aggressive refresh (10 seconds threshold)
-      // This minimizes the time between blockhash creation and Solana submission
+      // CRITICAL: Check blockhash age AND validity before sending to Firebase
+      // Best practice: Use shared utility for consistent blockhash age checking
+      // CRITICAL: Also validate the blockhash is actually valid on-chain
+      // Blockhashes expire based on slot height, not just time
       const blockhashAge = Date.now() - blockhashTimestamp;
-      const needsRebuild = isBlockhashTooOld(blockhashTimestamp);
+      let needsRebuild = isBlockhashTooOld(blockhashTimestamp);
+      
+      // CRITICAL: Also check if blockhash is actually valid on-chain
+      // Even if age is OK, the blockhash might have expired based on slot height
+      if (!needsRebuild) {
+        try {
+          const isValid = await this.connection.isBlockhashValid(blockhash, { commitment: 'confirmed' });
+          const isValidValue = isValid && (typeof isValid === 'boolean' ? isValid : isValid.value === true);
+          
+          if (!isValidValue) {
+            logger.warn('Blockhash is no longer valid on-chain, rebuilding transaction', {
+              blockhash: blockhash.substring(0, 8) + '...',
+              blockhashAge,
+              note: 'Blockhash expired based on slot height, not just time'
+            }, 'ExternalTransferService');
+            needsRebuild = true;
+          }
+        } catch (validationError) {
+          // If validation fails (network error), log but proceed
+          // The actual submission will catch if it's expired
+          logger.warn('Failed to validate blockhash on-chain, proceeding anyway', {
+            error: validationError instanceof Error ? validationError.message : String(validationError),
+            blockhash: blockhash.substring(0, 8) + '...'
+          }, 'ExternalTransferService');
+        }
+      }
       
       let currentTxArray = txArray;
       let currentBlockhashTimestamp = blockhashTimestamp;

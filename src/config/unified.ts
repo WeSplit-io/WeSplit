@@ -129,14 +129,15 @@ export function getUnifiedConfig(): UnifiedConfig {
     if (value.startsWith('http')) {
       // Extract the API key from URL like https://go.getblock.io/API_KEY
       const match = value.match(/go\.getblock\.io\/([^\/\s]+)/);
-      return match ? match[1] : value.split('/').pop() || value;
+      return match ? match[1]! : (value.split('/').pop() || '')!;
     }
     return value;
   };
 
-  const heliusApiKey = extractApiKey(getEnvVar('HELIUS_API_KEY'), 'mainnet.helius-rpc.com');
-  const alchemyApiKey = extractApiKey(getEnvVar('ALCHEMY_API_KEY'), 'solana-mainnet.g.alchemy.com/v2');
-  const getBlockApiKey = extractGetBlockKey(getEnvVar('GETBLOCK_API_KEY'));
+  // Get API keys - check both with and without EXPO_PUBLIC_ prefix
+  const heliusApiKey = extractApiKey((getEnvVar('HELIUS_API_KEY') || getEnvVar('EXPO_PUBLIC_HELIUS_API_KEY') || ''), 'mainnet.helius-rpc.com');
+  const alchemyApiKey = extractApiKey((getEnvVar('ALCHEMY_API_KEY') || getEnvVar('EXPO_PUBLIC_ALCHEMY_API_KEY') || ''), 'solana-mainnet.g.alchemy.com/v2');
+  const getBlockApiKey = extractGetBlockKey(getEnvVar('GETBLOCK_API_KEY') || getEnvVar('EXPO_PUBLIC_GETBLOCK_API_KEY') || '');
   const quickNodeEndpoint = getEnvVar('QUICKNODE_ENDPOINT');
   const chainstackEndpoint = getEnvVar('CHAINSTACK_ENDPOINT');
   
@@ -160,10 +161,16 @@ export function getUnifiedConfig(): UnifiedConfig {
     }
   }
   
+  // Log RPC provider configuration for debugging
   logger.info('Network configuration', { 
     network, 
     devNetwork, 
     forceMainnet,
+    hasAlchemy: !!alchemyApiKey && alchemyApiKey !== 'YOUR_ALCHEMY_API_KEY_HERE',
+    hasGetBlock: !!getBlockApiKey && getBlockApiKey !== 'YOUR_GETBLOCK_API_KEY_HERE',
+    hasHelius: !!heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE',
+    hasQuickNode: !!quickNodeEndpoint && quickNodeEndpoint !== 'YOUR_QUICKNODE_ENDPOINT_HERE',
+    hasChainstack: !!chainstackEndpoint && chainstackEndpoint !== 'YOUR_CHAINSTACK_ENDPOINT_HERE',
     note: 'Network determined from DEV_NETWORK and FORCE_MAINNET environment variables'
   }, 'unified');
   

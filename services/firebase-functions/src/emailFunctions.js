@@ -9,15 +9,31 @@ const nodemailer = require('nodemailer');
 
 const db = admin.firestore();
 
-// Email configuration
-// Uses Firebase Secrets (EMAIL_USER and EMAIL_PASSWORD) or environment variables
-const transporter = nodemailer.createTransport({
-  service: 'gmail', // or your preferred email service
-  auth: {
-    user: process.env.EMAIL_USER || 'your-email@gmail.com',
-    pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+// Email configuration helper function
+function createTransporter() {
+  const emailUser = process.env.EMAIL_USER?.trim();
+  const emailPassword = process.env.EMAIL_PASSWORD?.trim();
+  
+  // Log configuration status (without exposing credentials)
+  console.log('📧 Email configuration check:', {
+    hasEmailUser: !!emailUser,
+    emailUserLength: emailUser?.length || 0,
+    hasEmailPassword: !!emailPassword,
+    emailPasswordLength: emailPassword?.length || 0
+  });
+  
+  if (!emailUser || !emailPassword) {
+    throw new Error('Email credentials not configured. EMAIL_USER and EMAIL_PASSWORD must be set as Firebase Secrets.');
+  }
+  
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: emailUser,
+      pass: emailPassword
   }
 });
+}
 
 // Email template for verification codes
 function generateEmailTemplate(code) {
@@ -54,8 +70,11 @@ function generateEmailTemplate(code) {
 
 /**
  * HTTP Callable Function: Send verification code via email
+ * Secrets are explicitly bound using runWith to ensure EMAIL_USER and EMAIL_PASSWORD are available
  */
-exports.sendVerificationEmail = functions.https.onCall(async (data, context) => {
+exports.sendVerificationEmail = functions.runWith({
+  secrets: ['EMAIL_USER', 'EMAIL_PASSWORD']
+}).https.onCall(async (data, context) => {
   try {
     const { email, code } = data;
     
@@ -93,15 +112,64 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
       }
     }
 
+    // Create transporter (validate credentials)
+    let transporter;
+    try {
+      transporter = createTransporter();
+    } catch (configError) {
+      console.error('❌ Email configuration error:', configError.message);
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Email service not configured: ${configError.message}`
+      );
+    }
+    
+    // Verify transporter connection
+    try {
+      await transporter.verify();
+      console.log('✅ Email transporter verified successfully');
+    } catch (verifyError) {
+      console.error('❌ Email transporter verification failed:', verifyError.message);
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Email service authentication failed: ${verifyError.message}`
+      );
+    }
+
     // Send email
+    const emailUser = process.env.EMAIL_USER?.trim();
     const mailOptions = {
-      from: process.env.EMAIL_USER || process.env.EMAIL_FROM || 'noreply@wesplit.app',
+      from: emailUser || 'noreply@wesplit.app',
       to: sanitizedEmail,
       subject: 'WeSplit Verification Code',
       html: generateEmailTemplate(code)
     };
 
-    await transporter.sendMail(mailOptions);
+    console.log('📧 Attempting to send email:', {
+      from: mailOptions.from,
+      to: sanitizedEmail,
+      subject: mailOptions.subject
+    });
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log('✅ Email sent successfully:', {
+        messageId: info.messageId,
+        response: info.response
+      });
+    } catch (sendError) {
+      console.error('❌ Error sending email:', {
+        error: sendError.message,
+        code: sendError.code,
+        command: sendError.command,
+        response: sendError.response,
+        responseCode: sendError.responseCode
+      });
+      throw new functions.https.HttpsError(
+        'internal',
+        `Failed to send email: ${sendError.message || 'Unknown error'}`
+      );
+    }
     
     // Update rate limit
     await rateLimitRef.set({
@@ -117,13 +185,22 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
       message: 'Verification email sent successfully' 
     };
   } catch (error) {
-    console.error('Error sending verification email:', error);
+    console.error('❌ Error sending verification email:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
     
-    throw new functions.https.HttpsError('internal', 'Failed to send verification email');
+    // Provide more detailed error message
+    const errorMessage = error.message || 'Unknown error occurred';
+    throw new functions.https.HttpsError(
+      'internal',
+      `Failed to send verification email: ${errorMessage}`
+    );
   }
 });
 

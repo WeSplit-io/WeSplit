@@ -96,6 +96,64 @@ class ReferralService {
   }
 
   /**
+   * Ensure user has a referral code - generate and store if missing
+   * This is the centralized method for referral code generation
+   * Should be called when displaying the referral screen
+   */
+  async ensureUserHasReferralCode(userId: string): Promise<string> {
+    try {
+      // Get current user data
+      const user = await firebaseDataService.user.getCurrentUser(userId);
+      
+      // If user already has a referral code, return it
+      if (user.referral_code && user.referral_code.trim().length >= 8) {
+        logger.info('User already has referral code', { 
+          userId, 
+          referralCode: user.referral_code 
+        }, 'ReferralService');
+        return user.referral_code;
+      }
+
+      // Generate new referral code
+      const newCode = this.generateReferralCode(userId);
+      
+      // Verify code is unique (check if it already exists)
+      const existingReferrer = await this.findReferrerByCode(newCode);
+      if (existingReferrer) {
+        // If code exists, generate a new one with additional randomness
+        const timestamp = Date.now().toString(36);
+        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const uniqueCode = `${userId.substring(0, 6).toUpperCase()}${timestamp}${randomSuffix}`.substring(0, 12);
+        
+        // Store the unique code
+        await firebaseDataService.user.updateUser(userId, {
+          referral_code: uniqueCode
+        });
+        
+        logger.info('Generated and stored unique referral code', { 
+          userId, 
+          referralCode: uniqueCode 
+        }, 'ReferralService');
+        return uniqueCode;
+      }
+
+      // Store the generated code
+      await firebaseDataService.user.updateUser(userId, {
+        referral_code: newCode
+      });
+      
+      logger.info('Generated and stored referral code', { 
+        userId, 
+        referralCode: newCode 
+      }, 'ReferralService');
+      return newCode;
+    } catch (error) {
+      logger.error('Failed to ensure user has referral code', error, 'ReferralService');
+      throw error;
+    }
+  }
+
+  /**
    * Track a referral when a new user signs up
    */
   async trackReferral(referredUserId: string, referralCode?: string, referrerId?: string): Promise<{
@@ -194,8 +252,9 @@ class ReferralService {
 
   /**
    * Find referrer by referral code
+   * Public method for validation purposes
    */
-  private async findReferrerByCode(referralCode: string): Promise<{ id: string; referral_code?: string } | null> {
+  async findReferrerByCode(referralCode: string): Promise<{ id: string; referral_code?: string } | null> {
     try {
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('referral_code', '==', referralCode));

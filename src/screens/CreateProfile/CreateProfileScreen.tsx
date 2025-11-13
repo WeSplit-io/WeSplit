@@ -12,6 +12,7 @@ import {
   Platform,
   Linking,
   KeyboardAvoidingView,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -36,7 +37,73 @@ const CreateProfileScreen: React.FC = () => {
   const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showReferralModal, setShowReferralModal] = useState(false);
+  const [hasReferralCode, setHasReferralCode] = useState<boolean | null>(null);
+  const [referralInput, setReferralInput] = useState('');
+  const [referralValidation, setReferralValidation] = useState<{
+    isValidating: boolean;
+    isValid: boolean | null;
+    error?: string;
+  }>({ isValidating: false, isValid: null });
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { authenticateUser, state } = useApp();
+
+  // Validate referral code with debouncing
+  const validateReferralCode = React.useCallback(async (code: string) => {
+    // Clear previous timeout
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+    }
+
+    // Reset validation if code is empty
+    if (!code || code.trim().length === 0) {
+      setReferralValidation({ isValidating: false, isValid: null });
+      return;
+    }
+
+    // Minimum length check
+    if (code.length < 8) {
+      setReferralValidation({
+        isValidating: false,
+        isValid: false,
+        error: 'Referral code must be at least 8 characters'
+      });
+      return;
+    }
+
+    // Set validating state
+    setReferralValidation({ isValidating: true, isValid: null });
+
+    // Debounce validation (wait 500ms after user stops typing)
+    validationTimeoutRef.current = setTimeout(async () => {
+      try {
+        const { referralService } = await import('../../services/rewards/referralService');
+        // Check if referral code exists by trying to find the referrer
+        const referrer = await referralService.findReferrerByCode(code);
+        
+        if (referrer) {
+          setReferralValidation({
+            isValidating: false,
+            isValid: true,
+            error: undefined
+          });
+        } else {
+          setReferralValidation({
+            isValidating: false,
+            isValid: false,
+            error: 'Referral code not found. Please check and try again.'
+          });
+        }
+      } catch (error) {
+        logger.error('Error validating referral code', error, 'CreateProfileScreen');
+        setReferralValidation({
+          isValidating: false,
+          isValid: null,
+          error: 'Unable to validate code. Please try again.'
+        });
+      }
+    }, 500);
+  }, []);
 
   // Initialize referral code from route params if provided (e.g., from deep link)
   useEffect(() => {
@@ -44,9 +111,21 @@ const CreateProfileScreen: React.FC = () => {
     if (params?.referralCode) {
       const code = String(params.referralCode).toUpperCase().replace(/\s/g, '');
       setReferralCode(code);
+      setReferralInput(code); // Pre-fill the input if code comes from route
+      // Validate the pre-filled code
+      validateReferralCode(code);
       logger.info('Referral code loaded from route params', { referralCode: code }, 'CreateProfileScreen');
     }
-  }, [route.params]);
+  }, [route.params, validateReferralCode]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Debug logging (only in dev mode)
   useEffect(() => {
@@ -161,8 +240,7 @@ const CreateProfileScreen: React.FC = () => {
     }
   };
 
-  const handleNext = async () => {
-    try {
+  const handleNext = () => {
       logger.info('Next pressed', null, 'CreateProfileScreen');
       if (!pseudo) {
         setError('Pseudo is required');
@@ -176,6 +254,83 @@ const CreateProfileScreen: React.FC = () => {
       }
       
       setError('');
+    // Show referral modal instead of proceeding directly
+    setShowReferralModal(true);
+    setHasReferralCode(null);
+    // Reset validation state
+    setReferralValidation({ isValidating: false, isValid: null });
+    // Preserve referral code if it was pre-filled from route params
+    if (!referralInput && referralCode) {
+      setReferralInput(referralCode);
+      // Validate if code exists
+      if (referralCode.length >= 8) {
+        validateReferralCode(referralCode);
+      }
+    }
+  };
+
+  const handleReferralChoice = (hasCode: boolean) => {
+    setHasReferralCode(hasCode);
+    if (!hasCode) {
+      // User doesn't have a referral code, proceed with profile creation
+      setShowReferralModal(false);
+      createProfile('');
+    }
+  };
+
+  const handleReferralSubmit = () => {
+    const trimmedCode = referralInput.trim().toUpperCase().replace(/\s/g, '');
+    
+    // Validate before submitting
+    if (!trimmedCode || trimmedCode.length < 8) {
+      setReferralValidation({
+        isValidating: false,
+        isValid: false,
+        error: 'Please enter a valid referral code'
+      });
+      return;
+    }
+
+    // If validation hasn't completed yet, wait for it
+    if (referralValidation.isValidating) {
+      // Wait a bit for validation to complete
+      setTimeout(() => {
+        if (referralValidation.isValid === true) {
+          setShowReferralModal(false);
+          createProfile(trimmedCode);
+        } else {
+          setReferralValidation({
+            isValidating: false,
+            isValid: false,
+            error: 'Please verify the referral code is correct'
+          });
+        }
+      }, 600);
+      return;
+    }
+
+    // If code is invalid, don't proceed
+    if (referralValidation.isValid === false) {
+      setReferralValidation({
+        isValidating: false,
+        isValid: false,
+        error: 'Please enter a valid referral code before continuing'
+      });
+      return;
+    }
+
+    // Proceed with profile creation
+    setShowReferralModal(false);
+    createProfile(trimmedCode);
+  };
+
+  const handleSkipReferral = () => {
+    setShowReferralModal(false);
+    createProfile('');
+  };
+
+  const createProfile = async (finalReferralCode: string) => {
+    try {
       setIsLoading(true);
 
       // Get email from route/context or authenticated user
@@ -333,11 +488,11 @@ const CreateProfileScreen: React.FC = () => {
         }
 
         // Track referral if referral code was provided (non-blocking)
-        if (referralCode && referralCode.trim()) {
+        if (finalReferralCode && finalReferralCode.trim()) {
           (async () => {
             try {
               const { referralService } = await import('../../services/rewards/referralService');
-              const trimmedCode = referralCode.trim().toUpperCase();
+              const trimmedCode = finalReferralCode.trim().toUpperCase();
               
               logger.info('Tracking referral', { userId: appUser.id, referralCode: trimmedCode }, 'CreateProfileScreen');
               
@@ -359,7 +514,7 @@ const CreateProfileScreen: React.FC = () => {
             } catch (referralError) {
               logger.error('Error tracking referral', { 
                 userId: appUser.id, 
-                referralCode: referralCode.trim(),
+                referralCode: finalReferralCode.trim(),
                 error: referralError 
               }, 'CreateProfileScreen');
               // Don't fail account creation if referral tracking fails
@@ -441,6 +596,7 @@ const CreateProfileScreen: React.FC = () => {
               </TouchableOpacity>
               
               {/* Pseudo Input */}
+              <View style={styles.inputSection}>
               <Input
                 label="Pseudo *"
                   placeholder="Enter your pseudo"
@@ -452,31 +608,8 @@ const CreateProfileScreen: React.FC = () => {
                 error={error || undefined}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  containerStyle={{ width: '100%' }}
                 />
-
-              {/* Referral Code Input (Optional) */}
-              <View style={styles.inputSection}>
-                <View style={styles.referralCodeHeader}>
-                  <Text style={styles.inputLabel}>Referral Code</Text>
-                  <Text style={styles.optionalLabel}>(Optional)</Text>
-                </View>
-                <Input
-                  label=""
-                    placeholder="Enter referral code"
-                    value={referralCode}
-                    onChangeText={(text) => {
-                      // Auto-uppercase and remove spaces
-                      const cleaned = text.toUpperCase().replace(/\s/g, '');
-                      setReferralCode(cleaned);
-                    }}
-                  leftIcon="Handshake"
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    maxLength={12}
-                  />
-                <Text style={styles.referralCodeHint}>
-                  Have a referral code? Enter it to earn bonus points for you and your friend!
-                </Text>
               </View>
             </View>
           </ScrollView>
@@ -501,6 +634,178 @@ const CreateProfileScreen: React.FC = () => {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Referral Code Modal */}
+      <Modal
+        visible={showReferralModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowReferralModal(false)}
+        statusBarTranslucent={true}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowReferralModal(false)}
+          />
+          <View style={{
+            backgroundColor: colors.blackWhite5,
+            borderTopLeftRadius: spacing.lg,
+            borderTopRightRadius: spacing.lg,
+            padding: spacing.lg,
+            paddingBottom: 40,
+            maxHeight: '80%',
+          }}>
+            {/* Handle bar */}
+            <View style={{
+              alignSelf: 'center',
+              width: 50,
+              height: 4,
+              backgroundColor: colors.white50,
+              borderRadius: 2,
+              marginBottom: spacing.lg,
+            }} />
+
+            {hasReferralCode === null ? (
+              // Initial question
+              <>
+                <Text style={{
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  color: colors.white,
+                  textAlign: 'center',
+                  marginBottom: spacing.md,
+                }}>
+                  Do you have a referral code?
+                </Text>
+                <Text style={{
+                  fontSize: 16,
+                  color: colors.white70,
+                  textAlign: 'center',
+                  marginBottom: spacing.xl,
+                }}>
+                  Enter a referral code to earn bonus points for you and your friend!
+                </Text>
+                <View style={{ gap: spacing.md }}>
+                  <Button
+                    title="Yes, I have a code"
+                    onPress={() => handleReferralChoice(true)}
+                    variant="primary"
+                    fullWidth={true}
+                  />
+                  <Button
+                    title="No, skip"
+                    onPress={() => handleReferralChoice(false)}
+                    variant="secondary"
+                    fullWidth={true}
+                  />
+                </View>
+              </>
+            ) : (
+              // Referral code input
+              <>
+                <Text style={{
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  color: colors.white,
+                  textAlign: 'center',
+                  marginBottom: spacing.md,
+                }}>
+                  Enter Referral Code
+                </Text>
+                <Text style={{
+                  fontSize: 16,
+                  color: colors.white70,
+                  textAlign: 'center',
+                  marginBottom: spacing.xl,
+                }}>
+                  Paste your referral code below
+                </Text>
+                <View style={{ marginBottom: spacing.lg }}>
+                  <Input
+                    label=""
+                    placeholder="Enter referral code"
+                    value={referralInput}
+                    onChangeText={(text) => {
+                      // Auto-uppercase and remove spaces
+                      const cleaned = text.toUpperCase().replace(/\s/g, '');
+                      setReferralInput(cleaned);
+                      // Validate as user types (with debouncing)
+                      validateReferralCode(cleaned);
+                    }}
+                    leftIcon="Handshake"
+                    rightIcon={
+                      referralValidation.isValidating
+                        ? undefined
+                        : referralValidation.isValid === true
+                        ? "CheckCircle"
+                        : referralValidation.isValid === false
+                        ? "XCircle"
+                        : undefined
+                    }
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={12}
+                    error={referralValidation.error}
+                    containerStyle={{ width: '100%' }}
+                  />
+                  {referralValidation.isValidating && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs }}>
+                      <ActivityIndicator size="small" color={colors.white50} />
+                      <Text style={{ 
+                        color: colors.white50, 
+                        fontSize: 14, 
+                        marginLeft: spacing.sm 
+                      }}>
+                        Validating code...
+                      </Text>
+                    </View>
+                  )}
+                  {referralValidation.isValid === true && !referralValidation.isValidating && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs }}>
+                      <PhosphorIcon name="CheckCircle" size={16} color={colors.green} weight="fill" />
+                      <Text style={{ 
+                        color: colors.green, 
+                        fontSize: 14, 
+                        marginLeft: spacing.sm 
+                      }}>
+                        Valid referral code
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={{ gap: spacing.md }}>
+                  <Button
+                    title="Continue"
+                    onPress={handleReferralSubmit}
+                    variant="primary"
+                    fullWidth={true}
+                    disabled={
+                      !referralInput.trim() || 
+                      referralValidation.isValidating || 
+                      referralValidation.isValid === false
+                    }
+                  />
+                  <Button
+                    title="Skip"
+                    onPress={handleSkipReferral}
+                    variant="secondary"
+                    fullWidth={true}
+                  />
+                </View>
+              </>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </Container>
   );
 };

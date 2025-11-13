@@ -61,19 +61,22 @@ const ReferralScreen: React.FC = () => {
       }
 
       try {
-        const user = await firebaseDataService.user.getCurrentUser(currentUser.id);
-        if (user.referral_code) {
-          setReferralCode(user.referral_code);
-        } else {
-          // Generate referral code if not exists
-          const code = referralService.generateReferralCode(currentUser.id);
-          await firebaseDataService.user.updateUser(currentUser.id, {
-            referral_code: code
-          });
-          setReferralCode(code);
-        }
+        // Use centralized method to ensure user has a referral code
+        // This will generate and store the code if it doesn't exist
+        const code = await referralService.ensureUserHasReferralCode(currentUser.id);
+        setReferralCode(code);
+        logger.info('Referral code loaded/ensured', { 
+          userId: currentUser.id, 
+          referralCode: code 
+        }, 'ReferralScreen');
       } catch (error) {
         logger.error('Failed to load referral code', error, 'ReferralScreen');
+        // Show error but don't block the screen
+        Alert.alert(
+          'Error',
+          'Failed to load referral code. Please try again later.',
+          [{ text: 'OK' }]
+        );
       } finally {
         setLoading(false);
       }

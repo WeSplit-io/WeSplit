@@ -77,6 +77,21 @@ export class OptimizedTransactionUtils {
     const logger = loggerModule.logger;
 
     this.rpcEndpoints = getConfig().blockchain.rpcEndpoints || [getConfig().blockchain.rpcUrl];
+    
+    // Log RPC endpoint configuration for debugging
+    logger.info('OptimizedTransactionUtils initialized', {
+      endpointCount: this.rpcEndpoints.length,
+      primaryEndpoint: this.rpcEndpoints[0] ? this.rpcEndpoints[0].substring(0, 50) + '...' : 'none',
+      allEndpoints: this.rpcEndpoints.map(ep => {
+        // Mask API keys in logs
+        return ep.replace(/\/v2\/[^\/]+/, '/v2/***')
+                 .replace(/api_key=[^&]+/, 'api_key=***')
+                 .replace(/api-key=[^&]+/, 'api-key=***');
+      }),
+      network: getConfig().blockchain.network,
+      note: 'Using optimized RPC endpoints with rotation and rate limit handling'
+    }, 'OptimizedTransactionUtils');
+    
     this.connection = await this.createConnection();
     this.initialized = true;
   }

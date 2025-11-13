@@ -81,7 +81,8 @@ export const firebaseDataTransformers = {
     profile_assets: doc.data().profile_assets || [],
     active_profile_asset: doc.data().active_profile_asset || undefined,
     wallet_backgrounds: doc.data().wallet_backgrounds || [],
-    active_wallet_background: doc.data().active_wallet_background || undefined
+    active_wallet_background: doc.data().active_wallet_background || undefined,
+    referral_code: doc.data().referral_code || undefined
   }),
 
   // Transform User to Firestore data
@@ -120,6 +121,7 @@ export const firebaseDataTransformers = {
     if (user.active_profile_asset !== undefined) {data.active_profile_asset = user.active_profile_asset;}
     if (user.wallet_backgrounds !== undefined) {data.wallet_backgrounds = user.wallet_backgrounds;}
     if (user.active_wallet_background !== undefined) {data.active_wallet_background = user.active_wallet_background;}
+    if (user.referral_code !== undefined) {data.referral_code = user.referral_code;}
     
     return data;
   },

@@ -4,92 +4,30 @@
  */
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { initializeApp } from 'firebase/app';
-import Constants from 'expo-constants';
+import { getApp } from 'firebase/app';
 import { logger } from '../analytics/loggingService';
 
-// Get environment variables from Expo Constants
-const getEnvVar = (key: string): string => {
-  // Try to get from process.env first (for development)
-  if (process.env[key]) {
-    return process.env[key]!;
+// Use the existing Firebase app instance instead of creating a new one
+// This ensures we're using the same Firebase configuration and authentication state
+// The app is initialized in src/config/firebase/firebase.ts
+let app;
+try {
+  // Try to get the default Firebase app (initialized in firebase.ts)
+  app = getApp();
+  if (__DEV__) {
+    logger.info('Using existing Firebase app instance for Functions', null, 'firebaseFunctionsService');
   }
-  
-  // Try to get from process.env with EXPO_PUBLIC_ prefix
-  if (process.env[`EXPO_PUBLIC_${key}`]) {
-    return process.env[`EXPO_PUBLIC_${key}`]!;
+} catch (error) {
+  // If app doesn't exist yet, import and use the one from firebase config
+  // This ensures we always use the same app instance
+  const firebaseConfig = require('../../config/firebase/firebase');
+  app = firebaseConfig.default;
+  if (__DEV__) {
+    logger.info('Using Firebase app from config for Functions', null, 'firebaseFunctionsService');
   }
-  
-  // Try to get from Expo Constants
-  if (Constants.expoConfig?.extra?.[key]) {
-    return Constants.expoConfig.extra[key];
-  }
-  
-  // Try to get from Expo Constants with EXPO_PUBLIC_ prefix
-  if (Constants.expoConfig?.extra?.[`EXPO_PUBLIC_${key}`]) {
-    return Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`];
-  }
-  
-  // Try to get from Constants.manifest (older Expo versions)
-  if ((Constants.manifest as any)?.extra?.[key]) {
-    return (Constants.manifest as any).extra[key];
-  }
-  
-  // Try to get from Constants.manifest with EXPO_PUBLIC_ prefix
-  if ((Constants.manifest as any)?.extra?.[`EXPO_PUBLIC_${key}`]) {
-    return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];
-  }
-  
-  // Additional fallback: try to get from firebase config object
-  if (Constants.expoConfig?.extra?.firebase?.[key.toLowerCase().replace('FIREBASE_', '')]) {
-    return Constants.expoConfig.extra.firebase[key.toLowerCase().replace('FIREBASE_', '')];
-  }
-  
-  return '';
-};
-
-// Get Firebase configuration values
-const apiKey = getEnvVar('FIREBASE_API_KEY');
-const authDomain = getEnvVar('FIREBASE_AUTH_DOMAIN') || "wesplit-35186.firebaseapp.com";
-const projectId = getEnvVar('FIREBASE_PROJECT_ID') || "wesplit-35186";
-const storageBucket = getEnvVar('FIREBASE_STORAGE_BUCKET') || "wesplit-35186.appspot.com";
-const messagingSenderId = getEnvVar('FIREBASE_MESSAGING_SENDER_ID');
-const appId = getEnvVar('FIREBASE_APP_ID');
-
-// Firebase Functions service initialized
-
-// Validate required environment variables
-if (!apiKey) {
-  console.error('EXPO_PUBLIC_FIREBASE_API_KEY is missing. Please check your .env file and app.json configuration.');
-  throw new Error('EXPO_PUBLIC_FIREBASE_API_KEY is required. Please add it to your .env file or app.json extra section.');
 }
 
-if (!messagingSenderId) {
-  console.error('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID is missing. Please check your .env file and app.json configuration.');
-  throw new Error('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID is required. Please add it to your .env file or app.json extra section.');
-}
-
-if (!appId) {
-  console.error('EXPO_PUBLIC_FIREBASE_APP_ID is missing. Please check your .env file and app.json configuration.');
-  throw new Error('EXPO_PUBLIC_FIREBASE_APP_ID is required. Please add it to your .env file or app.json extra section.');
-}
-
-// Firebase configuration
-const firebaseConfig = {
-  apiKey,
-  authDomain,
-  projectId,
-  storageBucket,
-  messagingSenderId,
-  appId
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firebase Functions
-const functions = getFunctions(app);
-
+// Initialize Firebase Functions with the existing app
 // Set the region to us-central1 for your specific function
 const functionsRegion = getFunctions(app, 'us-central1');
 
@@ -182,15 +120,29 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
     }
     
   } catch (error: unknown) {
-    if (__DEV__) { console.error('❌ Error sending verification code via Firebase Functions:', error); }
+    if (__DEV__) { 
+      console.error('❌ Error sending verification code via Firebase Functions:', error);
+      if ((error as any)?.details) {
+        console.error('Error details:', (error as any).details);
+      }
+    }
     
     // Handle Firebase Functions specific errors
-    if (error.code === 'functions/resource-exhausted') {
+    const errorCode = (error as any)?.code;
+    const errorMessage = (error as any)?.message || '';
+    
+    if (errorCode === 'functions/resource-exhausted') {
       throw new Error('Too many requests. Please wait 1 minute before requesting another code.');
-    } else if (error.code === 'functions/invalid-argument') {
+    } else if (errorCode === 'functions/invalid-argument') {
       throw new Error('Invalid email format. Please enter a valid email address.');
-    } else if (error.message) {
-      throw new Error(error.message);
+    } else if (errorCode === 'functions/failed-precondition') {
+      // Email service configuration error
+      throw new Error(errorMessage || 'Email service is not properly configured. Please contact support.');
+    } else if (errorCode === 'functions/internal') {
+      // Internal server error with detailed message
+      throw new Error(errorMessage || 'Failed to send verification code. Please try again.');
+    } else if (errorMessage) {
+      throw new Error(errorMessage);
     } else {
       throw new Error('Failed to send verification code. Please try again.');
     }

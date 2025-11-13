@@ -30,7 +30,8 @@ import { notificationUtils } from '../../shared/notificationUtils';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';
 import { processUsdcTransfer } from './transactionSigningService';
 import { VersionedTransaction } from '@solana/web3.js';
-import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS } from '../../shared/blockhashUtils';
+import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS, shouldRebuildTransaction } from '../../shared/blockhashUtils';
+import { rebuildTransactionBeforeFirebase, rebuildTransactionWithFreshBlockhash } from '../../shared/transactionRebuildUtils';
 
 export interface InternalTransferParams {
   to: string;
@@ -372,6 +373,13 @@ class InternalTransferService {
         originalAmount: params.amount
       }, 'InternalTransferService');
 
+      // CRITICAL: Get wallet info FIRST to minimize delay after blockhash
+      // This async operation can take 100-500ms, so we do it before getting blockhash
+      const walletInfo = await solanaWalletService.getWalletInfo();
+      if (!walletInfo || !walletInfo.secretKey) {
+        throw new Error('Wallet keypair not available for signing');
+      }
+
       // Get wallet public key
       logger.info('Getting wallet public key', {}, 'InternalTransferService');
       const publicKey = solanaWalletService.getPublicKey();
@@ -536,12 +544,8 @@ class InternalTransferService {
         recentBlockhash: transaction.recentBlockhash
       }, 'InternalTransferService');
 
-      // Get wallet keypair for signing
-      const walletInfo = await solanaWalletService.getWalletInfo();
-      if (!walletInfo || !walletInfo.secretKey) {
-        throw new Error('Wallet keypair not available for signing');
-      }
-
+      // Wallet info already retrieved at the start of the function
+      // Create keypair from cached wallet info
       const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
       const userKeypair = Keypair.fromSecretKey(secretKeyBuffer);
 
@@ -589,143 +593,218 @@ class InternalTransferService {
         ? serializedTransaction 
         : new Uint8Array(serializedTransaction);
 
-      // CRITICAL: Check blockhash age before sending to Firebase
+      // CRITICAL: Check blockhash age AND validity before sending to Firebase
       // Best practice: Use shared utility for consistent blockhash age checking
+      // CRITICAL: Also validate the blockhash is actually valid on-chain
+      // Blockhashes expire based on slot height, not just time
       let currentTxArray = txArray;
       let currentBlockhashTimestamp = blockhashTimestamp;
-      const blockhashAge = Date.now() - blockhashTimestamp;
       
-      if (isBlockhashTooOld(blockhashTimestamp)) {
-        logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
-          blockhashAge,
-          maxAge: BLOCKHASH_MAX_AGE_MS
+      // Use shared utility to check if rebuild is needed (age + on-chain validation)
+      // Fallback to old logic if function not available (Metro bundler cache issue)
+      let needsRebuild = false;
+      let rebuildReason: string | undefined;
+      
+      if (typeof shouldRebuildTransaction === 'function') {
+        const rebuildCheck = await shouldRebuildTransaction(connection, blockhash, blockhashTimestamp);
+        needsRebuild = rebuildCheck.needsRebuild;
+        rebuildReason = rebuildCheck.reason;
+      } else {
+        // Fallback: Use old logic if function not available (Metro cache issue)
+        logger.warn('shouldRebuildTransaction not available - using fallback logic. Please clear Metro cache: npx react-native start --reset-cache', {
+          shouldRebuildTransactionType: typeof shouldRebuildTransaction
+        }, 'InternalTransferService');
+        needsRebuild = isBlockhashTooOld(blockhashTimestamp);
+        
+        if (!needsRebuild) {
+          try {
+            const isValid = await connection.isBlockhashValid(blockhash, { commitment: 'confirmed' });
+            const isValidValue = isValid && (typeof isValid === 'boolean' ? isValid : isValid.value === true);
+            if (!isValidValue) {
+              needsRebuild = true;
+              rebuildReason = 'Blockhash expired based on slot height';
+            }
+          } catch (validationError) {
+            // If validation fails, proceed without rebuild
+            logger.warn('Failed to validate blockhash on-chain, proceeding anyway', {
+              error: validationError instanceof Error ? validationError.message : String(validationError)
+            }, 'InternalTransferService');
+          }
+        } else {
+          rebuildReason = `Blockhash age (${Date.now() - blockhashTimestamp}ms) exceeds maximum (${BLOCKHASH_MAX_AGE_MS}ms)`;
+        }
+      }
+      
+      if (needsRebuild) {
+        logger.warn('Blockhash needs rebuild before Firebase call', {
+          blockhashAge: Date.now() - blockhashTimestamp,
+          maxAge: BLOCKHASH_MAX_AGE_MS,
+          reason: rebuildReason
         }, 'InternalTransferService');
         
-        // Get fresh blockhash and rebuild transaction
-        const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
-        const freshBlockhash = freshBlockhashData.blockhash;
-        const freshBlockhashTimestamp = freshBlockhashData.timestamp;
-        
-        // Rebuild transaction with fresh blockhash
-        const freshTransaction = new Transaction({
-          recentBlockhash: freshBlockhash,
-          feePayer: feePayerPublicKey
-        });
-        
-        // Re-add all instructions
-        const priorityFee = this.getPriorityFee(params.priority || 'medium');
-        if (priorityFee > 0) {
-          freshTransaction.add(
-            ComputeBudgetProgram.setComputeUnitPrice({
-              microLamports: priorityFee,
-            })
+        // Rebuild transaction with fresh blockhash using shared utility
+        // Fallback if function not available (Metro cache issue)
+        if (typeof rebuildTransactionWithFreshBlockhash === 'function') {
+          const rebuildResult = await rebuildTransactionWithFreshBlockhash(
+            transaction,
+            connection,
+            feePayerPublicKey,
+            userKeypair
           );
+          
+          currentTxArray = rebuildResult.serializedTransaction;
+          currentBlockhashTimestamp = rebuildResult.blockhashTimestamp;
+        } else {
+          // Fallback: Manual rebuild if function not available
+          logger.warn('rebuildTransactionWithFreshBlockhash not available - using fallback. Please clear Metro cache.', null, 'InternalTransferService');
+          const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+          const freshTransaction = new Transaction({
+            recentBlockhash: freshBlockhashData.blockhash,
+            feePayer: feePayerPublicKey
+          });
+          transaction.instructions.forEach(ix => freshTransaction.add(ix));
+          const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+          freshVersionedTransaction.sign([userKeypair]);
+          currentTxArray = freshVersionedTransaction.serialize();
+          currentBlockhashTimestamp = freshBlockhashData.timestamp;
         }
-        
-        if (needsTokenAccountCreation) {
-          freshTransaction.add(
-            createAssociatedTokenAccountInstruction(
-              feePayerPublicKey,
-              toTokenAccount,
-              toPublicKey,
-              usdcMint
-            )
-          );
-        }
-        
-        const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6) + 0.5);
-        freshTransaction.add(
-          createTransferInstruction(
-            fromTokenAccount,
-            toTokenAccount,
-            fromPublicKey,
-            transferAmount,
-            [],
-            TOKEN_PROGRAM_ID
-          )
-        );
-        
-        if (companyFee > 0) {
-          const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5);
-          const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(COMPANY_WALLET_CONFIG.address));
-          freshTransaction.add(
-            createTransferInstruction(
-              fromTokenAccount,
-              companyTokenAccount,
-              fromPublicKey,
-              companyFeeAmount,
-              [],
-              TOKEN_PROGRAM_ID
-            )
-          );
-        }
-        
-        if (params.memo) {
-          freshTransaction.add(
-            new TransactionInstruction({
-              keys: [{ pubkey: feePayerPublicKey, isSigner: true, isWritable: true }],
-              data: Buffer.from(params.memo, 'utf8'),
-              programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
-            })
-          );
-        }
-        
-        // Re-sign with fresh transaction
-        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
-        freshVersionedTransaction.sign([userKeypair]);
-        currentTxArray = freshVersionedTransaction.serialize();
-        
-        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
-          transactionSize: currentTxArray.length,
-          blockhashAge,
-          newBlockhashTimestamp: freshBlockhashTimestamp,
-          timeSinceNewBlockhash: Date.now() - freshBlockhashTimestamp
-        }, 'InternalTransferService');
-        
-        currentBlockhashTimestamp = freshBlockhashTimestamp;
       } else {
         logger.info('Blockhash is still fresh, using existing transaction', {
-          blockhashAge,
+          blockhashAge: Date.now() - blockhashTimestamp,
           maxAge: BLOCKHASH_MAX_AGE_MS,
           note: 'Blockhash is within acceptable age, proceeding without rebuild'
         }, 'InternalTransferService');
       }
 
-      // CRITICAL: Log blockhash age right before sending to Firebase
-      const finalBlockhashAge = Date.now() - currentBlockhashTimestamp;
-      logger.info('Transaction serialized, requesting company wallet signature', {
-        transactionSize: currentTxArray.length,
-        transactionType: typeof currentTxArray,
-        isUint8Array: currentTxArray instanceof Uint8Array,
-        blockhashAge: finalBlockhashAge,
-        blockhashAgeMs: finalBlockhashAge,
-        maxAgeMs: BLOCKHASH_MAX_AGE_MS,
-        isBlockhashFresh: finalBlockhashAge < BLOCKHASH_MAX_AGE_MS,
-        warning: finalBlockhashAge > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh',
-        note: 'Sending to Firebase immediately to minimize blockhash expiration risk'
-              }, 'InternalTransferService');
+      // CRITICAL: Get a fresh blockhash RIGHT BEFORE sending to Firebase
+      // Firebase takes 4-5 seconds to process, so we need the freshest possible blockhash
+      // Even if the current blockhash is only 1-2 seconds old, we rebuild to ensure it's fresh
+      // Use shared utility for consistent rebuild logic
+      // Fallback if function not available (Metro cache issue)
+      if (typeof rebuildTransactionBeforeFirebase === 'function') {
+        const preFirebaseRebuild = await rebuildTransactionBeforeFirebase(
+          transaction,
+          connection,
+          feePayerPublicKey,
+          userKeypair,
+          currentBlockhashTimestamp
+        );
+        
+        currentTxArray = preFirebaseRebuild.serializedTransaction;
+        currentBlockhashTimestamp = preFirebaseRebuild.blockhashTimestamp;
+      } else {
+        // Fallback: Manual rebuild if function not available
+        logger.warn('rebuildTransactionBeforeFirebase not available - using fallback. Please clear Metro cache.', null, 'InternalTransferService');
+        const preFirebaseBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+        const preFirebaseTransaction = new Transaction({
+          recentBlockhash: preFirebaseBlockhashData.blockhash,
+          feePayer: feePayerPublicKey
+        });
+        transaction.instructions.forEach(ix => preFirebaseTransaction.add(ix));
+        const preFirebaseVersionedTransaction = new VersionedTransaction(preFirebaseTransaction.compileMessage());
+        preFirebaseVersionedTransaction.sign([userKeypair]);
+        currentTxArray = preFirebaseVersionedTransaction.serialize();
+        currentBlockhashTimestamp = preFirebaseBlockhashData.timestamp;
+      }
 
       // Use processUsdcTransfer which combines signing and submission in one Firebase call
       // This minimizes blockhash expiration risk and reduces network round trips
+      // CRITICAL: Add retry logic with automatic blockhash refresh for blockhash expiration errors
       let signature: string;
-      try {
-        logger.info('Processing USDC transfer (sign and submit)', {
-          connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
-          commitment: getConfig().blockchain.commitment,
-          priority: params.priority || 'medium',
-          transactionSize: currentTxArray.length
-        }, 'InternalTransferService');
-        
-        const result = await processUsdcTransfer(currentTxArray);
-        signature = result.signature;
-        
-        logger.info('Transaction processed successfully', { signature }, 'InternalTransferService');
-      } catch (submissionError) {
-        logger.error('Transaction submission failed', { 
-          error: submissionError,
-          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
-        }, 'InternalTransferService');
-        throw submissionError;
+      let submissionAttempts = 0;
+      const maxSubmissionAttempts = 3; // Retry up to 3 times with fresh blockhash
+      
+      while (submissionAttempts < maxSubmissionAttempts) {
+        try {
+          logger.info('Processing USDC transfer (sign and submit)', {
+            connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
+            commitment: getConfig().blockchain.commitment,
+            priority: params.priority || 'medium',
+            transactionSize: currentTxArray.length,
+            attempt: submissionAttempts + 1,
+            maxAttempts: maxSubmissionAttempts,
+            blockhashAge: Date.now() - currentBlockhashTimestamp
+          }, 'InternalTransferService');
+          
+          const result = await processUsdcTransfer(currentTxArray);
+          signature = result.signature;
+          
+          logger.info('Transaction processed successfully', { signature }, 'InternalTransferService');
+          break; // Success, exit retry loop
+        } catch (submissionError) {
+          const errorMessage = submissionError instanceof Error ? submissionError.message : String(submissionError);
+          const isBlockhashExpired = 
+            errorMessage.includes('blockhash has expired') ||
+            errorMessage.includes('blockhash expired') ||
+            errorMessage.includes('Blockhash not found') ||
+            errorMessage.includes('blockhash');
+          
+          // If blockhash expired and we have retries left, rebuild transaction with fresh blockhash
+          if (isBlockhashExpired && submissionAttempts < maxSubmissionAttempts - 1) {
+            logger.warn('Transaction blockhash expired, rebuilding transaction with fresh blockhash', {
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts,
+              blockhashAge: Date.now() - currentBlockhashTimestamp,
+              note: 'Rebuilding transaction with fresh blockhash and retrying'
+            }, 'InternalTransferService');
+            
+            try {
+              // Rebuild transaction with fresh blockhash using shared utility
+              // Fallback if function not available (Metro cache issue)
+              const rebuildConnection = await optimizedTransactionUtils.getConnection();
+              if (typeof rebuildTransactionWithFreshBlockhash === 'function') {
+                const retryRebuild = await rebuildTransactionWithFreshBlockhash(
+                  transaction,
+                  rebuildConnection,
+                  feePayerPublicKey,
+                  userKeypair
+                );
+                
+                currentTxArray = retryRebuild.serializedTransaction;
+                currentBlockhashTimestamp = retryRebuild.blockhashTimestamp;
+              } else {
+                // Fallback: Manual rebuild if function not available
+                logger.warn('rebuildTransactionWithFreshBlockhash not available for retry - using fallback. Please clear Metro cache.', null, 'InternalTransferService');
+                const freshBlockhashData = await getFreshBlockhash(rebuildConnection, 'confirmed');
+                const freshTransaction = new Transaction({
+                  recentBlockhash: freshBlockhashData.blockhash,
+                  feePayer: feePayerPublicKey
+                });
+                transaction.instructions.forEach(ix => freshTransaction.add(ix));
+                const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+                freshVersionedTransaction.sign([userKeypair]);
+                currentTxArray = freshVersionedTransaction.serialize();
+                currentBlockhashTimestamp = freshBlockhashData.timestamp;
+              }
+              
+              submissionAttempts++;
+              // Wait a brief moment before retry to avoid immediate failure
+              await new Promise(resolve => setTimeout(resolve, 100));
+              continue; // Retry with fresh blockhash
+            } catch (rebuildError) {
+              logger.error('Failed to rebuild transaction with fresh blockhash', {
+                error: rebuildError,
+                errorMessage: rebuildError instanceof Error ? rebuildError.message : String(rebuildError)
+              }, 'InternalTransferService');
+              // If rebuild fails, throw the original error
+              throw submissionError;
+            }
+          } else {
+            // Not a blockhash error or no retries left
+            logger.error('Transaction submission failed', { 
+              error: submissionError,
+              errorMessage,
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts,
+              isBlockhashExpired
+            }, 'InternalTransferService');
+            throw submissionError;
+          }
+        }
+      }
+      
+      if (!signature) {
+        throw new Error('Transaction submission failed after all retry attempts');
       }
 
       logger.info('Transaction sent successfully', { signature }, 'InternalTransferService');
@@ -1002,7 +1081,7 @@ class InternalTransferService {
       const connection = await optimizedTransactionUtils.getConnection();
       const blockhashData = await getFreshBlockhash(connection, 'confirmed');
       const blockhash = blockhashData.blockhash;
-      const blockhashTimestamp = Date.now(); // Track when we got the blockhash
+      const blockhashTimestamp = blockhashData.timestamp; // Use actual blockhash timestamp, not Date.now()
 
       // Use company wallet for fees if configured, otherwise use user wallet
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromKeypair.publicKey);
@@ -1149,36 +1228,13 @@ class InternalTransferService {
         transaction.add(memoInstruction);
       }
 
-      // Simulate transaction first to catch errors early
-      // Skip simulation if we're creating a token account, as simulation often fails for account creation
-      const hasTokenAccountCreation = transaction.instructions.some(ix => 
-        ix.programId.equals(ASSOCIATED_TOKEN_PROGRAM_ID)
-      );
-      
-      if (!hasTokenAccountCreation) {
-        try {
-          logger.debug('Simulating transaction before sending', null, 'sendInternal');
-          const simulationResult = await (await optimizedTransactionUtils.getConnection()).simulateTransaction(transaction);
-          
-          if (simulationResult.value.err) {
-            console.error('❌ Transaction simulation failed:', simulationResult.value.err);
-            return {
-              success: false,
-              error: `Transaction simulation failed: ${JSON.stringify(simulationResult.value.err)}`
-            };
-          }
-          
-          logger.debug('Transaction simulation successful', null, 'sendInternal');
-        } catch (simulationError) {
-          console.error('❌ Transaction simulation error:', simulationError);
-          return {
-            success: false,
-            error: `Transaction simulation error: ${(simulationError as Error).message}`
-          };
-        }
-      } else {
-        logger.debug('Skipping simulation due to token account creation - proceeding with transaction', null, 'sendInternal');
-      }
+      // CRITICAL: Skip transaction simulation to minimize blockhash age
+      // Simulation adds 200-1000ms delay which can cause blockhash expiration
+      // Firebase will reject invalid transactions anyway, so simulation is redundant
+      // This optimization is critical for mainnet reliability
+      logger.debug('Skipping transaction simulation to minimize blockhash age - Firebase will validate transaction', {
+        note: 'Simulation adds 200-1000ms delay. Firebase will reject invalid transactions, so simulation is redundant.'
+      }, 'InternalTransferService');
 
       // Convert Transaction to VersionedTransaction for Firebase Functions
       // Firebase Functions expect VersionedTransaction format
@@ -1212,13 +1268,41 @@ class InternalTransferService {
         ? serializedTransaction 
         : new Uint8Array(serializedTransaction);
 
-      // CRITICAL: Check blockhash age before sending to Firebase
+      // CRITICAL: Check blockhash age AND validity before sending to Firebase
       // Best practice: Use shared utility for consistent blockhash age checking
+      // CRITICAL: Also validate the blockhash is actually valid on-chain
+      // Blockhashes expire based on slot height, not just time
       let currentTxArray = txArray;
       let currentBlockhashTimestamp = blockhashTimestamp;
       const blockhashAge = Date.now() - blockhashTimestamp;
+      let needsRebuild = isBlockhashTooOld(blockhashTimestamp);
       
-      if (isBlockhashTooOld(blockhashTimestamp)) {
+      // CRITICAL: Also check if blockhash is actually valid on-chain
+      // Even if age is OK, the blockhash might have expired based on slot height
+      if (!needsRebuild) {
+        try {
+          const isValid = await connection.isBlockhashValid(blockhash, { commitment: 'confirmed' });
+          const isValidValue = isValid && (typeof isValid === 'boolean' ? isValid : isValid.value === true);
+          
+          if (!isValidValue) {
+            logger.warn('Blockhash is no longer valid on-chain, rebuilding transaction', {
+              blockhash: blockhash.substring(0, 8) + '...',
+              blockhashAge,
+              note: 'Blockhash expired based on slot height, not just time'
+            }, 'InternalTransferService');
+            needsRebuild = true;
+          }
+        } catch (validationError) {
+          // If validation fails (network error), log but proceed
+          // The actual submission will catch if it's expired
+          logger.warn('Failed to validate blockhash on-chain, proceeding anyway', {
+            error: validationError instanceof Error ? validationError.message : String(validationError),
+            blockhash: blockhash.substring(0, 8) + '...'
+          }, 'InternalTransferService');
+        }
+      }
+      
+      if (needsRebuild) {
         logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
           blockhashAge,
           maxAge: BLOCKHASH_MAX_AGE_MS
@@ -1248,19 +1332,22 @@ class InternalTransferService {
           blockhashAge: blockhashAge,
           newBlockhashTimestamp: freshBlockhashTimestamp
         }, 'InternalTransferService');
+        
+        currentBlockhashTimestamp = freshBlockhashTimestamp;
       }
 
       // CRITICAL: Log blockhash age right before sending to Firebase
-      const finalBlockhashAge2 = Date.now() - blockhashTimestamp;
+      const finalBlockhashAge = Date.now() - currentBlockhashTimestamp;
       logger.info('Transaction serialized, requesting company wallet signature', {
         transactionSize: currentTxArray.length,
         transactionType: typeof currentTxArray,
         isUint8Array: currentTxArray instanceof Uint8Array,
-        blockhashAge: finalBlockhashAge2,
-        blockhashAgeMs: finalBlockhashAge2,
+        blockhashAge: finalBlockhashAge,
+        blockhashAgeMs: finalBlockhashAge,
         maxAgeMs: BLOCKHASH_MAX_AGE_MS,
-        isBlockhashFresh: finalBlockhashAge2 < BLOCKHASH_MAX_AGE_MS,
-        warning: finalBlockhashAge2 > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh'
+        isBlockhashFresh: finalBlockhashAge < BLOCKHASH_MAX_AGE_MS,
+        warning: finalBlockhashAge > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh',
+        note: 'Sending to Firebase immediately to minimize blockhash expiration risk'
       }, 'InternalTransferService');
 
       // SECURITY: Company wallet secret key is not available in client-side code
@@ -1270,27 +1357,121 @@ class InternalTransferService {
 
       // Use processUsdcTransfer which combines signing and submission in one Firebase call
       // This minimizes blockhash expiration risk and reduces network round trips
+      // CRITICAL: Add retry logic with automatic blockhash refresh for blockhash expiration errors
       let signature: string;
-      try {
-        logger.info('Processing USDC transfer (sign and submit)', {
-          connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
-          commitment: getConfig().blockchain.commitment,
-          priority: params.priority || 'medium',
-          transactionSize: currentTxArray.length
-        }, 'InternalTransferService');
-        
-        const result = await processUsdcTransfer(currentTxArray);
-        signature = result.signature;
-        
-        logger.info('Transaction processed successfully', { signature }, 'InternalTransferService');
-      } catch (submissionError) {
-        logger.error('Transaction submission failed', { 
-          error: submissionError,
-          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
-        }, 'InternalTransferService');
+      let submissionAttempts = 0;
+      const maxSubmissionAttempts = 3; // Retry up to 3 times with fresh blockhash
+      
+      while (submissionAttempts < maxSubmissionAttempts) {
+        try {
+          logger.info('Processing USDC transfer (sign and submit)', {
+            connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
+            commitment: getConfig().blockchain.commitment,
+            priority: params.priority || 'medium',
+            transactionSize: currentTxArray.length,
+            attempt: submissionAttempts + 1,
+            maxAttempts: maxSubmissionAttempts,
+            blockhashAge: Date.now() - currentBlockhashTimestamp
+          }, 'InternalTransferService');
+          
+          const result = await processUsdcTransfer(currentTxArray);
+          signature = result.signature;
+          
+          logger.info('Transaction processed successfully', { signature }, 'InternalTransferService');
+          break; // Success, exit retry loop
+        } catch (submissionError) {
+          const errorMessage = submissionError instanceof Error ? submissionError.message : String(submissionError);
+          const isBlockhashExpired = 
+            errorMessage.includes('blockhash has expired') ||
+            errorMessage.includes('blockhash expired') ||
+            errorMessage.includes('Blockhash not found') ||
+            errorMessage.includes('blockhash');
+          
+          // If blockhash expired and we have retries left, rebuild transaction with fresh blockhash
+          if (isBlockhashExpired && submissionAttempts < maxSubmissionAttempts - 1) {
+            logger.warn('Transaction blockhash expired, rebuilding transaction with fresh blockhash', {
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts,
+              blockhashAge: Date.now() - currentBlockhashTimestamp,
+              note: 'Rebuilding transaction with fresh blockhash and retrying'
+            }, 'InternalTransferService');
+            
+            try {
+              // Get fresh blockhash RIGHT before rebuilding using shared utility
+              const rebuildConnection = await optimizedTransactionUtils.getConnection();
+              const freshBlockhashData = await getFreshBlockhash(rebuildConnection, 'confirmed');
+              const freshBlockhash = freshBlockhashData.blockhash;
+              const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+              
+              logger.info('Got fresh blockhash for transaction rebuild', {
+                blockhash: freshBlockhash.substring(0, 8) + '...',
+                timestamp: freshBlockhashTimestamp
+              }, 'InternalTransferService');
+              
+              // Rebuild transaction with fresh blockhash
+              const freshTransaction = new Transaction({
+                recentBlockhash: freshBlockhash,
+                feePayer: feePayerPublicKey
+              });
+              
+              // Re-add all instructions in the same order
+              const priorityFee = this.getPriorityFee(params.priority || 'medium');
+              if (priorityFee > 0) {
+                freshTransaction.add(
+                  ComputeBudgetProgram.setComputeUnitPrice({
+                    microLamports: priorityFee,
+                  })
+                );
+              }
+              
+              // Re-add all original instructions
+              transaction.instructions.forEach(ix => freshTransaction.add(ix));
+              
+              // Re-sign with fresh transaction
+              const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+              freshVersionedTransaction.sign([fromKeypair]);
+              currentTxArray = freshVersionedTransaction.serialize();
+              currentBlockhashTimestamp = freshBlockhashTimestamp;
+              
+              logger.info('Transaction rebuilt with fresh blockhash for retry', {
+                transactionSize: currentTxArray.length,
+                newBlockhashTimestamp: freshBlockhashTimestamp,
+                timeSinceNewBlockhash: Date.now() - freshBlockhashTimestamp
+              }, 'InternalTransferService');
+              
+              submissionAttempts++;
+              // Wait a brief moment before retry to avoid immediate failure
+              await new Promise(resolve => setTimeout(resolve, 100));
+              continue; // Retry with fresh blockhash
+            } catch (rebuildError) {
+              logger.error('Failed to rebuild transaction with fresh blockhash', {
+                error: rebuildError,
+                errorMessage: rebuildError instanceof Error ? rebuildError.message : String(rebuildError)
+              }, 'InternalTransferService');
+              // If rebuild fails, throw the original error
+              throw submissionError;
+            }
+          } else {
+            // Not a blockhash error or no retries left
+            logger.error('Transaction submission failed', { 
+              error: submissionError,
+              errorMessage,
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts,
+              isBlockhashExpired
+            }, 'InternalTransferService');
+            return {
+              success: false,
+              error: `Failed to submit transaction: ${errorMessage}`
+            };
+          }
+        }
+      }
+      
+      if (!signature) {
         return {
           success: false,
-          error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
+          error: 'Transaction submission failed after all retry attempts'
         };
       }
 

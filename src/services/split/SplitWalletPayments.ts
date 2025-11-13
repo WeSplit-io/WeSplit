@@ -304,6 +304,44 @@ async function executeFairSplitTransaction(
       
       currentBlockhashTimestamp = freshBlockhashTimestamp;
     } else {
+      // CRITICAL: Also check if blockhash is actually valid on-chain
+      // Even if age is OK, the blockhash might have expired based on slot height
+      try {
+        const isValid = await connection.isBlockhashValid(blockhash, { commitment: 'confirmed' });
+        const isValidValue = isValid && (typeof isValid === 'boolean' ? isValid : isValid.value === true);
+        
+        if (!isValidValue) {
+          logger.warn('Blockhash is no longer valid on-chain, rebuilding transaction', {
+            blockhash: blockhash.substring(0, 8) + '...',
+            blockhashAge,
+            note: 'Blockhash expired based on slot height, not just time'
+          }, 'SplitWalletPayments');
+          
+          // Get fresh blockhash and rebuild
+          const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+          const freshBlockhash = freshBlockhashData.blockhash;
+          const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+          
+          const freshTransaction = new Transaction({
+            recentBlockhash: freshBlockhash,
+            feePayer: companyPublicKey
+          });
+          
+          transaction.instructions.forEach(ix => freshTransaction.add(ix));
+          
+          const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+          freshVersionedTransaction.sign([keypair]);
+          currentTxArray = freshVersionedTransaction.serialize();
+          currentBlockhashTimestamp = freshBlockhashTimestamp;
+        }
+      } catch (validationError) {
+        // If validation fails (network error), log but proceed
+        logger.warn('Failed to validate blockhash on-chain, proceeding anyway', {
+          error: validationError instanceof Error ? validationError.message : String(validationError),
+          blockhash: blockhash.substring(0, 8) + '...'
+        }, 'SplitWalletPayments');
+      }
+      
       logger.info('Blockhash is still fresh, using existing transaction', {
         blockhashAge,
         maxAge: BLOCKHASH_MAX_AGE_MS,
@@ -769,6 +807,44 @@ async function executeFastTransaction(
       
       currentBlockhashTimestamp = freshBlockhashTimestamp;
     } else {
+      // CRITICAL: Also check if blockhash is actually valid on-chain
+      // Even if age is OK, the blockhash might have expired based on slot height
+      try {
+        const isValid = await connection.isBlockhashValid(blockhash, { commitment: 'confirmed' });
+        const isValidValue = isValid && (typeof isValid === 'boolean' ? isValid : isValid.value === true);
+        
+        if (!isValidValue) {
+          logger.warn('Blockhash is no longer valid on-chain, rebuilding transaction', {
+            blockhash: blockhash.substring(0, 8) + '...',
+            blockhashAge,
+            note: 'Blockhash expired based on slot height, not just time'
+          }, 'SplitWalletPayments');
+          
+          // Get fresh blockhash and rebuild
+          const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+          const freshBlockhash = freshBlockhashData.blockhash;
+          const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+          
+          const freshTransaction = new Transaction({
+            recentBlockhash: freshBlockhash,
+            feePayer: companyPublicKey
+          });
+          
+          transaction.instructions.forEach(ix => freshTransaction.add(ix));
+          
+          const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+          freshVersionedTransaction.sign([keypair]);
+          currentTxArray = freshVersionedTransaction.serialize();
+          currentBlockhashTimestamp = freshBlockhashTimestamp;
+        }
+      } catch (validationError) {
+        // If validation fails (network error), log but proceed
+        logger.warn('Failed to validate blockhash on-chain, proceeding anyway', {
+          error: validationError instanceof Error ? validationError.message : String(validationError),
+          blockhash: blockhash.substring(0, 8) + '...'
+        }, 'SplitWalletPayments');
+      }
+      
       logger.info('Blockhash is still fresh, using existing transaction', {
         blockhashAge,
         maxAge: BLOCKHASH_MAX_AGE_MS,
@@ -1341,6 +1417,44 @@ async function executeDegenSplitTransaction(
       
       currentBlockhashTimestamp = freshBlockhashTimestamp;
     } else {
+      // CRITICAL: Also check if blockhash is actually valid on-chain
+      // Even if age is OK, the blockhash might have expired based on slot height
+      try {
+        const isValid = await connection.isBlockhashValid(blockhash, { commitment: 'confirmed' });
+        const isValidValue = isValid && (typeof isValid === 'boolean' ? isValid : isValid.value === true);
+        
+        if (!isValidValue) {
+          logger.warn('Blockhash is no longer valid on-chain, rebuilding transaction', {
+            blockhash: blockhash.substring(0, 8) + '...',
+            blockhashAge,
+            note: 'Blockhash expired based on slot height, not just time'
+          }, 'SplitWalletPayments');
+          
+          // Get fresh blockhash and rebuild
+          const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+          const freshBlockhash = freshBlockhashData.blockhash;
+          const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+          
+          const freshTransaction = new Transaction({
+            recentBlockhash: freshBlockhash,
+            feePayer: companyPublicKey
+          });
+          
+          transaction.instructions.forEach(ix => freshTransaction.add(ix));
+          
+          const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+          freshVersionedTransaction.sign([keypair]);
+          currentTxArray = freshVersionedTransaction.serialize();
+          currentBlockhashTimestamp = freshBlockhashTimestamp;
+        }
+      } catch (validationError) {
+        // If validation fails (network error), log but proceed
+        logger.warn('Failed to validate blockhash on-chain, proceeding anyway', {
+          error: validationError instanceof Error ? validationError.message : String(validationError),
+          blockhash: blockhash.substring(0, 8) + '...'
+        }, 'SplitWalletPayments');
+      }
+      
       logger.info('Blockhash is still fresh, using existing transaction', {
         blockhashAge,
         maxAge: BLOCKHASH_MAX_AGE_MS,
