@@ -148,6 +148,20 @@ const SeedPhraseViewScreen: React.FC = () => {
       const seedPhraseText = seedPhrase.join(' ');
       await Clipboard.setString(seedPhraseText);
       Alert.alert('Copied', 'Seed phrase copied to clipboard!');
+      
+      // Track seed phrase export reward (non-blocking)
+      if (currentUser?.id) {
+        try {
+          const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
+          await userActionSyncService.syncSeedPhraseExport(currentUser.id);
+        } catch (rewardError) {
+          logger.error('Failed to track seed phrase export reward', {
+            userId: currentUser.id,
+            rewardError
+          }, 'SeedPhraseViewScreen');
+          // Don't fail copy if reward tracking fails
+        }
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to copy seed phrase');
     }

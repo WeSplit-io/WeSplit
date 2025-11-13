@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import NavBar from '../../components/shared/NavBar';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { useContactActions } from '../../hooks';
-import { walletService, LinkedWalletService } from '../../services/blockchain/wallet';
+import { LinkedWalletService } from '../../services/blockchain/wallet';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { logger } from '../../services/analytics/loggingService';
 import type { LinkedWallet } from '../../services/blockchain/wallet/LinkedWalletService';
-import { Container, Button } from '../../components/shared';
+import { Container, Button, Tabs } from '../../components/shared';
 import Header from '../../components/shared/Header';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 
@@ -31,12 +28,9 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
   const { currentUser } = state;
   const { 
-    availableWallets, 
-    appWalletBalance, 
     appWalletConnected,
     ensureAppWallet 
   } = useWallet();
-  const { addContact } = useContactActions();
   
   
   const [activeTab, setActiveTab] = useState<'friends' | 'external'>(initialTab || 'friends');
@@ -47,7 +41,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const [loadingLinkedDestinations, setLoadingLinkedDestinations] = useState(false);
 
   // Load linked destinations
-  const loadLinkedDestinations = async () => {
+  const loadLinkedDestinations = useCallback(async () => {
     if (!currentUser?.id) {return;}
     
     setLoadingLinkedDestinations(true);
@@ -71,29 +65,23 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     } finally {
       setLoadingLinkedDestinations(false);
     }
-  };
+  }, [currentUser?.id]);
 
   // Ensure app wallet is connected on mount
   useEffect(() => {
     if (currentUser?.id && !appWalletConnected) {
       ensureAppWallet(currentUser.id?.toString() || '');
     }
-  }, [currentUser?.id, appWalletConnected]);
+  }, [currentUser?.id, appWalletConnected, ensureAppWallet]);
 
   // Load linked destinations when component mounts or when external tab is selected
-  useEffect(() => {
-    if (currentUser?.id && activeTab === 'external') {
-      loadLinkedDestinations();
-    }
-  }, [currentUser?.id, activeTab]);
-
-  // Refresh linked destinations when screen comes into focus (e.g., returning from LinkedCards)
+  // Use useFocusEffect only to avoid duplicate calls
   useFocusEffect(
     React.useCallback(() => {
       if (currentUser?.id && activeTab === 'external') {
         loadLinkedDestinations();
       }
-    }, [currentUser?.id, activeTab])
+    }, [currentUser?.id, activeTab, loadLinkedDestinations])
   );
 
   // Auto-navigate to SendAmount if we have pre-filled data from notification
@@ -153,7 +141,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Note: This callback is called AFTER ContactsList has already added the contact
   // It's for notification/UI updates only, not for the actual adding logic
-  const handleAddContact = async (user: User) => {
+  const handleAddContact = (user: User) => {
     // This is just a notification callback - the actual adding is done in ContactsList
     // We can use this to show success messages or update UI if needed
     logger.info('Contact addition callback received', { userName: user.name }, 'SendScreen');
@@ -177,10 +165,10 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     });
   };
 
-  const handleScanQR = () => {
-    // TODO: Implement QR scanner for wallet addresses
-    Alert.alert('QR Scanner', 'QR scanner functionality will be implemented');
-  };
+  // const handleScanQR = () => {
+  //   // TODO: Implement QR scanner for wallet addresses
+  //   Alert.alert('QR Scanner', 'QR scanner functionality will be implemented');
+  // };
 
   const formatWalletAddress = (address: string) => {
     if (!address) {return '';}
@@ -298,48 +286,15 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
       />
 
       {/* Tab Selector */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
-          onPress={() => setActiveTab('friends')}
-        >
-          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
-            Friends
-          </Text>
-          {activeTab === 'friends' ? (
-            <View style={styles.tabIndicatorContainer}>
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ height: 2, width: '100%' }}
-              />
-            </View>
-          ) : (
-            <View style={styles.tabIndicatorPlaceholder} />
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'external' && styles.activeTab]}
-          onPress={() => setActiveTab('external')}
-        >
-          <Text style={[styles.tabText, activeTab === 'external' && styles.activeTabText]}>
-            External Wallet
-          </Text>
-          {activeTab === 'external' ? (
-            <View style={styles.tabIndicatorContainer}>
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ height: 2, width: '100%' }}
-              />
-            </View>
-          ) : (
-            <View style={styles.tabIndicatorPlaceholder} />
-          )}
-        </TouchableOpacity>
-      </View>
+      <Tabs
+        tabs={[
+          { label: 'Friends', value: 'friends' },
+          { label: 'External Wallet', value: 'external' }
+        ]}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as 'friends' | 'external')}
+        enableAnimation={true}
+      />
 
       {/* Content */}
       <View style={styles.content}>

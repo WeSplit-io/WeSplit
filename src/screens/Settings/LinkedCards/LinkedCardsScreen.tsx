@@ -427,8 +427,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {isLoading ? (
               <View style={styles.loadingContainer}>
-                <ModernLoader />
-                <Text style={styles.loadingText}>Loading data</Text>
+                <ModernLoader size="large" text="Loading data" />
               </View>
             ) : !currentUser?.id ? (
               <View style={styles.globalEmptyState}>

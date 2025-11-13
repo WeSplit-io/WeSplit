@@ -111,6 +111,42 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: spacing.sm,
   },
+  referralCodeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  optionalLabel: {
+    color: colors.white50,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.regular,
+  },
+  referralCodeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    paddingHorizontal: spacing.md,
+  },
+  referralCodeIcon: {
+    marginRight: spacing.sm,
+  },
+  referralCodeInput: {
+    flex: 1,
+    paddingVertical: 15,
+    fontSize: typography.fontSize.md,
+    color: colors.white,
+    letterSpacing: 1,
+  },
+  referralCodeHint: {
+    color: colors.white50,
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.xs,
+    lineHeight: 18,
+  },
   nextButton: {
     borderRadius: 16,
     width: '100%',

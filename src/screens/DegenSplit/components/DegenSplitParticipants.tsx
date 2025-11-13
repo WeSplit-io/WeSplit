@@ -3,7 +3,7 @@
  * Shows participant list with lock status
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
@@ -14,6 +14,8 @@ import {
   getParticipantStatusDisplayText, 
   getParticipantStatusColor 
 } from '../../../utils/statusUtils';
+import BadgeDisplay from '../../../components/profile/BadgeDisplay';
+import { firebaseDataService } from '../../../services/data/firebaseDataService';
 
 interface Participant {
   id: string;
@@ -22,6 +24,7 @@ interface Participant {
   walletAddress?: string;
   amountPaid?: number;
   status?: string;
+  avatar?: string; // Add avatar property
 }
 
 interface DegenSplitParticipantsProps {
@@ -37,6 +40,40 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
   currentUserId,
   splitWallet,
 }) => {
+  const [participantBadges, setParticipantBadges] = useState<Record<string, { badges: string[]; active_badge?: string }>>({});
+
+  // Fetch badges for all participants
+  useEffect(() => {
+    const fetchBadges = async () => {
+      const badgesMap: Record<string, { badges: string[]; active_badge?: string }> = {};
+      
+      await Promise.all(
+        participants.map(async (participant) => {
+          try {
+            const userId = participant.userId || participant.id;
+            if (!userId) return;
+            
+            const userData = await firebaseDataService.user.getCurrentUser(userId);
+            if (userData.badges && userData.badges.length > 0) {
+              badgesMap[userId] = {
+                badges: userData.badges,
+                active_badge: userData.active_badge
+              };
+            }
+          } catch (error) {
+            // Silently fail - badges are optional
+          }
+        })
+      );
+      
+      setParticipantBadges(badgesMap);
+    };
+
+    if (participants.length > 0) {
+      fetchBadges();
+    }
+  }, [participants]);
+
   return (
     <View style={styles.participantsContainer}>
       <ScrollView 
@@ -45,6 +82,8 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
       >
         
         {participants.map((participant, index) => {
+          const userId = participant.userId || participant.id;
+          const badges = userId ? participantBadges[userId] : undefined;
           // Use wallet participant data if available for accurate lock status
           const walletParticipant = splitWallet?.participants?.find(
             (p: any) => p.userId === (participant.userId || participant.id)
@@ -79,6 +118,13 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
                   {participant.name || `Participant ${index + 1}`}
                   {isCurrentUser && ' (You)'}
                 </Text>
+                {badges && badges.badges.length > 0 && badges.active_badge && (
+                  <BadgeDisplay
+                    badges={badges.badges}
+                    activeBadge={badges.active_badge}
+                    showAll={false}
+                  />
+                )}
                 <Text style={styles.participantWallet}>
                   {participant.walletAddress && participant.walletAddress.length > 8 ? 
                     `${participant.walletAddress.slice(0, 4)}...${participant.walletAddress.slice(-4)}` : 

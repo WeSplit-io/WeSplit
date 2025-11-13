@@ -65,7 +65,7 @@ const WalletMismatchFixer: React.FC = () => {
         const message = `Wallet Address: ${result.walletAddress}\n\n` +
           (result.seedPhrase ? `Seed Phrase: ${result.seedPhrase}\n\n` : '') +
           (result.privateKey ? `Private Key: ${result.privateKey}\n\n` : '') +
-          `Export Type: ${result.exportType}\n\n` +
+          `Export Type: ${result.exportType || 'both'}\n\n` +
           '⚠️ IMPORTANT: Keep this information safe and never share it with anyone!';
         
         Alert.alert('Wallet Export', message, [
@@ -86,7 +86,7 @@ const WalletMismatchFixer: React.FC = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Wallet Mismatch Fixer</Text>
       <Text style={styles.subtitle}>
-        It looks like there's a mismatch between your stored wallet information. 
+        It looks like there&apos;s a mismatch between your stored wallet information. 
         This can happen when multiple wallet creation processes run simultaneously.
       </Text>
 
@@ -127,7 +127,7 @@ const WalletMismatchFixer: React.FC = () => {
         <Text style={styles.warningTitle}>⚠️ Important:</Text>
         <Text style={styles.warningText}>
           This will fix the mismatch between your stored wallet information and ensure you have access to your funds. 
-          After fixing, you'll be able to export your wallet information for backup.
+          After fixing, you&apos;ll be able to export your wallet information for backup.
         </Text>
       </View>
     </View>

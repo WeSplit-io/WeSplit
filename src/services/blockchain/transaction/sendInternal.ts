@@ -9,7 +9,6 @@ import {
   Transaction, 
   SystemProgram,
   TransactionInstruction,
-  sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
   ComputeBudgetProgram,
   Keypair
@@ -27,9 +26,11 @@ import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../../../con
 import { solanaWalletService } from '../wallet';
 import { logger } from '../../analytics/loggingService';
 import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimized';
-import { TransactionUtils as transactionUtils } from '../../shared/transactionUtils';
 import { notificationUtils } from '../../shared/notificationUtils';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';
+import { processUsdcTransfer } from './transactionSigningService';
+import { VersionedTransaction } from '@solana/web3.js';
+import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS } from '../../shared/blockhashUtils';
 
 export interface InternalTransferParams {
   to: string;
@@ -251,18 +252,9 @@ class InternalTransferService {
                 }, 'InternalTransferService');
               }
 
-              // Check and complete first transaction quest
-              const { questService } = await import('../../rewards/questService');
-              const isFirstTransaction = await questService.isQuestCompleted(params.userId, 'first_transaction');
-              if (!isFirstTransaction) {
-                const questResult = await questService.completeQuest(params.userId, 'first_transaction');
-                if (questResult.success) {
-                  logger.info('✅ First transaction quest completed', {
-                    userId: params.userId,
-                    pointsAwarded: questResult.pointsAwarded
-                  }, 'InternalTransferService');
-                }
-              }
+              // DISABLED: Old quest (first_transaction) - replaced by season-based system
+              // Transaction points are now awarded via awardTransactionPoints() which uses season-based rewards
+              // No need to complete old quest
             }
           } catch (pointsError) {
             logger.error('❌ Error awarding points for internal transfer', pointsError, 'InternalTransferService');
@@ -408,26 +400,36 @@ class InternalTransferService {
         toTokenAccount: toTokenAccount.toBase58()
       }, 'InternalTransferService');
 
+      // CRITICAL: Get fresh blockhash FIRST, then do async operations
+      // This ensures blockhash is as fresh as possible when we send to Firebase
+      // Best practice: Get blockhash before any async operations that might delay
+      const connection = await optimizedTransactionUtils.getConnection();
+      const blockhashData = await getFreshBlockhash(connection, 'confirmed');
+      
       // Check if recipient has USDC token account, create if needed
+      // NOTE: This check happens AFTER getting blockhash to minimize delay
       let needsTokenAccountCreation = false;
       try {
-        await getAccount((await optimizedTransactionUtils.getConnection()), toTokenAccount);
+        await getAccount(connection, toTokenAccount);
         logger.info('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'InternalTransferService');
       } catch (error) {
         // Token account doesn't exist, we need to create it
         logger.warn('Recipient USDC token account does not exist, will create it', { toTokenAccount: toTokenAccount.toBase58() }, 'InternalTransferService');
         needsTokenAccountCreation = true;
       }
-
-      // Get recent blockhash with retry logic
-      const connection = await optimizedTransactionUtils.getConnection();
-      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
-      logger.info('Got recent blockhash', { blockhash }, 'InternalTransferService');
+      const blockhash = blockhashData.blockhash;
+      const blockhashTimestamp = blockhashData.timestamp;
+      logger.info('Got fresh blockhash right before transaction creation', { 
+        blockhash: blockhash.substring(0, 8) + '...',
+        blockhashTimestamp,
+        lastValidBlockHeight: blockhashData.lastValidBlockHeight,
+        note: 'Blockhash will expire after approximately 60 seconds'
+      }, 'InternalTransferService');
 
       // Use company wallet for fees if configured, otherwise use user wallet
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
       
-      // Create transaction
+      // Create transaction (using fresh blockhash)
       const transaction = new Transaction({
         recentBlockhash: blockhash,
         feePayer: feePayerPublicKey // User or company pays fees based on configuration
@@ -440,7 +442,7 @@ class InternalTransferService {
       }, 'InternalTransferService');
 
       // Add priority fee
-      const priorityFee = transactionUtils.getPriorityFee(params.priority || 'medium');
+      const priorityFee = this.getPriorityFee(params.priority || 'medium');
       if (priorityFee > 0) {
         transaction.add(
           ComputeBudgetProgram.setComputeUnitPrice({
@@ -543,159 +545,187 @@ class InternalTransferService {
       const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
       const userKeypair = Keypair.fromSecretKey(secretKeyBuffer);
 
-      // Prepare signers array
-      const signers: Keypair[] = [];
-      
-      // Company wallet always pays SOL fees - we need company wallet keypair
+      // Company wallet always pays SOL fees
+      // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
       logger.info('Company wallet configuration check', {
         companyWalletRequired: true,
-        hasCompanySecretKey: !!COMPANY_WALLET_CONFIG.secretKey,
         companyWalletAddress: COMPANY_WALLET_CONFIG.address,
         feePayerAddress: feePayerPublicKey.toBase58()
       }, 'InternalTransferService');
-
-      if (COMPANY_WALLET_CONFIG.secretKey) {
-        try {
-          logger.info('Processing company wallet secret key', {
-            secretKeyLength: COMPANY_WALLET_CONFIG.secretKey.length,
-            secretKeyPreview: COMPANY_WALLET_CONFIG.secretKey.substring(0, 10) + '...',
-            secretKeyFormat: 'base64'
-          }, 'InternalTransferService');
-
-          // Try different formats for the secret key
-          let companySecretKeyBuffer: Buffer;
-          
-          // Check if it looks like a comma-separated array first
-          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
-            try {
-              // Remove square brackets if present and split by comma
-              const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
-              const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
-              
-              // Validate that all elements are valid numbers
-              if (keyArray.some(num => isNaN(num))) {
-                throw new Error('Invalid comma-separated array format - contains non-numeric values');
-              }
-              
-              companySecretKeyBuffer = Buffer.from(keyArray);
-              logger.info('Successfully decoded secret key as comma-separated array', {
-                bufferLength: companySecretKeyBuffer.length,
-                arrayLength: keyArray.length
-              }, 'InternalTransferService');
-            } catch (arrayError) {
-              throw new Error(`Failed to parse comma-separated array: ${arrayError instanceof Error ? arrayError.message : String(arrayError)}`);
-            }
-          } else {
-            try {
-              // Try base64 first for other formats
-              companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
-              
-              // Check if the length is reasonable for Solana (64 or 65 bytes)
-              if (companySecretKeyBuffer.length === 64 || companySecretKeyBuffer.length === 65) {
-                logger.info('Successfully decoded secret key as base64', {
-                  bufferLength: companySecretKeyBuffer.length
-                }, 'InternalTransferService');
-              } else {
-                throw new Error(`Base64 decoded to unexpected length: ${companySecretKeyBuffer.length}`);
-              }
-            } catch (base64Error) {
-              try {
-                // Try hex format
-                companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'hex');
-                logger.info('Successfully decoded secret key as hex', {
-                  bufferLength: companySecretKeyBuffer.length
-                }, 'InternalTransferService');
-              } catch (hexError) {
-                throw new Error('Unable to decode secret key in any supported format');
-              }
-            }
-          }
-
-          // Validate the secret key length (should be 64 or 65 bytes for Solana)
-          if (companySecretKeyBuffer.length === 65) {
-            // Remove the last byte (public key) to get the 64-byte secret key
-            companySecretKeyBuffer = companySecretKeyBuffer.slice(0, 64);
-            logger.info('Trimmed 65-byte keypair to 64-byte secret key', {
-              originalLength: 65,
-              trimmedLength: companySecretKeyBuffer.length
-            }, 'InternalTransferService');
-          } else if (companySecretKeyBuffer.length !== 64) {
-            throw new Error(`Invalid secret key length: ${companySecretKeyBuffer.length} bytes (expected 64 or 65)`);
-          }
-
-          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
-          
-        logger.info('Using company wallet for fees', {
-          companyWalletAddress: COMPANY_WALLET_CONFIG.address,
-          userWalletAddress: userKeypair.publicKey.toBase58(),
-          companyKeypairAddress: companyKeypair.publicKey.toBase58()
-        }, 'InternalTransferService');
-
-        // Add both keypairs to signers array
-        signers.push(userKeypair, companyKeypair);
-        logger.info('Added both keypairs to signers array', {
-          signersCount: signers.length,
-          signers: signers.map(signer => signer.publicKey.toBase58())
-        }, 'InternalTransferService');
-        } catch (error) {
-          logger.error('Failed to load company wallet keypair', { error }, 'InternalTransferService');
-          throw new Error('Company wallet keypair not available for signing');
-        }
-      } else {
-        throw new Error('Company wallet secret key is required for SOL fee coverage');
-      }
 
       // Debug transaction before serialization
       logger.info('Transaction ready for signing', {
         signerPublicKey: userKeypair.publicKey.toBase58(),
         feePayer: feePayerPublicKey.toBase58(),
-        signersCount: signers.length,
-        signers: signers.map(signer => signer.publicKey.toBase58()),
         instructionsCount: transaction.instructions.length
-      }, 'InternalTransferService');
+          }, 'InternalTransferService');
 
-      logger.info('Signing and sending transaction', {
-        signerPublicKey: userKeypair.publicKey.toBase58(),
-        feePayer: feePayerPublicKey.toBase58(),
-        signersCount: signers.length,
-        signers: signers.map(signer => signer.publicKey.toBase58())
-      }, 'InternalTransferService');
+      // Convert Transaction to VersionedTransaction for Firebase Functions
+      // Firebase Functions expect VersionedTransaction format
+      // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+      // This avoids double signing and ensures clean signature handling
+      let versionedTransaction: VersionedTransaction;
+      try {
+        versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+        // Sign the versioned transaction with user keypair (only sign once)
+        versionedTransaction.sign([userKeypair]);
+        logger.info('Transaction converted to VersionedTransaction and signed', {
+          userAddress: userKeypair.publicKey.toBase58(),
+          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+        }, 'InternalTransferService');
+      } catch (versionError) {
+        logger.error('Failed to convert transaction to VersionedTransaction', {
+          error: versionError,
+          errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+        }, 'InternalTransferService');
+        throw new Error(`Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`);
+      }
 
-      // Debug transaction structure
-      logger.info('Transaction structure debug', {
-        instructionsCount: transaction.instructions.length,
-        instructions: transaction.instructions.map((ix, index) => ({
-          index,
-          programId: ix.programId.toBase58(),
-          keys: ix.keys.map(key => ({
-            pubkey: key.pubkey.toBase58(),
-            isSigner: key.isSigner,
-            isWritable: key.isWritable
-          }))
-        }))
-      }, 'InternalTransferService');
+      // Serialize the partially signed transaction
+      const serializedTransaction = versionedTransaction.serialize();
+              
+      // Ensure we have a proper Uint8Array
+      const txArray = serializedTransaction instanceof Uint8Array 
+        ? serializedTransaction 
+        : new Uint8Array(serializedTransaction);
 
-      // Sign and send transaction with optimized approach
+      // CRITICAL: Check blockhash age before sending to Firebase
+      // Best practice: Use shared utility for consistent blockhash age checking
+      let currentTxArray = txArray;
+      let currentBlockhashTimestamp = blockhashTimestamp;
+      const blockhashAge = Date.now() - blockhashTimestamp;
+      
+      if (isBlockhashTooOld(blockhashTimestamp)) {
+        logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS
+        }, 'InternalTransferService');
+        
+        // Get fresh blockhash and rebuild transaction
+        const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+        const freshBlockhash = freshBlockhashData.blockhash;
+        const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+        
+        // Rebuild transaction with fresh blockhash
+        const freshTransaction = new Transaction({
+          recentBlockhash: freshBlockhash,
+          feePayer: feePayerPublicKey
+        });
+        
+        // Re-add all instructions
+        const priorityFee = this.getPriorityFee(params.priority || 'medium');
+        if (priorityFee > 0) {
+          freshTransaction.add(
+            ComputeBudgetProgram.setComputeUnitPrice({
+              microLamports: priorityFee,
+            })
+          );
+        }
+        
+        if (needsTokenAccountCreation) {
+          freshTransaction.add(
+            createAssociatedTokenAccountInstruction(
+              feePayerPublicKey,
+              toTokenAccount,
+              toPublicKey,
+              usdcMint
+            )
+          );
+        }
+        
+        const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6) + 0.5);
+        freshTransaction.add(
+          createTransferInstruction(
+            fromTokenAccount,
+            toTokenAccount,
+            fromPublicKey,
+            transferAmount,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+        
+        if (companyFee > 0) {
+          const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5);
+          const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(COMPANY_WALLET_CONFIG.address));
+          freshTransaction.add(
+            createTransferInstruction(
+              fromTokenAccount,
+              companyTokenAccount,
+              fromPublicKey,
+              companyFeeAmount,
+              [],
+              TOKEN_PROGRAM_ID
+            )
+          );
+        }
+        
+        if (params.memo) {
+          freshTransaction.add(
+            new TransactionInstruction({
+              keys: [{ pubkey: feePayerPublicKey, isSigner: true, isWritable: true }],
+              data: Buffer.from(params.memo, 'utf8'),
+              programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
+            })
+          );
+        }
+        
+        // Re-sign with fresh transaction
+        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+        freshVersionedTransaction.sign([userKeypair]);
+        currentTxArray = freshVersionedTransaction.serialize();
+        
+        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+          transactionSize: currentTxArray.length,
+          blockhashAge,
+          newBlockhashTimestamp: freshBlockhashTimestamp,
+          timeSinceNewBlockhash: Date.now() - freshBlockhashTimestamp
+        }, 'InternalTransferService');
+        
+        currentBlockhashTimestamp = freshBlockhashTimestamp;
+      } else {
+        logger.info('Blockhash is still fresh, using existing transaction', {
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS,
+          note: 'Blockhash is within acceptable age, proceeding without rebuild'
+        }, 'InternalTransferService');
+      }
+
+      // CRITICAL: Log blockhash age right before sending to Firebase
+      const finalBlockhashAge = Date.now() - currentBlockhashTimestamp;
+      logger.info('Transaction serialized, requesting company wallet signature', {
+        transactionSize: currentTxArray.length,
+        transactionType: typeof currentTxArray,
+        isUint8Array: currentTxArray instanceof Uint8Array,
+        blockhashAge: finalBlockhashAge,
+        blockhashAgeMs: finalBlockhashAge,
+        maxAgeMs: BLOCKHASH_MAX_AGE_MS,
+        isBlockhashFresh: finalBlockhashAge < BLOCKHASH_MAX_AGE_MS,
+        warning: finalBlockhashAge > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh',
+        note: 'Sending to Firebase immediately to minimize blockhash expiration risk'
+              }, 'InternalTransferService');
+
+      // Use processUsdcTransfer which combines signing and submission in one Firebase call
+      // This minimizes blockhash expiration risk and reduces network round trips
       let signature: string;
       try {
-        logger.info('Attempting to sign and send transaction', {
+        logger.info('Processing USDC transfer (sign and submit)', {
           connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
           commitment: getConfig().blockchain.commitment,
-          priority: params.priority || 'medium'
+          priority: params.priority || 'medium',
+          transactionSize: currentTxArray.length
         }, 'InternalTransferService');
         
-        // Use sendTransaction for faster response, then confirm separately
-        signature = await optimizedTransactionUtils.sendTransactionWithRetry(transaction, signers, params.priority || 'medium');
+        const result = await processUsdcTransfer(currentTxArray);
+        signature = result.signature;
         
-        logger.info('Transaction signed and sent successfully', { signature }, 'InternalTransferService');
-      } catch (signingError) {
-        logger.error('Transaction signing failed', { 
-          error: signingError,
-          errorMessage: signingError instanceof Error ? signingError.message : String(signingError),
-          signersCount: signers.length,
-          signers: signers.map(signer => signer.publicKey.toBase58())
+        logger.info('Transaction processed successfully', { signature }, 'InternalTransferService');
+      } catch (submissionError) {
+        logger.error('Transaction submission failed', { 
+          error: submissionError,
+          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
         }, 'InternalTransferService');
-        throw signingError;
+        throw submissionError;
       }
 
       logger.info('Transaction sent successfully', { signature }, 'InternalTransferService');
@@ -712,7 +742,7 @@ class InternalTransferService {
         // Try to check transaction status one more time after a short delay
         try {
           await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-          const status = await transactionUtils.getTransactionStatus(signature);
+          const status = await this.getTransactionStatus(signature);
           
           if (status.status === 'confirmed' || status.status === 'finalized') {
             logger.info('Transaction confirmed on retry check', { signature, status }, 'InternalTransferService');
@@ -788,10 +818,22 @@ class InternalTransferService {
 
 
   /**
+   * Get priority fee
+   */
+  private getPriorityFee(priority: 'low' | 'medium' | 'high'): number {
+    return TRANSACTION_CONFIG.priorityFees[priority];
+  }
+
+  /**
    * Estimate blockchain fee
    */
   private estimateBlockchainFee(transaction: Transaction): number {
-    return transactionUtils.estimateBlockchainFee(transaction);
+    // Rough estimate: 5000 lamports per signature + compute units
+    const signatureCount = transaction.signatures.length;
+    const computeUnits = TRANSACTION_CONFIG.computeUnits.tokenTransfer;
+    const feePerComputeUnit = 0.000001; // 1 micro-lamport per compute unit
+    
+    return (signatureCount * 5000 + computeUnits * feePerComputeUnit) / LAMPORTS_PER_SOL;
   }
 
 
@@ -836,7 +878,7 @@ class InternalTransferService {
       
       // Switch to next RPC endpoint if available
       if ((await optimizedTransactionUtils.getConnection())) {
-        await transactionUtils.switchToNextEndpoint();
+        await optimizedTransactionUtils.switchToNextEndpoint();
         // Retry once with new endpoint
         try {
           const retryStatus = await (await optimizedTransactionUtils.getConnection()).getSignatureStatus(signature, {
@@ -946,9 +988,8 @@ class InternalTransferService {
         } catch (jsonError) {
           console.error('❌ Failed to create keypair from secret key:', {
             base64Error: (base64Error as Error).message,
-            jsonError: (jsonError as Error).message,
-            secretKeyLength: userWallet.secretKey?.length,
-            secretKeyPreview: userWallet.secretKey?.substring(0, 20) + '...'
+            jsonError: (jsonError as Error).message
+            // SECURITY: Do not log secret key metadata (length, previews, etc.)
           });
           return {
             success: false,
@@ -959,7 +1000,9 @@ class InternalTransferService {
 
       // Get recent blockhash with retry logic
       const connection = await optimizedTransactionUtils.getConnection();
-      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
+      const blockhashData = await getFreshBlockhash(connection, 'confirmed');
+      const blockhash = blockhashData.blockhash;
+      const blockhashTimestamp = Date.now(); // Track when we got the blockhash
 
       // Use company wallet for fees if configured, otherwise use user wallet
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromKeypair.publicKey);
@@ -971,7 +1014,7 @@ class InternalTransferService {
       });
 
       // Add priority fee
-      const priorityFee = transactionUtils.getPriorityFee(params.priority || 'medium');
+      const priorityFee = this.getPriorityFee(params.priority || 'medium');
       if (priorityFee > 0) {
         transaction.add(
           ComputeBudgetProgram.setComputeUnitPrice({
@@ -1137,161 +1180,117 @@ class InternalTransferService {
         logger.debug('Skipping simulation due to token account creation - proceeding with transaction', null, 'sendInternal');
       }
 
-      // Prepare signers array
-      const signers: Keypair[] = [fromKeypair]; // User always signs for token transfers
-      
-      // Company wallet always pays SOL fees - we need company wallet keypair
-      if (COMPANY_WALLET_CONFIG.secretKey) {
-        try {
-          // Try different formats for the company secret key
-          let companySecretKeyBuffer: Buffer;
-          
-          // Check if it looks like a comma-separated array first
-          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
-            try {
-              // Remove square brackets if present and split by comma
-              const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
-              const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
-              
-              // Validate that all elements are valid numbers
-              if (keyArray.some(num => isNaN(num))) {
-                throw new Error('Invalid comma-separated array format - contains non-numeric values');
-              }
-              
-              companySecretKeyBuffer = Buffer.from(keyArray);
-            } catch (arrayError) {
-              throw new Error(`Failed to parse comma-separated array: ${arrayError instanceof Error ? arrayError.message : String(arrayError)}`);
-            }
-          } else {
-            try {
-              // Try base64 first for other formats
-              companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
-            } catch (base64Error) {
-              throw new Error(`Failed to decode base64 secret key: ${base64Error instanceof Error ? base64Error.message : String(base64Error)}`);
-            }
-          }
-          
-          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
-          signers.push(companyKeypair);
-          logger.info('Company wallet keypair added to signers', null, 'sendInternal');
-        } catch (error) {
-          console.error('❌ Failed to create company wallet keypair:', error);
-          return {
-            success: false,
-            error: 'Failed to load company wallet for fee payment'
-          };
-        }
-      }
-
-      // Send transaction with retry logic for blockhash expiration
-      logger.info('Sending transaction', null, 'sendInternal');
-      let signature: string | undefined;
-      let lastError: any;
-      
+      // Convert Transaction to VersionedTransaction for Firebase Functions
+      // Firebase Functions expect VersionedTransaction format
+      // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+      // This avoids double signing and ensures clean signature handling
+      let versionedTransaction: VersionedTransaction;
       try {
-        // Try up to 3 times with fresh blockhashes and exponential backoff
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            logger.info('Transaction attempt', { 
-              attempt, 
-              maxAttempts: 3, 
-              details: {
-                instructionCount: transaction.instructions.length,
-                feePayer: transaction.feePayer?.toBase58(),
-                signerCount: signers.length,
-                signers: signers.map(s => s.publicKey.toBase58())
-              }
-            }, 'sendInternal');
-            
-            // Get fresh blockhash for each attempt with retry
-            const connection = await optimizedTransactionUtils.getConnection();
-            const freshBlockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection, 'confirmed');
-            
-            // Update blockhash and re-sign transaction for each attempt
-            transaction.recentBlockhash = freshBlockhash;
-            
-            // Clear previous signatures and re-sign with fresh blockhash
-            transaction.signatures = [];
-            transaction.sign(...signers);
-            logger.info('Transaction re-signed with fresh blockhash', { freshBlockhash }, 'sendInternal');
-            
-            logger.info('Attempting sendAndConfirmTransaction with fresh blockhash', { freshBlockhash }, 'sendInternal');
-            
-            // Use optimized transaction sending approach
-            try {
-              logger.info('Sending transaction with optimized approach', null, 'sendInternal');
-              
-              // Transaction is already signed above with fresh blockhash
-              
-              // Send transaction first (faster response)
-              signature = await (await optimizedTransactionUtils.getConnection()).sendRawTransaction(transaction.serialize(), {
-                skipPreflight: false,
-                preflightCommitment: 'confirmed',
-                maxRetries: 0, // We handle retries ourselves
-              });
-              
-              logger.info('Transaction sent with signature, waiting for confirmation', { signature }, 'sendInternal');
-              
-              // Confirm transaction with timeout using centralized configuration
-              const confirmPromise = (await optimizedTransactionUtils.getConnection()).confirmTransaction(signature, 'confirmed');
-              const confirmTimeoutPromise = new Promise<never>((_, reject) => {
-                const timeout = TRANSACTION_CONFIG.timeout.confirmation;
-                setTimeout(() => reject(new Error(`Transaction confirmation timeout after ${timeout/1000} seconds`)), timeout);
-              });
-              
-              await Promise.race([confirmPromise, confirmTimeoutPromise]);
-              logger.info('Transaction confirmed', { signature }, 'sendInternal');
-              
-            } catch (confirmError) {
-              console.warn(`⚠️ Transaction confirmation failed:`, (confirmError as Error).message);
-              
-              // For split wallet payments, we need strict confirmation
-              // Don't accept transactions that haven't been confirmed
-              throw new Error(`Transaction confirmation failed: ${(confirmError as Error).message}. Transaction may have failed or is still pending.`);
-            }
-            
-            logger.info('Transaction successful on attempt', { attempt, signature }, 'sendInternal');
-            break; // Success, exit retry loop
-            
-          } catch (error) {
-            lastError = error;
-            console.warn(`⚠️ Transaction attempt ${attempt} failed:`, (error as Error).message);
-            
-            // Check if it's a blockhash expiration error
-            if ((error as Error).message.includes('block height exceeded') || (error as Error).message.includes('blockhash')) {
-              logger.info('Blockhash expired, retrying with fresh blockhash', null, 'sendInternal');
-            } else {
-              logger.info('Transaction failed for other reason, retrying', null, 'sendInternal');
-            }
-            
-            if (attempt === 3) {
-              // Last attempt failed
-              console.error('❌ All transaction attempts failed');
-              return {
-                success: false,
-                error: `Transaction failed after 3 attempts: ${(error as Error).message}`
-              };
-            }
-            
-            // Wait with exponential backoff before retrying
-            const backoffDelay = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
-            logger.info('Waiting before retry', { backoffDelay }, 'sendInternal');
-            await new Promise(resolve => setTimeout(resolve, backoffDelay));
-          }
-        }
-      } catch (error) {
-        console.error('❌ Transaction sending failed:', error);
+        versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+        // Sign the versioned transaction with user keypair (only sign once)
+        versionedTransaction.sign([fromKeypair]);
+        logger.info('Transaction converted to VersionedTransaction and signed', {
+          userAddress: fromKeypair.publicKey.toBase58(),
+          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+        }, 'InternalTransferService');
+      } catch (versionError) {
+        logger.error('Failed to convert transaction to VersionedTransaction', {
+          error: versionError,
+          errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+        }, 'InternalTransferService');
         return {
           success: false,
-          error: `Transaction failed: ${(error as Error).message}`
+          error: `Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`
         };
       }
 
-      // Ensure signature is defined
-      if (!signature) {
+      // Serialize the partially signed transaction
+      const serializedTransaction = versionedTransaction.serialize();
+              
+      // Ensure we have a proper Uint8Array
+      const txArray = serializedTransaction instanceof Uint8Array 
+        ? serializedTransaction 
+        : new Uint8Array(serializedTransaction);
+
+      // CRITICAL: Check blockhash age before sending to Firebase
+      // Best practice: Use shared utility for consistent blockhash age checking
+      let currentTxArray = txArray;
+      let currentBlockhashTimestamp = blockhashTimestamp;
+      const blockhashAge = Date.now() - blockhashTimestamp;
+      
+      if (isBlockhashTooOld(blockhashTimestamp)) {
+        logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS
+        }, 'InternalTransferService');
+        
+        // Get fresh blockhash and rebuild transaction
+        const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+        const freshBlockhash = freshBlockhashData.blockhash;
+        const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+        
+        // Rebuild transaction with fresh blockhash
+        const freshTransaction = new Transaction({
+          recentBlockhash: freshBlockhash,
+          feePayer: feePayerPublicKey
+        });
+        
+        // Re-add all instructions
+        transaction.instructions.forEach(ix => freshTransaction.add(ix));
+        
+        // Re-sign with fresh transaction
+        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+        freshVersionedTransaction.sign([fromKeypair]);
+        currentTxArray = freshVersionedTransaction.serialize();
+        
+        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+          transactionSize: currentTxArray.length,
+          blockhashAge: blockhashAge,
+          newBlockhashTimestamp: freshBlockhashTimestamp
+        }, 'InternalTransferService');
+      }
+
+      // CRITICAL: Log blockhash age right before sending to Firebase
+      const finalBlockhashAge2 = Date.now() - blockhashTimestamp;
+      logger.info('Transaction serialized, requesting company wallet signature', {
+        transactionSize: currentTxArray.length,
+        transactionType: typeof currentTxArray,
+        isUint8Array: currentTxArray instanceof Uint8Array,
+        blockhashAge: finalBlockhashAge2,
+        blockhashAgeMs: finalBlockhashAge2,
+        maxAgeMs: BLOCKHASH_MAX_AGE_MS,
+        isBlockhashFresh: finalBlockhashAge2 < BLOCKHASH_MAX_AGE_MS,
+        warning: finalBlockhashAge2 > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh'
+      }, 'InternalTransferService');
+
+      // SECURITY: Company wallet secret key is not available in client-side code
+      // All secret key operations must be performed on backend services via Firebase Functions
+      // This is a security requirement - secret keys should never be in client bundles
+      // The transaction will be signed with company wallet via Firebase Functions after user signs
+
+      // Use processUsdcTransfer which combines signing and submission in one Firebase call
+      // This minimizes blockhash expiration risk and reduces network round trips
+      let signature: string;
+      try {
+        logger.info('Processing USDC transfer (sign and submit)', {
+          connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
+          commitment: getConfig().blockchain.commitment,
+          priority: params.priority || 'medium',
+          transactionSize: currentTxArray.length
+        }, 'InternalTransferService');
+        
+        const result = await processUsdcTransfer(currentTxArray);
+        signature = result.signature;
+        
+        logger.info('Transaction processed successfully', { signature }, 'InternalTransferService');
+      } catch (submissionError) {
+        logger.error('Transaction submission failed', { 
+          error: submissionError,
+          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+        }, 'InternalTransferService');
         return {
           success: false,
-          error: 'Transaction failed - no signature received'
+          error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
         };
       }
 

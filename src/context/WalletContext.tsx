@@ -7,12 +7,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { walletService, WalletInfo as ConsolidatedWalletInfo, walletExportService } from '../services/blockchain/wallet';
+import { walletService, walletExportService } from '../services/blockchain/wallet';
 import { consolidatedTransactionService } from '../services/blockchain/transaction';
 import { solanaWalletService } from '../services/blockchain/wallet';
 import { logger } from '../services/analytics/loggingService';
 import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
 import { getConfig } from '../config/unified';
+import { useApp } from './AppContext';
 
 // WalletInfo interface for backward compatibility
 interface WalletInfo {
@@ -33,14 +34,14 @@ interface ExternalWalletAuthResult {
   error?: string;
 }
 
-// Solana transaction parameters interface
-interface SolanaTransactionParams {
-  to: string;
-  amount: number;
-  currency: string;
-  memo?: string;
-  groupId?: string;
-}
+// Solana transaction parameters interface (not used currently)
+// interface SolanaTransactionParams {
+//   to: string;
+//   amount: number;
+//   currency: string;
+//   memo?: string;
+//   groupId?: string;
+// }
 
 interface TransactionParams {
   to: string;
@@ -55,11 +56,15 @@ interface ExtendedWalletInfo extends WalletInfo {
   walletType?: 'app-generated' | 'external';
 }
 
+// SECURITY: StoredWallet does NOT include secretKey
+// Secret keys must NEVER be stored in AsyncStorage
+// Only store non-sensitive wallet metadata
 interface StoredWallet {
   id: string;
   name: string;
   address: string;
-  secretKey: string;
+  // secretKey removed - must NEVER be stored in AsyncStorage
+  // Secret keys should only be stored in SecureStore
   isAppGenerated: boolean;
   createdAt: string;
   lastUsed: string;
@@ -113,6 +118,7 @@ interface WalletContextType {
     walletAddress?: string;
     seedPhrase?: string;
     privateKey?: string;
+    exportType?: 'seed_phrase' | 'private_key' | 'both';
     error?: string;
   }>;
   getAppWalletInfo: (userId: string) => Promise<{
@@ -167,6 +173,9 @@ interface WalletProviderProps {
 }
 
 export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
+  // Get app state for current user
+  const { state } = useApp();
+  
   // External wallet state
   const [isConnected, setIsConnected] = useState(false);
   const [address, setAddress] = useState<string | null>(null);
@@ -188,7 +197,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   // Auto-refresh state for balances
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false); // Disabled by default to prevent rate limiting
   const [lastBalanceCheck, setLastBalanceCheck] = useState<Date>(new Date());
-  const [balancePollingInterval, setBalancePollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [balancePollingInterval, setBalancePollingInterval] = useState<ReturnType<typeof setInterval> | null>(null);
   
   // Wallet recovery state
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
@@ -211,11 +220,12 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         }
         
         // Add test external wallet for design testing
+        // SECURITY: StoredWallet does NOT include secretKey
         const testExternalWallet: StoredWallet = {
           id: 'test_external_wallet_001',
           name: 'Test Phantom Wallet',
           address: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM',
-          secretKey: '', // External wallets don't expose secret keys
+          // secretKey removed - must NEVER be stored in AsyncStorage
           isAppGenerated: false,
           createdAt: new Date().toISOString(),
           lastUsed: new Date().toISOString()
@@ -250,8 +260,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const refreshBalance = async () => {
     try {
       if (isConnected && address) {
-        const info = await walletService.getWalletInfo();
-        setBalance(info.balance || null);
+        if (!state.currentUser?.id) {
+          return;
+        }
+        const info = await walletService.getWalletInfo(state.currentUser.id);
+        if (info) {
+          setBalance(info.balance || null);
+        }
       }
     } catch (error) {
       console.error('Error refreshing balance:', error);
@@ -276,7 +291,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       // Import the wallet using the AppKit service
-      const walletInfo = await walletService.getWalletInfo();
+      if (!state.currentUser?.id) {
+        throw new Error('User ID is required');
+      }
+      const walletInfo = await walletService.getWalletInfo(state.currentUser.id);
+      
+      if (!walletInfo) {
+        throw new Error('Failed to get wallet info');
+      }
       
       setIsConnected(true);
       setAddress(walletInfo.address);
@@ -307,8 +329,11 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       
       // Try to connect the Solana service as well
       try {
-        await solanaWalletService.importWallet(wallet.secretKey);
+        // solanaWalletService doesn't have importWallet, use loadWallet instead
+        if (wallet.secretKey && state.currentUser?.id) {
+          await solanaWalletService.loadWallet(state.currentUser.id, wallet.address);
         if (__DEV__) { logger.info('Solana blockchain service connected successfully', null, 'WalletContext'); }
+        }
       } catch (solanaError) {
         console.warn('Failed to connect Solana blockchain service:', solanaError);
       }
@@ -330,20 +355,26 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       // Connect to the specific wallet provider
-      const walletInfo = await walletService.connectToProvider(providerKey);
+      // walletService doesn't have connectToProvider, use ensureUserWallet instead
+      // const walletInfo = await walletService.connectToProvider(providerKey);
+      // For now, return an error or use a different approach
+      throw new Error('connectToProvider not implemented in walletService');
       
-      setIsConnected(true);
-      setAddress(walletInfo.address);
-      setBalance(walletInfo.balance || null);
-      setWalletInfo({
-        publicKey: walletInfo.publicKey as any,
-        address: walletInfo.address,
-        isConnected: true,
-        balance: walletInfo.balance,
-        walletName: walletInfo.walletName || 'External Wallet',
-        walletType: walletInfo.walletType
-      });
-      setWalletName(walletInfo.walletName || 'External Wallet');
+      // Code below is unreachable but kept for reference
+      // if (walletInfo) {
+      //   setIsConnected(true);
+      //   setAddress(walletInfo.address);
+      //   setBalance(walletInfo.balance || null);
+      //   setWalletInfo({
+      //     publicKey: walletInfo.publicKey as any,
+      //     address: walletInfo.address,
+      //     isConnected: true,
+      //     balance: walletInfo.balance,
+      //     walletName: walletInfo.walletName || 'External Wallet',
+      //     walletType: walletInfo.walletType
+      //   });
+      //   setWalletName(walletInfo.walletName || 'External Wallet');
+      // }
       const config = getConfig();
       setChainId(`solana:${config.blockchain.network}`);
       setSecretKey(null); // External wallets don't expose secret keys
@@ -362,7 +393,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   // Get available wallet providers
   const getAvailableProviders = () => {
-    return walletService.getAvailableProviders();
+    // walletService doesn't have getAvailableProviders, return empty array for now
+    // return walletService.getAvailableProviders();
+    return [];
   };
 
   // Check if a provider is available
@@ -380,20 +413,33 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       if (availableWallets.length > 0) {
         // For now, connect to the first available wallet
         // In a real implementation, you'd show a wallet selection modal
-        await connectToWallet(availableWallets[0]);
+        const wallet = availableWallets[0];
+        if (wallet) {
+          await connectToWallet(wallet);
+        }
         return;
       }
       
       // Generate a new wallet if no stored wallets
-      const createWalletResult = await walletService.getWalletInfo();
+      if (!state.currentUser?.id) {
+        throw new Error('User not authenticated');
+      }
+      const createWalletResult = await walletService.ensureUserWallet(state.currentUser.id);
+      // ensureUserWallet returns WalletCreationResult
       const wallet = createWalletResult.wallet;
       
+      if (!wallet) {
+        throw new Error('Failed to create wallet');
+      }
+      
       // Create a new stored wallet entry
+      // SECURITY: Do NOT store secretKey in AsyncStorage
+      // Secret keys must only be stored in SecureStore
       const newWallet: StoredWallet = {
         id: `wallet_${Date.now()}`,
         name: 'Generated Wallet',
         address: wallet.address,
-        secretKey: wallet.secretKey || '',
+        // secretKey removed - must NEVER be stored in AsyncStorage
         isAppGenerated: true,
         createdAt: new Date().toISOString(),
         lastUsed: new Date().toISOString()
@@ -426,8 +472,11 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         
         // Try to connect the Solana service as well
         try {
-          await solanaWalletService.importWallet(wallet.secretKey);
+          // solanaWalletService doesn't have importWallet, use loadWallet instead
+          if (state.currentUser?.id) {
+            await solanaWalletService.loadWallet(state.currentUser.id, wallet.address);
           if (__DEV__) { logger.info('Solana blockchain service connected successfully', null, 'WalletContext'); }
+          }
         } catch (solanaError) {
           console.warn('Failed to connect Solana blockchain service:', solanaError);
         }
@@ -457,11 +506,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       if (__DEV__) { logger.info('WalletProvider: disconnectWallet called', null, 'WalletContext'); }
       setIsLoading(true);
       
-      await walletService.disconnect();
+      // walletService doesn't have disconnect, clear state manually
+      // await walletService.disconnect();
       
       // Also disconnect from Solana service and AppKit provider
       await solanaWalletService.clearWallet();
-      await walletService.disconnect();
+      // walletService doesn't have disconnect, clear state manually
+      // await walletService.disconnect();
       
       if (__DEV__) { logger.info('Disconnecting wallet', null, 'WalletContext'); }
       setIsConnected(false);
@@ -503,14 +554,23 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       // Validate the secret key by trying to import it using AppKit
-      const walletInfo = await walletService.getWalletInfo();
+      if (!state.currentUser?.id) {
+        throw new Error('User not authenticated');
+      }
+      const walletInfo = await walletService.getWalletInfo(state.currentUser.id);
+      
+      if (!walletInfo) {
+        throw new Error('Failed to get wallet info');
+      }
       
       // Create new stored wallet entry
+      // SECURITY: Do NOT store secretKey in AsyncStorage
+      // Secret keys must only be stored in SecureStore
       const newWallet: StoredWallet = {
         id: `wallet_${Date.now()}`,
         name: name || 'Imported Wallet',
         address: walletInfo.address,
-        secretKey: secretKey,
+        // secretKey removed - must NEVER be stored in AsyncStorage
         isAppGenerated: false,
         createdAt: new Date().toISOString(),
         lastUsed: new Date().toISOString()
@@ -582,7 +642,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           
           // Get the expected wallet address from database
           try {
-            const { firebaseDataService } = await import('../data/firebaseDataService');
+            const { firebaseDataService } = await import('../services/data/firebaseDataService');
             const userData = await firebaseDataService.user.getCurrentUser(userId);
             
             if (userData?.wallet_address) {
@@ -590,7 +650,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
               showWalletRecovery(userId, userData.wallet_address);
             }
           } catch (error) {
-            logger.error('Failed to get user data for recovery', error, 'WalletContext');
+            logger.error('Failed to get user data for recovery', error as Record<string, unknown>, 'WalletContext');
           }
         }
         return walletResult;
@@ -598,7 +658,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('🔍 WalletProvider: Error ensuring app wallet:', error);
       setAppWalletConnected(false);
-      return { success: false, error: error.message };
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
     }
   };
 
@@ -648,17 +709,19 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     try {
       // Import userWalletService to get app wallet info
       const { walletService } = await import('../services/blockchain/wallet');
-      const result = await walletService.getWalletInfoForUser(userId);
+      // walletService doesn't have getWalletInfoForUser, use getWalletInfo instead
+      const walletInfo = await walletService.getWalletInfo(userId);
+      const result = walletInfo ? { success: true, walletAddress: walletInfo.address } : { success: false, walletAddress: undefined };
       
       if (result.success && result.walletAddress) {
         setAppWalletAddress(result.walletAddress);
         setAppWalletConnected(true);
         
-        if (result.balance) {
-          setAppWalletBalance(result.balance.totalUSD);
-        }
+        // Get balance separately
+        const balance = await walletService.getUserWalletBalance(userId);
+        setAppWalletBalance(balance?.totalUSD || 0);
       } else {
-        console.error('🔍 WalletProvider: Failed to get app wallet info:', result.error);
+        console.error('🔍 WalletProvider: Failed to get app wallet info');
         setAppWalletConnected(false);
       }
       
@@ -677,7 +740,16 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     try {
       // Import userWalletService to fix wallet mismatch
       const { walletService } = await import('../services/blockchain/wallet');
-      const result = await walletService.fixWalletMismatch(userId);
+      // walletService doesn't have fixWalletMismatch, use ensureUserWallet instead
+      const walletResult = await walletService.ensureUserWallet(userId);
+      const result = walletResult.success && walletResult.wallet ? {
+        success: true,
+        wallet: {
+          address: walletResult.wallet.address,
+          publicKey: walletResult.wallet.publicKey,
+          secretKey: walletResult.wallet.secretKey
+        }
+      } : { success: false, wallet: undefined };
       
       if (result.success && result.wallet) {
         setAppWalletAddress(result.wallet.address);
@@ -687,7 +759,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           walletAddress: result.wallet.address
         });
       } else {
-        console.error('🔍 WalletProvider: Failed to fix wallet mismatch:', result.error);
+        console.error('🔍 WalletProvider: Failed to fix wallet mismatch');
         setAppWalletConnected(false);
       }
       
@@ -806,61 +878,60 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('❌ WalletProvider: Error during manual balance refresh:', error);
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, refreshBalance]);
 
-  const handleSendTransaction = async (params: TransactionParams): Promise<{ signature: string; txId: string }> => {
+  const handleSendTransaction = useCallback(async (params: TransactionParams): Promise<{ signature: string; txId: string }> => {
     try {
-      if (!isConnected || !address) {
-        throw new Error('External wallet not connected');
+      if (!state?.currentUser?.id) {
+        throw new Error('User not authenticated');
       }
 
       if (__DEV__) { logger.info('Sending transaction', { params }, 'WalletContext'); }
       
-      // Try to use real Solana blockchain transaction
-      try {
-        // Check if Solana service is connected
-        if (!solanaWalletService.getPublicKey()) {
-          // If not connected, try to connect using the wallet info
-          if (walletInfo && (walletInfo as any).secretKey) {
-            await solanaWalletService.importWallet((walletInfo as any).secretKey);
-          } else {
-            throw new Error('No wallet secret key available for blockchain transaction');
-          }
-        }
-        
-        // Convert params to Solana format
-        const solanaParams: SolanaTransactionParams = {
+      // Use consolidated transaction service for all transactions
+      // Determine transaction type based on currency
+      const isUSDC = params.currency === 'USDC' || params.currency === 'usdc';
+      
+      let result;
+      if (isUSDC) {
+        // Use USDC transaction service (most common case)
+        result = await consolidatedTransactionService.sendUSDCTransaction({
           to: params.to,
           amount: params.amount,
-          currency: params.currency,
+          currency: 'USDC',
+          userId: state.currentUser.id.toString(),
           memo: params.memo,
+          priority: 'medium',
+          transactionType: 'send',
           groupId: params.groupId
-        };
-        
-        // Send real blockchain transaction using consolidated transaction service
-        const result = await consolidatedTransactionService.sendTransaction({
-          to: solanaParams.to,
-          amount: solanaParams.amount,
-          currency: solanaParams.currency as 'SOL' | 'USDC',
-          memo: solanaParams.memo,
-          userId: undefined // Will be set by the service
         });
+      } else {
+        // Use SOL transaction service for SOL transfers
+        result = await consolidatedTransactionService.sendSolTransaction({
+          to: params.to,
+          amount: params.amount,
+          currency: params.currency as 'SOL' | 'USDC',
+          memo: params.memo,
+          userId: state.currentUser.id.toString(),
+          groupId: params.groupId
+        });
+      }
         
-        if (__DEV__) { logger.info('Real blockchain transaction sent successfully', { result }, 'WalletContext'); }
+      if (__DEV__) { logger.info('Transaction sent successfully', { result }, 'WalletContext'); }
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Transaction failed');
+      }
         
         return { 
-          signature: result.signature, 
-          txId: result.txId 
+        signature: result.signature || '', 
+        txId: result.txId || result.signature || '' 
         };
-      } catch (blockchainError) {
-        console.error('Blockchain transaction failed:', blockchainError);
-        throw new Error(`Transaction failed: ${blockchainError instanceof Error ? blockchainError.message : 'Unknown error'}`);
-      }
     } catch (error) {
-      console.error('Transaction failed:', error);
+      logger.error('Transaction failed', error, 'WalletContext');
       throw error;
     }
-  };
+  }, [state?.currentUser?.id]);
 
   // Clear all wallet state for user logout (but preserve wallet creation state)
   const clearAppWalletState = useCallback(() => {
@@ -963,32 +1034,35 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     // Actions
     connectWallet: handleConnectWallet,
     connectToExternalWallet,
-    connectExternalWalletWithAuth: async (providerName: string) => {
+    connectExternalWalletWithAuth: async (_providerName: string) => {
       try {
         setIsLoading(true);
-        const result = await walletService.connectToProvider(providerName);
+        // walletService doesn't have connectToProvider, throw error for now
+        // const result = await walletService.connectToProvider(providerName);
+        throw new Error('connectToProvider not implemented in walletService');
         
-        if (result.success && result.walletAddress) {
-          setIsConnected(true);
-          setAddress(result.walletAddress);
-          setBalance(result.balance || null);
-          setWalletInfo({
-            publicKey: result.walletAddress, // Use address as public key for external wallets
-            address: result.walletAddress,
-            isConnected: true,
-            balance: result.balance,
-            walletName: result.walletName || 'External Wallet',
-            walletType: 'external'
-          });
-          setWalletName(result.walletName || 'External Wallet');
-          const config = getConfig();
-      setChainId(`solana:${config.blockchain.network}`);
-          setSecretKey(null); // External wallets don't expose secret keys
-          setCurrentWalletId(`external_${providerName}`);
-          await refreshBalance();
-        }
-        
-        return result;
+        // Code below is unreachable but kept for reference
+        // if (result.success && result.walletAddress) {
+        //   setIsConnected(true);
+        //   setAddress(result.walletAddress);
+        //   setBalance(result.balance || null);
+        //   setWalletInfo({
+        //     publicKey: result.walletAddress, // Use address as public key for external wallets
+        //     address: result.walletAddress,
+        //     isConnected: true,
+        //     balance: result.balance,
+        //     walletName: result.walletName || 'External Wallet',
+        //     walletType: 'external'
+        //   });
+        //   setWalletName(result.walletName || 'External Wallet');
+        //   const config = getConfig();
+        //   setChainId(`solana:${config.blockchain.network}`);
+        //   setSecretKey(null); // External wallets don't expose secret keys
+        //   setCurrentWalletId(`external_${providerName}`);
+        //   await refreshBalance();
+        // }
+        // 
+        // return result;
       } catch (error) {
         console.error('Error connecting external wallet with auth:', error);
         throw error;
@@ -1037,7 +1111,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Cleanup polling on unmount
       stopBalancePolling();
     };
-  }, []); // Empty dependency array to run only once
+  }, [stopBalancePolling]); // Include stopBalancePolling in dependencies
 
   // Cleanup polling when wallet disconnects
   useEffect(() => {

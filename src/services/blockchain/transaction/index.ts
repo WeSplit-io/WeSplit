@@ -13,7 +13,6 @@ export { transactionHistoryService } from './transactionHistoryService';
 // Transfer services
 export { externalTransferService } from './sendExternal';
 export { internalTransferService } from './sendInternal';
-export { default as usdcTransfer } from './usdcTransfer';
 
 export type {
   TransactionParams,

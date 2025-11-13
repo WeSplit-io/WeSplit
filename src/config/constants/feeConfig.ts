@@ -118,9 +118,11 @@ export const TRANSACTION_FEE_CONFIGS = {
 export const COMPANY_FEE_CONFIG = TRANSACTION_FEE_CONFIGS.default;
 
 // Company Wallet Configuration
+// SECURITY: Secret key is NOT stored in client-side code
+// All secret key operations must be performed on backend services
 export const COMPANY_WALLET_CONFIG = {
   address: getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS'),
-  secretKey: getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY'),
+  // secretKey removed - must be handled by backend services only
   minSolReserve: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE') || '1.0'),
   gasFeeEstimate: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE') || '0.001'),
   // Company wallet should always pay SOL fees - no fallback to user wallet
@@ -221,7 +223,7 @@ export class FeeService {
    * Get fee payer public key for SOL gas fees
    * Company wallet ALWAYS pays SOL gas fees - no exceptions
    */
-  static getFeePayerPublicKey(userPublicKey: PublicKey): PublicKey {
+  static getFeePayerPublicKey(_userPublicKey: PublicKey): PublicKey {
     if (!this.isCompanyWalletConfigured()) {
       throw new Error('Company wallet not configured. SOL gas fees must be paid by company wallet.');
     }

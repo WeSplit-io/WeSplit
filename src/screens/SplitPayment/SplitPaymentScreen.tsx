@@ -20,7 +20,7 @@ import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../s
 import { priceManagementService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, LoadingScreen, ErrorScreen, Button } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
 interface RouteParams {
@@ -182,11 +182,10 @@ const SplitPaymentScreen: React.FC = () => {
             finalBillId: billId
           }, 'SplitPaymentScreen');
           
+          // getParticipantAmount takes totalAmount and participantCount
           const participantAmount = priceManagementService.getParticipantAmount(
-            billId,
-            currentUser.id.toString(),
-            walletResult.wallet.participants.length,
-            'equal'
+            totalAmount || 0, // Ensure totalAmount is defined
+            participants.length
           );
           
           // If no authoritative price found, use the split wallet's totalAmount as fallback
@@ -370,40 +369,32 @@ const SplitPaymentScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Container>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.green} />
-          <Text style={styles.loadingText}>Loading split information...</Text>
-        </View>
-      </Container>
+      <LoadingScreen
+        message="Loading split information..."
+        showSpinner={true}
+      />
     );
   }
 
   if (error) {
     return (
-      <Container>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Error</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </Container>
+      <ErrorScreen
+        title="Error"
+        message={error}
+        onRetry={handleBack}
+        retryText="Go Back"
+      />
     );
   }
 
   if (!splitWallet || !participant) {
     return (
-      <Container>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Not Found</Text>
-          <Text style={styles.errorMessage}>Split information not found.</Text>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </Container>
+      <ErrorScreen
+        title="Not Found"
+        message="Split information not found."
+        onRetry={handleBack}
+        retryText="Go Back"
+      />
     );
   }
 

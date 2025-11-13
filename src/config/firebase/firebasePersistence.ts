@@ -4,7 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getAuth, initializeAuth } from 'firebase/auth';
 import { logger } from '../../services/analytics/loggingService';
 
 /**
@@ -13,10 +13,22 @@ import { logger } from '../../services/analytics/loggingService';
  */
 export function initializeFirebaseAuth(app: any) {
   try {
+    // Try to get ReactNativePersistence if available, otherwise use basic initialization
+    let persistence: any = undefined;
+    try {
+      // Dynamic import to handle cases where getReactNativePersistence might not be available
+      const authModule = require('firebase/auth');
+      if (authModule.getReactNativePersistence) {
+        persistence = authModule.getReactNativePersistence(AsyncStorage);
+      }
+    } catch {
+      // getReactNativePersistence not available, will use default persistence
+    }
+    
     // Always try to initialize with AsyncStorage persistence first
-    return initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage)
-    });
+    return initializeAuth(app, persistence ? {
+      persistence: persistence
+    } : {});
   } catch (error) {
     // If initialization fails (e.g., already initialized), try to get existing instance
     try {

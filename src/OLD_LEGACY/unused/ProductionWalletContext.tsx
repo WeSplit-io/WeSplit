@@ -73,20 +73,16 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
 
       // Try to restore wallet from secure storage
       // Note: This context should be used with a specific user ID
+      // SECURITY: Secret keys must NOT be stored in AsyncStorage
+      // Secret keys should only be stored in SecureStore
       const currentUserId = 'production-user'; // This should be passed from the parent component
       const storedWallet = await walletService.getUserWallet(currentUserId);
-      if (storedWallet && storedWallet.secretKey) {
-        try {
-          const keypair = Keypair.fromSecretKey(
-            new Uint8Array(JSON.parse(storedWallet.secretKey))
-          );
-          
-          await connectWallet(keypair, storedWallet.walletName || 'Restored Wallet');
-        } catch (error) {
-          console.warn('Failed to restore wallet:', error);
-          // Clear invalid wallet data
-          await walletService.clearWalletDataForUser(currentUserId);
-        }
+      // SECURITY: Secret keys must not be accessed from stored wallet metadata
+      // Secret keys should only be retrieved from SecureStore when needed
+      if (storedWallet) {
+        // Note: Secret key operations should be performed through secure storage
+        // This legacy code should not be used in production
+        console.warn('⚠️ ProductionWalletContext is legacy code and should not be used in production');
       }
     } catch (error) {
       console.error('Failed to initialize wallet:', error);
@@ -108,10 +104,13 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
       const balance = await consolidatedTransactionService.getWalletBalance();
 
       // Store wallet securely
+      // SECURITY: Secret keys must NOT be stored in AsyncStorage
+      // Secret keys should only be stored in SecureStore
       await walletService.storeWalletSecurelyPublic('current', {
         address: walletInfo.address,
         publicKey: walletInfo.publicKey,
-        secretKey: JSON.stringify(Array.from(keypair.secretKey)),
+        // SECURITY: secretKey removed - must NEVER be stored in AsyncStorage
+        // Secret keys should only be stored in SecureStore
         walletName,
       });
 

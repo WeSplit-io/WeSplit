@@ -363,7 +363,7 @@ export class TransactionHistoryService {
       currency: string;
       note?: string;
     },
-    transactionResult: any,
+    transactionResult: Record<string, unknown>,
     userId: string,
     recipientName?: string,
     senderName?: string
@@ -411,7 +411,7 @@ export class TransactionHistoryService {
       currency: string;
       note?: string;
     },
-    transactionResult: any,
+    transactionResult: Record<string, unknown>,
     userId: string,
     senderName?: string
   ): Promise<SaveTransactionResult> {

@@ -10,8 +10,6 @@ import {
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import QrCodeView from '../services/core/QrCodeView';
-import { createUsdcRequestUri } from '../services/core/solanaPay';
-import Icon from './Icon';
 import { styles } from './QRCodeModal.styles';
 import { colors } from '../theme';
 
@@ -29,8 +27,13 @@ interface QRCodeModalProps {
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Image source type for group images
+type GroupImageSource = {
+  uri: string;
+};
+
 // Image mapping for group categories
-const GROUP_IMAGES: { [key: string]: any } = {
+const GROUP_IMAGES: Record<string, GroupImageSource> = {
   trip: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftrip-icon-black.png?alt=media&token=3afeb768-566f-4fd7-a550-a19c5c4f5caf' },
   food: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ffood-icon-black.png?alt=media&token=ef382697-bf78-49e6-b3b3-f669378ebd36' },
   home: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fhouse-icon-black.png?alt=media&token=03406723-1c5b-45fd-a20b-dda8c49a2f83' },
@@ -118,7 +121,9 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
         }),
       ]).start();
     }
-  }, [visible]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // opacity and translateY are Animated.Value objects that shouldn't be in dependencies
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get the appropriate image source for the group
   const getGroupImageSource = (iconName: string) => {
@@ -166,7 +171,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
                       size={200}
                       backgroundColor={colors.white}
                       color={colors.black}
-                      useSolanaPay={qrValue && !qrValue.startsWith('wesplit://')}
+                      useSolanaPay={!!(qrValue && !qrValue.startsWith('wesplit://'))}
                       address={rawAddress}
                       label="WeSplit"
                       message={isGroup ? 'Group invite link' : 'Send USDC'}

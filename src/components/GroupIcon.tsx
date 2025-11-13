@@ -1,9 +1,14 @@
 import React from 'react';
-import { View, Image } from 'react-native';
+import { View, Image, ViewStyle, StyleProp } from 'react-native';
 import { colors } from '../theme';
 
+// Image source type for group images
+type GroupImageSource = {
+  uri: string;
+};
+
 // Image mapping for group categories
-const GROUP_IMAGES: { [key: string]: any } = {
+const GROUP_IMAGES: Record<string, GroupImageSource> = {
   trip: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftrip-icon-black.png?alt=media&token=3afeb768-566f-4fd7-a550-a19c5c4f5caf' },
   food: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ffood-icon-black.png?alt=media&token=ef382697-bf78-49e6-b3b3-f669378ebd36' },
   home: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fhouse-icon-black.png?alt=media&token=03406723-1c5b-45fd-a20b-dda8c49a2f83' },
@@ -14,7 +19,7 @@ const GROUP_IMAGES: { [key: string]: any } = {
 interface GroupIconProps {
   category: string;
   size?: number;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 const GroupIcon: React.FC<GroupIconProps> = ({ 
@@ -40,6 +45,8 @@ const GroupIcon: React.FC<GroupIconProps> = ({
         },
         style
       ]}
+      accessibilityRole="image"
+      accessibilityLabel={`${category} group icon`}
     >
       <Image
         source={getGroupImageSource(category)}
@@ -49,9 +56,11 @@ const GroupIcon: React.FC<GroupIconProps> = ({
           resizeMode: 'contain',
           tintColor: colors.white, // Apply white tint to make icons white
         }}
+        accessibilityRole="image"
+        accessibilityLabel={`${category} icon`}
       />
     </View>
   );
 };
 
-export default GroupIcon; 
+export default React.memo(GroupIcon); 

@@ -6,7 +6,7 @@ import { useWallet } from '../../../context/WalletContext';
 import { subscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod, SubscriptionService } from '../../../services/core';
 import { consolidatedTransactionService } from '../../../services/blockchain/transaction';
 import styles from './styles';
-import { Container } from '../../../components/shared';
+import { Container, LoadingScreen } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 
 interface PremiumScreenProps {
@@ -59,7 +59,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
       // Load current subscription if user is logged in
       if (currentUser) {
         try {
-          const subscription = await subscriptionService.getUserSubscription(parseInt(currentUser.id));
+          const subscription = await subscriptionService.getUserSubscription(currentUser.id);
           setCurrentSubscription(subscription);
         } catch (error) {
           // No subscription found, which is fine
@@ -112,7 +112,11 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
             onPress: async () => {
               try {
                 // Use company wallet address for premium payments
-                const companyWalletAddress = process.env.EXPO_PUBLIC_COMPANY_WALLET_ADDRESS || 'HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH';
+                const companyWalletAddress = process.env.EXPO_PUBLIC_COMPANY_WALLET_ADDRESS;
+                
+                if (!companyWalletAddress) {
+                  throw new Error('Company wallet address is not configured. Please contact support.');
+                }
                 
                 // Send payment transaction to company wallet
                 const transactionResult = await sendTransaction({
@@ -124,14 +128,11 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
                 });
                 
                 // Process the crypto payment on backend
-                const paymentResult = await subscriptionService.processPayment({
-                  userId: currentUser.id,
-                  planId: plan.id,
-                  paymentMethod: selectedPaymentMethod,
-                  amount: currency === 'USDC' ? plan.price : cryptoAmount,
-                  currency: currency,
-                  transactionSignature: transactionResult.signature
-                });
+                const paymentResult = await subscriptionService.processPayment(
+                  currentUser.id,
+                  plan.id.toString(),
+                  selectedPaymentMethod || 'crypto'
+                );
                 
                 if (paymentResult.success) {
                   Alert.alert(
@@ -140,7 +141,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
                     [{ text: 'OK', onPress: () => loadPremiumData() }]
                   );
                 } else {
-                  throw new Error(paymentResult.message);
+                  throw new Error(paymentResult.error || 'Payment processing failed');
                 }
               } catch (paymentError) {
                 console.error('Payment error:', paymentError);
@@ -172,7 +173,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
           onPress: async () => {
             try {
               setLoading(true);
-              await subscriptionService.cancelSubscription(parseInt(currentUser.id));
+              await subscriptionService.cancelSubscription(currentSubscription?.id || '');
               Alert.alert('Subscription Cancelled', 'Your subscription will end at the current period end.');
               loadPremiumData();
             } catch (error) {
@@ -195,7 +196,8 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
 
     try {
       setLoading(true);
-      const subscription = await subscriptionService.validateSubscription(parseInt(currentUser.id));
+      const subscriptionResult = await subscriptionService.validateSubscription(currentSubscription?.id || '');
+      const subscription = subscriptionResult.subscription;
       
       if (subscription) {
         Alert.alert('Subscription Restored', 'Your premium subscription has been restored!');
@@ -219,10 +221,10 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
           onBackPress={() => navigation.goBack()}
           showBackButton={true}
         />
-        <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="large" color="#A5EA15" />
-          <Text style={{ color: '#FFF', marginTop: 16 }}>Loading premium features...</Text>
-        </View>
+        <LoadingScreen
+          message="Loading premium features..."
+          showSpinner={true}
+        />
       </Container>
     );
   }

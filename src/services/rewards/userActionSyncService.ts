@@ -7,11 +7,16 @@
 import { logger } from '../analytics/loggingService';
 import { questService } from './questService';
 import { firebaseDataService } from '../data/firebaseDataService';
+import { seasonService } from './seasonService';
+import { getSeasonReward, calculateRewardPoints } from './seasonRewardsConfig';
+import { pointsService } from './pointsService';
+import { referralService } from './referralService';
 
 class UserActionSyncService {
   /**
    * Sync onboarding completion
-   * Should be called when user completes onboarding flow
+   * ⚠️ DISABLED: This quest has been replaced by the season-based system
+   * This method is kept for backward compatibility but will not award points
    */
   async syncOnboardingCompletion(userId: string, hasCompleted: boolean = true): Promise<void> {
     try {
@@ -22,24 +27,9 @@ class UserActionSyncService {
 
       logger.info('Onboarding status synced', { userId, hasCompleted }, 'UserActionSyncService');
 
-      // Trigger onboarding quest completion if not already completed
-      if (hasCompleted) {
-        try {
-          const isCompleted = await questService.isQuestCompleted(userId, 'complete_onboarding');
-          if (!isCompleted) {
-            const questResult = await questService.completeQuest(userId, 'complete_onboarding');
-            if (questResult.success) {
-              logger.info('✅ Onboarding quest completed', {
-                userId,
-                pointsAwarded: questResult.pointsAwarded
-              }, 'UserActionSyncService');
-            }
-          }
-        } catch (questError) {
-          logger.error('Failed to complete onboarding quest', { userId, questError }, 'UserActionSyncService');
-          // Don't throw - quest completion failure shouldn't break onboarding
-        }
-      }
+      // DISABLED: Old quest (complete_onboarding) - replaced by season-based system
+      // Quest completion is now handled by setup_account_pp quest
+      // No points will be awarded for this legacy quest
     } catch (error) {
       logger.error('Failed to sync onboarding completion', { userId, error }, 'UserActionSyncService');
       throw error;
@@ -48,7 +38,8 @@ class UserActionSyncService {
 
   /**
    * Sync profile image upload
-   * Should be called when user uploads or updates their avatar
+   * ⚠️ DISABLED: This quest has been replaced by the season-based system
+   * This method is kept for backward compatibility but will not award points
    */
   async syncProfileImage(userId: string, avatarUrl: string): Promise<void> {
     try {
@@ -59,24 +50,8 @@ class UserActionSyncService {
 
       logger.info('Profile image synced', { userId, hasAvatar: !!avatarUrl }, 'UserActionSyncService');
 
-      // Trigger profile image quest completion if avatar exists and not already completed
-      if (avatarUrl && avatarUrl.trim() !== '') {
-        try {
-          const isCompleted = await questService.isQuestCompleted(userId, 'profile_image');
-          if (!isCompleted) {
-            const questResult = await questService.completeQuest(userId, 'profile_image');
-            if (questResult.success) {
-              logger.info('✅ Profile image quest completed', {
-                userId,
-                pointsAwarded: questResult.pointsAwarded
-              }, 'UserActionSyncService');
-            }
-          }
-        } catch (questError) {
-          logger.error('Failed to complete profile image quest', { userId, questError }, 'UserActionSyncService');
-          // Don't throw - quest completion failure shouldn't break profile update
-        }
-      }
+      // DISABLED: Old quest (profile_image) - replaced by season-based system
+      // No points will be awarded for this legacy quest
     } catch (error) {
       logger.error('Failed to sync profile image', { userId, error }, 'UserActionSyncService');
       throw error;
@@ -85,31 +60,16 @@ class UserActionSyncService {
 
   /**
    * Sync first transaction
-   * Should be called when user completes their first transaction
-   * Note: This is already handled in ConsolidatedTransactionService and sendInternal.ts
-   * but we keep this for consistency and as a fallback
+   * ⚠️ DISABLED: This quest has been replaced by the season-based system
+   * Transaction points are now awarded via awardTransactionPoints() which uses season-based rewards
+   * This method is kept for backward compatibility but will not award points
    */
   async syncFirstTransaction(userId: string): Promise<void> {
     try {
-      // Check if this is the user's first transaction
-      const isCompleted = await questService.isQuestCompleted(userId, 'first_transaction');
-      if (!isCompleted) {
-        // Verify user actually has a completed transaction
-        const transactions = await firebaseDataService.transaction.getTransactions(userId, 1);
-        const hasCompletedTransaction = transactions.some(
-          tx => tx.type === 'send' && tx.status === 'completed'
-        );
-
-        if (hasCompletedTransaction) {
-          const questResult = await questService.completeQuest(userId, 'first_transaction');
-          if (questResult.success) {
-            logger.info('✅ First transaction quest completed', {
-              userId,
-              pointsAwarded: questResult.pointsAwarded
-            }, 'UserActionSyncService');
-          }
-        }
-      }
+      // DISABLED: Old quest (first_transaction) - replaced by season-based system
+      // Transaction points are now awarded via awardTransactionPoints() which uses season-based rewards
+      // No points will be awarded for this legacy quest
+      logger.info('First transaction sync called (disabled)', { userId }, 'UserActionSyncService');
     } catch (error) {
       logger.error('Failed to sync first transaction', { userId, error }, 'UserActionSyncService');
       // Don't throw - quest completion failure shouldn't break transaction flow
@@ -118,26 +78,14 @@ class UserActionSyncService {
 
   /**
    * Sync first contact addition
-   * Should be called when user adds their first contact
+   * ⚠️ DISABLED: This quest has been replaced by the season-based system
+   * This method is kept for backward compatibility but will not award points
    */
   async syncFirstContact(userId: string): Promise<void> {
     try {
-      // Check if this is the user's first contact
-      const isCompleted = await questService.isQuestCompleted(userId, 'add_first_contact');
-      if (!isCompleted) {
-        // Verify user actually has contacts
-        const contacts = await firebaseDataService.contact.getContacts(userId);
-        if (contacts.length > 0) {
-          const questResult = await questService.completeQuest(userId, 'add_first_contact');
-          if (questResult.success) {
-            logger.info('✅ First contact quest completed', {
-              userId,
-              pointsAwarded: questResult.pointsAwarded,
-              contactsCount: contacts.length
-            }, 'UserActionSyncService');
-          }
-        }
-      }
+      // DISABLED: Old quest (add_first_contact) - replaced by season-based system
+      // No points will be awarded for this legacy quest
+      logger.info('First contact sync called (disabled)', { userId }, 'UserActionSyncService');
     } catch (error) {
       logger.error('Failed to sync first contact', { userId, error }, 'UserActionSyncService');
       // Don't throw - quest completion failure shouldn't break contact addition
@@ -146,31 +94,16 @@ class UserActionSyncService {
 
   /**
    * Sync first split creation
-   * Should be called when user creates their first split
+   * ⚠️ DISABLED: This quest has been replaced by the season-based system
+   * Split rewards are now handled by first_split_with_friends quest and split rewards service
+   * This method is kept for backward compatibility but will not award points
    */
   async syncFirstSplit(userId: string): Promise<void> {
     try {
-      // Check if this is the user's first split
-      const isCompleted = await questService.isQuestCompleted(userId, 'create_first_split');
-      if (!isCompleted) {
-        // Verify user actually created a split
-        const { SplitStorageService } = await import('../splits/splitStorageService');
-        const result = await SplitStorageService.getUserSplits(userId);
-        
-        if (result.success && result.splits) {
-          const userCreatedSplits = result.splits.filter(split => split.creatorId === userId);
-          if (userCreatedSplits.length > 0) {
-            const questResult = await questService.completeQuest(userId, 'create_first_split');
-            if (questResult.success) {
-              logger.info('✅ First split quest completed', {
-                userId,
-                pointsAwarded: questResult.pointsAwarded,
-                splitsCreated: userCreatedSplits.length
-              }, 'UserActionSyncService');
-            }
-          }
-        }
-      }
+      // DISABLED: Old quest (create_first_split) - replaced by season-based system
+      // Split rewards are now handled by first_split_with_friends quest and split rewards service
+      // No points will be awarded for this legacy quest
+      logger.info('First split sync called (disabled)', { userId }, 'UserActionSyncService');
     } catch (error) {
       logger.error('Failed to sync first split', { userId, error }, 'UserActionSyncService');
       // Don't throw - quest completion failure shouldn't break split creation
@@ -297,51 +230,71 @@ class UserActionSyncService {
       // Get user data
       const user = await firebaseDataService.user.getCurrentUser(userId);
 
-      // 1. Check onboarding
-      if (user.hasCompletedOnboarding || user.wallet_address || user.name) {
-        try {
-          await this.syncOnboardingCompletion(userId, true);
-          synced.push('onboarding');
-        } catch (error) {
-          errors.push(`Failed to sync onboarding: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
+      // DISABLED: Legacy quests (complete_onboarding, profile_image)
+      // These have been replaced by the new season-based quest system
+      // 1. Check onboarding - DISABLED
+      // if (user.hasCompletedOnboarding || user.wallet_address || user.name) {
+      //   try {
+      //     await this.syncOnboardingCompletion(userId, true);
+      //     synced.push('onboarding');
+      //   } catch (error) {
+      //     errors.push(`Failed to sync onboarding: ${error instanceof Error ? error.message : String(error)}`);
+      //   }
+      // }
 
-      // 2. Check profile image
-      if (user.avatar && user.avatar.trim() !== '') {
-        try {
-          await this.syncProfileImage(userId, user.avatar);
-          synced.push('profile_image');
-        } catch (error) {
-          errors.push(`Failed to sync profile image: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
+      // 2. Check profile image - DISABLED
+      // if (user.avatar && user.avatar.trim() !== '') {
+      //   try {
+      //     await this.syncProfileImage(userId, user.avatar);
+      //     synced.push('profile_image');
+      //   } catch (error) {
+      //     errors.push(`Failed to sync profile image: ${error instanceof Error ? error.message : String(error)}`);
+      //   }
+      // }
 
-      // 3. Check first transaction
+      // DISABLED: Legacy quests (first_transaction, add_first_contact, create_first_split)
+      // These have been replaced by the new season-based quest system
+      // 3. Check first transaction - DISABLED
+      // try {
+      //   await this.syncFirstTransaction(userId);
+      //   synced.push('first_transaction');
+      //   
+      //   // Also check if transaction points need to be backfilled for old transactions
+      //   await this.checkAndBackfillTransactionPoints(userId);
+      // } catch (error) {
+      //   errors.push(`Failed to sync first transaction: ${error instanceof Error ? error.message : String(error)}`);
+      // }
+
+      // 4. Check first contact - DISABLED
+      // try {
+      //   await this.syncFirstContact(userId);
+      //   synced.push('first_contact');
+      // } catch (error) {
+      //   errors.push(`Failed to sync first contact: ${error instanceof Error ? error.message : String(error)}`);
+      // }
+
+      // 5. Check first split - DISABLED
+      // try {
+      //   await this.syncFirstSplit(userId);
+      //   synced.push('first_split');
+      // } catch (error) {
+      //   errors.push(`Failed to sync first split: ${error instanceof Error ? error.message : String(error)}`);
+      // }
+
+      // 6. Check seed phrase export
       try {
-        await this.syncFirstTransaction(userId);
-        synced.push('first_transaction');
-        
-        // Also check if transaction points need to be backfilled for old transactions
-        await this.checkAndBackfillTransactionPoints(userId);
+        await this.syncSeedPhraseExport(userId);
+        synced.push('seed_phrase_export');
       } catch (error) {
-        errors.push(`Failed to sync first transaction: ${error instanceof Error ? error.message : String(error)}`);
+        errors.push(`Failed to sync seed phrase export: ${error instanceof Error ? error.message : String(error)}`);
       }
 
-      // 4. Check first contact
+      // 7. Check external wallet linking
       try {
-        await this.syncFirstContact(userId);
-        synced.push('first_contact');
+        await this.syncExternalWalletLinking(userId);
+        synced.push('external_wallet_linking');
       } catch (error) {
-        errors.push(`Failed to sync first contact: ${error instanceof Error ? error.message : String(error)}`);
-      }
-
-      // 5. Check first split
-      try {
-        await this.syncFirstSplit(userId);
-        synced.push('first_split');
-      } catch (error) {
-        errors.push(`Failed to sync first split: ${error instanceof Error ? error.message : String(error)}`);
+        errors.push(`Failed to sync external wallet linking: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       logger.info('User actions verified and synced', {
@@ -356,6 +309,125 @@ class UserActionSyncService {
     }
 
     return { synced, errors };
+  }
+
+  /**
+   * Sync seed phrase export
+   * Should be called when user exports their seed phrase
+   */
+  async syncSeedPhraseExport(userId: string): Promise<void> {
+    try {
+      const isCompleted = await questService.isQuestCompleted(userId, 'export_seed_phrase');
+      if (!isCompleted) {
+        // Check if user has seed phrase (indicates they've exported it)
+        const user = await firebaseDataService.user.getCurrentUser(userId);
+        if (user.wallet_has_seed_phrase) {
+          // completeQuest will handle awarding points (no need to call awardSeasonPoints separately)
+          const questResult = await questService.completeQuest(userId, 'export_seed_phrase');
+          
+          if (questResult.success) {
+            logger.info('✅ Seed phrase export quest completed', {
+              userId,
+              pointsAwarded: questResult.pointsAwarded,
+              totalPoints: questResult.totalPoints
+            }, 'UserActionSyncService');
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync seed phrase export', { userId, error }, 'UserActionSyncService');
+      // Don't throw - quest completion failure shouldn't break flow
+    }
+  }
+
+  /**
+   * Sync account setup with privacy policy
+   * Should be called when user completes account setup with privacy policy acceptance
+   */
+  async syncAccountSetupPP(userId: string): Promise<void> {
+    try {
+      const isCompleted = await questService.isQuestCompleted(userId, 'setup_account_pp');
+      if (!isCompleted) {
+        // Check if user has completed onboarding (indicates they've set up account)
+        const user = await firebaseDataService.user.getCurrentUser(userId);
+        if (user.hasCompletedOnboarding) {
+          // completeQuest will handle awarding points (no need to call awardSeasonPoints separately)
+          const questResult = await questService.completeQuest(userId, 'setup_account_pp');
+          
+          if (questResult.success) {
+            logger.info('✅ Account setup PP quest completed', {
+              userId,
+              pointsAwarded: questResult.pointsAwarded,
+              totalPoints: questResult.totalPoints
+            }, 'UserActionSyncService');
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync account setup PP', { userId, error }, 'UserActionSyncService');
+      // Don't throw - quest completion failure shouldn't break flow
+    }
+  }
+
+  /**
+   * Sync first split with friends
+   * Should be called when user creates their first split with friends
+   */
+  async syncFirstSplitWithFriends(userId: string, splitId: string, participantCount: number): Promise<void> {
+    try {
+      const isCompleted = await questService.isQuestCompleted(userId, 'first_split_with_friends');
+      if (!isCompleted) {
+        // Check if split has multiple participants (friends)
+        if (participantCount > 1) {
+          // completeQuest will handle awarding points (no need to call awardSeasonPoints separately)
+          const questResult = await questService.completeQuest(userId, 'first_split_with_friends');
+          
+          if (questResult.success) {
+            logger.info('✅ First split with friends quest completed', {
+              userId,
+              splitId,
+              participantCount,
+              pointsAwarded: questResult.pointsAwarded,
+              totalPoints: questResult.totalPoints
+            }, 'UserActionSyncService');
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync first split with friends', { userId, error }, 'UserActionSyncService');
+      // Don't throw - quest completion failure shouldn't break split creation
+    }
+  }
+
+  /**
+   * Sync external wallet linking
+   * Should be called when user links their first external wallet
+   */
+  async syncExternalWalletLinking(userId: string): Promise<void> {
+    try {
+      const isCompleted = await questService.isQuestCompleted(userId, 'first_external_wallet_linked');
+      if (!isCompleted) {
+        // Check if user has linked external wallets
+        const linkedWallets = await firebaseDataService.linkedWallet.getLinkedWallets(userId);
+        const externalWallets = linkedWallets.filter(w => w.type === 'external');
+        
+        if (externalWallets.length > 0) {
+          // completeQuest will handle awarding points (no need to call awardSeasonPoints separately)
+          const questResult = await questService.completeQuest(userId, 'first_external_wallet_linked');
+          
+          if (questResult.success) {
+            logger.info('✅ External wallet linking quest completed', {
+              userId,
+              pointsAwarded: questResult.pointsAwarded,
+              totalPoints: questResult.totalPoints
+            }, 'UserActionSyncService');
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync external wallet linking', { userId, error }, 'UserActionSyncService');
+      // Don't throw - quest completion failure shouldn't break flow
+    }
   }
 }
 

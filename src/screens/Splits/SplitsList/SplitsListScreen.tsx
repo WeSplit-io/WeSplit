@@ -4,7 +4,7 @@
  * Renamed from GroupsListScreen to focus on bill splitting functionality
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -17,6 +17,8 @@ import {
   RefreshControl,
   ActivityIndicator,
   StyleSheet,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';  
@@ -25,7 +27,7 @@ import NavBar from '../../../components/shared/NavBar';
 import Avatar from '../../../components/shared/Avatar';
 import GroupIcon from '../../../components/GroupIcon';
 import Icon from '../../../components/Icon';
-import { Container } from '../../../components/shared';
+import { Container, Button, ModernLoader } from '../../../components/shared';
 import { BillSplitSummary } from '../../../types/billSplitting';
 import { splitStorageService, Split, SplitStorageService } from '../../../services/splits';
 import { logger } from '../../../services/analytics/loggingService';
@@ -73,6 +75,19 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'closed'>('all');
   const [participantAvatars, setParticipantAvatars] = useState<Record<string, string>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalSplits, setTotalSplits] = useState(0); // Track total splits for page calculation
+  const [lastDoc, setLastDoc] = useState<any>(null); // Store last document for pagination
+  const [pageHistory, setPageHistory] = useState<Array<{ page: number; lastDoc: any }>>([]); // Track page history for navigation
+  const SPLITS_PER_PAGE = 20;
+  
+  // Refs to prevent infinite loops
+  const hasLoadedOnFocusRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
+  
+  // Calculate total pages
+  const totalPages = Math.ceil(totalSplits / SPLITS_PER_PAGE) || 1;
 
   // Load participant avatars dynamically
   const loadParticipantAvatars = useCallback(async (splits: Split[]) => {
@@ -124,21 +139,49 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
   useEffect(() => {
     if (currentUser?.id) {
-      loadSplits();
+      // Check if user changed
+      if (lastUserIdRef.current !== currentUser.id) {
+        // Reset to page 1 when user changes
+        setCurrentPage(1);
+        setPageHistory([]);
+        setLastDoc(null);
+        hasLoadedOnFocusRef.current = false;
+        lastUserIdRef.current = currentUser.id;
+        loadSplits(1, undefined);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // loadSplits is stable and doesn't need to be in deps
   }, [currentUser?.id]);
 
-  // Refresh splits when screen comes into focus (e.g., after joining a split)
+  // Refresh splits when screen comes into focus (e.g., after joining a split or creating a new one)
   useFocusEffect(
     useCallback(() => {
-      if (currentUser?.id) {
+      if (!currentUser?.id) {
+        return;
+      }
+      
+      // Check if user changed (login/logout)
+      const userChanged = lastUserIdRef.current !== currentUser.id;
+      if (userChanged) {
+        hasLoadedOnFocusRef.current = false;
+        lastUserIdRef.current = currentUser.id;
+        // Reset to page 1 when user changes
+        setCurrentPage(1);
+        setPageHistory([]);
+        setLastDoc(null);
+      }
+      
+      // Always reload on focus to ensure we have the latest splits
+      // This is important when user creates a new split and navigates back
         if (__DEV__) {
-          logger.debug('Screen focused, refreshing splits for user', { userId: currentUser.id }, 'SplitsListScreen');
+          logger.debug('Screen focused, loading splits for user', { userId: currentUser.id }, 'SplitsListScreen');
         }
         // Clear avatar cache to force reload
         setParticipantAvatars({});
-        loadSplits();
-      }
+        // Load page 1 on focus (user might have created a new split)
+        loadSplits(1, undefined);
+        hasLoadedOnFocusRef.current = true;
     }, [currentUser?.id])
   );
 
@@ -149,37 +192,35 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
   }, [splits, loadParticipantAvatars]);
 
-  const loadSplits = async () => {
+  const loadSplits = async (page: number = 1, lastDocument?: any) => {
     if (!currentUser?.id) {
       logger.debug('No current user, skipping load', null, 'SplitsListScreen');
       return;
     }
 
     setIsLoading(true);
-    try {
-      logger.debug('Loading splits for user', { userId: currentUser.id }, 'SplitsListScreen');
 
-      const result = await SplitStorageService.getUserSplits(String(currentUser.id));
+    try {
+      if (__DEV__) {
+        logger.debug('Loading splits for user', { userId: currentUser.id, page }, 'SplitsListScreen');
+      }
+
+      const result = await SplitStorageService.getUserSplits(
+        String(currentUser.id),
+        SPLITS_PER_PAGE,
+        page,
+        lastDocument
+      );
 
       if (result.success && result.splits) {
-        logger.debug('Loaded splits', {
-          count: result.splits.length,
-          splits: result.splits.map(s => ({
-            id: s.id,
-            title: s.title,
-            status: s.status,
-            splitType: s.splitType,
-            totalAmount: s.totalAmount,
-            date: s.date,
-            createdAt: s.createdAt,
-            participantsCount: s.participants.length,
-            participants: s.participants.map(p => ({
-              userId: p.userId,
-              name: p.name,
-              status: p.status
-            }))
-          }))
-        });
+        if (__DEV__) {
+          logger.debug('Loaded splits', {
+            count: result.splits.length,
+            hasMore: result.hasMore,
+            page: result.currentPage,
+            willShowPagination: result.hasMore || result.currentPage > 1
+          }, 'SplitsListScreen');
+        }
 
         // Fix existing splits where creator has 'pending' status and validate prices
         const updatedSplits = await Promise.all(result.splits.map(async (split) => {
@@ -226,8 +267,52 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
         // Set the splits without test data
         setSplits(updatedSplits);
+        // hasMore is true if we got exactly SPLITS_PER_PAGE splits (meaning there might be more)
+        const calculatedHasMore = result.hasMore !== undefined ? result.hasMore : (updatedSplits.length === SPLITS_PER_PAGE);
+        setHasMore(calculatedHasMore);
+        setCurrentPage(page);
+        
+        // Update total splits count for page calculation
+        // If we're on page 1, estimate total based on hasMore
+        if (page === 1) {
+          if (calculatedHasMore) {
+            // We have at least SPLITS_PER_PAGE + 1 splits
+            setTotalSplits(updatedSplits.length + 1); // Minimum estimate
+          } else {
+            // This is all the splits
+            setTotalSplits(updatedSplits.length);
+          }
+        } else {
+          // For subsequent pages, update estimate
+          const estimatedTotal = (page - 1) * SPLITS_PER_PAGE + updatedSplits.length;
+          if (calculatedHasMore) {
+            setTotalSplits(estimatedTotal + 1); // At least one more
+          } else {
+            setTotalSplits(estimatedTotal); // This is the total
+          }
+        }
+        
+        if (__DEV__) {
+          console.log('🔍 SplitsListScreen: Pagination state', {
+            splitsCount: updatedSplits.length,
+            hasMore: calculatedHasMore,
+            currentPage: page,
+            totalSplits: totalSplits,
+            totalPages: Math.ceil(totalSplits / SPLITS_PER_PAGE) || 1
+          });
+        }
+        
+        // Store last document for next page navigation
+        if (result.lastDoc) {
+          setLastDoc(result.lastDoc);
+          // Update page history
+          setPageHistory(prev => {
+            const newHistory = prev.filter(h => h.page < page);
+            return [...newHistory, { page, lastDoc: result.lastDoc }];
+          });
+        }
 
-        // Force reload participant avatars (clear cache first)
+        // Force reload participant avatars
         setParticipantAvatars({});
         loadParticipantAvatars(updatedSplits);
       } else {
@@ -244,20 +329,95 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
   };
 
+  const goToNextPage = useCallback(() => {
+    if (!isLoading && hasMore && currentUser?.id) {
+      loadSplits(currentPage + 1, lastDoc);
+    }
+  }, [isLoading, hasMore, currentUser?.id, currentPage, lastDoc]);
+
+  const goToPreviousPage = useCallback(() => {
+    if (!isLoading && currentPage > 1 && currentUser?.id) {
+      // Find the lastDoc for the previous page from history
+      const prevPageHistory = pageHistory.find(h => h.page === currentPage - 1);
+      const prevLastDoc = prevPageHistory?.lastDoc || null;
+      
+      // For page 1, we don't need lastDoc
+      if (currentPage === 2) {
+        loadSplits(1, undefined);
+      } else if (prevLastDoc) {
+        // We need to go back 2 pages to get the correct lastDoc
+        const twoPagesBack = pageHistory.find(h => h.page === currentPage - 2);
+        loadSplits(currentPage - 1, twoPagesBack?.lastDoc);
+      } else {
+        // Fallback: reload from beginning and navigate
+        loadSplits(1, undefined);
+        // Then navigate to the desired page
+        setTimeout(() => {
+          if (currentPage - 1 > 1) {
+            // This is a simplified approach - in production, you might want to cache all pages
+            loadSplits(currentPage - 1, undefined);
+          }
+        }, 100);
+      }
+    }
+  }, [isLoading, currentPage, currentUser?.id, pageHistory]);
+
+  // Swipe gesture handler - created after navigation functions are defined
+  // Use refs to access latest values
+  const currentPageRef = useRef(currentPage);
+  const hasMoreRef = useRef(hasMore);
+  
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+    hasMoreRef.current = hasMore;
+  }, [currentPage, hasMore]);
+  
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to horizontal swipes
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 10;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const { dx } = gestureState;
+        const swipeThreshold = 50; // Minimum swipe distance
+        
+        if (Math.abs(dx) > swipeThreshold) {
+          if (dx > 0) {
+            // Swipe right - go to previous page
+            if (currentPageRef.current > 1) {
+              goToPreviousPage();
+            }
+          } else {
+            // Swipe left - go to next page
+            if (hasMoreRef.current) {
+              goToNextPage();
+            }
+          }
+        }
+      },
+    })
+  ).current;
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadSplits();
+    // Reset to page 1 on refresh
+    setCurrentPage(1);
+    setPageHistory([]);
+    setLastDoc(null);
+    await loadSplits(1, undefined);
     setRefreshing(false);
   }, []);
 
 
   const handleCreateSplit = useCallback(() => {
     try {
-      // Temporarily disabled OCR access - navigate to manual creation instead
-      navigation.navigate('ManualBillCreation');
+      // Navigate to camera screen for OCR-based split creation
+      navigation.navigate('BillCamera');
     } catch (err) {
-      console.error('❌ SplitsListScreen: Error navigating to manual creation:', err);
-      Alert.alert('Navigation Error', 'Failed to open manual creation');
+      console.error('❌ SplitsListScreen: Error navigating to camera:', err);
+      Alert.alert('Navigation Error', 'Failed to open camera');
     }
   }, [navigation]);
 
@@ -328,10 +488,13 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
       // Always navigate to SplitDetails first for consistent behavior
       // This ensures all splits (OCR and manual) follow the same flow
+      // CRITICAL: Explicitly set isNewBill and isManualCreation to false for existing splits
       navigation.navigate('SplitDetails', {
         splitId: split.id,
         splitData: split,
-        isEditing: false
+        isEditing: false,
+        isNewBill: false, // Explicitly mark as existing split
+        isManualCreation: false, // Explicitly mark as existing split
       });
     } catch (err) {
       console.error('❌ SplitsListScreen: Error navigating to split details:', err);
@@ -473,7 +636,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
     return splits.filter(split => {
       if (activeFilter === 'active') {
-        return split.status === 'active';
+        // Include active, pending, and draft splits in "active" filter
+        return split.status === 'active' || split.status === 'pending' || split.status === 'draft';
       }
       if (activeFilter === 'closed') {
         return split.status === 'completed' || split.status === 'cancelled';
@@ -487,12 +651,17 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
   return (
     <Container>
 
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+      <View 
+        style={styles.scrollContainer}
+        {...panResponder.panHandlers}
       >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Pools</Text>
@@ -591,11 +760,19 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
+        {/* Page Indicator - Below filter tabs */}
+        {(hasMore || currentPage > 1) && displaySplits.length > 0 && (
+          <View style={styles.pageIndicatorContainer}>
+            <Text style={styles.pageIndicatorText}>
+              Page {currentPage} of {totalPages}
+            </Text>
+          </View>
+        )}
+
         {/* Splits List */}
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.green} />
-            <Text style={styles.loadingText}>Loading splits...</Text>
+            <ModernLoader size="large" text="Loading splits..." />
           </View>
         ) : splits.length === 0 ? (
           // Global empty state when there are no pools at all
@@ -610,20 +787,13 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
                 Pools let you bring people together and share expenses seamlessly. Create one to kick things off!
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.createFirstButtonWrapper}
+            <Button
+              title="Create my first pool"
               onPress={handleCreateSplit}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.createFirstButton}
-              >
-                <Text style={styles.createFirstButtonText}>Create my first pool</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+              variant="primary"
+              size="large"
+              style={styles.createFirstButtonWrapper}
+            />
           </View>
         ) : displaySplits.length === 0 ? (
           // Compact empty state for tabs (e.g., Closed) with no results
@@ -635,7 +805,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             {displaySplits.map(renderSplitCard)}
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       <NavBar currentRoute="SplitsList" navigation={navigation} />
     </Container>

@@ -4,7 +4,7 @@
  */
 
 // Core Components
-export { default as AddButton } from './AddButton';
+// Removed AddButton - file doesn't exist
 export { default as AddDestinationSheet } from './AddDestinationSheet';
 export { default as AppLoadingScreen } from './AppLoadingScreen';
 export { default as BalanceRow } from './BalanceRow';
@@ -14,10 +14,10 @@ export { default as GroupIcon } from './GroupIcon';
 export { default as Icon } from './Icon';
 export { default as MoonPayWidget } from './MoonPayWidget';
 export { default as NavBar } from './shared/NavBar';
-export { default as NavIcon } from './NavIcon';
+// Removed NavIcon - file doesn't exist
 export { default as NavigationWrapper } from './NavigationWrapper';
 export { default as QRCodeModal } from './QRCodeModal';
-export { default as SlideButton } from './SlideButton';
+// Removed SlideButton - file doesn't exist
 export { default as UserAvatar } from './UserAvatar';
 export { default as Avatar } from './shared/Avatar';
 

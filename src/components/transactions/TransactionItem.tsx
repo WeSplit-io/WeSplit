@@ -25,7 +25,7 @@ interface TransactionItemProps {
 const TransactionItem: React.FC<TransactionItemProps> = ({
   transaction,
   onPress,
-  showTime = true,
+  showTime: _showTime = true,
   recipientName,
   senderName,
 }) => {
@@ -89,13 +89,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
     };
   };
 
-  const transactionTime = transaction.created_at ? new Date(transaction.created_at).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  }) : 'N/A';
-
-  const { amount, color } = getTransactionAmount();
+  const { amount } = getTransactionAmount();
 
   const handlePress = () => {
     if (onPress) {
@@ -108,6 +102,9 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       style={styles.transactionItem}
       onPress={handlePress}
       disabled={!onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${getTransactionTitle()}, ${amount}`}
+      accessibilityHint={onPress ? "Opens transaction details" : undefined}
     >
       <View style={styles.transactionIconContainer}>
         {getTransactionIcon()}

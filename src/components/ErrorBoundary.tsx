@@ -1,8 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { logger } from '../services/core';
-import { colors } from '../theme';
+import ErrorScreen from './shared/ErrorScreen';
 
 interface Props {
   children: ReactNode;
@@ -40,48 +38,12 @@ class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-          <View style={{ 
-            flex: 1, 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            padding: 20 
-          }}>
-            <Text style={{ 
-              fontSize: 24, 
-              fontWeight: 'bold', 
-              color: colors.black,
-              marginBottom: 10 
-            }}>
-              Oops! Something went wrong
-            </Text>
-            <Text style={{ 
-              fontSize: 16, 
-              color: colors.GRAY,
-              textAlign: 'center',
-              marginBottom: 20 
-            }}>
-              We're sorry, but something unexpected happened. Please try again.
-            </Text>
-            <TouchableOpacity
-              style={{
-                backgroundColor: colors.primaryGreen,
-                paddingHorizontal: 20,
-                paddingVertical: 10,
-                borderRadius: 8
-              }}
-              onPress={this.handleRetry}
-            >
-              <Text style={{ 
-                color: colors.white, 
-                fontSize: 16, 
-                fontWeight: 'bold' 
-              }}>
-                Try Again
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+        <ErrorScreen
+          title="Oops! Something went wrong"
+          message="We're sorry, but something unexpected happened. Please try again."
+          onRetry={this.handleRetry}
+          retryText="Try Again"
+        />
       );
     }
 

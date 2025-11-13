@@ -135,13 +135,13 @@ export const setupGlobalErrorHandlers = () => {
     
     // Call original handler if it exists
     if (originalUnhandledRejection) {
-      originalUnhandledRejection(event);
+      (originalUnhandledRejection as any)(event);
     }
   };
 
   // Handle uncaught exceptions
   const originalUncaughtException = global.onerror;
-  global.onerror = (message: string, source?: string, lineno?: number, colno?: number, error?: Error) => {
+  (global as any).onerror = (message: string, source?: string, lineno?: number, colno?: number, error?: Error) => {
     logger.error('Uncaught exception', { 
       message, 
       source, 
@@ -159,9 +159,10 @@ export const setupGlobalErrorHandlers = () => {
   };
 
   // Handle React Native specific errors
-  if (typeof global !== 'undefined' && global.ErrorUtils) {
-    const originalGlobalHandler = global.ErrorUtils.getGlobalHandler();
-    global.ErrorUtils.setGlobalHandler((error: Error, isFatal: boolean) => {
+  if (typeof global !== 'undefined' && (global as any).ErrorUtils) {
+    const ErrorUtils = (global as any).ErrorUtils;
+    const originalGlobalHandler = ErrorUtils.getGlobalHandler();
+    ErrorUtils.setGlobalHandler((error: Error, isFatal: boolean) => {
       // Filter out WebSocket errors from React Native error handler
       const errorMessage = error?.message?.toLowerCase() || '';
       const errorStack = error?.stack?.toLowerCase() || '';
@@ -226,10 +227,11 @@ export const safeDefineProperty = (obj: any, name: string, value: any, options: 
     
     return true;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Failed to define property', { 
       object: obj.constructor?.name, 
       property: name, 
-      error: error.message 
+      error: errorMessage 
     }, 'RuntimeErrorHandler');
     return false;
   }

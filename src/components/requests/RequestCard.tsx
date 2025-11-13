@@ -7,12 +7,17 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import Avatar from '../shared/Avatar';
+import { PaymentRequestNotificationData } from '../../types/notificationTypes';
+import { NotificationData } from '../../types/notifications';
 import styles from './RequestCard.styles';
 
+// Request can be either PaymentRequestNotificationData (direct properties) or NotificationData (with id, title, data)
+type RequestData = PaymentRequestNotificationData | (NotificationData & { data?: PaymentRequestNotificationData });
+
 interface RequestCardProps {
-  request: any;
+  request: RequestData;
   index: number;
-  onSendPress: (request: any) => void;
+  onSendPress: (request: RequestData) => void;
 }
 
 const RequestCard: React.FC<RequestCardProps> = ({
@@ -31,16 +36,31 @@ const RequestCard: React.FC<RequestCardProps> = ({
   };
 
   try {
-    const senderName = request.data?.senderName || request.data?.fromUser || request.title || 'Unknown User';
-    const amount = request.data?.amount || 0;
-    const currency = request.data?.currency || 'USDC';
-    const senderAvatar = request.data?.senderAvatar || null;
-    const description = request.data?.description || request.data?.note || '';
+    // Handle both data structures: direct properties or nested in data
+    const hasDataProperty = 'data' in request && request.data !== undefined;
+    const requestData = hasDataProperty 
+      ? (request as unknown as NotificationData).data as unknown as PaymentRequestNotificationData 
+      : request as PaymentRequestNotificationData;
+    
+    const senderName = requestData?.senderName || 
+      (requestData as unknown as Record<string, unknown>)?.fromUser as string || 
+      (request as unknown as NotificationData)?.title || 
+      'Unknown User';
+    const amount = requestData?.amount || 0;
+    const currency = requestData?.currency || 'USDC';
+    const senderAvatar = (requestData as unknown as Record<string, unknown>)?.senderAvatar as string | null || null;
+    const description = requestData?.description || 
+      (requestData as unknown as Record<string, unknown>)?.note as string || 
+      '';
+    const requestId = (request as unknown as NotificationData)?.id || 
+      (requestData as unknown as Record<string, unknown>)?.requestId as string || 
+      String(index);
+    const senderId = requestData?.senderId || '';
 
     return (
-      <View key={request.id || index} style={styles.requestItemNew}>
+      <View key={requestId} style={styles.requestItemNew}>
         <Avatar
-          userId={request.data?.senderId}
+          userId={senderId}
           userName={senderName || 'U'}
           avatarUrl={senderAvatar || ''}
           style={styles.requestAvatarNew}
@@ -55,13 +75,16 @@ const RequestCard: React.FC<RequestCardProps> = ({
           </Text>
           {description && (
             <Text style={styles.requestDescription}>
-              "{description}"
+              &quot;{description}&quot;
             </Text>
           )}
         </View>
         <TouchableOpacity
           style={styles.requestSendButtonNew}
           onPress={() => onSendPress(request)}
+          accessibilityRole="button"
+          accessibilityLabel={`Send payment of ${formatAmount(amount)} ${currency} to ${senderName}`}
+          accessibilityHint="Opens the send payment screen"
         >
           <LinearGradient
             colors={[colors.green, colors.greenLight]}

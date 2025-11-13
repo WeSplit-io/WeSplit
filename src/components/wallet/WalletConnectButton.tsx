@@ -1,12 +1,12 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, StyleProp } from 'react-native';
 import { useWallet } from '../../context/WalletContext';
 
 interface WalletConnectButtonProps {
   onConnect?: () => void;
   onDisconnect?: () => void;
-  style?: any;
-  textStyle?: any;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   showWalletName?: boolean;
 }
 

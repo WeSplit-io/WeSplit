@@ -8,9 +8,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
+import { Button } from '../shared';
 import { 
   CheckCircle, 
-  ArrowsClockwise, 
   User, 
   HandCoins, 
   PiggyBank, 
@@ -30,7 +30,7 @@ interface NotificationCardProps {
 
 const NotificationCard: React.FC<NotificationCardProps> = ({
   notification,
-  onPress,
+  onPress: _onPress,
   onActionPress,
   actionState,
   fadeAnimation

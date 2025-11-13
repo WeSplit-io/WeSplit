@@ -1,13 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth,
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
   onAuthStateChanged, 
   User as FirebaseUser,
   signOut,
-  updateProfile,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
@@ -32,6 +30,7 @@ import {
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { initializeFirebaseAuth } from './firebasePersistence';
 import { logger } from '../../services/analytics/loggingService';
@@ -157,7 +156,10 @@ export const firebaseAuth = {
       await sendSignInLinkToEmail(auth, email, settings);
       
       // Save the email for later use
-      await AsyncStorage.setItem('emailForSignIn', email);
+      // SECURITY: Use SecureStore instead of AsyncStorage for email storage
+      await SecureStore.setItemAsync('emailForSignIn', email, {
+        requireAuthentication: false, // Email is less sensitive than private keys
+      });
       
       return { success: true };
     } catch (error) {
@@ -286,9 +288,10 @@ export const firebaseAuth = {
   },
 
   // Get stored email for sign-in
+  // SECURITY: Uses SecureStore instead of AsyncStorage for email storage
   async getStoredEmail(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem('emailForSignIn');
+      return await SecureStore.getItemAsync('emailForSignIn');
     } catch (error) {
       console.error('Error getting stored email:', error);
       return null;
@@ -296,9 +299,10 @@ export const firebaseAuth = {
   },
 
   // Clear stored email
+  // SECURITY: Uses SecureStore instead of AsyncStorage for email storage
   async clearStoredEmail() {
     try {
-      await AsyncStorage.removeItem('emailForSignIn');
+      await SecureStore.deleteItemAsync('emailForSignIn');
     } catch (error) {
       console.error('Error clearing stored email:', error);
     }
@@ -329,6 +333,32 @@ export const firestoreService = {
       };
 
       await setDoc(userRef, userData, { merge: true });
+      
+      // Generate referral code and track referrals (non-blocking, fire and forget)
+      (async () => {
+        try {
+          const { referralService } = await import('../services/rewards/referralService');
+          const { userActionSyncService } = await import('../services/rewards/userActionSyncService');
+          const { updateDoc } = await import('firebase/firestore');
+          
+          // Generate referral code
+          const referralCode = referralService.generateReferralCode(user.uid);
+          await updateDoc(userRef, {
+            referral_code: referralCode
+          });
+          
+          // Track referral if provided (check route params or query params)
+          // Note: This would need to be passed from the signup flow
+          // For now, we'll handle it in the signup screen
+          
+          // Sync account setup reward
+          await userActionSyncService.syncAccountSetupPP(user.uid);
+        } catch (rewardError) {
+          console.error('Error setting up rewards for new user:', rewardError);
+          // Don't fail user creation if rewards setup fails
+        }
+      })().catch(() => {}); // Swallow errors - non-blocking
+      
       return userData;
     } catch (error) {
       console.error('Error creating user document:', error);
@@ -366,6 +396,9 @@ export const firestoreService = {
       }
       
       const userDoc = querySnapshot.docs[0];
+      if (!userDoc) {
+        return false; // No user document found
+      }
       const userData = userDoc.data();
       const lastVerifiedAt = userData.lastVerifiedAt;
       
@@ -408,6 +441,9 @@ export const firestoreService = {
       
       if (!querySnapshot.empty) {
         const userDoc = querySnapshot.docs[0];
+        if (!userDoc) {
+          return; // No user document found
+        }
         await updateDoc(userDoc.ref, {
           lastVerifiedAt: new Date().toISOString(),
           lastLoginAt: new Date().toISOString()
@@ -636,6 +672,9 @@ export const firestoreService = {
       }
 
       const doc = querySnapshot.docs[0];
+      if (!doc) {
+        return false; // No document found
+      }
       const data = doc.data();
       
       if (__DEV__) { logger.debug('Document data', { data }, 'firebase'); }
@@ -652,6 +691,9 @@ export const firestoreService = {
       }
 
       // Mark code as used
+      if (!doc) {
+        return false; // No document found
+      }
       await updateDoc(doc.ref, { used: true });
       
       if (__DEV__) { logger.info('Code verified successfully', null, 'firebase'); }

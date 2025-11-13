@@ -17,7 +17,6 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
-import { typography } from '../../../theme/typography';
 import { styles } from './BillCameraStyles';
 import { logger } from '../../../services/analytics/loggingService';
 import { Container } from '../../../components/shared';
@@ -32,6 +31,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
   const cameraRef = useRef<CameraView>(null);
   
   const [permission, requestPermission] = useCameraPermissions();
+  // Camera type and flash mode state - defaults to back camera and flash off
   const [cameraType, setCameraType] = useState<'back' | 'front'>('back');
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [isCapturing, setIsCapturing] = useState(false);
@@ -121,15 +121,17 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
     }
   };
 
-  const toggleFlash = () => {
-    setFlashMode(flashMode === 'off' ? 'on' : 'off');
-  };
-
-  const toggleCameraType = () => {
-    setCameraType(
-      cameraType === 'back' ? 'front' : 'back'
-    );
-  };
+  // Flash and camera type toggle functions are not currently used
+  // but may be needed for future camera controls
+  // const toggleFlash = () => {
+  //   setFlashMode(flashMode === 'off' ? 'on' : 'off');
+  // };
+  // 
+  // const toggleCameraType = () => {
+  //   setCameraType(
+  //     cameraType === 'back' ? 'front' : 'back'
+  //   );
+  // };
 
   logger.debug('Rendering with permission', { permission }, 'BillCameraScreen');
 

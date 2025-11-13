@@ -8,14 +8,11 @@ import {
   View,
   Text,
   Image,
-  StyleSheet,
   ViewStyle,
   TextStyle,
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { logger } from '../services/core';
-import { spacing } from '../theme/spacing';
-import { typography } from '../theme/typography';
 import { userImageService } from '../services/core';
 import { UserImageInfo, UserImageService } from '../services/core/userImageService';
 import { DEFAULT_AVATAR_URL } from '../config/constants/constants';
@@ -119,6 +116,8 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
 
       return () => clearTimeout(timeout);
     }
+    // Return undefined if no cleanup needed
+    return undefined;
   }, [isLoading, loadingTimeout]);
 
   const handleImageError = () => {

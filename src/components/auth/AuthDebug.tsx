@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { auth } from '../../config/firebase/firebase';
-import { logger } from '../../services/analytics/loggingService';
 import Constants from 'expo-constants';
+import { logger } from '../../services/analytics/loggingService';
 
 interface AuthDebugProps {
   onClose: () => void;
@@ -42,7 +42,7 @@ export const AuthDebug: React.FC<AuthDebugProps> = ({ onClose }) => {
         
         setDebugInfo(info);
       } catch (error) {
-        console.error('Error gathering debug info:', error);
+        logger.error('Error gathering debug info', error as Record<string, unknown>, 'AuthDebug');
       }
     };
 
@@ -61,7 +61,8 @@ export const AuthDebug: React.FC<AuthDebugProps> = ({ onClose }) => {
         Alert.alert('Info', 'Firebase connection working! No user currently authenticated.');
       }
     } catch (error) {
-      Alert.alert('Error', `Firebase connection failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Firebase connection failed: ${errorMessage}`);
     }
   };
 
@@ -70,7 +71,8 @@ export const AuthDebug: React.FC<AuthDebugProps> = ({ onClose }) => {
       await auth.signOut();
       Alert.alert('Success', 'Authentication data cleared. Please restart the app.');
     } catch (error) {
-      Alert.alert('Error', `Failed to clear auth data: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Failed to clear auth data: ${errorMessage}`);
     }
   };
 

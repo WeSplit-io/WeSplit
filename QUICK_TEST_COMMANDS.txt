@@ -1,0 +1,64 @@
+═══════════════════════════════════════════════════════════
+  WALLET PERSISTENCE - QUICK TEST COMMANDS
+═══════════════════════════════════════════════════════════
+
+📱 METHOD 1: ONE-LINE CONSOLE COMMAND (EASIEST)
+───────────────────────────────────────────────────────────
+
+Copy and paste this SINGLE line into React Native Debugger console:
+
+require('@react-native-async-storage/async-storage').default.clear().then(() => console.log('✅ AsyncStorage cleared - now test wallet recovery'));
+
+Then:
+1. Close and reopen app
+2. Log in with same email
+3. Check if wallet address is the same ✅
+
+───────────────────────────────────────────────────────────
+
+📱 METHOD 2: MULTI-LINE (If one-liner doesn't work)
+───────────────────────────────────────────────────────────
+
+Paste this into console (all at once):
+
+(async function() {
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  await AsyncStorage.clear();
+  console.log('✅ AsyncStorage cleared - now test wallet recovery');
+})();
+
+───────────────────────────────────────────────────────────
+
+📱 METHOD 3: USE TEST SCREEN (NO CONSOLE NEEDED!)
+───────────────────────────────────────────────────────────
+
+1. Add this to App.tsx (around line 70, with other imports):
+
+   import WalletPersistenceTestScreen from './src/screens/Testing/WalletPersistenceTestScreen';
+
+2. Add this to Stack.Navigator (around line 150, with other screens):
+
+   {__DEV__ && (
+     <Stack.Screen name="WalletPersistenceTest" component={WalletPersistenceTestScreen} />
+   )}
+
+3. Navigate to it from anywhere:
+   navigation.navigate('WalletPersistenceTest');
+
+4. Tap "Simulate App Update (Clear AsyncStorage)" button
+
+───────────────────────────────────────────────────────────
+
+🔍 CHECK RESULTS
+───────────────────────────────────────────────────────────
+
+After clearing AsyncStorage:
+✅ Same wallet address = Test PASSED
+❌ Different wallet address = Test FAILED
+
+Look for in logs:
+✅ "Wallet recovered successfully"
+❌ "Creating new wallet"
+
+═══════════════════════════════════════════════════════════
+

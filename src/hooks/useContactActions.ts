@@ -39,7 +39,6 @@ export const useContactActions = () => {
         wallet_address: user.wallet_address,
         wallet_public_key: user.wallet_public_key,
         avatar: user.avatar || '',
-        mutual_groups_count: 0,
         isFavorite: false,
         first_met_at: new Date().toISOString()
       });
@@ -61,7 +60,7 @@ export const useContactActions = () => {
       return { success: true, contact: newContact };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      logger.error('Failed to add contact', error, 'useContactActions');
+      logger.error('Failed to add contact', error as Record<string, unknown>, 'useContactActions');
       return { success: false, error: errorMessage };
     }
   }, [currentUser?.id]);
@@ -89,7 +88,7 @@ export const useContactActions = () => {
       return { success: true };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      logger.error('Failed to remove contact', error, 'useContactActions');
+      logger.error('Failed to remove contact', error as Record<string, unknown>, 'useContactActions');
       return { success: false, error: errorMessage };
     }
   }, [currentUser?.id]);
@@ -119,7 +118,7 @@ export const useContactActions = () => {
       return { success: true };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      logger.error('Failed to toggle contact favorite', error, 'useContactActions');
+      logger.error('Failed to toggle contact favorite', error as Record<string, unknown>, 'useContactActions');
       return { success: false, error: errorMessage };
     }
   }, [currentUser?.id]);

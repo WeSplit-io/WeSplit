@@ -89,7 +89,13 @@ interface IconProps {
 }
 
 // Icon mapping from current names to Bootstrap icon components
-const iconMap: Record<string, React.ComponentType<any>> = {
+// All icon components accept size and color props
+interface IconComponentProps {
+  size?: number;
+  color?: string;
+}
+
+const iconMap: Record<string, React.ComponentType<IconComponentProps>> = {
   // Navigation
   'home': House,
   'house': HouseFill,

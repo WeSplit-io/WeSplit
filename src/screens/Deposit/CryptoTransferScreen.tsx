@@ -156,7 +156,8 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
         // Save deposit transaction to database for history
         if (currentUser?.id) {
           try {
-            const { firebaseTransactionService } = await import('../../services/data');
+            // Use firebaseDataService.transaction instead of firebaseTransactionService
+            const { firebaseDataService } = await import('../../services/data');
             
             const transactionData = {
               type: 'deposit' as const,
@@ -174,7 +175,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
               sender_name: 'External Wallet'
             };
             
-            await firebaseTransactionService.createTransaction(transactionData);
+            await firebaseDataService.transaction.createTransaction(transactionData);
             logger.info('✅ Deposit transaction saved to database', {
               signature: result.signature,
               amount: amount,

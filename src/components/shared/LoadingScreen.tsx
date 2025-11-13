@@ -10,6 +10,8 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
+  ViewStyle,
+  StyleProp,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
@@ -19,7 +21,7 @@ import { spacing } from '../../theme/spacing';
 interface LoadingScreenProps {
   message?: string;
   showSpinner?: boolean;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({
@@ -58,7 +60,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   message: {
-    ...typography.body,
+    ...typography.textStyles.body,
     color: colors.textSecondary,
     textAlign: 'center',
   },

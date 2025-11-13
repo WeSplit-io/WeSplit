@@ -6,7 +6,7 @@ import { logger } from '../../services/analytics/loggingService';
 
 // Global request throttling
 class RequestThrottler {
-  private requestQueue: (() => Promise<any>)[] = [];
+  private requestQueue: (() => Promise<unknown>)[] = [];
   private isProcessing = false;
   private lastRequestTime = 0;
   private minInterval = 100; // Minimum 100ms between requests
@@ -54,9 +54,16 @@ class RequestThrottler {
 
 const requestThrottler = new RequestThrottler();
 
-// Possible backend URLs in order of preference
-const POSSIBLE_BACKEND_URLS =
-  Platform.OS === 'ios'
+// Get backend URL from environment or use defaults
+const getBackendUrls = (): string[] => {
+  // Check for environment variable first (production)
+  const envBackendUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+  if (envBackendUrl) {
+    return [envBackendUrl];
+  }
+
+  // Development fallback URLs
+  const defaultUrls = Platform.OS === 'ios'
     ? [
         'http://localhost:4000',
         'http://127.0.0.1:4000',
@@ -71,7 +78,13 @@ const POSSIBLE_BACKEND_URLS =
         'http://192.168.1.75:4000',
       ];
 
-let API_BASE_URL = POSSIBLE_BACKEND_URLS[0]; // Start with Android emulator URL
+  return defaultUrls;
+};
+
+// Possible backend URLs in order of preference
+const POSSIBLE_BACKEND_URLS = getBackendUrls();
+
+let API_BASE_URL: string = POSSIBLE_BACKEND_URLS[0] || 'http://localhost:3000'; // Start with Android emulator URL
 
 // Create iOS-compatible timeout signal
 function createTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
@@ -115,14 +128,15 @@ export async function initializeBackendURL(): Promise<string> {
   }
   
   // If no backend is found, use the first URL as fallback
-  console.warn(`⚠️ No backend found, using fallback: ${POSSIBLE_BACKEND_URLS[0]}`);
-  API_BASE_URL = POSSIBLE_BACKEND_URLS[0];
-  return POSSIBLE_BACKEND_URLS[0];
+  const fallbackUrl = POSSIBLE_BACKEND_URLS[0] || 'http://localhost:3000';
+  logger.warn('No backend found, using fallback', { url: fallbackUrl }, 'api');
+  API_BASE_URL = fallbackUrl;
+  return fallbackUrl;
 }
 
 // Get the current backend URL
 export function getBackendURL(): string {
-  return API_BASE_URL;
+  return API_BASE_URL || 'http://localhost:3000';
 }
 
 // Set a specific backend URL (for testing or manual override)
@@ -160,7 +174,12 @@ export async function apiRequest<T>(
           const retryAfter = response.headers.get('Retry-After');
           const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
           
-          console.warn(`⚠️ Rate limited (429). Retrying after ${waitTime}ms... (attempt ${attempt + 1}/${retries + 1})`);
+          logger.warn('Rate limited (429). Retrying', { 
+            waitTime, 
+            attempt: attempt + 1, 
+            maxRetries: retries + 1,
+            endpoint 
+          }, 'api');
           
           // Log 429 error to monitoring
           monitoringService.instance.logRequest(endpoint, 429, Date.now() - startTime, 'Rate limited');
@@ -187,7 +206,11 @@ export async function apiRequest<T>(
         return data;
         
               } catch (error) {
-          console.error(`❌ API Request failed (attempt ${attempt + 1}): ${endpoint}`, error);
+          logger.error('API Request failed', { 
+            attempt: attempt + 1, 
+            endpoint,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }, 'api');
           
           // Log failed request to monitoring
           monitoringService.instance.logRequest(endpoint, 0, Date.now() - startTime, error instanceof Error ? error.message : 'Unknown error');
@@ -204,7 +227,9 @@ export async function apiRequest<T>(
             await initializeBackendURL();
             // Continue to next attempt with new URL
           } catch (initError) {
-            console.error('Failed to initialize backend URL:', initError);
+            logger.error('Failed to initialize backend URL', { 
+              error: initError instanceof Error ? initError.message : 'Unknown error' 
+            }, 'api');
           }
         }
         

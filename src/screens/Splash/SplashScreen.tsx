@@ -90,8 +90,25 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         // Wait for app initialization and minimum splash screen duration
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Check Firebase auth state
-        const firebaseUser = auth.currentUser;
+        // ✅ CRITICAL: Wait for Firebase Auth state to be fully restored
+        // AsyncStorage may be cleared on app updates, so we need to wait for auth state restoration
+        let firebaseUser = auth.currentUser;
+        if (!firebaseUser) {
+          // Wait up to 3 seconds for auth state to restore from AsyncStorage
+          logger.info('No immediate auth state, waiting for restoration', null, 'SplashScreen');
+          await new Promise((resolve) => {
+            const unsubscribe = auth.onAuthStateChanged((user) => {
+              unsubscribe();
+              firebaseUser = user;
+              resolve(user);
+            });
+            // Timeout after 3 seconds
+            setTimeout(() => {
+              unsubscribe();
+              resolve(null);
+            }, 3000);
+          });
+        }
 
         if (firebaseUser && firebaseUser.emailVerified) {
           // User is authenticated and email is verified

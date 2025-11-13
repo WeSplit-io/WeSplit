@@ -20,6 +20,7 @@ import { colors } from '../../theme';
 import { parseUri, extractRecipientAddress, isSolanaPayUri } from './solanaPay';
 import { logger } from '../../services/analytics/loggingService';
 import { isValidSolanaAddress } from '../../utils/validation';
+import Header from '../../components/shared/Header';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -210,17 +211,17 @@ const ScannerScreen: React.FC<ScannerScreenProps> = ({
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={goBack}>
-          <Text style={styles.headerButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{title}</Text>
-        <TouchableOpacity style={styles.headerButton} onPress={toggleFlash}>
-          <Text style={styles.headerButtonText}>
-            {flashMode === 'off' ? '💡' : '🔦'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <Header
+        title={title}
+        onBackPress={goBack}
+        rightElement={
+          <TouchableOpacity onPress={toggleFlash}>
+            <Text style={styles.headerButtonText}>
+              {flashMode === 'off' ? '💡' : '🔦'}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* Camera View */}
       <View style={styles.cameraContainer}>

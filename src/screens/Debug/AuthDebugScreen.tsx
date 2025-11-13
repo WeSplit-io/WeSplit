@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +13,7 @@ import Constants from 'expo-constants';
 import { auth } from '../../config/firebase/firebase';
 import { ProductionAuthService } from '../../services/auth/ProductionAuthService';
 import { logger } from '../../services/analytics/loggingService';
+import ModernLoader from '../../components/shared/ModernLoader';
 
 interface EnvironmentStatus {
   isProduction: boolean;
@@ -259,8 +259,7 @@ const AuthDebugScreen: React.FC = () => {
 
         {loading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={styles.loadingText}>Running diagnostics...</Text>
+            <ModernLoader size="large" text="Running diagnostics..." />
           </View>
         )}
       </ScrollView>

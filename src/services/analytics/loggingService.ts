@@ -10,10 +10,13 @@ export interface LogLevel {
   ERROR: 'error';
 }
 
+// Log data can be any serializable object
+type LogData = Record<string, unknown> | unknown[] | string | number | boolean | null | undefined;
+
 export interface LogEntry {
   level: string;
   message: string;
-  data?: any;
+  data?: LogData;
   timestamp: string;
   source?: string;
 }
@@ -32,7 +35,7 @@ class LoggingService {
     return LoggingService.instance;
   }
 
-  private log(level: string, message: string, data?: any, source?: string): void {
+  private log(level: string, message: string, data?: LogData, source?: string): void {
     const entry: LogEntry = {
       level,
       message,
@@ -54,19 +57,19 @@ class LoggingService {
     }
   }
 
-  public debug(message: string, data?: any, source?: string): void {
+  public debug(message: string, data?: LogData, source?: string): void {
     this.log('debug', message, data, source);
   }
 
-  public info(message: string, data?: any, source?: string): void {
+  public info(message: string, data?: LogData, source?: string): void {
     this.log('info', message, data, source);
   }
 
-  public warn(message: string, data?: any, source?: string): void {
+  public warn(message: string, data?: LogData, source?: string): void {
     this.log('warn', message, data, source);
   }
 
-  public error(message: string, data?: any, source?: string): void {
+  public error(message: string, data?: LogData, source?: string): void {
     this.log('error', message, data, source);
   }
 

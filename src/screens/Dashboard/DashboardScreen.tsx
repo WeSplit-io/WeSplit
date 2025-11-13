@@ -28,7 +28,7 @@ import { AuthGuard } from '../../components/auth';
 import NavBar from '../../components/shared/NavBar';
 import Avatar from '../../components/shared/Avatar';
 import { WalletSelectorModal } from '../../components/wallet';
-import { Container } from '../../components/shared';
+import { Container, ModernLoader, ErrorScreen, Button } from '../../components/shared';
 import { QRCodeScreen } from '../QRCode';
 import { TransactionModal, TransactionItem } from '../../components/transactions';
 import { useApp } from '../../context/AppContext';
@@ -44,6 +44,9 @@ import { RequestCard } from '../../components/requests';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { useWalletState } from '../../hooks/useWalletState';
 import { secureVault, isVaultAuthenticated } from '../../services/security/secureVault';
+import BadgeDisplay from '../../components/profile/BadgeDisplay';
+import ProfileAssetDisplay from '../../components/profile/ProfileAssetDisplay';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 
@@ -181,7 +184,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       await Clipboard.setStringAsync(address);
       Alert.alert('Copied', 'Wallet address copied to clipboard');
     } catch (error) {
-      console.error('Failed to copy wallet address:', error);
+      logger.error('Failed to copy wallet address', error as Record<string, unknown>, 'DashboardScreen');
       Alert.alert('Error', 'Failed to copy wallet address');
     }
   };
@@ -247,7 +250,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       // Get the sender ID from the request data
       const senderId = request.data?.senderId || request.data?.requester || request.data?.sender;
       if (!senderId) {
-        console.error('🔍 Dashboard: No sender ID found in request data:', request.data);
+        logger.error('No sender ID found in request data', { requestData: request.data }, 'DashboardScreen');
         Alert.alert('Error', 'Unable to find sender information');
         return;
       }
@@ -295,7 +298,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         requestId: request.data?.requestId || request.id
       });
     } catch (error) {
-      console.error('🔍 Dashboard: Error handling send payment:', error);
+      logger.error('Error handling send payment', error as Record<string, unknown>, 'DashboardScreen');
       Alert.alert('Error', 'Failed to process payment request. Please try again.');
     }
   };
@@ -556,12 +559,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         const shouldRefreshRequests = route?.params?.refreshRequests;
         
         if (!hasLoadedRef.current || shouldRefreshBalance || shouldRefreshRequests) {
-          logger.info('Starting data load', { 
-            hasLoaded: hasLoadedRef.current, 
-            shouldRefreshBalance, 
-            shouldRefreshRequests,
-            userChanged
-          }, 'DashboardScreen');
+          // Only log if actually loading for the first time
+          if (!hasLoadedRef.current && __DEV__) {
+            logger.debug('Starting initial data load', null, 'DashboardScreen');
+          }
           
           isInitialLoadingRef.current = true;
           
@@ -575,7 +576,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               setHasInitialLoad(true);
               hasLoadedRef.current = true;
               isInitialLoadingRef.current = false;
-              logger.info('Initial data load completed', null, 'DashboardScreen');
+              // Removed excessive logging
             });
           } else {
             // Handle navigation refresh parameters
@@ -590,57 +591,22 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               if (shouldRefreshBalance) {
                 walletService.clearUserCache(currentUserId);
                 refreshWallet();
-                logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
               }
               
               if (shouldRefreshRequests) {
                 loadPaymentRequests();
                 refreshNotifications();
-                logger.info('Requests refresh triggered from navigation parameter', null, 'DashboardScreen');
               }
             }
             isInitialLoadingRef.current = false;
           }
-        } else {
-          logger.debug('Skipping data load - already loaded and no refresh params', null, 'DashboardScreen');
         }
       }
-    }, [isAuthenticated, currentUser?.id])
+    }, [isAuthenticated, currentUser?.id, route?.params?.refreshBalance, route?.params?.refreshRequests])
   );
 
-  // Handle route parameter changes separately
-  useEffect(() => {
-    if (isAuthenticated && currentUser?.id && hasLoadedRef.current) {
-      const shouldRefreshBalance = route?.params?.refreshBalance;
-      const shouldRefreshRequests = route?.params?.refreshRequests;
-      
-      if (shouldRefreshBalance || shouldRefreshRequests) {
-        logger.info('Route parameter refresh triggered', { 
-          shouldRefreshBalance, 
-          shouldRefreshRequests 
-        }, 'DashboardScreen');
-        
-        // Clear the parameters to prevent infinite loops
-        navigation.setParams({ 
-          refreshBalance: undefined,
-          refreshRequests: undefined 
-        });
-        
-        // Trigger appropriate refreshes
-        if (shouldRefreshBalance) {
-          walletService.clearUserCache(currentUser.id);
-          refreshWallet();
-          logger.info('Balance refresh triggered from route parameter', null, 'DashboardScreen');
-        }
-        
-        if (shouldRefreshRequests) {
-          loadPaymentRequests();
-          refreshNotifications();
-          logger.info('Requests refresh triggered from route parameter', null, 'DashboardScreen');
-        }
-      }
-    }
-  }, [route?.params?.refreshBalance, route?.params?.refreshRequests, isAuthenticated, currentUser?.id]);
+  // Removed separate useEffect for route parameter changes - now handled in useFocusEffect
+  // This prevents duplicate calls when both useFocusEffect and useEffect trigger
 
   // Removed group loading logic
 
@@ -758,40 +724,20 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Show loading screen while authenticating with Face ID
   if (isAuthenticating) {
     return (
-      <Container>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.black }}>
-          <ActivityIndicator size="large" color={colors.primaryGreen} />
-          <Text style={{ color: colors.white, marginTop: spacing.md, fontSize: 16 }}>
-            Authenticating...
-          </Text>
-          <Text style={{ color: colors.white70, marginTop: spacing.sm, fontSize: 14, textAlign: 'center', paddingHorizontal: spacing.lg }}>
-            Please use Face ID to access your wallet
-          </Text>
-        </View>
-      </Container>
+      <ModernLoader
+        size="large"
+        text="Authenticating..."
+      />
     );
   }
 
   // Show error screen if authentication failed
   if (authenticationError) {
     return (
-      <Container>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.black, padding: spacing.lg }}>
-          <Text style={{ color: colors.error, fontSize: 18, fontWeight: '600', marginBottom: spacing.md, textAlign: 'center' }}>
-            Authentication Required
-          </Text>
-          <Text style={{ color: colors.white70, fontSize: 14, textAlign: 'center', marginBottom: spacing.lg }}>
-            {authenticationError}
-          </Text>
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.primaryGreen,
-              paddingHorizontal: spacing.xl,
-              paddingVertical: spacing.md,
-              borderRadius: spacing.radiusMd,
-              marginTop: spacing.md,
-            }}
-            onPress={async () => {
+      <ErrorScreen
+        title="Authentication Required"
+        message={authenticationError}
+        onRetry={async () => {
               setIsAuthenticating(true);
               setAuthenticationError(null);
               hasAuthenticatedRef.current = false; // Reset to allow retry
@@ -811,13 +757,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 setIsAuthenticating(false);
               }
             }}
-          >
-            <Text style={{ color: colors.white, fontSize: 16, fontWeight: '600' }}>
-              Try Again
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </Container>
+        retryText="Try Again"
+      />
     );
   }
 
@@ -856,6 +797,21 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               <Text style={styles.userName}>
                 {currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}!
               </Text>
+              {currentUser?.badges && currentUser.badges.length > 0 && (
+                <BadgeDisplay
+                  badges={currentUser.badges}
+                  activeBadge={currentUser.active_badge}
+                  showAll={false}
+                />
+              )}
+              {currentUser?.active_profile_asset && (
+                <ProfileAssetDisplay
+                  userId={currentUser.id}
+                  profileAssets={currentUser.profile_assets}
+                  activeProfileAsset={currentUser.active_profile_asset}
+                  showProfileAsset={true}
+                />
+              )}
             </View>
           </TouchableOpacity>
 
@@ -877,7 +833,112 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           </TouchableOpacity>
         </View>
 
+        {/* Development Test Buttons - Wallet Persistence */}
+        {__DEV__ && (
+          <>
+            <TouchableOpacity
+              onPress={async () => {
+                Alert.alert(
+                  '🧪 Test 1: App Update Scenario',
+                  'This will clear AsyncStorage to simulate an app update.\n\nYour wallet should persist via Keychain/SecureStore.\n\nAfter clearing:\n1. Close app completely\n2. Reopen app\n3. Log in with same email\n4. Check if wallet address is the same',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Clear AsyncStorage',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await AsyncStorage.clear();
+                          Alert.alert(
+                            '✅ AsyncStorage Cleared',
+                            'AsyncStorage has been cleared.\n\nNow:\n1. Close the app completely\n2. Reopen the app\n3. Log in with the same email\n4. Check if your wallet address is the same\n\nIf the wallet address matches, the test PASSED! ✅',
+                            [{ text: 'OK' }]
+                          );
+                        } catch (error) {
+                          Alert.alert('Error', error instanceof Error ? error.message : 'Failed to clear AsyncStorage');
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+              style={{
+                backgroundColor: '#FF9500',
+                padding: 12,
+                marginHorizontal: 20,
+                marginTop: 10,
+                borderRadius: 8,
+                alignItems: 'center',
+                borderWidth: 2,
+                borderColor: '#FF6B00',
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: 14 }}>
+                🧪 Test 1: Simulate App Update (Clear AsyncStorage)
+              </Text>
+            </TouchableOpacity>
 
+            <TouchableOpacity
+              onPress={async () => {
+                Alert.alert(
+                  '⚠️ Test 2: App Deletion Scenario',
+                  'This simulates app deletion/reinstallation:\n• Clears ALL data (AsyncStorage, Keychain, MMKV)\n• Wallet will be LOST\n• Requires cloud backup or seed phrase to recover\n\n⚠️ WARNING: This will delete your wallet from this device!\n\nYou will need:\n• Cloud backup (with password), OR\n• Seed phrase to restore\n\nContinue?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Simulate App Deletion',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const { WalletPersistenceTester } = await import('../../utils/testing/walletPersistenceTester');
+                          const userId = currentUser?.id || '';
+                          const userEmail = currentUser?.email || '';
+                          
+                          if (!userId) {
+                            Alert.alert('Error', 'User not logged in');
+                            return;
+                          }
+
+                          const result = await WalletPersistenceTester.testCompleteDataClear(userId, userEmail);
+                          
+                          Alert.alert(
+                            result.success ? '✅ All Data Cleared' : '⚠️ Partial Clear',
+                            result.message + '\n\n' + 
+                            'Now:\n' +
+                            '1. Close the app completely\n' +
+                            '2. Reopen the app\n' +
+                            '3. Log in with same email\n' +
+                            '4. Try to recover wallet:\n' +
+                            '   • From cloud backup (if available)\n' +
+                            '   • From seed phrase (if saved)\n\n' +
+                            '⚠️ If no backup exists, wallet is LOST!',
+                            [{ text: 'OK' }]
+                          );
+                        } catch (error) {
+                          Alert.alert('Error', error instanceof Error ? error.message : 'Failed to clear all data');
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+              style={{
+                backgroundColor: '#FF3B30',
+                padding: 12,
+                marginHorizontal: 20,
+                marginTop: 10,
+                borderRadius: 8,
+                alignItems: 'center',
+                borderWidth: 2,
+                borderColor: '#CC0000',
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: 14 }}>
+                ⚠️ Test 2: Simulate App Deletion (Clear ALL Data)
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Balance Card */}
         <ImageBackground
@@ -948,7 +1009,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                   // The wallet connection will be handled by the WalletContext
                   // and the UI will update automatically
                 } catch (error) {
-                  console.error('Error connecting wallet:', error);
+                  logger.error('Error connecting wallet', error as Record<string, unknown>, 'DashboardScreen');
                   // Error handling is already done in the WalletContext
                 } finally {
                   setConnectingWallet(false);
@@ -1030,8 +1091,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               </View>
             ) : (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={colors.primaryGreen} />
-                <Text style={styles.loadingText}>Loading...</Text>
+                <ModernLoader size="small" text="Loading..." />
               </View>
             )
           ) : (

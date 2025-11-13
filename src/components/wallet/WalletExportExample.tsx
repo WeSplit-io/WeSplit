@@ -36,7 +36,7 @@ const WalletExportExample: React.FC = () => {
         const message = `Wallet Address: ${result.walletAddress}\n\n` +
           (result.seedPhrase ? `Seed Phrase: ${result.seedPhrase}\n\n` : '') +
           (result.privateKey ? `Private Key: ${result.privateKey}\n\n` : '') +
-          `Export Type: ${result.exportType}\n\n` +
+          `Export Type: ${result.exportType || 'both'}\n\n` +
           '⚠️ IMPORTANT: Keep this information safe and never share it with anyone!';
         
         Alert.alert('Wallet Export', message, [
@@ -116,7 +116,7 @@ const WalletExportExample: React.FC = () => {
             • The same wallet is preserved when you log out and log back in{'\n'}
             • Your seed phrase and private key are stored securely{'\n'}
             • You can export your wallet to use in external wallets{'\n'}
-            • All transactions use your app's built-in wallet
+            • All transactions use your app&apos;s built-in wallet
           </Text>
         </View>
       </View>

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, Alert, Linking, Animated, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Image, Alert, Linking, Animated, RefreshControl } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from './Icon';
-import { Input, PhosphorIcon } from './shared';
+import { Input, PhosphorIcon, Tabs, Tab, ModernLoader } from './shared';
 import { useApp } from '../context/AppContext';
 import { useContacts, useContactActions } from '../hooks';
 import { deepLinkHandler } from '../services/core';
@@ -14,7 +14,7 @@ import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
 import { logger } from '../services/core';
 import Avatar from './shared/Avatar';
-import { formatWalletAddress, getWalletAddressStatus } from '../utils/crypto/wallet';
+import { getWalletAddressStatus } from '../utils/crypto/wallet';
 import { useRealtimeUserSearch } from '../hooks/useRealtimeUserSearch';
 
 interface ContactsListProps {
@@ -52,7 +52,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
   onNavigateToTransfer,
   selectedContacts = [],
   multiSelect = false,
-  groupId,
+  groupId: _groupId,
 }) => {
   const { state } = useApp();
   const { currentUser } = state;
@@ -66,9 +66,6 @@ const ContactsList: React.FC<ContactsListProps> = ({
   
   // Real-time user search
   const { 
-    users: realtimeUsers, 
-    isLoading: realtimeSearchLoading, 
-    error: realtimeSearchError,
     subscribe: subscribeRealtimeSearch,
     unsubscribe: unsubscribeRealtimeSearch,
     clearResults: clearRealtimeResults
@@ -109,7 +106,6 @@ const ContactsList: React.FC<ContactsListProps> = ({
       logger.debug('User removed from search results', { userId: user.id, name: user.name }, 'ContactsList');
     }
   };
-  const [qrInputValue, setQrInputValue] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   
   // Animation values
@@ -129,11 +125,6 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   // Camera permissions are now handled by useCameraPermissions hook
 
-  // Handle QR code scanning with real camera
-  const handleQRScan = (data: { recipient: string; amount?: number; label?: string; message?: string }) => {
-    // Process the scanned QR code data
-    handleBarCodeScanned({ type: 'qr', data: data.recipient });
-  };
 
   // Use useMemo to prevent unnecessary filtering and state updates
   const filteredContacts = useMemo(() => {
@@ -175,7 +166,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
   }, [searchQuery, contacts, activeTab]);
 
   // Handle user search with enhanced functionality
-  const handleUserSearch = async (query: string) => {
+  // Memoize handleUserSearch to prevent infinite loops
+  const handleUserSearch = useCallback(async (query: string) => {
     if (!query.trim() || query.length < 2) {
       setSearchResults([]);
       return;
@@ -243,47 +235,72 @@ const ContactsList: React.FC<ContactsListProps> = ({
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [currentUser?.id]); // Only depend on currentUser.id to prevent infinite loops
 
-  // Debounced search with proper cleanup
+  // Store functions in refs to prevent infinite loops
+  const subscribeRealtimeSearchRef = useRef(subscribeRealtimeSearch);
+  const unsubscribeRealtimeSearchRef = useRef(unsubscribeRealtimeSearch);
+  const clearRealtimeResultsRef = useRef(clearRealtimeResults);
+  const handleUserSearchRef = useRef(handleUserSearch);
+  
+  // Update refs when functions change
   useEffect(() => {
-    if (__DEV__) {
-      logger.debug('Search effect triggered', { activeTab, searchQuery: searchQuery.trim() }, 'ContactsList');
-    }
+    subscribeRealtimeSearchRef.current = subscribeRealtimeSearch;
+    unsubscribeRealtimeSearchRef.current = unsubscribeRealtimeSearch;
+    clearRealtimeResultsRef.current = clearRealtimeResults;
+    handleUserSearchRef.current = handleUserSearch;
+  }, [subscribeRealtimeSearch, unsubscribeRealtimeSearch, clearRealtimeResults, handleUserSearch]);
+
+  // Debounced search with proper cleanup - only depend on searchQuery and activeTab
+  useEffect(() => {
+    const subscribeRef = subscribeRealtimeSearchRef.current;
+    const unsubscribeRef = unsubscribeRealtimeSearchRef.current;
+    const clearRef = clearRealtimeResultsRef.current;
+    const handleSearchRef = handleUserSearchRef.current;
     
     if (searchQuery.trim() && searchQuery.length >= 2) {
-      if (__DEV__) {
-        logger.debug('Setting up real-time search for', { searchQuery }, 'ContactsList');
-      }
+      // Subscribe to real-time search using ref
+      subscribeRef(searchQuery);
       
-      // Subscribe to real-time search
-      subscribeRealtimeSearch(searchQuery);
-      
-      // Also run traditional search as fallback
-      handleUserSearch(searchQuery);
-      
-      // Cleanup function
-      return () => {
-        unsubscribeRealtimeSearch();
-        clearRealtimeResults();
-      };
+      // Also run traditional search as fallback using ref
+      handleSearchRef(searchQuery);
     } else {
       setSearchResults([]);
-      clearRealtimeResults();
-      unsubscribeRealtimeSearch();
+      clearRef();
+      unsubscribeRef();
     }
-  }, [searchQuery]); // Remove the function dependencies that cause infinite loops
-
-  // Cleanup on unmount
-  useEffect(() => {
+    
+    // Cleanup function for all cases
     return () => {
-      unsubscribeRealtimeSearch();
-      clearRealtimeResults();
-      // Clear any ongoing operations
-      addingContactsRef.current.clear();
-      togglingFavoritesRef.current.clear();
+      unsubscribeRef();
+      clearRef();
     };
-  }, [unsubscribeRealtimeSearch, clearRealtimeResults]);
+  }, [searchQuery, activeTab]); // Only depend on searchQuery and activeTab
+
+  // Cleanup on unmount - use refs to avoid dependency issues
+  useEffect(() => {
+    const addingRef = addingContactsRef.current;
+    const togglingRef = togglingFavoritesRef.current;
+    const unsubscribeRef = unsubscribeRealtimeSearchRef.current;
+    const clearRef = clearRealtimeResultsRef.current;
+    
+    return () => {
+      // Always cleanup realtime subscriptions on unmount
+      if (unsubscribeRef) {
+        unsubscribeRef();
+      }
+      if (clearRef) {
+        clearRef();
+      }
+      // Clear any ongoing operations using refs captured in closure
+      if (addingRef) {
+        addingRef.clear();
+      }
+      if (togglingRef) {
+        togglingRef.clear();
+      }
+    };
+  }, []); // Empty deps - only run on mount/unmount
 
   // Contact loading is now handled by the useContacts hook
 
@@ -408,8 +425,6 @@ const ContactsList: React.FC<ContactsListProps> = ({
     }
   };
 
-  const getFriends = () => filteredContacts.filter(contact => contact.isFavorite);
-  const getOthers = () => filteredContacts.filter(contact => !contact.isFavorite);
 
   const formatWalletAddress = (address: string) => {
     if (!address) {return '';}
@@ -420,7 +435,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
   // isUserAlreadyContact is now provided by the useContactActions hook
 
   // Handle QR code scanning
-  const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
+  const handleBarCodeScanned = async ({ data }: { type: string; data: string }) => {
     if (scanned || isProcessingQR) {return;}
     
     setScanned(true);
@@ -499,7 +514,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
               Alert.alert('Error', result.message || 'Failed to add contact.');
             }
           } catch (error) {
-            console.error('Error adding contact from QR:', error);
+            logger.error('Error adding contact from QR:', error as Record<string, unknown>, 'ContactsList');
             Alert.alert('Error', 'Failed to add contact. Please try again.');
           }
           break;
@@ -510,8 +525,13 @@ const ContactsList: React.FC<ContactsListProps> = ({
             return;
           }
           
+          if (!linkData.inviteId) {
+            Alert.alert('Error', 'Invalid group invitation link.');
+            return;
+          }
+          
           try {
-            const result = await deepLinkHandler.handleJoinGroupDeepLink(linkData.inviteId!, currentUser.id.toString());
+            const result = await deepLinkHandler.handleJoinGroupDeepLink(linkData.inviteId, currentUser.id.toString());
             if (result.success) {
               Alert.alert('Success', `Successfully joined group: ${result.groupName || 'Unknown Group'}`);
               // Refresh contacts list
@@ -520,12 +540,17 @@ const ContactsList: React.FC<ContactsListProps> = ({
               Alert.alert('Error', result.message || 'Failed to join group.');
             }
           } catch (error) {
-            console.error('Error joining group from QR:', error);
+            logger.error('Error joining group from QR:', error as Record<string, unknown>, 'ContactsList');
             Alert.alert('Error', 'Failed to join group. Please try again.');
           }
           break;
           
         case 'send':
+          if (!linkData.recipientWalletAddress) {
+            Alert.alert('Error', 'Invalid send link - missing wallet address.');
+            return;
+          }
+          
           if (onNavigateToSend) {
             Alert.alert(
               'Send Money',
@@ -535,7 +560,9 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 { 
                   text: 'Send Money', 
                   onPress: () => {
-                    onNavigateToSend(linkData.recipientWalletAddress!, linkData.userName);
+                    if (linkData.recipientWalletAddress) {
+                      onNavigateToSend(linkData.recipientWalletAddress, linkData.userName);
+                    }
                   }
                 }
               ]
@@ -546,6 +573,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
           break;
           
         case 'transfer':
+          if (!linkData.recipientWalletAddress) {
+            Alert.alert('Error', 'Invalid transfer link - missing wallet address.');
+            return;
+          }
+          
           if (onNavigateToTransfer) {
             Alert.alert(
               'External Transfer',
@@ -555,7 +587,9 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 { 
                   text: 'Transfer', 
                   onPress: () => {
-                    onNavigateToTransfer(linkData.recipientWalletAddress!, linkData.userName);
+                    if (linkData.recipientWalletAddress) {
+                      onNavigateToTransfer(linkData.recipientWalletAddress, linkData.userName);
+                    }
                   }
                 }
               ]
@@ -658,8 +692,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
         <View>
           <Text style={styles.contactEmail}>
             {item.wallet_address ? formatWalletAddress(item.wallet_address) : (item.email || '')}
-            {(item as any).mutual_groups_count > 0 && (
-              <Text style={styles.mutualGroupsText}> • {(item as any).mutual_groups_count} splits</Text>
+            {('mutual_groups_count' in item && typeof (item as { mutual_groups_count?: number }).mutual_groups_count === 'number' && (item as { mutual_groups_count: number }).mutual_groups_count > 0) && (
+              <Text style={styles.mutualGroupsText}> • {(item as { mutual_groups_count: number }).mutual_groups_count} splits</Text>
             )}
           </Text>
           {(() => {
@@ -721,7 +755,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading contacts...</Text>
+        <ModernLoader size="large" text="Loading contacts..." />
       </View>
     );
   }
@@ -748,64 +782,18 @@ const ContactsList: React.FC<ContactsListProps> = ({
       {/* Affichage selon le mode */}
       {(hideToggleBar || mode === 'list') ? (
         <>
-          {/* Tabs All/Favorite/Search (design arrondi/fond) */}
+          {/* Tabs All/Favorite/Search */}
           {showTabs && (
-            <View style={styles.tabsContainer}>
-              <TouchableOpacity
-                style={styles.tab}
-                onPress={() => animateTabChange(() => onTabChange?.('All'))}
-                disabled={isAnimating}
-              >
-                {activeTab === 'All' ? (
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.tabGradient}
-                  >
-                    <Text style={styles.tabTextActive}>All</Text>
-                  </LinearGradient>
-                ) : (
-                  <Text style={styles.tabText}>All</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.tab}
-                onPress={() => animateTabChange(() => onTabChange?.('Favorite'))}
-                disabled={isAnimating}
-              >
-                {activeTab === 'Favorite' ? (
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.tabGradient}
-                  >
-                    <Text style={styles.tabTextActive}>Favorite</Text>
-                  </LinearGradient>
-                ) : (
-                  <Text style={styles.tabText}>Favorite</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.tab}
-                onPress={() => animateTabChange(() => onTabChange?.('Search'))}
-                disabled={isAnimating}
-              >
-                {activeTab === 'Search' ? (
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.tabGradient}
-                  >
-                    <Text style={styles.tabTextActive}>Search</Text>
-                  </LinearGradient>
-                ) : (
-                  <Text style={styles.tabText}>Search</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            <Tabs
+              tabs={[
+                { label: 'All', value: 'All' },
+                { label: 'Favorite', value: 'Favorite' },
+                { label: 'Search', value: 'Search' }
+              ]}
+              activeTab={activeTab}
+              onTabChange={(tab) => animateTabChange(() => onTabChange?.(tab as 'All' | 'Favorite' | 'Search'))}
+              enableAnimation={true}
+            />
           )}
           {/* Search Input */}
           {showSearch && (
@@ -872,7 +860,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
               <>
                 {isSearching && (
                   <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Searching users...</Text>
+                    <ModernLoader size="medium" text="Searching users..." />
                   </View>
                 )}
                 {!isSearching && searchResults.length > 0 && (
@@ -1022,7 +1010,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 {!isSearching && searchQuery.trim() && searchResults.length === 0 && (
                   <View style={styles.emptyContainer}>
                     <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-empty-state.png?alt=media&token=9da88073-11df-4b69-bfd8-21ec369f51c4' }} style={styles.searchIconEmpty} />
-                    <Text style={styles.emptyText}>No users found matching "{searchQuery}"</Text>
+                    <Text style={styles.emptyText}>No users found matching &quot;{searchQuery}&quot;</Text>
                   </View>
                 )}
                 {!isSearching && !searchQuery.trim() && (
@@ -1076,7 +1064,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                       );
                     }
                   } catch (error) {
-                    logger.error('Error requesting camera permission', error, 'ContactsList');
+                    logger.error('Error requesting camera permission', error as Record<string, unknown>, 'ContactsList');
                     Alert.alert('Error', 'Failed to request camera permission. Please try again.');
                   }
                 }}

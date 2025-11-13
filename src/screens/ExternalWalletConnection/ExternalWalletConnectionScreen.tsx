@@ -16,7 +16,7 @@ import { SolanaAppKitService, WalletProvider } from '../../services/blockchain/w
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, ModernLoader, ErrorScreen } from '../../components/shared';
 import Header from '../../components/shared/Header';
 import { getPlatformInfo } from '../../utils/core/platformDetection';
 
@@ -177,16 +177,17 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
 
         {/* Error Display */}
         {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
+          <ErrorScreen
+            title="Connection Error"
+            message={error}
+            showIcon={true}
+          />
         )}
 
         {/* Loading indicator */}
         {loading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primaryGreen} />
-            <Text style={styles.loadingText}>Loading available wallets...</Text>
+            <ModernLoader size="large" text="Loading available wallets..." />
           </View>
         )}
 

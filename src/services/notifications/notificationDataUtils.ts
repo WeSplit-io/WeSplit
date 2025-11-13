@@ -26,14 +26,14 @@ export interface StandardizedNotificationData {
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
   
   // Additional context
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
  * Standardize notification data from various sources
  */
 export function standardizeNotificationData(
-  rawData: any,
+  rawData: Record<string, unknown>,
   notificationType: string
 ): StandardizedNotificationData | null {
   try {
@@ -184,7 +184,7 @@ export function createPaymentRequestNotificationData(
 /**
  * Extract recipient ID from notification data
  */
-export function extractRecipientId(notificationData: any): string | null {
+export function extractRecipientId(notificationData: Record<string, unknown>): string | null {
   // For payment requests, the recipient is the current user
   // This function is mainly for validation and logging
   return notificationData?.recipientId || null;
@@ -194,7 +194,7 @@ export function extractRecipientId(notificationData: any): string | null {
  * Log notification data for debugging
  */
 export function logNotificationData(
-  data: any,
+  data: Record<string, unknown>,
   context: string,
   notificationType?: string
 ): void {

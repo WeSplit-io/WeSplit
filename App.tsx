@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
@@ -6,7 +6,6 @@ import { AppProvider } from './src/context/AppContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NavigationWrapper from './src/components/NavigationWrapper';
 import ErrorBoundary from './src/components/ErrorBoundary';
-import { logger } from './src/services/analytics/loggingService';
 import { View, StatusBar } from 'react-native';
 import { colors } from './src/theme';
 
@@ -30,6 +29,12 @@ import AccountSettingsScreen from './src/screens/Settings/AccountSettings/Accoun
 import PremiumScreen from './src/screens/Settings/Premium/PremiumScreen';
 import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
 import LanguageScreen from './src/screens/Settings/Language/LanguageScreen';
+import RewardsScreen from './src/screens/Rewards/RewardsScreen';
+import LeaderboardDetailScreen from './src/screens/Rewards/LeaderboardDetailScreen';
+import HowToEarnPointsScreen from './src/screens/Rewards/HowToEarnPointsScreen';
+import ReferralScreen from './src/screens/Rewards/ReferralScreen';
+import PointsHistoryScreen from './src/screens/Rewards/PointsHistoryScreen';
+import ChristmasCalendarScreen from './src/screens/Rewards/ChristmasCalendarScreen';
 import SendScreen from './src/screens/Send/SendScreen';
 import SendAmountScreen from './src/screens/Send/SendAmountScreen';
 import SendConfirmationScreen from './src/screens/Send/SendConfirmationScreen';
@@ -54,7 +59,6 @@ import WithdrawAmountScreen from './src/screens/Withdraw/WithdrawAmountScreen';
 import WithdrawConfirmationScreen from './src/screens/Withdraw/WithdrawConfirmationScreen';
 import WithdrawSuccessScreen from './src/screens/Withdraw/WithdrawSuccessScreen';
 import WalletManagementScreen from './src/screens/WalletManagement/WalletManagementScreen';
-import RewardsScreen from './src/screens/Rewards/RewardsScreen';
 import SeedPhraseViewScreen from './src/screens/WalletManagement/SeedPhraseViewScreen';
 import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVerifyScreen';
 import { ContactsScreen } from './src/screens/Contacts';
@@ -64,6 +68,16 @@ import ExternalWalletConnectionScreen from './src/screens/ExternalWalletConnecti
 import ManualSignatureInputScreen from './src/screens/ExternalWalletConnection/ManualSignatureInputScreen';
 import ManualBillCreationScreen from './src/screens/Billing/ManualBillCreation/ManualBillCreationScreen';
 // import AuthDebugScreen from './src/screens/Debug/AuthDebugScreen';
+
+// Development-only test screen
+let WalletPersistenceTestScreen: any = null;
+if (__DEV__) {
+  try {
+    WalletPersistenceTestScreen = require('./src/screens/Testing/WalletPersistenceTestScreen').default;
+  } catch (e) {
+    // Screen not available
+  }
+}
 
 
 const Stack = createStackNavigator();
@@ -77,8 +91,8 @@ export default function App() {
       <ErrorBoundary>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <WalletProvider>
-              <AppProvider>
+            <AppProvider>
+              <WalletProvider>
                 <NavigationWrapper>
                   <Stack.Navigator
                     initialRouteName="Splash"
@@ -105,7 +119,7 @@ export default function App() {
                           },
                         },
                       },
-                      cardStyleInterpolator: ({ current, next, layouts }) => {
+                      cardStyleInterpolator: ({ current }) => {
                         return {
                           cardStyle: {
                             opacity: current.progress.interpolate({
@@ -161,6 +175,12 @@ export default function App() {
                     <Stack.Screen name="FairSplit" component={FairSplitScreen} />
                     <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} />
                     <Stack.Screen name="KastAccountLinking" component={KastAccountLinkingScreen} />
+                    <Stack.Screen name="Rewards" component={RewardsScreen} />
+                    <Stack.Screen name="LeaderboardDetail" component={LeaderboardDetailScreen} />
+                    <Stack.Screen name="HowToEarnPoints" component={HowToEarnPointsScreen} />
+                    <Stack.Screen name="Referral" component={ReferralScreen} />
+                    <Stack.Screen name="PointsHistory" component={PointsHistoryScreen} />
+                    <Stack.Screen name="ChristmasCalendar" component={ChristmasCalendarScreen} />
                     {/* Degen Split screens disabled */}
                     {/* <Stack.Screen name="DegenLock" component={DegenLockScreen} /> */}
                     {/* <Stack.Screen name="DegenSpin" component={DegenSpinScreen} /> */}
@@ -170,7 +190,6 @@ export default function App() {
                     <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />
                     <Stack.Screen name="WithdrawSuccess" component={WithdrawSuccessScreen} />
                     <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
-                    <Stack.Screen name="Rewards" component={RewardsScreen} />
                     <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
                     <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
                     <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
@@ -178,10 +197,13 @@ export default function App() {
                     <Stack.Screen name="ManualSignatureInput" component={ManualSignatureInputScreen} />
                     <Stack.Screen name="ManualBillCreation" component={ManualBillCreationScreen} />
                     {/* <Stack.Screen name="AuthDebug" component={AuthDebugScreen} /> */}
+                    {__DEV__ && WalletPersistenceTestScreen && (
+                      <Stack.Screen name="WalletPersistenceTest" component={WalletPersistenceTestScreen} />
+                    )}
                   </Stack.Navigator>
                 </NavigationWrapper>
-              </AppProvider>
-            </WalletProvider>
+              </WalletProvider>
+            </AppProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
       </ErrorBoundary>

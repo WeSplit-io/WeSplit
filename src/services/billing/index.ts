@@ -7,6 +7,7 @@ export { ConsolidatedBillAnalysisService } from './consolidatedBillAnalysisServi
 export { consolidatedBillAnalysisService } from './consolidatedBillAnalysisService';
 export { manualSplitCreationService } from './manualSplitCreationService';
 export { ManualSplitCreationService } from './manualSplitCreationService';
+export { ocrService } from './ocrService';
 
 // Re-export types
 export type { 

@@ -3,7 +3,7 @@
  * React hook for subscribing to real-time balance updates
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { liveBalanceService, BalanceUpdate } from '../services/blockchain/balance/LiveBalanceService';  
 import { logger } from '../services/analytics/loggingService';
 
@@ -37,8 +37,8 @@ export const useLiveBalance = (
   const subscriptionIdRef = useRef<string | null>(null);
   const isSubscribedRef = useRef(false);
   
-  // Subscribe to balance updates
-  const subscribe = (targetAddress: string) => {
+  // Subscribe to balance updates - wrapped in useCallback to prevent recreation
+  const subscribe = useCallback((targetAddress: string) => {
     if (!enabled || isSubscribedRef.current) {
       return;
     }
@@ -74,10 +74,10 @@ export const useLiveBalance = (
       
       setError(errorMessage);
     }
-  };
+  }, [enabled, onBalanceChange]);
   
-  // Unsubscribe from balance updates
-  const unsubscribe = () => {
+  // Unsubscribe from balance updates - wrapped in useCallback
+  const unsubscribe = useCallback(() => {
     if (subscriptionIdRef.current) {
       logger.info('Unsubscribing from live balance updates', { 
         subscriptionId: subscriptionIdRef.current 
@@ -87,7 +87,7 @@ export const useLiveBalance = (
       subscriptionIdRef.current = null;
       isSubscribedRef.current = false;
     }
-  };
+  }, []);
   
   // Force update balance
   const forceUpdate = async () => {
@@ -113,28 +113,37 @@ export const useLiveBalance = (
     }
   };
   
-  // Effect to handle subscription when address changes
+  // Store subscribe/unsubscribe in refs to prevent dependency issues
+  const subscribeRef = useRef(subscribe);
+  const unsubscribeRef = useRef(unsubscribe);
+  
+  useEffect(() => {
+    subscribeRef.current = subscribe;
+    unsubscribeRef.current = unsubscribe;
+  }, [subscribe, unsubscribe]);
+  
+  // Consolidated effect to handle subscription when address or enabled state changes
+  // This prevents duplicate calls from having two separate useEffect hooks
   useEffect(() => {
     if (address && enabled) {
-      subscribe(address);
+      // Only subscribe if not already subscribed
+      if (!isSubscribedRef.current) {
+        subscribeRef.current(address);
+      }
     } else {
-      unsubscribe();
+      // Unsubscribe if disabled or no address
+      if (isSubscribedRef.current) {
+        unsubscribeRef.current();
+      }
     }
     
-    // Cleanup on unmount
+    // Cleanup on unmount or when dependencies change
     return () => {
-      unsubscribe();
+      if (isSubscribedRef.current) {
+        unsubscribeRef.current();
+      }
     };
-  }, [address, enabled]);
-  
-  // Effect to handle enabled state changes
-  useEffect(() => {
-    if (!enabled && isSubscribedRef.current) {
-      unsubscribe();
-    } else if (enabled && address && !isSubscribedRef.current) {
-      subscribe(address);
-    }
-  }, [enabled]);
+  }, [address, enabled]); // Only depend on address and enabled, not the functions
   
   return {
     balance,
@@ -168,8 +177,8 @@ export const useMultipleLiveBalances = (
   
   const subscriptionIdsRef = useRef<Map<string, string>>(new Map());
   
-  // Subscribe to all addresses
-  const subscribeAll = () => {
+  // Subscribe to all addresses - wrapped in useCallback to prevent recreation
+  const subscribeAll = useCallback(() => {
     if (!enabled) {
       return;
     }
@@ -207,15 +216,15 @@ export const useMultipleLiveBalances = (
         }
       }
     });
-  };
+  }, [enabled, addresses, onBalanceChange]);
   
-  // Unsubscribe from all addresses
-  const unsubscribeAll = () => {
-    subscriptionIdsRef.current.forEach((subscriptionId, address) => {
+  // Unsubscribe from all addresses - wrapped in useCallback
+  const unsubscribeAll = useCallback(() => {
+    subscriptionIdsRef.current.forEach((subscriptionId, _address) => {
       liveBalanceService.unsubscribe(subscriptionId);
     });
     subscriptionIdsRef.current.clear();
-  };
+  }, []);
   
   // Force update all addresses
   const forceUpdateAll = async () => {
@@ -230,19 +239,31 @@ export const useMultipleLiveBalances = (
     }
   };
   
+  // Store subscribeAll/unsubscribeAll in refs to prevent dependency issues
+  const subscribeAllRef = useRef(subscribeAll);
+  const unsubscribeAllRef = useRef(unsubscribeAll);
+  
+  useEffect(() => {
+    subscribeAllRef.current = subscribeAll;
+    unsubscribeAllRef.current = unsubscribeAll;
+  }, [subscribeAll, unsubscribeAll]);
+  
+  // Extract addresses string for dependency array (prevents complex expression warning)
+  const addressesKey = addresses.join(',');
+  
   // Effect to handle subscription when addresses change
   useEffect(() => {
     if (enabled && addresses.length > 0) {
-      subscribeAll();
+      subscribeAllRef.current();
     } else {
-      unsubscribeAll();
+      unsubscribeAllRef.current();
     }
     
     // Cleanup on unmount
     return () => {
-      unsubscribeAll();
+      unsubscribeAllRef.current();
     };
-  }, [addresses.join(','), enabled]);
+  }, [addressesKey, enabled, addresses.length]); // Use addressesKey instead of addresses.join(',')
   
   return {
     balances,

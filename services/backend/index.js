@@ -4,6 +4,7 @@ const authService = require('./services/authService');
 const security = require('./middleware/security');
 const monitoringService = require('./services/monitoringService');
 const emailVerificationService = require('./services/emailVerificationService');
+const { transactionSigningService } = require('./services/transactionSigningService');
 require('dotenv').config();
 
 const app = express();
@@ -252,6 +253,241 @@ app.get('/api/subscription/:userId/history', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch subscription history' });
   }
 });
+
+// ===== TRANSACTION SIGNING ENDPOINTS =====
+// These endpoints handle company wallet transaction signing
+// SECURITY: All endpoints require authentication and rate limiting
+
+// Add company signature to partially signed transaction
+app.post('/api/transactions/sign', 
+  security.authenticateToken,
+  security.strictLimiter,
+  security.validateRequired(['serializedTransaction']),
+  async (req, res) => {
+    try {
+      const { serializedTransaction } = req.body;
+      
+      // Validate input
+      if (!serializedTransaction || typeof serializedTransaction !== 'string') {
+        return res.status(400).json({ error: 'Invalid serializedTransaction format' });
+      }
+
+      // Convert base64 string to Buffer
+      let transactionBuffer;
+      try {
+        transactionBuffer = Buffer.from(serializedTransaction, 'base64');
+      } catch (error) {
+        return res.status(400).json({ error: 'Invalid base64 encoding' });
+      }
+
+      // Validate transaction before signing
+      await transactionSigningService.validateTransaction(transactionBuffer);
+
+      // Add company signature
+      const fullySignedTransaction = await transactionSigningService.addCompanySignature(transactionBuffer);
+
+      // Return fully signed transaction as base64
+      res.json({
+        success: true,
+        serializedTransaction: fullySignedTransaction.toString('base64')
+      });
+    } catch (error) {
+      console.error('Error signing transaction:', error);
+      res.status(500).json({ 
+        error: 'Failed to sign transaction',
+        message: error.message 
+      });
+    }
+  }
+);
+
+// Submit fully signed transaction
+app.post('/api/transactions/submit',
+  security.authenticateToken,
+  security.strictLimiter,
+  security.validateRequired(['serializedTransaction']),
+  async (req, res) => {
+    try {
+      const { serializedTransaction } = req.body;
+      
+      // Validate input
+      if (!serializedTransaction || typeof serializedTransaction !== 'string') {
+        return res.status(400).json({ error: 'Invalid serializedTransaction format' });
+      }
+
+      // Convert base64 string to Buffer
+      let transactionBuffer;
+      try {
+        transactionBuffer = Buffer.from(serializedTransaction, 'base64');
+      } catch (error) {
+        return res.status(400).json({ error: 'Invalid base64 encoding' });
+      }
+
+      // Validate transaction before submission
+      await transactionSigningService.validateTransaction(transactionBuffer);
+
+      // Submit transaction
+      const result = await transactionSigningService.submitTransaction(transactionBuffer);
+
+      res.json({
+        success: true,
+        signature: result.signature,
+        confirmation: result.confirmation
+      });
+    } catch (error) {
+      console.error('Error submitting transaction:', error);
+      res.status(500).json({ 
+        error: 'Failed to submit transaction',
+        message: error.message 
+      });
+    }
+  }
+);
+
+// Process USDC transfer with company fee payer (sign and submit)
+app.post('/api/transactions/process',
+  security.authenticateToken,
+  security.strictLimiter,
+  security.validateRequired(['serializedTransaction']),
+  async (req, res) => {
+    try {
+      const { serializedTransaction } = req.body;
+      
+      // Validate input
+      if (!serializedTransaction || typeof serializedTransaction !== 'string') {
+        return res.status(400).json({ error: 'Invalid serializedTransaction format' });
+      }
+
+      // Convert base64 string to Buffer
+      let transactionBuffer;
+      try {
+        transactionBuffer = Buffer.from(serializedTransaction, 'base64');
+      } catch (error) {
+        return res.status(400).json({ error: 'Invalid base64 encoding' });
+      }
+
+      // Process USDC transfer (sign and submit)
+      const result = await transactionSigningService.processUsdcTransfer(transactionBuffer);
+
+      res.json({
+        success: true,
+        signature: result.signature,
+        confirmation: result.confirmation
+      });
+    } catch (error) {
+      console.error('Error processing USDC transfer:', error);
+      res.status(500).json({ 
+        error: 'Failed to process USDC transfer',
+        message: error.message 
+      });
+    }
+  }
+);
+
+// Validate transaction before signing
+app.post('/api/transactions/validate',
+  security.authenticateToken,
+  security.strictLimiter,
+  security.validateRequired(['serializedTransaction']),
+  async (req, res) => {
+    try {
+      const { serializedTransaction } = req.body;
+      
+      // Validate input
+      if (!serializedTransaction || typeof serializedTransaction !== 'string') {
+        return res.status(400).json({ error: 'Invalid serializedTransaction format' });
+      }
+
+      // Convert base64 string to Buffer
+      let transactionBuffer;
+      try {
+        transactionBuffer = Buffer.from(serializedTransaction, 'base64');
+      } catch (error) {
+        return res.status(400).json({ error: 'Invalid base64 encoding' });
+      }
+
+      // Validate transaction
+      await transactionSigningService.validateTransaction(transactionBuffer);
+
+      res.json({
+        success: true,
+        valid: true,
+        message: 'Transaction is valid'
+      });
+    } catch (error) {
+      res.status(400).json({ 
+        success: false,
+        valid: false,
+        error: 'Transaction validation failed',
+        message: error.message 
+      });
+    }
+  }
+);
+
+// Get transaction fee estimate
+app.post('/api/transactions/fee-estimate',
+  security.authenticateToken,
+  security.strictLimiter,
+  security.validateRequired(['serializedTransaction']),
+  async (req, res) => {
+    try {
+      const { serializedTransaction } = req.body;
+      
+      // Validate input
+      if (!serializedTransaction || typeof serializedTransaction !== 'string') {
+        return res.status(400).json({ error: 'Invalid serializedTransaction format' });
+      }
+
+      // Convert base64 string to Buffer
+      let transactionBuffer;
+      try {
+        transactionBuffer = Buffer.from(serializedTransaction, 'base64');
+      } catch (error) {
+        return res.status(400).json({ error: 'Invalid base64 encoding' });
+      }
+
+      // Get fee estimate
+      const estimate = await transactionSigningService.getTransactionFeeEstimate(transactionBuffer);
+
+      res.json({
+        success: true,
+        fee: estimate.fee,
+        lamports: estimate.lamports
+      });
+    } catch (error) {
+      console.error('Error estimating transaction fee:', error);
+      res.status(500).json({ 
+        error: 'Failed to estimate transaction fee',
+        message: error.message 
+      });
+    }
+  }
+);
+
+// Get company wallet balance
+app.get('/api/transactions/company-wallet/balance',
+  security.authenticateToken,
+  security.strictLimiter,
+  async (req, res) => {
+    try {
+      const balance = await transactionSigningService.getCompanyWalletBalance();
+
+      res.json({
+        success: true,
+        address: balance.address,
+        balance: balance.balance,
+        lamports: balance.lamports
+      });
+    } catch (error) {
+      console.error('Error getting company wallet balance:', error);
+      res.status(500).json({ 
+        error: 'Failed to get company wallet balance',
+        message: error.message 
+      });
+    }
+  }
+);
 
 // ===== ERROR HANDLING =====
 app.use((err, req, res, next) => {

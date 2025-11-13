@@ -16,12 +16,16 @@ export interface UnifiedBillData {
   totalAmount: number;
   currency: string;
   date: string;
+  time?: string;
+  subtotal?: number;
+  tax?: number;
   merchant?: string;
   location?: string;
   items?: any[];
   participants?: any[];
   billImageUrl?: string;
   settings?: any;
+  originalAnalysis?: any;
 }
 
 /**
@@ -73,6 +77,8 @@ export interface SplitDetailsNavigationParams extends SplitNavigationParams {
   splitId?: string;
   splitData?: Split;
   isEditing?: boolean;
+  isNewBill?: boolean; // Whether this is a new bill (not an existing split)
+  isManualCreation?: boolean; // Whether this is from manual creation (true) or OCR (false)
   selectedContact?: any; // Contact selected from ContactsScreen
   isFromNotification?: boolean; // Whether opened from notification
   notificationId?: string; // Notification ID for deletion after join

@@ -15,6 +15,9 @@ import { KeypairUtils } from '../shared/keypairUtils';
 import { ValidationUtils } from '../shared/validationUtils';
 import { BalanceUtils } from '../shared/balanceUtils';
 import { USDC_CONFIG } from '../shared/walletConstants';
+import { processUsdcTransfer } from '../blockchain/transaction/transactionSigningService';
+import { VersionedTransaction } from '@solana/web3.js';
+import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS } from '../shared/blockhashUtils';
 
 // Helper function to verify transaction on blockchain
 async function verifyTransactionOnBlockchain(transactionSignature: string): Promise<boolean> {
@@ -202,162 +205,152 @@ async function executeFairSplitTransaction(
       }
     }
 
-    // Get recent blockhash
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    // IMPORTANT: Get fresh blockhash RIGHT BEFORE finalizing the transaction
+    // Blockhashes expire after ~60 seconds, so we get it as late as possible
+    // to minimize the time between creation and submission
+    // Best practice: Use shared utility for consistent blockhash handling
+    const blockhashData = await getFreshBlockhash(connection, 'confirmed');
+    const blockhash = blockhashData.blockhash;
+    const blockhashTimestamp = blockhashData.timestamp;
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
+    // SECURITY: Company wallet secret key is not available in client-side code
+    // All secret key operations must be performed on backend services
     const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
     const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
-    const companyWalletSecretKey = COMPANY_WALLET_CONFIG.secretKey;
     
-    if (!companyWalletAddress || !companyWalletSecretKey) {
+    if (!companyWalletAddress) {
       return {
         success: false,
-        error: 'Company wallet not configured for fee payment'
+        error: 'Company wallet address is not configured'
       };
     }
     
     const companyPublicKey = new PublicKey(companyWalletAddress);
     transaction.feePayer = companyPublicKey;
     
-    // Create company keypair for signing
-    const companyKeypairResult = KeypairUtils.createKeypairFromSecretKey(companyWalletSecretKey);
-    if (!companyKeypairResult.success || !companyKeypairResult.keypair) {
+    // Convert Transaction to VersionedTransaction for Firebase Functions
+    // Firebase Functions expect VersionedTransaction format
+    // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+    // This avoids double signing and ensures clean signature handling
+    let versionedTransaction: VersionedTransaction;
+    try {
+      versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+      // Sign the versioned transaction with user keypair (only sign once)
+      versionedTransaction.sign([keypair]);
+      logger.info('Transaction converted to VersionedTransaction and signed', {
+        userAddress: keypair.publicKey.toBase58(),
+        feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+      }, 'SplitWalletPayments');
+    } catch (versionError) {
+      logger.error('Failed to convert transaction to VersionedTransaction', {
+        error: versionError,
+        errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+      }, 'SplitWalletPayments');
       return {
         success: false,
-        error: 'Failed to create company wallet keypair for fee payment'
+        error: `Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`
       };
     }
-    const companyKeypair = companyKeypairResult.keypair;
 
-    // Sign with both keypairs (user for USDC transfer, company for fees)
-    transaction.sign(keypair, companyKeypair);
+    // Serialize the partially signed transaction
+    const serializedTransaction = versionedTransaction.serialize();
 
-    const signature = await connection.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'processed', // Use 'processed' for faster confirmation
-      maxRetries: 2 // Reduced retries for faster processing
-    });
+    // Ensure we have a proper Uint8Array
+    const txArray = serializedTransaction instanceof Uint8Array 
+      ? serializedTransaction 
+      : new Uint8Array(serializedTransaction);
 
-    logger.info('Fair split transaction sent successfully', {
-      signature,
-            fromAddress,
-            toAddress,
-            amount,
-      currency,
-      transactionType
-    }, 'SplitWalletPayments');
+    // CRITICAL: Check blockhash age before sending to Firebase
+    // Mainnet is slower, so we need aggressive refresh (10 seconds threshold)
+    // Best practice: Use shared utility for consistent blockhash age checking
+    const blockhashAge = Date.now() - blockhashTimestamp;
+    let currentTxArray = txArray;
+    let currentBlockhashTimestamp = blockhashTimestamp;
     
-    // For fair splits, use fast confirmation strategy
-    let confirmed = false;
-    let attempts = 0;
-    const maxAttempts = 5; // Reduced attempts for faster processing
-    const waitTime = 500; // Reduced wait time to 500ms
-
-    while (!confirmed && attempts < maxAttempts) {
-      try {
-        const status = await connection.getSignatureStatus(signature, { 
-          searchTransactionHistory: true 
-        });
-        
-        if (status.value?.confirmationStatus === 'confirmed' || 
-            status.value?.confirmationStatus === 'finalized') {
-          confirmed = true;
-          logger.info('Fair split transaction confirmed', {
-            signature,
-            confirmationStatus: status.value.confirmationStatus,
-            attempts
-          }, 'SplitWalletPayments');
-        } else if (status.value?.err) {
-          logger.error('Fair split transaction failed', {
-                signature,
-            error: status.value.err
-              }, 'SplitWalletPayments');
-            return {
-              success: false,
-                  signature,
-            error: `Transaction failed: ${JSON.stringify(status.value.err)}`
-          };
-        }
-      } catch (error) {
-        logger.warn('Error checking fair split transaction status', {
-                signature,
-          attempt: attempts + 1,
-          error
-              }, 'SplitWalletPayments');
-            }
+    if (isBlockhashTooOld(blockhashTimestamp)) {
+      logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+        blockhashAge,
+        maxAge: BLOCKHASH_MAX_AGE_MS,
+        note: 'Rebuilding to ensure blockhash is fresh when Firebase submits'
+      }, 'SplitWalletPayments');
       
-      if (!confirmed) {
-        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 500ms
-        attempts++;
-      }
+      // Get fresh blockhash using shared utility
+      const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+      const freshBlockhash = freshBlockhashData.blockhash;
+      const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+      
+      // Rebuild transaction with fresh blockhash
+      const freshTransaction = new Transaction({
+        recentBlockhash: freshBlockhash,
+        feePayer: companyPublicKey
+      });
+      
+      // Re-add all instructions
+      transaction.instructions.forEach(ix => freshTransaction.add(ix));
+      
+      // Re-sign with fresh transaction
+      const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+      freshVersionedTransaction.sign([keypair]);
+      currentTxArray = freshVersionedTransaction.serialize();
+      
+      logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+        transactionSize: currentTxArray.length,
+        blockhashAge,
+        newBlockhashTimestamp: freshBlockhashTimestamp,
+        timeSinceNewBlockhash: Date.now() - freshBlockhashTimestamp
+      }, 'SplitWalletPayments');
+      
+      currentBlockhashTimestamp = freshBlockhashTimestamp;
+    } else {
+      logger.info('Blockhash is still fresh, using existing transaction', {
+        blockhashAge,
+        maxAge: BLOCKHASH_MAX_AGE_MS,
+        note: 'Blockhash is within acceptable age, proceeding without rebuild'
+      }, 'SplitWalletPayments');
     }
 
-    if (!confirmed) {
-      logger.warn('Fair split transaction confirmation timed out - using likely succeeded mode', {
-              signature,
-        attempts,
-        transactionType
-            }, 'SplitWalletPayments');
-            
-      // For funding transactions, use "likely succeeded" mode when confirmation times out
-      // This prevents blocking the funding process due to network delays
-      if (transactionType === 'funding') {
-        logger.info('Fair split funding using likely succeeded mode due to timeout', {
-          signature,
-          expectedAmount: amount,
-          transactionType
-        }, 'SplitWalletPayments');
-        
-        return {
-          success: true,
-          signature
-        };
-      } else {
-        // For withdrawal transactions, be more strict about verification
-        try {
-          const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
-          
-          if (transactionConfirmed) {
-            logger.info('Fair split withdrawal verified by blockchain confirmation', {
-              signature,
-              expectedAmount: amount
-            }, 'SplitWalletPayments');
-            return {
-              success: true,
-              signature
-            };
-          } else {
-            logger.error('Fair split withdrawal verification failed - transaction not confirmed on blockchain', {
-              signature,
-              expectedAmount: amount
+    // CRITICAL: Log blockhash age right before sending to Firebase
+    const finalBlockhashAge = Date.now() - currentBlockhashTimestamp;
+    logger.info('Transaction serialized, requesting company wallet signature', {
+      transactionSize: currentTxArray.length,
+      transactionType: typeof currentTxArray,
+      isUint8Array: currentTxArray instanceof Uint8Array,
+      blockhashAge: finalBlockhashAge,
+      blockhashAgeMs: finalBlockhashAge,
+      maxAgeMs: BLOCKHASH_MAX_AGE_MS,
+      isBlockhashFresh: finalBlockhashAge < BLOCKHASH_MAX_AGE_MS,
+      warning: finalBlockhashAge > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh',
+      note: 'Sending to Firebase immediately to minimize blockhash expiration risk'
+    }, 'SplitWalletPayments');
+    
+    // Use processUsdcTransfer which combines signing and submission in one Firebase call
+    // This minimizes blockhash expiration risk and reduces network round trips
+    let signature: string;
+    try {
+      logger.info('Processing USDC transfer (sign and submit)', {
+        transactionSize: currentTxArray.length
+          }, 'SplitWalletPayments');
+      
+      const result = await processUsdcTransfer(currentTxArray);
+      signature = result.signature;
+      logger.info('Transaction processed successfully', { signature }, 'SplitWalletPayments');
+    } catch (submissionError) {
+      logger.error('Transaction submission failed', { 
+        error: submissionError,
+        errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
             }, 'SplitWalletPayments');
             return {
               success: false,
-              signature,
-              error: 'Transaction confirmation timed out and blockchain verification failed'
-            };
-          }
-        } catch (balanceError) {
-          logger.error('Failed to verify fair split withdrawal', {
-            signature,
-            error: balanceError instanceof Error ? balanceError.message : String(balanceError)
-          }, 'SplitWalletPayments');
-          return {
-            success: false,
-            signature,
-            error: 'Transaction confirmation timed out and verification failed'
-          };
-        }
-      }
+        error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
+      };
     }
 
             return {
               success: true,
             signature
           };
-
   } catch (error) {
     logger.error('Fair split transaction failed', error, 'SplitWalletPayments');
             return {
@@ -461,35 +454,93 @@ async function executeFastTransaction(
       const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromPublicKey);
       const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
 
-      // Validate source token account exists and has sufficient balance
+      // Validate source token account exists and get actual balance
+      // CRITICAL: Use fallback method if getAccount fails (account might exist but getAccount throws)
+      let actualAccountBalance: number | null = null;
+      let fromAccount: any = null;
+      let actualFromTokenAccount = fromTokenAccount;
+      
       try {
-        const fromAccount = await getAccount(connection, fromTokenAccount);
-        logger.info('Source token account validated', {
+        // Try primary method: getAccount with associated token address
+        fromAccount = await getAccount(connection, fromTokenAccount);
+        actualAccountBalance = fromAccount.amount / Math.pow(10, 6); // Convert to USDC (6 decimals)
+        
+        logger.info('Source token account validated (primary method)', {
           fromTokenAccount: fromTokenAccount.toString(),
           owner: fromAccount.owner.toString(),
           mint: fromAccount.mint.toString(),
-          amount: fromAccount.amount.toString(),
-          requiredAmount: Math.floor(amount * Math.pow(10, 6))
+          actualBalance: actualAccountBalance,
+          requestedAmount: amount,
+          rawAmount: fromAccount.amount.toString()
+        }, 'SplitWalletPayments');
+      } catch (primaryError) {
+        // Fallback: Try to find USDC account using getTokenAccountsByOwner
+        logger.warn('Primary token account validation failed, trying fallback method', {
+          fromTokenAccount: fromTokenAccount.toString(),
+          fromAddress,
+          error: primaryError instanceof Error ? primaryError.message : String(primaryError)
         }, 'SplitWalletPayments');
         
-        if (fromAccount.amount < Math.floor(amount * Math.pow(10, 6))) {
+        try {
+          const { TOKEN_PROGRAM_ID } = await memoryManager.loadModule('solana-spl-token');
+          const tokenAccounts = await connection.getTokenAccountsByOwner(
+            fromPublicKey,
+            { mint: mintPublicKey },
+            { commitment: 'confirmed' }
+          );
+          
+          if (tokenAccounts.value.length > 0) {
+            // Found USDC account using fallback method
+            const usdcAccount = tokenAccounts.value[0];
+            fromAccount = await getAccount(connection, usdcAccount.pubkey);
+            actualAccountBalance = Number(fromAccount.amount) / Math.pow(10, 6);
+            
+            // Update to use the found account
+            actualFromTokenAccount = usdcAccount.pubkey;
+            
+            logger.info('Source token account found using fallback method', {
+              originalTokenAccount: fromTokenAccount.toString(),
+              foundTokenAccount: actualFromTokenAccount.toString(),
+              actualBalance: actualAccountBalance,
+              rawAmount: fromAccount.amount.toString()
+            }, 'SplitWalletPayments');
+          } else {
+            throw new Error('No USDC token account found using fallback method');
+          }
+        } catch (fallbackError) {
+          logger.error('Source token account validation failed (both methods)', {
+            fromTokenAccount: fromTokenAccount.toString(),
+            fromPublicKey: fromPublicKey.toString(),
+            fromAddress,
+            mintPublicKey: mintPublicKey.toString(),
+            primaryError: primaryError instanceof Error ? primaryError.message : String(primaryError),
+            fallbackError: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+          }, 'SplitWalletPayments');
+          
           return {
             success: false,
-            error: `Insufficient USDC balance. Available: ${fromAccount.amount / Math.pow(10, 6)} USDC, Required: ${amount} USDC`
+            error: 'Source wallet does not have a USDC token account. Please ensure your wallet is properly set up.'
           };
         }
-      } catch (error) {
-        logger.error('Source token account validation failed', {
-          fromTokenAccount: fromTokenAccount.toString(),
-          fromPublicKey: fromPublicKey.toString(),
-          mintPublicKey: mintPublicKey.toString(),
-          error: error instanceof Error ? error.message : String(error)
-        }, 'SplitWalletPayments');
-        
-        return {
-          success: false,
-          error: 'Source wallet does not have a USDC token account. Please ensure your wallet is properly set up.'
-        };
+      }
+      
+      // Validate balance for withdrawals and funding
+      if (transactionType === 'withdrawal') {
+        // For withdrawals, use the actual balance from the account to withdraw everything
+        if (!fromAccount || fromAccount.amount <= 0) {
+          return {
+            success: false,
+            error: `Split wallet has no USDC balance available`
+          };
+        }
+      } else {
+        // For funding, check if we have sufficient balance
+        if (!fromAccount || fromAccount.amount < Math.floor(amount * Math.pow(10, 6))) {
+          return {
+            success: false,
+            error: `Insufficient USDC balance. Available: ${actualAccountBalance || 0} USDC, Required: ${amount} USDC`
+          };
+        }
       }
 
       // Check if destination token account exists
@@ -526,14 +577,20 @@ async function executeFastTransaction(
       }
 
       // Calculate company fee for funding transactions (1.5% fee for money going INTO splits)
-      let transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
+      // For withdrawals, use the actual balance from the account to withdraw everything
+      const amountToUse = transactionType === 'withdrawal' && actualAccountBalance !== null 
+        ? actualAccountBalance 
+        : amount;
+      let transferAmount = Math.floor(amountToUse * Math.pow(10, 6)); // USDC has 6 decimals
       let companyFeeAmount = 0;
       
       logger.info('Transfer amount calculation', {
         originalAmount: amount,
+        amountToUse: amountToUse,
+        actualAccountBalance: actualAccountBalance,
         transferAmount,
         transactionType,
-        fromTokenAccount: fromTokenAccount.toString(),
+        fromTokenAccount: actualFromTokenAccount.toString(),
         toTokenAccount: toTokenAccount.toString()
       }, 'SplitWalletPayments');
       
@@ -548,9 +605,10 @@ async function executeFastTransaction(
           const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
           const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(COMPANY_WALLET_CONFIG.address));
           
+          // CRITICAL: Use actualFromTokenAccount (might be different if fallback method was used)
           transaction.add(
             createTransferInstruction(
-              fromTokenAccount,
+              actualFromTokenAccount,
               companyTokenAccount,
               fromPublicKey,
               companyFeeAmount,
@@ -567,18 +625,34 @@ async function executeFastTransaction(
             companyFee,
             companyFeeAmount,
             recipientAmount,
-            transferAmount
+            transferAmount,
+            fromTokenAccount: actualFromTokenAccount.toString()
           }, 'SplitWalletPayments');
         }
       }
 
+      // For withdrawals, use the exact raw amount from the account to withdraw everything
+      // This ensures no residual balance is left (0.000001 USDC or similar)
+      let finalTransferAmount = transferAmount;
+      if (transactionType === 'withdrawal' && fromAccount) {
+        // Use the exact raw amount from the account we already fetched
+        finalTransferAmount = fromAccount.amount; // Use exact raw amount (already in 6 decimal format)
+        logger.info('Using exact account balance for withdrawal (no residual)', {
+          actualBalance: actualAccountBalance,
+          rawAmount: fromAccount.amount.toString(),
+          finalTransferAmount: finalTransferAmount.toString(),
+          tokenAccount: actualFromTokenAccount.toString()
+        }, 'SplitWalletPayments');
+      }
+      
       // Add transfer instruction (recipient gets the full amount they expect)
+      // CRITICAL: Use actualFromTokenAccount (might be different if fallback method was used)
       transaction.add(
         createTransferInstruction(
-          fromTokenAccount,
+          actualFromTokenAccount,
           toTokenAccount,
           fromPublicKey,
-          transferAmount
+          finalTransferAmount
         )
       );
     }
@@ -596,44 +670,147 @@ async function executeFastTransaction(
       }
     }
 
-    // Get recent blockhash
-    const { blockhash } = await connection.getLatestBlockhash('processed'); // Use 'processed' for speed
+    // IMPORTANT: Get fresh blockhash RIGHT BEFORE finalizing the transaction
+    // Blockhashes expire after ~60 seconds, so we get it as late as possible
+    // to minimize the time between creation and submission
+    // Best practice: Use shared utility for consistent blockhash handling
+    const blockhashData = await getFreshBlockhash(connection, 'confirmed');
+    const blockhash = blockhashData.blockhash;
+    const blockhashTimestamp = blockhashData.timestamp;
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
+    // SECURITY: Company wallet secret key is not available in client-side code
+    // All secret key operations must be performed on backend services
     const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
     const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
-    const companyWalletSecretKey = COMPANY_WALLET_CONFIG.secretKey;
     
-    if (!companyWalletAddress || !companyWalletSecretKey) {
+    if (!companyWalletAddress) {
       return {
         success: false,
-        error: 'Company wallet not configured for fee payment'
+        error: 'Company wallet address is not configured'
       };
     }
     
     const companyPublicKey = new PublicKey(companyWalletAddress);
     transaction.feePayer = companyPublicKey;
     
-    // Create company keypair for signing
-    const companyKeypairResult = KeypairUtils.createKeypairFromSecretKey(companyWalletSecretKey);
-    if (!companyKeypairResult.success || !companyKeypairResult.keypair) {
+    // Convert Transaction to VersionedTransaction for Firebase Functions
+    // Firebase Functions expect VersionedTransaction format
+    // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+    // This avoids double signing and ensures clean signature handling
+    let versionedTransaction: VersionedTransaction;
+    try {
+      versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+      // Sign the versioned transaction with user keypair (only sign once)
+      versionedTransaction.sign([keypair]);
+      logger.info('Transaction converted to VersionedTransaction and signed', {
+        userAddress: keypair.publicKey.toBase58(),
+        feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+      }, 'SplitWalletPayments');
+    } catch (versionError) {
+      logger.error('Failed to convert transaction to VersionedTransaction', {
+        error: versionError,
+        errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+      }, 'SplitWalletPayments');
       return {
         success: false,
-        error: 'Failed to create company wallet keypair for fee payment'
+        error: `Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`
       };
     }
-    const companyKeypair = companyKeypairResult.keypair;
 
-    // Sign with both keypairs (user for USDC transfer, company for fees)
-    transaction.sign(keypair, companyKeypair);
+    // Serialize the partially signed transaction
+    const serializedTransaction = versionedTransaction.serialize();
 
+    // Ensure we have a proper Uint8Array
+    const txArray = serializedTransaction instanceof Uint8Array 
+      ? serializedTransaction 
+      : new Uint8Array(serializedTransaction);
 
-    const signature = await connection.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'processed', // Use 'processed' for fastest confirmation
-      maxRetries: 1 // Minimal retries for speed
-    });
+    // CRITICAL: Check blockhash age before sending to Firebase
+    // Mainnet is slower, so we need aggressive refresh (10 seconds threshold)
+    // Best practice: Use shared utility for consistent blockhash age checking
+    const blockhashAge = Date.now() - blockhashTimestamp;
+    let currentTxArray = txArray;
+    let currentBlockhashTimestamp = blockhashTimestamp;
+    
+    if (isBlockhashTooOld(blockhashTimestamp)) {
+      logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+        blockhashAge,
+        maxAge: BLOCKHASH_MAX_AGE_MS,
+        note: 'Rebuilding to ensure blockhash is fresh when Firebase submits'
+      }, 'SplitWalletPayments');
+      
+      // Get fresh blockhash using shared utility
+      const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+      const freshBlockhash = freshBlockhashData.blockhash;
+      const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+      
+      // Rebuild transaction with fresh blockhash
+      const freshTransaction = new Transaction({
+        recentBlockhash: freshBlockhash,
+        feePayer: companyPublicKey
+      });
+      
+      // Re-add all instructions
+      transaction.instructions.forEach(ix => freshTransaction.add(ix));
+      
+      // Re-sign with fresh transaction
+      const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+      freshVersionedTransaction.sign([keypair]);
+      currentTxArray = freshVersionedTransaction.serialize();
+      
+      logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+        transactionSize: currentTxArray.length,
+        blockhashAge,
+        newBlockhashTimestamp: freshBlockhashTimestamp,
+        timeSinceNewBlockhash: Date.now() - freshBlockhashTimestamp
+      }, 'SplitWalletPayments');
+      
+      currentBlockhashTimestamp = freshBlockhashTimestamp;
+    } else {
+      logger.info('Blockhash is still fresh, using existing transaction', {
+        blockhashAge,
+        maxAge: BLOCKHASH_MAX_AGE_MS,
+        note: 'Blockhash is within acceptable age, proceeding without rebuild'
+      }, 'SplitWalletPayments');
+    }
+
+    // CRITICAL: Log blockhash age right before sending to Firebase
+    const finalBlockhashAge = Date.now() - currentBlockhashTimestamp;
+    logger.info('Transaction serialized, requesting company wallet signature', {
+      transactionSize: currentTxArray.length,
+      transactionType: typeof currentTxArray,
+      isUint8Array: currentTxArray instanceof Uint8Array,
+      blockhashAge: finalBlockhashAge,
+      blockhashAgeMs: finalBlockhashAge,
+      maxAgeMs: BLOCKHASH_MAX_AGE_MS,
+      isBlockhashFresh: finalBlockhashAge < BLOCKHASH_MAX_AGE_MS,
+      warning: finalBlockhashAge > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh',
+      note: 'Sending to Firebase immediately to minimize blockhash expiration risk'
+    }, 'SplitWalletPayments');
+
+    // Use processUsdcTransfer which combines signing and submission in one Firebase call
+    // This minimizes blockhash expiration risk and reduces network round trips
+    let signature: string;
+    try {
+      logger.info('Processing USDC transfer (sign and submit)', {
+        transactionSize: currentTxArray.length
+      }, 'SplitWalletPayments');
+      
+      const result = await processUsdcTransfer(currentTxArray);
+      signature = result.signature;
+      logger.info('Transaction processed successfully', { signature }, 'SplitWalletPayments');
+    } catch (submissionError) {
+      logger.error('Transaction submission failed', { 
+        error: submissionError,
+        errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+      }, 'SplitWalletPayments');
+      return {
+        success: false,
+        error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
+      };
+    }
 
     logger.info('Fast transaction sent successfully', {
       signature,
@@ -647,10 +824,16 @@ async function executeFastTransaction(
     // Balance capture moved to before transaction execution
 
     // For withdrawals, use optimized confirmation strategy
+    // Mainnet-aware: Use longer timeouts for mainnet since it's slower
+    const { getConfig } = await import('../../config/unified');
+    const config = getConfig();
+    const isMainnet = config.blockchain.network === 'mainnet';
+    
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 15; // Reduced attempts for faster response
-    const waitTime = 2000; // Increased wait time to 2 seconds for better reliability
+    // Mainnet needs more time - transactions can take 30+ seconds
+    const maxAttempts = isMainnet ? 30 : 15; // 30 attempts for mainnet (60 seconds), 15 for devnet (30 seconds)
+    const waitTime = isMainnet ? 2000 : 2000; // 2 seconds for both (mainnet needs more attempts, not longer waits)
 
     logger.info('Starting withdrawal transaction confirmation', {
       signature,
@@ -1061,57 +1244,143 @@ async function executeDegenSplitTransaction(
       }
     }
 
-    // Get recent blockhash
+    // IMPORTANT: Get fresh blockhash RIGHT BEFORE finalizing the transaction
+    // Blockhashes expire after ~60 seconds, so we get it as late as possible
+    // to minimize the time between creation and submission
     const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    const blockhashTimestamp = Date.now(); // Track when we got the blockhash
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
+    // SECURITY: Company wallet secret key is not available in client-side code
+    // All secret key operations must be performed on backend services
     const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
     const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
-    const companyWalletSecretKey = COMPANY_WALLET_CONFIG.secretKey;
     
-    if (!companyWalletAddress || !companyWalletSecretKey) {
+    if (!companyWalletAddress) {
             return {
         success: false,
-        error: 'Company wallet not configured for fee payment'
+        error: 'Company wallet address is not configured'
       };
     }
     
     const companyPublicKey = new PublicKey(companyWalletAddress);
     transaction.feePayer = companyPublicKey;
     
-    // Create company keypair for signing
-    const companyKeypairResult = KeypairUtils.createKeypairFromSecretKey(companyWalletSecretKey);
-    if (!companyKeypairResult.success || !companyKeypairResult.keypair) {
-        return {
-        success: false,
-        error: 'Failed to create company wallet keypair for fee payment'
-      };
-    }
-    const companyKeypair = companyKeypairResult.keypair;
-
-    // Sign with both keypairs (user for USDC transfer, company for fees)
-    transaction.sign(keypair, companyKeypair);
-
-    let signature;
+    // Convert Transaction to VersionedTransaction for Firebase Functions
+    // Firebase Functions expect VersionedTransaction format
+    // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+    // This avoids double signing and ensures clean signature handling
+    let versionedTransaction: VersionedTransaction;
     try {
-      signature = await connection.sendRawTransaction(transaction.serialize(), {
-        skipPreflight: false,
-        preflightCommitment: 'processed', // Use 'processed' for faster confirmation
-        maxRetries: 2 // Reduced retries for faster processing
-      });
-    } catch (sendError) {
-      logger.error('Failed to send degen split transaction', {
-        fromAddress,
-        toAddress,
-        amount,
-        currency,
-        error: sendError instanceof Error ? sendError.message : String(sendError)
+      versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+      // Sign the versioned transaction with user keypair (only sign once)
+      versionedTransaction.sign([keypair]);
+      logger.info('Transaction converted to VersionedTransaction and signed', {
+        userAddress: keypair.publicKey.toBase58(),
+        feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
       }, 'SplitWalletPayments');
-      
+    } catch (versionError) {
+      logger.error('Failed to convert transaction to VersionedTransaction', {
+        error: versionError,
+        errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+      }, 'SplitWalletPayments');
       return {
         success: false,
-        error: `Transaction failed to send: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`
+        error: `Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`
+      };
+    }
+
+    // Serialize the partially signed transaction
+    const serializedTransaction = versionedTransaction.serialize();
+
+    // Ensure we have a proper Uint8Array
+    const txArray = serializedTransaction instanceof Uint8Array 
+      ? serializedTransaction 
+      : new Uint8Array(serializedTransaction);
+
+    // CRITICAL: Check blockhash age before sending to Firebase
+    // Mainnet is slower, so we need aggressive refresh (10 seconds threshold)
+    // Best practice: Use shared utility for consistent blockhash age checking
+    const blockhashAge = Date.now() - blockhashTimestamp;
+    let currentTxArray = txArray;
+    let currentBlockhashTimestamp = blockhashTimestamp;
+    
+    if (isBlockhashTooOld(blockhashTimestamp)) {
+      logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+        blockhashAge,
+        maxAge: BLOCKHASH_MAX_AGE_MS,
+        note: 'Rebuilding to ensure blockhash is fresh when Firebase submits'
+      }, 'SplitWalletPayments');
+      
+      // Get fresh blockhash using shared utility
+      const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+      const freshBlockhash = freshBlockhashData.blockhash;
+      const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+      
+      // Rebuild transaction with fresh blockhash
+      const freshTransaction = new Transaction({
+        recentBlockhash: freshBlockhash,
+        feePayer: companyPublicKey
+      });
+      
+      // Re-add all instructions
+      transaction.instructions.forEach(ix => freshTransaction.add(ix));
+      
+      // Re-sign with fresh transaction
+      const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+      freshVersionedTransaction.sign([keypair]);
+      currentTxArray = freshVersionedTransaction.serialize();
+      
+      logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+        transactionSize: currentTxArray.length,
+        blockhashAge,
+        newBlockhashTimestamp: freshBlockhashTimestamp,
+        timeSinceNewBlockhash: Date.now() - freshBlockhashTimestamp
+      }, 'SplitWalletPayments');
+      
+      currentBlockhashTimestamp = freshBlockhashTimestamp;
+    } else {
+      logger.info('Blockhash is still fresh, using existing transaction', {
+        blockhashAge,
+        maxAge: BLOCKHASH_MAX_AGE_MS,
+        note: 'Blockhash is within acceptable age, proceeding without rebuild'
+      }, 'SplitWalletPayments');
+    }
+
+    // CRITICAL: Log blockhash age right before sending to Firebase
+    const finalBlockhashAge = Date.now() - currentBlockhashTimestamp;
+    logger.info('Transaction serialized, requesting company wallet signature', {
+      transactionSize: currentTxArray.length,
+      transactionType: typeof currentTxArray,
+      isUint8Array: currentTxArray instanceof Uint8Array,
+      blockhashAge: finalBlockhashAge,
+      blockhashAgeMs: finalBlockhashAge,
+      maxAgeMs: BLOCKHASH_MAX_AGE_MS,
+      isBlockhashFresh: finalBlockhashAge < BLOCKHASH_MAX_AGE_MS,
+      warning: finalBlockhashAge > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh',
+      note: 'Sending to Firebase immediately to minimize blockhash expiration risk'
+    }, 'SplitWalletPayments');
+
+    // Use processUsdcTransfer which combines signing and submission in one Firebase call
+    // This minimizes blockhash expiration risk and reduces network round trips
+    let signature: string;
+    try {
+      logger.info('Processing USDC transfer (sign and submit)', {
+        transactionSize: currentTxArray.length
+      }, 'SplitWalletPayments');
+      
+      const result = await processUsdcTransfer(currentTxArray);
+      signature = result.signature;
+      logger.info('Transaction processed successfully', { signature }, 'SplitWalletPayments');
+    } catch (submissionError) {
+      logger.error('Transaction submission failed', { 
+        error: submissionError,
+        errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+      }, 'SplitWalletPayments');
+      return {
+        success: false,
+        error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
       };
     }
 
@@ -1127,8 +1396,13 @@ async function executeDegenSplitTransaction(
     // For degen splits, use enhanced confirmation strategy
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 30; // Increased attempts for better reliability
-    const waitTime = 1000; // Increased wait time to 1 second
+    // Mainnet-aware: Use longer timeouts for mainnet since it's slower
+    const { getConfig: getConfigForDegen } = await import('../../config/unified');
+    const degenConfig = getConfigForDegen();
+    const isMainnetDegen = degenConfig.blockchain.network === 'mainnet';
+    
+    const maxAttempts = isMainnetDegen ? 40 : 30; // 40 attempts for mainnet (40 seconds), 30 for devnet (30 seconds)
+    const waitTime = isMainnetDegen ? 2000 : 1000; // 2 seconds for mainnet, 1 second for devnet
 
     while (!confirmed && attempts < maxAttempts) {
       try {
@@ -1806,6 +2080,36 @@ export class SplitWalletPayments {
           : p
       );
 
+      // Award Fair Split participation reward (non-blocking)
+      try {
+        const { splitRewardsService } = await import('../../services/rewards/splitRewardsService');
+        const { SplitStorageService } = await import('../splits/splitStorageService');
+        
+        // Get split data to determine split type and amount
+        const splitResult = await SplitStorageService.getSplitByBillId(wallet.billId);
+        if (splitResult.success && splitResult.split) {
+          const split = splitResult.split;
+          
+          if (split.splitType === 'fair') {
+            // Award participant reward (non-owner)
+            await splitRewardsService.awardFairSplitParticipation({
+              userId: participantId,
+              splitId: split.id,
+              splitType: 'fair',
+              splitAmount: roundedAmount,
+              isOwner: false
+            });
+          }
+        }
+      } catch (rewardError) {
+        logger.error('Failed to award Fair Split participation reward', {
+          participantId,
+          splitWalletId,
+          rewardError
+        }, 'SplitWalletPayments');
+        // Don't fail payment if reward fails
+      }
+
       // CRITICAL: Single atomic database update for both collections
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
       const updatedParticipant = updatedParticipants.find(p => p.userId === participantId);
@@ -1948,9 +2252,10 @@ export class SplitWalletPayments {
 
       const availableBalance = balanceResult.balance;
       
-      // For fair split withdrawals, leave a small buffer to prevent transaction rejection
-      const minimumBuffer = 0.000001; // 0.000001 USDC buffer
-      const withdrawalAmount = Math.max(0, availableBalance - minimumBuffer);
+      // CRITICAL: Withdraw the FULL balance - no buffer needed for USDC token transfers
+      // Transaction fees are paid in SOL, not USDC, so we can withdraw the entire USDC balance
+      // Round to 6 decimal places to match USDC precision
+      const withdrawalAmount = Math.floor(availableBalance * Math.pow(10, 6)) / Math.pow(10, 6);
       
       if (withdrawalAmount <= 0) {
         return {
@@ -1958,6 +2263,13 @@ export class SplitWalletPayments {
           error: 'Insufficient balance for withdrawal',
         };
       }
+      
+      logger.info('Withdrawing full balance from split wallet', {
+        splitWalletId,
+        availableBalance,
+        withdrawalAmount,
+        walletAddress: wallet.walletAddress
+      }, 'SplitWalletPayments');
 
       // Execute transaction using fast or standard method based on fastMode
       const transactionResult = fastMode 
@@ -2091,6 +2403,38 @@ export class SplitWalletPayments {
       // Calculate the actual total amount from all participants' locked funds
       // For degen splits, the winner gets all the money that was locked by all participants
       const actualTotalAmount = wallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+      
+      // Award Degen Split completion rewards (non-blocking)
+      try {
+        const { splitRewardsService } = await import('../../services/rewards/splitRewardsService');
+        const { SplitStorageService } = await import('../splits/splitStorageService');
+        
+        // Get split data
+        const splitResult = await SplitStorageService.getSplitByBillId(wallet.billId);
+        if (splitResult.success && splitResult.split) {
+          const split = splitResult.split;
+          
+          // Award rewards for all participants (winner and losers)
+          for (const participant of wallet.participants) {
+            const isWinner = participant.userId === winnerUserId;
+            await splitRewardsService.awardDegenSplitParticipation({
+              userId: participant.userId,
+              splitId: split.id,
+              splitType: 'degen',
+              splitAmount: participant.amountPaid || 0,
+              isOwner: false,
+              isWinner
+            });
+          }
+        }
+      } catch (rewardError) {
+        logger.error('Failed to award Degen Split completion rewards', {
+          winnerUserId,
+          splitWalletId,
+          rewardError
+        }, 'SplitWalletPayments');
+        // Don't fail payout if rewards fail
+      }
       
       logger.info('Degen winner payout amount calculation', {
         splitWalletId,

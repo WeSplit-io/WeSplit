@@ -75,6 +75,28 @@ class SubscriptionService {
     const subscription = await this.getUserSubscription(userId);
     return subscription?.isActive || false;
   }
+
+  // Alias methods for compatibility
+  public async getPlans(): Promise<SubscriptionPlan[]> {
+    return this.getAvailablePlans();
+  }
+
+  public async processPayment(userId: string, planId: string, paymentMethodId: string): Promise<{ success: boolean; subscription?: UserSubscription; error?: string }> {
+    try {
+      const subscription = await this.createSubscription(userId, planId);
+      return { success: true, subscription };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Payment processing failed' 
+      };
+    }
+  }
+
+  public async validateSubscription(subscriptionId: string): Promise<{ isValid: boolean; subscription?: UserSubscription; error?: string }> {
+    // This is a placeholder - actual validation would check subscription status
+    return { isValid: false, error: 'Subscription validation not implemented' };
+  }
 }
 
 export const subscriptionService = SubscriptionService.getInstance();

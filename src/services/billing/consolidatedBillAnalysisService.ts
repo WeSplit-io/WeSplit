@@ -291,91 +291,27 @@ class ConsolidatedBillAnalysisService {
 
   /**
    * HIGHLY OPTIMIZED: OCR-based bill analysis
+   * Uses the dedicated OCR service for clean implementation
    */
   private async analyzeBillWithOCR(imageUri: string, currentUser?: { id: string; name: string; wallet_address: string }): Promise<BillAnalysisResult> {
-    const startTime = Date.now();
-    
     try {
       logger.info('Starting OCR bill analysis', { imageUri }, 'BillAnalysis');
 
-      const base64Image = await this.convertImageToBase64(imageUri);
-      const ocrResponse = await this.callOCRService(base64Image);
-      
-      if (!ocrResponse.success) {
-        throw new Error(ocrResponse.error || 'OCR processing failed');
-      }
-
-      const billData = this.convertOCRResponseToBillData(ocrResponse);
-      
-      // Convert currency to USDC if needed - convert both total and item prices
-      if (billData.currency && billData.currency !== 'USDC' && billData.currency !== 'USD') {
-        try {
-          const { convertFiatToUSDC } = await import('../core');
-          
-          // Save original total before conversion
-          const originalTotal = billData.transaction.order_total;
-          
-          // Convert total amount using live market rates
-          const convertedAmount = await convertFiatToUSDC(originalTotal, billData.currency);
-          billData.transaction.order_total = convertedAmount;
-          billData.transaction.calculated_total = convertedAmount;
-          
-          // Convert item prices proportionally using live market rates
-          if (billData.transaction.items && billData.transaction.items.length > 0) {
-            const conversionRate = convertedAmount / originalTotal;
-            
-            // Convert each item price using the same conversion rate
-            billData.transaction.items = billData.transaction.items.map((item: any) => ({
-              ...item,
-              price: item.price * conversionRate
-            }));
-            
-            logger.info('Converted OCR bill items to USDC', {
-              itemsCount: billData.transaction.items.length,
-              conversionRate: conversionRate.toFixed(4),
-              originalCurrency: billData.currency,
-              originalTotal,
-              convertedTotal: convertedAmount
-            }, 'BillAnalysis');
-          }
-          
-          billData.currency = 'USDC';
-          logger.info('Converted OCR bill amount to USDC', { 
-            originalAmount: ocrResponse.totalAmount,
-            originalCurrency: billData.currency,
-            convertedAmount,
-            currency: 'USDC'
-          }, 'BillAnalysis');
-        } catch (conversionError) {
-          // For OCR bills, we should throw error to prevent using incorrect values
-          logger.error('Failed to convert OCR bill amount to USDC', { 
-            error: conversionError,
-            originalAmount: billData.transaction.order_total,
-            originalCurrency: billData.currency
-          }, 'BillAnalysis');
-          throw new Error(`Failed to convert ${billData.currency} to USDC: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`);
-        }
-      }
-      
-      const processedData = this.processBillData(billData, currentUser);
-      const processingTime = Date.now() - startTime;
+      // Use the dedicated OCR service
+      const { ocrService } = await import('./ocrService');
+      const result = await ocrService.analyzeReceipt(imageUri, currentUser);
 
       logger.info('OCR analysis completed', {
-        processingTime,
-        itemCount: processedData.items.length,
-        totalAmount: processedData.totalAmount
+        success: result.success,
+        processingTime: result.processingTime,
+        itemCount: result.data?.items.length || 0,
+        totalAmount: result.data?.totalAmount || 0,
       }, 'BillAnalysis');
 
-      return {
-        success: true,
-        data: processedData,
-        processingTime,
-        confidence: ocrResponse.confidence || 0.85
-      };
+      return result;
     } catch (error) {
       logger.error('OCR analysis failed', { 
         error: error instanceof Error ? error.message : 'Unknown error',
-        processingTime: Date.now() - startTime
       }, 'BillAnalysis');
       throw error;
     }
@@ -654,41 +590,8 @@ class ConsolidatedBillAnalysisService {
     };
   }
 
-  /**
-   * OPTIMIZED: Convert OCR response to bill data format
-   */
-  private convertOCRResponseToBillData(ocrResponse: any): InternalBillData {
-    return {
-      category: "Food & Drinks",
-      country: "USA",
-      store: {
-        name: ocrResponse.merchant || "Extracted Store",
-        location: {
-          address: "",
-          city: "Unknown City",
-          state: "Unknown State",
-          zip_code: "",
-          phone: ""
-        },
-        store_id: ""
-      },
-      transaction: {
-        date: ocrResponse.date || new Date().toISOString().split('T')[0],
-        time: new Date().toTimeString().split(' ')[0],
-        order_id: this.generateBillId(),
-        employee: "Unknown",
-        items: (ocrResponse.extractedItems || []).map((item: any) => ({
-          name: item.name || "Unknown Item",
-          price: item.price || 0
-        })),
-        sub_total: ocrResponse.totalAmount * 0.9,
-        sales_tax: ocrResponse.totalAmount * 0.1,
-        order_total: ocrResponse.totalAmount,
-        calculated_total: ocrResponse.totalAmount
-      },
-      currency: ocrResponse.currency || "USD"
-    };
-  }
+  // Removed: convertOCRResponseToBillData method - no longer needed
+  // OCR service now directly returns ProcessedBillData structure
 
   /**
    * OPTIMIZED: Convert incoming data to bill data format
@@ -743,7 +646,12 @@ class ConsolidatedBillAnalysisService {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = reader.result as string;
-          resolve(base64.split(',')[1]);
+          const base64Data = base64.split(',')[1];
+          if (!base64Data) {
+            reject(new Error('Failed to extract base64 data'));
+            return;
+          }
+          resolve(base64Data);
         };
         reader.onerror = reject;
         reader.readAsDataURL(blob);
@@ -854,32 +762,9 @@ class ConsolidatedBillAnalysisService {
     }
   }
 
-  private async callOCRService(base64Image: string): Promise<any> {
-    try {
-      // Enhanced mock OCR service - provides better data structure for testing
-      // TODO: Replace with actual OCR implementation
-      logger.info('Using mock OCR service for bill analysis', { imageSize: base64Image.length }, 'BillAnalysis');
-      
-      return {
-        success: true,
-        extractedItems: [
-          { name: 'Restaurant Bill Item 1', price: 15.50 },
-          { name: 'Restaurant Bill Item 2', price: 12.00 },
-          { name: 'Tax', price: 2.75 },
-          { name: 'Tip', price: 5.00 }
-        ],
-        totalAmount: 35.25,
-        confidence: 0.85,
-        rawText: 'Sample restaurant receipt with multiple items',
-        merchant: 'Sample Restaurant',
-        date: new Date().toISOString().split('T')[0],
-        currency: 'USD'
-      };
-    } catch (error) {
-      logger.error('OCR service call failed', { error }, 'BillAnalysis');
-      throw error;
-    }
-  }
+  // Removed: callOCRService method - now using dedicated ocrService
+  // The OCR functionality has been moved to src/services/billing/ocrService.ts
+  // for better separation of concerns and cleaner implementation
 
 }
 

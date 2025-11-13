@@ -3,11 +3,24 @@ const OpenAI = require('openai');
 const sharp = require('sharp');
 const cors = require('cors')({ origin: true });
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: functions.config().openrouter?.api_key || process.env.OPENROUTER_API_KEY,
+// Initialize OpenAI client lazily
+// Uses Firebase Secrets (OPENROUTER_API_KEY) or environment variables
+// Initialize only when needed to avoid errors during code analysis
+let openai = null;
+
+const getOpenAIClient = () => {
+  if (!openai) {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENROUTER_API_KEY is not set. Set it as a Firebase Secret.');
+    }
+    openai = new OpenAI({
+      apiKey: apiKey,
   baseURL: 'https://openrouter.ai/api/v1',
 });
+  }
+  return openai;
+};
 
 // AI Configuration
 const AI_CONFIG = {
@@ -273,7 +286,7 @@ function validateReceiptData(data) {
  */
 exports.aiHealthCheck = functions.https.onRequest((req, res) => {
   return cors(req, res, () => {
-    const apiKeyConfigured = !!(functions.config().openrouter?.api_key || process.env.OPENROUTER_API_KEY);
+    const apiKeyConfigured = !!process.env.OPENROUTER_API_KEY;
     
     res.json({
       status: 'healthy',
@@ -291,7 +304,7 @@ exports.analyzeBill = functions.https.onRequest(async (req, res) => {
   return cors(req, res, async () => {
     try {
       // Check API key
-      const apiKey = functions.config().openrouter?.api_key || process.env.OPENROUTER_API_KEY;
+      const apiKey = process.env.OPENROUTER_API_KEY;
       if (!apiKey) {
         return res.status(500).json({
           success: false,
@@ -372,7 +385,7 @@ exports.analyzeBill = functions.https.onRequest(async (req, res) => {
         try {
           console.log(`Attempting AI analysis (attempt ${retryCount + 1}/${maxRetries}) with model: ${AI_CONFIG.model}`);
           
-          response = await openai.chat.completions.create({
+          response = await getOpenAIClient().chat.completions.create({
             model: AI_CONFIG.model,
             messages: [
               {

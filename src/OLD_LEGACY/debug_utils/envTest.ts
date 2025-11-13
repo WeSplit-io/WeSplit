@@ -20,16 +20,18 @@ export function testEnvironmentVariables(): void {
   logger.info('Environment Variables Test', null, 'envTest');
   
   // Test Google OAuth variables
+  // SECURITY: Client secrets must NOT be in client-side code
+  // OAuth client secrets should only be used on backend services
   const googleClientId = getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID');
   const androidClientId = getEnvVar('ANDROID_GOOGLE_CLIENT_ID');
   const iosClientId = getEnvVar('IOS_GOOGLE_CLIENT_ID');
-  const googleClientSecret = getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_SECRET');
+  // EXPO_PUBLIC_GOOGLE_CLIENT_SECRET removed - must be handled by backend services only
   
   logger.info('Google OAuth Variables', {
     googleClientId: googleClientId ? `${googleClientId.substring(0, 20)}...` : 'NOT_FOUND',
     androidClientId: androidClientId ? `${androidClientId.substring(0, 20)}...` : 'NOT_FOUND',
-    iosClientId: iosClientId ? `${iosClientId.substring(0, 20)}...` : 'NOT_FOUND',
-    googleClientSecret: googleClientSecret ? `${googleClientSecret.substring(0, 10)}...` : 'NOT_FOUND'
+    iosClientId: iosClientId ? `${iosClientId.substring(0, 20)}...` : 'NOT_FOUND'
+    // SECURITY: Client secrets must not be logged or accessed in client-side code
   }, 'envTest');
   
   // Test Firebase variables

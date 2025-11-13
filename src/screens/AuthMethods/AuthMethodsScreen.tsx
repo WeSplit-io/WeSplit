@@ -13,7 +13,7 @@ import {
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
 import { colors } from '../../theme';
-import { Container, Header, Button, Input } from '../../components/shared';
+import { Container, Header, Button, Input, LoadingScreen } from '../../components/shared';
 import { useApp } from '../../context/AppContext';
 import { firebaseAuth, firestoreService, auth } from '../../config/firebase/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -48,7 +48,7 @@ const AuthMethodsScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [hasHandledAuthState, setHasHandledAuthState] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [emailSaveTimeout, setEmailSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [emailSaveTimeout, setEmailSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   // Email validation function
   const isValidEmail = (email: string): boolean => {
@@ -179,8 +179,12 @@ const AuthMethodsScreen: React.FC = () => {
 
       // Ensure user has a wallet using the centralized wallet service
       // CRITICAL: Always call ensureUserWallet to verify wallet integrity and restore if needed
+      // ✅ Pass email for email-based recovery fallback
       try {
-        logger.info('Ensuring wallet integrity for user', null, 'AuthMethodsScreen');
+        logger.info('Ensuring wallet integrity for user', { 
+          userId: appUser.id,
+          email: appUser.email?.substring(0, 5) + '...'
+        }, 'AuthMethodsScreen');
         const walletResult = await walletService.ensureUserWallet(appUser.id);
 
         if (walletResult.success && walletResult.wallet) {
@@ -288,6 +292,9 @@ const AuthMethodsScreen: React.FC = () => {
           if (!querySnapshot.empty) {
             // User exists in Firestore, get the user data
             const userDoc = querySnapshot.docs[0];
+            if (!userDoc) {
+              throw new Error('User document not found');
+            }
             const userData = userDoc.data();
 
             if (__DEV__) { logger.debug('Found existing user in Firestore', { userData }, 'AuthMethodsScreen'); }
@@ -531,6 +538,9 @@ const AuthMethodsScreen: React.FC = () => {
           if (!querySnapshot.empty) {
             // User exists in Firestore, get the user data
             const userDoc = querySnapshot.docs[0];
+            if (!userDoc) {
+              throw new Error('User document not found');
+            }
             const userData = userDoc.data();
 
             if (__DEV__) { logger.debug('Found existing user in Firestore', { userData }, 'AuthMethodsScreen'); }
@@ -726,10 +736,10 @@ const AuthMethodsScreen: React.FC = () => {
       <Container>
         <View style={styles.contentContainer}>
           <Header variant="logoOnly" />
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.green} />
-            <Text style={styles.loadingText}>Checking authentication...</Text>
-          </View>
+          <LoadingScreen
+            message="Checking authentication..."
+            showSpinner={true}
+          />
         </View>
       </Container>
     );

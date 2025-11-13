@@ -52,7 +52,9 @@ async function loadDeps() {
   }
   if (!MMKV) {
     try {
-      MMKV = (await import('react-native-mmkv')).MMKV;
+      const mmkvModule = await import('react-native-mmkv');
+      // react-native-mmkv v4 exports MMKV class - use createMMKV or default export
+      MMKV = (mmkvModule as any).default || (mmkvModule as any).MMKV || mmkvModule.createMMKV;
     } catch (e) {
       logger.warn('secureVault: MMKV not available', e, 'SecureVault');
     }
@@ -271,21 +273,31 @@ export function isVaultAuthenticated(): boolean {
 async function encryptAesGcm(key: Uint8Array, plaintextUtf8: string): Promise<{ iv: string; ct: string } | null> {
   try {
     const iv = getRandomBytes(12);
-    // Prefer SubtleCrypto if available
-    if (globalThis.crypto?.subtle) {
-      const subtle = globalThis.crypto.subtle;
-      const cryptoKey = await subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
-      const enc = new TextEncoder().encode(plaintextUtf8);
-      const ctBuf = await subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
-      return { iv: Buffer.from(iv).toString('base64'), ct: Buffer.from(new Uint8Array(ctBuf)).toString('base64') };
+    
+    // Try Web Crypto API (available in React Native with polyfill or newer versions)
+    const crypto = globalThis.crypto || (global as any).crypto;
+    if (crypto?.subtle) {
+      try {
+        const subtle = crypto.subtle;
+        // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+        const keyBuffer = new Uint8Array(key);
+        const cryptoKey = await subtle.importKey('raw', keyBuffer as BufferSource, 'AES-GCM', false, ['encrypt']);
+        const enc = new TextEncoder().encode(plaintextUtf8);
+        // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+        const ivBuffer = new Uint8Array(iv);
+        const encBuffer = new Uint8Array(enc);
+        const ctBuf = await subtle.encrypt({ name: 'AES-GCM', iv: ivBuffer as BufferSource }, cryptoKey, encBuffer as BufferSource);
+        return { iv: Buffer.from(iv).toString('base64'), ct: Buffer.from(new Uint8Array(ctBuf)).toString('base64') };
+      } catch (subtleError) {
+        logger.warn('secureVault: Web Crypto subtle failed, trying alternative', { error: subtleError }, 'SecureVault');
+      }
     }
-    // Fallback using Node crypto (Hermes may not have it; guarded above)
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const nodeCrypto = require('crypto');
-    const cipher = nodeCrypto.createCipheriv('aes-256-gcm', Buffer.from(key), Buffer.from(iv));
-    const ct = Buffer.concat([cipher.update(plaintextUtf8, 'utf8'), cipher.final()]);
-    const tag = cipher.getAuthTag();
-    return { iv: Buffer.from(iv).toString('base64'), ct: Buffer.concat([ct, tag]).toString('base64') };
+    
+    // Fallback: Use SecureStore directly (no encryption needed, SecureStore encrypts)
+    // This is acceptable since SecureStore uses Keychain which is already encrypted
+    logger.warn('secureVault: Web Crypto not available, encryption will be handled by SecureStore', {}, 'SecureVault');
+    // Return null to trigger SecureStore fallback
+    return null;
   } catch (e) {
     logger.error('secureVault: encrypt failed', e, 'SecureVault');
     return null;
@@ -296,23 +308,29 @@ async function decryptAesGcm(key: Uint8Array, ivB64: string, ctB64: string): Pro
   try {
     const iv = Uint8Array.from(Buffer.from(ivB64, 'base64'));
     const ctBuf = Uint8Array.from(Buffer.from(ctB64, 'base64'));
-    if (globalThis.crypto?.subtle) {
-      const subtle = globalThis.crypto.subtle;
-      const cryptoKey = await subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
-      const pt = await subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ctBuf);
-      return new TextDecoder().decode(pt);
+    
+    // Try Web Crypto API
+    const crypto = globalThis.crypto || (global as any).crypto;
+    if (crypto?.subtle) {
+      try {
+        const subtle = crypto.subtle;
+        // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+        const keyBuffer = new Uint8Array(key);
+        const cryptoKey = await subtle.importKey('raw', keyBuffer as BufferSource, 'AES-GCM', false, ['decrypt']);
+        // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+        const ivBuffer = new Uint8Array(iv);
+        // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+        const ctBuffer = new Uint8Array(ctBuf);
+        const pt = await subtle.decrypt({ name: 'AES-GCM', iv: ivBuffer as BufferSource }, cryptoKey, ctBuffer as BufferSource);
+        return new TextDecoder().decode(pt);
+      } catch (subtleError) {
+        logger.warn('secureVault: Web Crypto subtle decrypt failed', { error: subtleError }, 'SecureVault');
+      }
     }
-    // Node fallback with tag concatenated at end (last 16 bytes)
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const nodeCrypto = require('crypto');
-    const tagLen = 16;
-    const data = Buffer.from(ctBuf);
-    const body = data.slice(0, data.length - tagLen);
-    const tag = data.slice(data.length - tagLen);
-    const decipher = nodeCrypto.createDecipheriv('aes-256-gcm', Buffer.from(key), Buffer.from(iv));
-    decipher.setAuthTag(tag);
-    const pt = Buffer.concat([decipher.update(body), decipher.final()]);
-    return pt.toString('utf8');
+    
+    // If Web Crypto fails, return null (data might be in SecureStore)
+    logger.warn('secureVault: Web Crypto not available for decryption', {}, 'SecureVault');
+    return null;
   } catch (e) {
     logger.error('secureVault: decrypt failed', e, 'SecureVault');
     return null;
@@ -336,10 +354,14 @@ export const secureVault = {
       const kv = await getStorage();
       if (key && kv) {
         const enc = await encryptAesGcm(key, value);
-        if (!enc) throw new Error('encryption failed');
-        kv.set(`${name}_ct_${userId}`, enc.ct);
-        kv.set(`${name}_iv_${userId}`, enc.iv);
-        return true;
+        if (enc) {
+          // Encryption succeeded, store in MMKV
+          kv.set(`${name}_ct_${userId}`, enc.ct);
+          kv.set(`${name}_iv_${userId}`, enc.iv);
+          return true;
+        }
+        // Encryption failed (Web Crypto not available), fall through to SecureStore
+        logger.debug('secureVault: Encryption failed, falling back to SecureStore', { platform: Platform.OS }, 'SecureVault');
       }
       // Fallback to SecureStore cleartext (existing behavior)
       await loadDeps();

@@ -4,9 +4,10 @@ import { Header } from '../../components/shared';
 import { View, Text, TouchableOpacity, Image, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
-import UserAvatar from '../../components/UserAvatar';
 import Avatar from '../../components/shared/Avatar';
 import Button from '../../components/shared/Button';
+import { Tabs } from '../../components/shared';
+import type { Tab } from '../../components/shared/Tabs';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
@@ -163,41 +164,16 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
         onBackPress={() => navigation.goBack()}
       />
 
-      {/* Action Toggle - Using NotificationsScreen design */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity style={styles.tab} onPress={() => handleActionToggle('send')}>
-          {activeAction === 'send' ? (
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.tabActive}
-            >
-              <Text style={[styles.tabText, styles.activeTabText]}>Send</Text>
-            </LinearGradient>
-          ) : (
-            <View style={styles.tab}>
-              <Text style={styles.tabText}>Send</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab} onPress={() => handleActionToggle('request')}>
-          {activeAction === 'request' ? (
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.tabActive}
-            >
-              <Text style={[styles.tabText, styles.activeTabText]}>Request</Text>
-            </LinearGradient>
-          ) : (
-            <View style={styles.tab}>
-              <Text style={styles.tabText}>Request</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+      {/* Action Toggle */}
+      <Tabs
+        tabs={[
+          { label: 'Send', value: 'send' },
+          { label: 'Request', value: 'request' }
+        ]}
+        activeTab={activeAction}
+        onTabChange={(tab) => handleActionToggle(tab as 'send' | 'request')}
+        enableAnimation={true}
+      />
 
       {/* Contact Info - Using SendAmountScreen design */}
       <View style={styles.recipientAvatarContainer}>

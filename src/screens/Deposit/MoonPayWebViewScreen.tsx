@@ -27,7 +27,7 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
   const [webViewError, setWebViewError] = useState(false);
   const webViewRef = useRef<any>(null);
   const isMountedRef = useRef(true);
-  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const { getAppWalletBalance } = useWallet();
   const { state } = useApp();

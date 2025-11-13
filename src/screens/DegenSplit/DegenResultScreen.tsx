@@ -31,9 +31,9 @@ import { getSplitStatusDisplayText, getParticipantStatusDisplayText } from '../.
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader } from './components';
-import { Container, Button, AppleSlider } from '@/components/shared';
-import CustomModal from '@/components/shared/Modal';
+import { Container, Button, AppleSlider, Modal } from '@/components/shared';
 import Avatar from '@/components/shared/Avatar';
+import BadgeDisplay from '../../components/profile/BadgeDisplay';
 
 interface DegenResultScreenProps {
   navigation: any;
@@ -485,6 +485,15 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             showBorder={true}
             borderColor={isWinner ? colors.green : colors.red}
           />
+          {currentUser?.badges && currentUser.badges.length > 0 && currentUser.active_badge && (
+            <View style={{ marginTop: spacing.sm, alignItems: 'center' }}>
+              <BadgeDisplay
+                badges={currentUser.badges}
+                activeBadge={currentUser.active_badge}
+                showAll={false}
+              />
+            </View>
+          )}
         </View>
 
         {/* Result Title */}
@@ -567,7 +576,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       </View>
 
       {/* Claim CustomModal */}
-      <CustomModal
+      <Modal
         visible={degenState.showClaimModal}
         onClose={() => degenState.setShowClaimModal(false)}
         title={hasAlreadyClaimed ? 'Funds Already Claimed' : 'Claim Your Winnings'}
@@ -614,10 +623,10 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             text="Slide to Claim"
           />
         )}
-      </CustomModal>
+      </Modal>
 
       {/* Payment Options CustomModal */}
-      <CustomModal
+      <Modal
         visible={degenState.showPaymentOptionsModal}
         onClose={() => degenState.setShowPaymentOptionsModal(false)}
         title={!degenState.showSignatureStep ? 'Choose Payment Method' : 'Withdraw Your Locked Funds'}
@@ -724,10 +733,10 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             </TouchableOpacity>
           </>
         )}
-      </CustomModal>
+      </Modal>
 
       {/* Private Key CustomModal */}
-      <CustomModal
+      <Modal
         visible={degenState.showPrivateKeyModal && !!degenState.privateKey}
         onClose={handleClosePrivateKeyCustomModal}
         title="🔑 Split Wallet Details"
@@ -779,7 +788,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             <Text style={styles.closePrivateKeyButtonText}>Close</Text>
           </TouchableOpacity>
         </View>
-      </CustomModal>
+      </Modal>
     </Container>
   );
 };

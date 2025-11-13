@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
-import { Linking, View } from 'react-native';
+import { Linking } from 'react-native';
 import { logger } from '../services/core';
 import { deepLinkHandler } from '../services/core/deepLinkHandler';
 import { navigationService } from '../services/core/navigationService';
@@ -12,12 +12,11 @@ interface NavigationWrapperProps {
 }
 
 const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
-  const navigationRef = useRef<NavigationContainerRef<any>>(null);
+  const navigationRef = useRef<NavigationContainerRef<Record<string, object | undefined>>>(null);
   const { state } = useApp();
   const { currentUser } = state;
   const deepLinkSetupRef = useRef<boolean>(false);
   const currentUserIdRef = useRef<string | null>(null);
-  const [isNavigationReady, setIsNavigationReady] = useState(false);
 
   useEffect(() => {
     // Only set up deep link listeners if:
@@ -33,12 +32,16 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
     ) {
       logger.info('Setting up deep link listeners for user', { userId: currentUser.id }, 'NavigationWrapper');
       
+      // Capture currentUser in closure to avoid stale closure issues
+      const user = currentUser;
+      const navRef = navigationRef.current;
+      
       // Set up deep link listeners when navigation and user are available
-      const subscription = deepLinkHandler.setupDeepLinkListeners(navigationRef.current, currentUser);
+      const subscription = deepLinkHandler.setupDeepLinkListeners(navRef, user);
       
       // Mark as set up to prevent multiple calls
       deepLinkSetupRef.current = true;
-      currentUserIdRef.current = currentUser.id;
+      currentUserIdRef.current = user.id;
       
       return () => {
         // Clean up subscription when component unmounts or user changes
@@ -48,7 +51,9 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
         deepLinkSetupRef.current = false;
       };
     }
-  }, [currentUser?.id]); // Only depend on user ID, not the entire user object
+    // Return undefined if condition not met
+    return undefined;
+  }, [currentUser?.id, currentUser]); // Include both ID and user object for proper dependency tracking
 
   // Handle initial URL when app starts
   useEffect(() => {
@@ -73,7 +78,6 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
     <NavigationContainer 
       ref={navigationRef}
       onReady={() => {
-        setIsNavigationReady(true);
         // Set the navigation reference in the navigation service
         try {
           if (navigationService && navigationService.instance) {

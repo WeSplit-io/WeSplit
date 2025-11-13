@@ -3,13 +3,10 @@ import {
   User, 
   AppState, 
   AppAction,
-  NavigationParams,
-  Notification
+  NotificationData
 } from '../types';
 import { firebaseDataService } from '../services/data';
-import { i18nService } from '../services/core';
 import { notificationService } from '../services/notifications';
-import { multiSignStateService } from '../services/core';
 import { logger } from '../services/analytics/loggingService';
 import { SplitInvitationService } from '../services/splits/splitInvitationService';
 
@@ -89,7 +86,7 @@ interface AppContextType {
   clearError: () => void;
 
   // Notifications
-  notifications: Notification[];
+  notifications: NotificationData[];
   loadNotifications: (forceRefresh?: boolean) => Promise<void>;
   refreshNotifications: () => Promise<void>;
   
@@ -147,13 +144,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dispatch({
           type: 'SET_NOTIFICATIONS',
           payload: {
-            notifications: notifications as Notification[],
+            notifications: notifications as NotificationData[],
             timestamp: now
           }
         });
       }
     } catch (error) {
-      logger.error('Failed to load notifications:', error, 'AppContext');
+      logger.error('Failed to load notifications:', error as Record<string, unknown>, 'AppContext');
     }
   }, [state.currentUser?.id]);
 
@@ -165,16 +162,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Remove notification
   const removeNotification = useCallback(async (notificationId: string) => {
     try {
-      await notificationService.deleteNotification(notificationId);
+      await notificationService.instance.deleteNotification(notificationId);
       dispatch({
         type: 'SET_NOTIFICATIONS',
         payload: {
-          notifications: state.notifications.filter(n => n.id !== notificationId),
+            notifications: state.notifications.filter((n) => n.id !== notificationId),
           timestamp: Date.now()
         }
       });
     } catch (error) {
-      logger.error('Failed to remove notification:', error, 'AppContext');
+      logger.error('Failed to remove notification:', error as Record<string, unknown>, 'AppContext');
     }
   }, [state.notifications]);
 
@@ -186,7 +183,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       // Find the notification
-      const notification = state.notifications.find(n => n.id === notificationId);
+      const notification = state.notifications.find((n) => n.id === notificationId);
       if (!notification || !notification.data?.splitId) {
         throw new Error('Invalid notification or missing split data');
       }
@@ -199,7 +196,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         totalAmount: notification.data.totalAmount || 0,
         currency: notification.data.currency || 'USDC',
         creatorId: notification.data.creatorId || '',
-        timestamp: notification.timestamp || new Date().toISOString(),
+        timestamp: notification.created_at || new Date().toISOString(),
       };
 
       // Use SplitInvitationService to actually join the split
@@ -234,7 +231,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       return { success: true, splitId, joinResult };
     } catch (error) {
-      logger.error('Failed to accept split invitation:', error, 'AppContext');
+      logger.error('Failed to accept split invitation:', error as Record<string, unknown>, 'AppContext');
       // Check if it's an "already participant" error
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('already a participant')) {
@@ -256,7 +253,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Load notifications after authentication
       await loadNotifications(true);
       } catch (error) {
-      logger.error('Failed to authenticate user:', error, 'AppContext');
+      logger.error('Failed to authenticate user:', error as Record<string, unknown>, 'AppContext');
       throw error;
     }
   }, [loadNotifications]);
@@ -274,7 +271,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         payload: { ...state.currentUser, ...updates }
       });
     } catch (error) {
-      logger.error('Failed to update user:', error, 'AppContext');
+      logger.error('Failed to update user:', error as Record<string, unknown>, 'AppContext');
       throw error;
     }
   }, [state.currentUser]);

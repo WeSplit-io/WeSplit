@@ -55,18 +55,21 @@ export const protectGlobalProperties = () => {
                 configurable: true
               });
             } catch (defineError) {
-              logger.warn('Failed to make property configurable', { property: propName, error: defineError.message }, 'PropertyProtection');
+              const errorMessage = defineError instanceof Error ? defineError.message : 'Unknown error';
+              logger.warn('Failed to make property configurable', { property: propName, error: errorMessage }, 'PropertyProtection');
             }
           }
         }
       } catch (error) {
-        logger.warn('Failed to protect property', { property: propName, error: error.message }, 'PropertyProtection');
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.warn('Failed to protect property', { property: propName, error: errorMessage }, 'PropertyProtection');
       }
     });
     
     logger.info('Global properties protected', { count: CRITICAL_PROPERTIES.length }, 'PropertyProtection');
   } catch (error) {
-    logger.error('Failed to protect global properties', { error: error.message }, 'PropertyProtection');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Failed to protect global properties', { error: errorMessage }, 'PropertyProtection');
   }
 };
 
@@ -77,13 +80,15 @@ export const restoreGlobalProperties = () => {
       try {
         Object.defineProperty(global, propName, descriptor);
       } catch (error) {
-        logger.warn('Failed to restore property', { property: propName, error: error.message }, 'PropertyProtection');
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logger.warn('Failed to restore property', { property: propName, error: errorMessage }, 'PropertyProtection');
       }
     });
     
     logger.info('Global properties restored', { count: originalDescriptors.size }, 'PropertyProtection');
   } catch (error) {
-    logger.error('Failed to restore global properties', { error: error.message }, 'PropertyProtection');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Failed to restore global properties', { error: errorMessage }, 'PropertyProtection');
   }
 };
 
@@ -92,7 +97,8 @@ export const safeGetGlobalProperty = (propName: string, fallback: any = undefine
   try {
     return (global as any)[propName];
   } catch (error) {
-    logger.warn('Failed to access global property', { property: propName, error: error.message }, 'PropertyProtection');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.warn('Failed to access global property', { property: propName, error: errorMessage }, 'PropertyProtection');
     return fallback;
   }
 };
@@ -117,7 +123,8 @@ export const safeSetGlobalProperty = (propName: string, value: any, options: Pro
     
     return true;
   } catch (error) {
-    logger.error('Failed to set global property', { property: propName, error: error.message }, 'PropertyProtection');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Failed to set global property', { property: propName, error: errorMessage }, 'PropertyProtection');
     return false;
   }
 };

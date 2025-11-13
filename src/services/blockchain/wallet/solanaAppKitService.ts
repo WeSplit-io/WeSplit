@@ -22,11 +22,12 @@ import {
 
 // Import shared constants and utilities
 import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from '../../../services/shared/walletConstants';
-import { FeeService, TransactionType } from '../../../config/constants/feeConfig';
+import { FeeService, TransactionType, COMPANY_WALLET_CONFIG } from '../../../config/constants/feeConfig';
 import { optimizedTransactionUtils } from '../../../services/shared/transactionUtilsOptimized';
-import { TransactionUtils } from '../../../services/shared/transactionUtils';
 import { balanceUtils } from '../../../services/shared/balanceUtils';
 import { logger } from '../../../services/analytics/loggingService';
+import { processUsdcTransfer } from '../../blockchain/transaction/transactionSigningService';
+import { getFreshBlockhash } from '../../../services/shared/blockhashUtils';
 
 
   
@@ -712,9 +713,11 @@ export class SolanaAppKitService {
       const recipientAmountRaw = PriceUtils.convertUsdcToRawUnits(recipientAmount);
       const companyFeeRaw = PriceUtils.convertUsdcToRawUnits(companyFee);
 
-      // Get recent blockhash
+      // Get fresh blockhash using shared utility for consistent handling
       const connection = await optimizedTransactionUtils.getConnection();
-      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
+      const blockhashData = await getFreshBlockhash(connection, 'confirmed');
+      const blockhash = blockhashData.blockhash;
+      const blockhashTimestamp = blockhashData.timestamp;
 
       // Use centralized fee payer logic - Company pays SOL gas fees
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
@@ -790,63 +793,131 @@ export class SolanaAppKitService {
         transaction.add(memoInstruction);
       }
 
-      // Prepare signers array
-      const signers: Keypair[] = [];
-      
-      // Add user keypair
-      if (this.keypair) {
-        signers.push(this.keypair);
-      }
-      
-      // Add company wallet keypair for fee payment
-      const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
-      if (COMPANY_WALLET_CONFIG.secretKey) {
-        try {
-          let companySecretKeyBuffer: Buffer;
-          
-          // Handle different secret key formats
-          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
-            const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
-            const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
-            companySecretKeyBuffer = Buffer.from(keyArray);
-          } else {
-            companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
-          }
-          
-          // Validate and trim if needed
-          if (companySecretKeyBuffer.length === 65) {
-            companySecretKeyBuffer = companySecretKeyBuffer.slice(0, 64);
-          }
-          
-          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
-          signers.push(companyKeypair);
-        } catch (error) {
-          console.error('Failed to load company wallet keypair:', error);
-          throw new Error('Company wallet keypair not available for signing');
-        }
+      // Company wallet always pays SOL fees
+      // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
+      if (!COMPANY_WALLET_CONFIG.address) {
+        throw new Error('Company wallet address is not configured');
       }
 
-      // Sign transaction
+      // Sign transaction with user keypair first
       if (this.connectedProvider) {
         // For external wallets, use the provider's signing method
         await this.connectedProvider.signTransaction(transaction);
       } else if (this.keypair) {
         // For app-generated wallets, sign directly
-        transaction.sign(...signers);
+        transaction.sign(this.keypair);
+      } else {
+        throw new Error('No wallet available for signing');
       }
 
-      // Send and confirm transaction
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        signers,
-        {
-          commitment: 'confirmed',
-          preflightCommitment: 'confirmed'
-        }
-      );
+      logger.info('Transaction signed with user keypair', {
+        userAddress: this.keypair?.publicKey.toBase58() || 'external-wallet'
+      }, 'SolanaAppKitService');
 
-      return signature;
+      // Convert Transaction to VersionedTransaction for Firebase Functions
+      // Firebase Functions expect VersionedTransaction format
+      const { VersionedTransaction } = await import('@solana/web3.js');
+      let versionedTransaction: VersionedTransaction;
+      try {
+        versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+        // Sign the versioned transaction with user keypair
+        if (this.connectedProvider) {
+          // For external wallets, we need to re-sign with the provider
+          // Note: External wallet providers may not support VersionedTransaction directly
+          // In this case, we'll need to handle it differently
+          versionedTransaction.sign([this.keypair!]);
+        } else if (this.keypair) {
+          versionedTransaction.sign([this.keypair]);
+        }
+        logger.info('Transaction converted to VersionedTransaction and signed', {
+          userAddress: this.keypair?.publicKey.toBase58() || 'external-wallet',
+          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+        }, 'SolanaAppKitService');
+      } catch (versionError) {
+        logger.error('Failed to convert transaction to VersionedTransaction', {
+          error: versionError,
+          errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+        }, 'SolanaAppKitService');
+        throw new Error(`Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`);
+      }
+
+      // Serialize the partially signed transaction
+      const serializedTransaction = versionedTransaction.serialize();
+
+      // Ensure we have a proper Uint8Array
+      const txArray = serializedTransaction instanceof Uint8Array 
+        ? serializedTransaction 
+        : new Uint8Array(serializedTransaction);
+
+      // CRITICAL: Check blockhash age before sending to Firebase
+      // If blockhash is more than 45 seconds old, get a fresh one and rebuild
+      const blockhashAge = Date.now() - blockhashTimestamp;
+      const BLOCKHASH_MAX_AGE_MS = 45000; // 45 seconds - rebuild if older
+      
+      let currentTxArray = txArray;
+      
+      if (blockhashAge > BLOCKHASH_MAX_AGE_MS) {
+        logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS
+        }, 'SolanaAppKitService');
+        
+        // Get fresh blockhash using shared utility
+        const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+        const freshBlockhash = freshBlockhashData.blockhash;
+        const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+        
+        // Rebuild transaction with fresh blockhash
+        const freshTransaction = new Transaction({
+          recentBlockhash: freshBlockhash,
+          feePayer: feePayerPublicKey
+        });
+        
+        // Re-add all instructions
+        transaction.instructions.forEach(ix => freshTransaction.add(ix));
+        
+        // Re-sign with fresh transaction
+        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+        if (this.connectedProvider) {
+          freshVersionedTransaction.sign([this.keypair!]);
+        } else if (this.keypair) {
+          freshVersionedTransaction.sign([this.keypair]);
+        }
+        currentTxArray = freshVersionedTransaction.serialize();
+        
+        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+          transactionSize: currentTxArray.length,
+          blockhashAge: blockhashAge,
+          newBlockhashTimestamp: freshBlockhashTimestamp
+        }, 'SolanaAppKitService');
+      }
+
+      logger.info('Transaction serialized, requesting company wallet signature', {
+        transactionSize: currentTxArray.length,
+        transactionType: typeof currentTxArray,
+        isUint8Array: currentTxArray instanceof Uint8Array,
+        blockhashAge: Date.now() - blockhashTimestamp
+      }, 'SolanaAppKitService');
+
+      // Use processUsdcTransfer which combines signing and submission in one Firebase call
+      // This minimizes blockhash expiration risk and reduces network round trips
+      try {
+        logger.info('Processing USDC transfer (sign and submit)', {
+          transactionSize: currentTxArray.length
+        }, 'SolanaAppKitService');
+        
+        const result = await processUsdcTransfer(currentTxArray);
+        logger.info('Transaction processed successfully', { 
+          signature: result.signature 
+        }, 'SolanaAppKitService');
+        return result.signature;
+      } catch (submissionError) {
+        logger.error('Transaction submission failed', { 
+          error: submissionError,
+          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+        }, 'SolanaAppKitService');
+        throw new Error(`Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`);
+      }
     } catch (error) {
       console.error('Error sending USDC transaction:', error);
       throw new Error('Transaction failed: ' + (error as Error).message);
@@ -1052,9 +1123,10 @@ export class SolanaAppKitService {
         throw new Error('Not enough approvals to execute transaction');
       }
 
-      // Get recent blockhash
+      // Get fresh blockhash using shared utility for consistent handling
       const connection = await optimizedTransactionUtils.getConnection();
-      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
+      const blockhashData = await getFreshBlockhash(connection, 'confirmed');
+      const blockhash = blockhashData.blockhash;
 
       // Create the transaction
       const solanaTransaction = new Transaction({

@@ -32,6 +32,17 @@ export interface User {
   points?: number; // Total points accumulated
   total_points_earned?: number; // Lifetime points (for stats)
   points_last_updated?: string; // Timestamp when points were last updated
+  is_partnership?: boolean; // Partnership status for enhanced rewards
+  referral_code?: string; // User's referral code
+  referred_by?: string; // User ID who referred this user
+  
+  // Christmas calendar rewards
+  badges?: string[]; // Array of badge IDs earned
+  active_badge?: string; // Currently active badge ID
+  profile_assets?: string[]; // Array of profile asset IDs owned
+  active_profile_asset?: string; // Currently active profile asset ID
+  wallet_backgrounds?: string[]; // Array of wallet background asset IDs owned
+  active_wallet_background?: string; // Currently active wallet background asset ID
 }
 
 // User contact includes relationship metadata
@@ -129,7 +140,7 @@ export interface AppState {
   lastDataFetch: Record<string, number>;
   
   // Notifications
-  notifications: Notification[];
+  notifications: NotificationData[];
   lastNotificationsFetch: number;
 }
 
@@ -142,7 +153,7 @@ export type AppAction =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'CLEAR_ERROR' }
   | { type: 'UPDATE_CACHE_TIMESTAMP'; payload: { type: string; timestamp: number } }
-  | { type: 'SET_NOTIFICATIONS'; payload: { notifications: Notification[]; timestamp: number } };
+  | { type: 'SET_NOTIFICATIONS'; payload: { notifications: NotificationData[]; timestamp: number } };
 
 // Re-export unified notification types
 export { NotificationType, NotificationData as Notification, NotificationPayload } from './notifications';

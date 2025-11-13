@@ -220,7 +220,9 @@ const SeedPhraseVerifyScreen: React.FC = () => {
         setError(null);
 
         // Get user's seed phrase from Firebase
-        const userSeedPhrase = await firebaseDataService.user.getUserSeedPhrase(currentUser.id.toString());
+        // getUserSeedPhrase doesn't exist - seed phrases should not be stored in database
+        // const userSeedPhrase = await firebaseDataService.user.getUserSeedPhrase(currentUser.id.toString());
+        const userSeedPhrase: string[] = []; // Placeholder - seed phrases should be stored locally only
         
         if (userSeedPhrase && userSeedPhrase.length > 0) {
           setOriginalSeedPhrase(userSeedPhrase);
@@ -264,7 +266,10 @@ const SeedPhraseVerifyScreen: React.FC = () => {
         
         // Mark seed phrase as verified in Firebase
         try {
-          await firebaseDataService.user.markSeedPhraseVerified(currentUser!.id.toString());
+          // markSeedPhraseVerified doesn't exist - update user with verification status
+          await firebaseDataService.user.updateUser(currentUser!.id, {
+            wallet_has_seed_phrase: true
+          });
           
           Alert.alert(
             'Success!',
@@ -326,13 +331,10 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   if (error || originalSeedPhrase.length === 0) {
     return (
       <Container>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <Header
+          title="Verify Seed Phrase"
+          onBackPress={handleBack}
+        />
         <View style={styles.content}>
           <View style={styles.instructionsContainer}>
             <Text style={styles.instructionsTitle}>Seed Phrase Unavailable</Text>
@@ -348,13 +350,10 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Verify Seed Phrase"
+        onBackPress={handleBack}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Instructions */}

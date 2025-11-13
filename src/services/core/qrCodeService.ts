@@ -5,9 +5,12 @@
 
 import { logger } from '../analytics/loggingService';
 
+// Union type for all possible QR code data types
+type QRCodeDataType = SplitInvitationQRData | WalletQRData | PaymentRequestQRData;
+
 export interface QRCodeData {
   type: 'split_invitation' | 'wallet_address' | 'payment_request';
-  data: any;
+  data: QRCodeDataType;
   timestamp: string;
 }
 

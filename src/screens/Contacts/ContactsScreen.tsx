@@ -16,6 +16,7 @@ import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { Container } from '../../components/shared';
 import { Button } from '../../components/shared';
 import Header from '../../components/shared/Header';
+import Tabs, { Tab } from '../../components/shared/Tabs';
 
 interface ContactsScreenProps {
   navigation: any;
@@ -134,40 +135,14 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
 
       {/* Request Mode Tabs */}
       {isRequestMode && (
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity style={styles.tab} onPress={() => handleRequestTabChange('Contacts')}>
-            {requestActiveTab === 'Contacts' ? (
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.tabActive}
-              >
-                <Text style={[styles.tabText, styles.tabTextActive]}>Contacts</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.tab}>
-                <Text style={styles.tabText}>Contacts</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.tab} onPress={() => handleRequestTabChange('Show QR code')}>
-            {requestActiveTab === 'Show QR code' ? (
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.tabActive}
-              >
-                <Text style={[styles.tabText, styles.tabTextActive]}>Show QR code</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.tab}>
-                <Text style={styles.tabText}>Show QR code</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        <Tabs
+          tabs={[
+            { label: 'Contacts', value: 'Contacts' },
+            { label: 'Show QR code', value: 'Show QR code' }
+          ]}
+          activeTab={requestActiveTab}
+          onTabChange={(tab) => handleRequestTabChange(tab as 'Contacts' | 'Show QR code')}
+        />
       )}
 
       <View style={[styles.content, (isSplitMode || isRequestMode) && styles.contentWithButton]}>

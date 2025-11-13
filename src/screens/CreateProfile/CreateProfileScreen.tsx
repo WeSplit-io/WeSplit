@@ -24,7 +24,7 @@ import { AvatarUploadFallbackService } from '../../services/core/avatarUploadFal
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import * as ImagePicker from 'expo-image-picker';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Input, Button } from '../../components/shared';
 import Header from '../../components/shared/Header';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 
@@ -33,15 +33,29 @@ const CreateProfileScreen: React.FC = () => {
   const route = useRoute();
   const [pseudo, setPseudo] = useState('');
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { authenticateUser, state } = useApp();
 
-  // Debug logging
+  // Initialize referral code from route params if provided (e.g., from deep link)
   useEffect(() => {
-    console.log('🔍 CreateProfileScreen: Screen mounted');
-    console.log('🔍 CreateProfileScreen: Route params:', route.params);
-    console.log('🔍 CreateProfileScreen: State:', state);
+    const params = route.params as any;
+    if (params?.referralCode) {
+      const code = String(params.referralCode).toUpperCase().replace(/\s/g, '');
+      setReferralCode(code);
+      logger.info('Referral code loaded from route params', { referralCode: code }, 'CreateProfileScreen');
+    }
+  }, [route.params]);
+
+  // Debug logging (only in dev mode)
+  useEffect(() => {
+    if (__DEV__) {
+      logger.debug('CreateProfileScreen mounted', { 
+        hasReferralCode: !!referralCode,
+        routeParams: route.params 
+      }, 'CreateProfileScreen');
+    }
   }, []);
 
   const handlePickImage = () => {
@@ -201,14 +215,8 @@ const CreateProfileScreen: React.FC = () => {
         logger.warn('Could not check existing user, proceeding with profile creation', null, 'CreateProfileScreen');
       }
 
-      // Create or update user using unified service
+        // Create or update user using unified service
       try {
-        const userData = {
-          email,
-          name: pseudo,
-          avatar: avatar || undefined,
-        };
-
         logger.info('Creating/updating user with firebase service', { email, name: pseudo }, 'CreateProfileScreen');
         
         // First check if user exists
@@ -225,9 +233,14 @@ const CreateProfileScreen: React.FC = () => {
           });
         } else {
           // User doesn't exist, create new user
+          // Note: wallet_address is required by User type, but may not exist during onboarding
+          // We'll use an empty string as placeholder - wallet will be created later
           logger.info('User does not exist, creating new user', { email, name: pseudo }, 'CreateProfileScreen');
           user = await firebaseDataService.user.createUser({
-            ...userData,
+            email,
+            name: pseudo,
+            wallet_address: '', // Placeholder - will be set when wallet is created
+            avatar: avatar || undefined,
             hasCompletedOnboarding: true
           });
         }
@@ -306,14 +319,52 @@ const CreateProfileScreen: React.FC = () => {
         // Sync onboarding and profile image quests after user is authenticated
         try {
           const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
-          await userActionSyncService.syncOnboardingCompletion(appUser.id, true);
+          // DISABLED: Legacy quest completion (complete_onboarding, profile_image)
+          // These quests have been replaced by the new season-based quest system
+          // Database flags are still updated via setup_account_pp quest
+          // await userActionSyncService.syncOnboardingCompletion(appUser.id, true);
           
-          if (finalAvatarUrl && finalAvatarUrl !== DEFAULT_AVATAR_URL) {
-            await userActionSyncService.syncProfileImage(appUser.id, finalAvatarUrl);
-          }
+          // if (finalAvatarUrl && finalAvatarUrl !== DEFAULT_AVATAR_URL) {
+          //   await userActionSyncService.syncProfileImage(appUser.id, finalAvatarUrl);
+          // }
         } catch (syncError) {
           logger.error('Failed to sync quests after profile creation', { userId: appUser.id, syncError }, 'CreateProfileScreen');
           // Don't fail profile creation if sync fails
+        }
+
+        // Track referral if referral code was provided (non-blocking)
+        if (referralCode && referralCode.trim()) {
+          (async () => {
+            try {
+              const { referralService } = await import('../../services/rewards/referralService');
+              const trimmedCode = referralCode.trim().toUpperCase();
+              
+              logger.info('Tracking referral', { userId: appUser.id, referralCode: trimmedCode }, 'CreateProfileScreen');
+              
+              const result = await referralService.trackReferral(appUser.id, trimmedCode);
+              
+              if (result.success) {
+                logger.info('Referral tracked successfully', { 
+                  userId: appUser.id, 
+                  referrerId: result.referrerId 
+                }, 'CreateProfileScreen');
+              } else {
+                logger.warn('Referral tracking failed', { 
+                  userId: appUser.id, 
+                  referralCode: trimmedCode,
+                  error: result.error 
+                }, 'CreateProfileScreen');
+                // Don't show error to user - referral is optional
+              }
+            } catch (referralError) {
+              logger.error('Error tracking referral', { 
+                userId: appUser.id, 
+                referralCode: referralCode.trim(),
+                error: referralError 
+              }, 'CreateProfileScreen');
+              // Don't fail account creation if referral tracking fails
+            }
+          })().catch(() => {}); // Swallow errors - non-blocking
         }
         
         // Verify data was saved correctly
@@ -390,45 +441,56 @@ const CreateProfileScreen: React.FC = () => {
               </TouchableOpacity>
               
               {/* Pseudo Input */}
-              <View style={styles.inputSection}>
-                <Text style={styles.inputLabel}>Pseudo *</Text>
-                <TextInput
-                  style={styles.input}
+              <Input
+                label="Pseudo *"
                   placeholder="Enter your pseudo"
-                  placeholderTextColor={colors.white50}
                   value={pseudo}
                   onChangeText={(text) => {
                     setPseudo(text);
                     setError(''); // Clear error when user types
                   }}
+                error={error || undefined}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              {/* Referral Code Input (Optional) */}
+              <View style={styles.inputSection}>
+                <View style={styles.referralCodeHeader}>
+                  <Text style={styles.inputLabel}>Referral Code</Text>
+                  <Text style={styles.optionalLabel}>(Optional)</Text>
+                </View>
+                <Input
+                  label=""
+                    placeholder="Enter referral code"
+                    value={referralCode}
+                    onChangeText={(text) => {
+                      // Auto-uppercase and remove spaces
+                      const cleaned = text.toUpperCase().replace(/\s/g, '');
+                      setReferralCode(cleaned);
+                    }}
+                  leftIcon="Handshake"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={12}
+                  />
+                <Text style={styles.referralCodeHint}>
+                  Have a referral code? Enter it to earn bonus points for you and your friend!
+                </Text>
               </View>
             </View>
           </ScrollView>
 
           {/* Next Button - Fixed at bottom */}
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.nextButton}
+            <Button
+              title="Next"
               onPress={handleNext}
+              variant="primary"
               disabled={!pseudo || isLoading}
-            >
-              <LinearGradient
-                colors={(!pseudo || isLoading) ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientButton}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="white" size="small" />
-                ) : (
-                  <Text style={styles.nextButtonText}>Next</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+              loading={isLoading}
+              fullWidth={true}
+            />
           </View>
 
           {/* Help Link - Fixed at bottom */}

@@ -37,7 +37,7 @@ import { logger } from '../analytics/loggingService';
 // Data transformation utilities
 export const firebaseDataTransformers = {
   // Transform Firestore timestamp to ISO string
-  timestampToISO: (timestamp: Timestamp | null | any): string => {
+  timestampToISO: (timestamp: Timestamp | null | unknown): string => {
     if (!timestamp) {return new Date().toISOString();}
     if (timestamp.toDate) {return timestamp.toDate().toISOString();}
     if (timestamp.seconds) {return new Date(timestamp.seconds * 1000).toISOString();}
@@ -50,7 +50,7 @@ export const firebaseDataTransformers = {
   },
 
   // Transform Firestore document to User
-  firestoreToUser: (doc: any): User => ({
+  firestoreToUser: (doc: DocumentData): User => ({
     id: doc.id,
     name: doc.data().name || '',
     email: doc.data().email || '',
@@ -75,12 +75,18 @@ export const firebaseDataTransformers = {
     migration_version: doc.data().migration_version || '',
     points: doc.data().points || 0,
     total_points_earned: doc.data().total_points_earned || 0,
-    points_last_updated: doc.data().points_last_updated ? firebaseDataTransformers.timestampToISO(doc.data().points_last_updated) : undefined
+    points_last_updated: doc.data().points_last_updated ? firebaseDataTransformers.timestampToISO(doc.data().points_last_updated) : undefined,
+    badges: doc.data().badges || [],
+    active_badge: doc.data().active_badge || undefined,
+    profile_assets: doc.data().profile_assets || [],
+    active_profile_asset: doc.data().active_profile_asset || undefined,
+    wallet_backgrounds: doc.data().wallet_backgrounds || [],
+    active_wallet_background: doc.data().active_wallet_background || undefined
   }),
 
   // Transform User to Firestore data
-  userToFirestore: (user: Omit<User, 'id' | 'created_at'>): any => {
-    const data: any = {
+  userToFirestore: (user: Omit<User, 'id' | 'created_at'>): DocumentData => {
+    const data: DocumentData = {
       updated_at: serverTimestamp()
     };
     
@@ -108,12 +114,18 @@ export const firebaseDataTransformers = {
     if (user.points !== undefined) {data.points = user.points;}
     if (user.total_points_earned !== undefined) {data.total_points_earned = user.total_points_earned;}
     if (user.points_last_updated !== undefined) {data.points_last_updated = user.points_last_updated ? firebaseDataTransformers.isoToTimestamp(user.points_last_updated) : null;}
+    if (user.badges !== undefined) {data.badges = user.badges;}
+    if (user.active_badge !== undefined) {data.active_badge = user.active_badge;}
+    if (user.profile_assets !== undefined) {data.profile_assets = user.profile_assets;}
+    if (user.active_profile_asset !== undefined) {data.active_profile_asset = user.active_profile_asset;}
+    if (user.wallet_backgrounds !== undefined) {data.wallet_backgrounds = user.wallet_backgrounds;}
+    if (user.active_wallet_background !== undefined) {data.active_wallet_background = user.active_wallet_background;}
     
     return data;
   },
 
   // Transform Firestore document to UserContact
-  firestoreToUserContact: (doc: any): UserContact => ({
+  firestoreToUserContact: (doc: DocumentData): UserContact => ({
     id: doc.id,
     name: doc.data().name || '',
     email: doc.data().email || '',
@@ -141,8 +153,8 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform UserContact to Firestore data
-  userContactToFirestore: (contact: Omit<UserContact, 'id' | 'created_at'>): any => {
-    const data: any = {
+  userContactToFirestore: (contact: Omit<UserContact, 'id' | 'created_at'>): DocumentData => {
+    const data: DocumentData = {
       name: contact.name || '',
       email: contact.email || '',
       wallet_address: contact.wallet_address || '',
@@ -204,7 +216,7 @@ export const firebaseDataTransformers = {
   },
 
   // Transform Firestore document to Notification
-  firestoreToNotification: (doc: any): Notification => ({
+  firestoreToNotification: (doc: DocumentData): Notification => ({
     id: doc.id,
     type: doc.data().type || 'general',
     title: doc.data().title || '',
@@ -216,7 +228,7 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform Notification to Firestore data
-  notificationToFirestore: (notification: Omit<Notification, 'id' | 'created_at'>): any => ({
+  notificationToFirestore: (notification: Omit<Notification, 'id' | 'created_at'>): DocumentData => ({
     type: notification.type,
     title: notification.title,
     message: notification.message,
@@ -227,7 +239,7 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform Firestore document to Transaction
-  firestoreToTransaction: (doc: any): Transaction => ({
+  firestoreToTransaction: (doc: DocumentData): Transaction => ({
     id: doc.id,
     type: doc.data().type || 'send',
     amount: doc.data().amount || 0,
@@ -250,7 +262,7 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform Transaction to Firestore data
-  transactionToFirestore: (transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): any => ({
+  transactionToFirestore: (transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): DocumentData => ({
     type: transaction.type,
     amount: transaction.amount,
     currency: transaction.currency,
@@ -885,7 +897,7 @@ export const firebaseDataService = {
       }
     },
 
-    addLinkedWallet: async (userId: string, walletData: any): Promise<{ success: boolean; walletId?: string; error?: string }> => {
+    addLinkedWallet: async (userId: string, walletData: Record<string, unknown>): Promise<{ success: boolean; walletId?: string; error?: string }> => {
       try {
         logger.info('Adding linked wallet', { userId, type: walletData.type }, 'FirebaseDataService');
         
@@ -927,7 +939,7 @@ export const firebaseDataService = {
       }
     },
 
-    updateLinkedWallet: async (walletId: string, updates: any): Promise<{ success: boolean; error?: string }> => {
+    updateLinkedWallet: async (walletId: string, updates: Record<string, unknown>): Promise<{ success: boolean; error?: string }> => {
       try {
         logger.info('Updating linked wallet', { walletId }, 'FirebaseDataService');
         

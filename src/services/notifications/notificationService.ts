@@ -95,7 +95,7 @@ class NotificationServiceClass {
     title: string,
     message: string,
     type: NotificationType = 'general',
-    data: { [key: string]: any } = {}
+    data: Record<string, unknown> = {}
   ): Promise<boolean> {
     // Data validation is handled at the data layer
     
@@ -139,7 +139,7 @@ class NotificationServiceClass {
     title: string,
     message: string,
     type: NotificationType = 'general',
-    data: { [key: string]: any } = {}
+    data: Record<string, unknown> = {}
   ): Promise<void> {
     try {
       // Store in Firestore
@@ -227,7 +227,7 @@ class NotificationServiceClass {
   async sendBulkNotifications(
     userIds: string[],
     type: NotificationType,
-    data?: { [key: string]: any },
+    data?: Record<string, unknown>,
     timeoutMs: number = 12000
   ): Promise<void> {
     try {
@@ -316,7 +316,7 @@ class NotificationServiceClass {
   /**
    * Get notification message based on type
    */
-  private getNotificationMessage(type: NotificationType, data?: { [key: string]: any }): string {
+  private getNotificationMessage(type: NotificationType, data?: Record<string, unknown>): string {
     switch (type) {
       case 'split_payment_required':
         return `You have a payment due for ${data?.billName || 'a split'}`;
@@ -917,8 +917,8 @@ class NotificationServiceClass {
    * Navigate from notification (handles both push and in-app notifications)
    */
   async navigateFromNotification(
-    notification: { id: string; type: NotificationType; data?: any },
-    navigation: any,
+    notification: { id: string; type: NotificationType; data?: Record<string, unknown> },
+    navigation: NavigationContainerRef<ParamListBase> | { navigate: (route: string, params?: Record<string, unknown>) => void },
     currentUserId: string
   ): Promise<void> {
     try {

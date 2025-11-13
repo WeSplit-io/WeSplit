@@ -488,9 +488,32 @@ export const styles = StyleSheet.create({
     borderColor: colors.green,
   },
   modalButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     gap: spacing.md,
+  },
+  balanceCheckContainer: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  balanceErrorContainer: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    width: '100%',
+  },
+  balanceErrorText: {
+    color: colors.error,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  balanceErrorSubtext: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.xs,
+    textAlign: 'center',
   },
   modalSaveButton: {
     flex: 1,

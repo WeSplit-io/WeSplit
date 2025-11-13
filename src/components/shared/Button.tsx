@@ -210,6 +210,10 @@ const Button: React.FC<ButtonProps> = ({
           activeOpacity={isDisabled ? 1 : 0.7}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
+          accessibilityRole="button"
+          accessibilityLabel={title}
+          accessibilityState={{ disabled: isDisabled }}
+          accessibilityHint={loading ? "Loading" : undefined}
         >
           {disabled ? (
             <View style={[styles.gradient, { backgroundColor: colors.white10 }]}>

@@ -5,4 +5,5 @@
 
 export { db, auth, storage } from './firebase';
 export { initializeFirebaseAuth } from './firebasePersistence';
-export { firebaseConfig } from './firebaseProduction';
+// firebaseConfig doesn't exist as named export - use default export instead
+export { default as firebaseConfig } from './firebaseProduction';

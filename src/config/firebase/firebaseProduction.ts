@@ -6,8 +6,7 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth,
-  initializeAuth,
-  getReactNativePersistence
+  initializeAuth
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -100,9 +99,20 @@ export const initializeFirebaseProduction = () => {
     
     // Initialize Firebase Auth with persistence
     try {
-      firebaseAuth = initializeAuth(firebaseApp, {
-        persistence: getReactNativePersistence(AsyncStorage)
-      });
+      // Try to get ReactNativePersistence if available
+      let persistence: any = undefined;
+      try {
+        const authModule = require('firebase/auth');
+        if (authModule.getReactNativePersistence) {
+          persistence = authModule.getReactNativePersistence(AsyncStorage);
+        }
+      } catch {
+        // getReactNativePersistence not available, will use default persistence
+      }
+      
+      firebaseAuth = initializeAuth(firebaseApp, persistence ? {
+        persistence: persistence
+      } : {});
       logger.info('Firebase Auth initialized with persistence', null, 'firebaseProduction');
     } catch (authError: any) {
       if (authError.code === 'auth/already-initialized') {
@@ -130,7 +140,7 @@ export const initializeFirebaseProduction = () => {
     };
     
   } catch (error) {
-    logger.error('Firebase initialization failed', error, 'firebaseProduction');
+    logger.error('Firebase initialization failed', error as Record<string, unknown>, 'firebaseProduction');
     throw error;
   }
 };
@@ -155,7 +165,7 @@ export const testFirebaseConnection = async (): Promise<boolean> => {
     
     return true;
   } catch (error) {
-    logger.error('Firebase connection test failed', error, 'firebaseProduction');
+    logger.error('Firebase connection test failed', error as Record<string, unknown>, 'firebaseProduction');
     return false;
   }
 };
@@ -182,7 +192,7 @@ export const testNetworkConnectivity = async (): Promise<boolean> => {
       return false;
     }
   } catch (error) {
-    logger.error('Network connectivity test failed', error, 'firebaseProduction');
+    logger.error('Network connectivity test failed', error as Record<string, unknown>, 'firebaseProduction');
     return false;
   }
 };

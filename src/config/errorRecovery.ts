@@ -71,7 +71,7 @@ export const recoverFromError = async (
     case RecoveryStrategy.RETRY:
       return await retryWithBackoff(() => {
         throw error; // This would be replaced with the actual operation
-      }, config.maxRetries, config.retryDelay);
+      }, config.maxRetries || 3, config.retryDelay || 1000);
       
     case RecoveryStrategy.RESTART:
       logger.error('Restart strategy not implemented', { context, error: error.message }, 'ErrorRecovery');
@@ -116,23 +116,22 @@ const retryWithBackoff = async <T>(
     } catch (error) {
       lastError = error as Error;
       
-      if (attempt === maxRetries) {
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        logger.warn('Retry attempt failed, waiting before retry', { 
+          attempt: attempt + 1, 
+          maxRetries, 
+          delay,
+          error: lastError.message 
+        }, 'ErrorRecovery');
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
         logger.error('Max retries exceeded', { 
           maxRetries, 
           error: lastError.message 
         }, 'ErrorRecovery');
-        break;
       }
-      
-      const delay = baseDelay * Math.pow(2, attempt);
-      logger.warn('Retry attempt failed, waiting before retry', { 
-        attempt: attempt + 1, 
-        maxRetries, 
-        delay,
-        error: lastError.message 
-      }, 'ErrorRecovery');
-      
-      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   
@@ -149,8 +148,8 @@ export const withErrorRecovery = <T extends any[], R>(
     try {
       const result = fn(...args);
       // Handle both sync and async functions
-      if (result && typeof result.then === 'function') {
-        return result.catch((error: Error) => recoverFromError(error, context, config)) as R;
+      if (result && typeof result === 'object' && 'then' in result && typeof (result as unknown as Promise<unknown>).then === 'function') {
+        return ((result as unknown as Promise<unknown>).catch((error: Error) => recoverFromError(error, context, config)) as unknown) as R;
       }
       return result;
     } catch (error) {

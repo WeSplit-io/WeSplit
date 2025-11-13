@@ -3,22 +3,22 @@
  * Provides user interface for wallet recovery when data loss is detected
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   Alert,
   ScrollView,
-  ActivityIndicator,
   StyleSheet,
-  Modal,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { logger } from '../../services/analytics/loggingService';
 import { walletRecoveryService } from '../../services/blockchain/wallet';
+import Modal from '../shared/Modal';
+import ModernLoader from '../shared/ModernLoader';
 
 interface WalletRecoveryModalProps {
   visible: boolean;
@@ -56,17 +56,21 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
   const [recoveryStep, setRecoveryStep] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      loadRecoveryReport();
-    }
-  }, [visible]);
-
-  const loadRecoveryReport = async () => {
+  const loadRecoveryReport = useCallback(async () => {
     try {
       setLoading(true);
-      // Get basic recovery information
-      const recoveryResult = await walletRecoveryService.recoverWallet(userId);
+      // Get user email for email-based recovery
+      let userEmail: string | undefined;
+      try {
+        const { firebaseDataService } = await import('../../services/data/firebaseDataService');
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        userEmail = userData?.email;
+      } catch (emailError) {
+        logger.debug('Failed to get user email for recovery', emailError as Record<string, unknown>, 'WalletRecoveryModal');
+      }
+      
+      // Get basic recovery information (with email-based fallback)
+      const recoveryResult = await walletRecoveryService.recoverWallet(userId, userEmail);
       const report = {
         hasLocalWallet: recoveryResult.success,
         localWallets: recoveryResult.wallet ? [recoveryResult.wallet.address] : [],
@@ -77,18 +81,34 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
       };
       setRecoveryReport(report);
     } catch (error) {
-      logger.error('Failed to load recovery report', error, 'WalletRecoveryModal');
+      logger.error('Failed to load recovery report', error as Record<string, unknown>, 'WalletRecoveryModal');
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, expectedWalletAddress]);
+
+  useEffect(() => {
+    if (visible) {
+      loadRecoveryReport();
+    }
+  }, [visible, loadRecoveryReport]);
 
   const handleAutomaticRecovery = async () => {
     try {
       setIsRecovering(true);
       setRecoveryStep('Starting automatic recovery...');
 
-      const result = await walletRecoveryService.recoverWallet(userId);
+      // Get user email for email-based recovery
+      let userEmail: string | undefined;
+      try {
+        const { firebaseDataService } = await import('../../services/data/firebaseDataService');
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        userEmail = userData?.email;
+      } catch (emailError) {
+        logger.debug('Failed to get user email for recovery', emailError as Record<string, unknown>, 'WalletRecoveryModal');
+      }
+
+      const result = await walletRecoveryService.recoverWallet(userId, userEmail);
 
       if (result.success && result.wallet) {
         setRecoveryStep('Recovery successful!');
@@ -104,7 +124,10 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
             {
               text: 'Continue',
               onPress: () => {
-                onRecoverySuccess(result.wallet!);
+                onRecoverySuccess({
+                  ...result.wallet!,
+                  recoveryMethod: 'automatic' // Default recovery method
+                });
                 onClose();
               }
             }
@@ -118,7 +141,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
     } catch (error) {
       setRecoveryStep('Recovery failed');
       const errorMessage = error instanceof Error ? error.message : 'Recovery failed';
-      logger.error('Wallet recovery failed via UI', error, 'WalletRecoveryModal');
+      logger.error('Wallet recovery failed via UI', error as Record<string, unknown>, 'WalletRecoveryModal');
       onRecoveryFailed(errorMessage);
     } finally {
       setIsRecovering(false);
@@ -192,31 +215,27 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
   return (
     <Modal
       visible={visible}
+      onClose={onClose}
       animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      transparent={false}
+      title="Wallet Recovery"
+      showHandle={true}
+      closeOnBackdrop={true}
     >
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Wallet Recovery</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
 
         <ScrollView style={styles.content}>
           <View style={styles.warningContainer}>
             <Text style={styles.warningTitle}>⚠️ Wallet Data Issue Detected</Text>
             <Text style={styles.warningText}>
-              We detected that your wallet data in local storage doesn't match your database wallet. 
+              We detected that your wallet data in local storage doesn&apos;t match your database wallet. 
               This can happen after app updates or device changes.
             </Text>
           </View>
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primaryGreen} />
-              <Text style={styles.loadingText}>Analyzing wallet data...</Text>
+              <ModernLoader size="large" text="Analyzing wallet data..." />
             </View>
           ) : (
             renderRecoveryReport()
@@ -224,8 +243,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
 
           {isRecovering && (
             <View style={styles.recoveryContainer}>
-              <ActivityIndicator size="large" color={colors.primaryGreen} />
-              <Text style={styles.recoveryText}>{recoveryStep}</Text>
+              <ModernLoader size="large" text={recoveryStep} />
             </View>
           )}
 
@@ -397,7 +415,7 @@ const styles = StyleSheet.create({
   secondaryButton: {
     backgroundColor: colors.white10,
     borderWidth: 1,
-    borderColor: colors.white30,
+    borderColor: colors.white10,
   },
   buttonText: {
     fontSize: typography.fontSize.md,

@@ -15,7 +15,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      buildNumber: "18",
+      buildNumber: "19",
       deploymentTarget: "15.1",
       infoPlist: {
         LSApplicationQueriesSchemes: [
@@ -41,7 +41,7 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      versionCode: 10018,
+      versionCode: 10019,
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"
@@ -117,8 +117,10 @@ module.exports = {
       EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
       
       // Social Authentication configuration
+      // SECURITY: Client secrets must NOT be exposed to client-side code
+      // EXPO_PUBLIC_GOOGLE_CLIENT_SECRET and EXPO_PUBLIC_TWITTER_CLIENT_SECRET removed
+      // These must be handled by backend services only
       EXPO_PUBLIC_GOOGLE_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-      EXPO_PUBLIC_GOOGLE_CLIENT_SECRET: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET,
       ANDROID_GOOGLE_CLIENT_ID: process.env.ANDROID_GOOGLE_CLIENT_ID,
       IOS_GOOGLE_CLIENT_ID: process.env.IOS_GOOGLE_CLIENT_ID,
       EXPO_PUBLIC_APPLE_CLIENT_ID: process.env.EXPO_PUBLIC_APPLE_CLIENT_ID,
@@ -126,7 +128,6 @@ module.exports = {
       EXPO_PUBLIC_APPLE_TEAM_ID: process.env.EXPO_PUBLIC_APPLE_TEAM_ID,
       EXPO_PUBLIC_APPLE_KEY_ID: process.env.EXPO_PUBLIC_APPLE_KEY_ID,
       EXPO_PUBLIC_TWITTER_CLIENT_ID: process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID,
-      EXPO_PUBLIC_TWITTER_CLIENT_SECRET: process.env.EXPO_PUBLIC_TWITTER_CLIENT_SECRET,
       
       // Solana Configuration
       EXPO_PUBLIC_HELIUS_API_KEY: process.env.EXPO_PUBLIC_HELIUS_API_KEY,
@@ -139,8 +140,9 @@ module.exports = {
       EXPO_PUBLIC_COMPANY_MAX_FEE: process.env.EXPO_PUBLIC_COMPANY_MAX_FEE,
       
       // Company Wallet Configuration
+      // SECURITY: Secret key is NOT exposed to client-side code
+      // EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY removed - must be handled by backend services only
       EXPO_PUBLIC_COMPANY_WALLET_ADDRESS: process.env.EXPO_PUBLIC_COMPANY_WALLET_ADDRESS,
-      EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY: process.env.EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY,
       EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE: process.env.EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE,
       EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE: process.env.EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE,
       

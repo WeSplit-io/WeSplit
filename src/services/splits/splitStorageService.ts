@@ -16,6 +16,9 @@ import {
   where, 
   orderBy, 
   limit,
+  startAfter,
+  DocumentSnapshot,
+  QueryDocumentSnapshot,
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
@@ -60,6 +63,10 @@ export interface Split {
   updatedAt: string;
   completedAt?: string;
   firebaseDocId?: string;
+  // OCR-extracted data
+  subtotal?: number; // Subtotal from receipt (before tax)
+  tax?: number; // Tax amount from receipt
+  receiptNumber?: string; // Receipt number from OCR
   // Wallet information
   walletId?: string;
   walletAddress?: string;
@@ -96,6 +103,11 @@ export interface SplitListResult {
   success: boolean;
   splits?: Split[];
   error?: string;
+  hasMore?: boolean; // Indicates if there are more splits to load
+  totalCount?: number; // Total number of splits (if available)
+  currentPage?: number; // Current page number
+  totalPages?: number; // Total number of pages
+  lastDoc?: QueryDocumentSnapshot; // Last document for pagination
 }
 
 export class SplitStorageServiceClass {
@@ -150,6 +162,39 @@ export class SplitStorageServiceClass {
           syncError 
         }, 'SplitStorageService');
         // Don't fail split creation if sync fails
+      }
+
+      // Award split creation rewards (owner bonus + first split with friends)
+      try {
+        const { splitRewardsService } = await import('../../services/rewards/splitRewardsService');
+        const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
+        
+        // Award owner bonus for creating split
+        if (createdSplit.splitType === 'fair') {
+          await splitRewardsService.awardFairSplitParticipation({
+            userId: createdSplit.creatorId,
+            splitId: createdSplit.id,
+            splitType: 'fair',
+            splitAmount: createdSplit.totalAmount,
+            isOwner: true
+          });
+        }
+        
+        // Check for first split with friends (multiple participants)
+        if (createdSplit.participants.length > 1) {
+          await userActionSyncService.syncFirstSplitWithFriends(
+            createdSplit.creatorId,
+            createdSplit.id,
+            createdSplit.participants.length
+          );
+        }
+      } catch (rewardError) {
+        logger.error('Failed to award split creation rewards', { 
+          userId: createdSplit.creatorId, 
+          splitId: createdSplit.id,
+          rewardError 
+        }, 'SplitStorageService');
+        // Don't fail split creation if rewards fail
       }
 
       return {
@@ -292,22 +337,49 @@ export class SplitStorageServiceClass {
   }
 
   /**
-   * Get all splits for a user (as creator or participant)
+   * Get splits for a user (as creator or participant) with pagination
+   * @param userId - User ID
+   * @param limitCount - Maximum number of splits to return (default: 20)
+   * @param pageNumber - Page number (1-indexed, default: 1)
+   * @param lastDoc - Last document snapshot from previous page (for pagination)
    */
-  static async getUserSplits(userId: string): Promise<SplitListResult> {
+  static async getUserSplits(
+    userId: string, 
+    limitCount: number = 20,
+    pageNumber: number = 1,
+    lastDoc?: QueryDocumentSnapshot
+  ): Promise<SplitListResult> {
     try {
-      // Getting splits for user - Removed log to prevent infinite logging
-
       const splitsRef = collection(db, this.COLLECTION_NAME);
       
-      // Get splits where user is creator
-      const creatorQuery = query(
-        splitsRef, 
-        where('creatorId', '==', userId)
-      );
+      // Build creator query with pagination
+      let creatorQueryConstraints: any[] = [
+        where('creatorId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      ];
       
-      // Get all splits and filter for participants (array-contains doesn't work well with complex objects)
-      const allSplitsQuery = query(splitsRef);
+      // Add startAfter for pagination (skip first page)
+      if (lastDoc && pageNumber > 1) {
+        creatorQueryConstraints.splice(-1, 0, startAfter(lastDoc));
+      }
+      
+      let creatorQuery = query(splitsRef, ...creatorQueryConstraints);
+      
+      // For participant splits, we need to query all and filter client-side
+      // But limit the query to reduce data transfer
+      // Note: Firestore doesn't support array-contains with complex objects well
+      // So we limit the query and filter client-side
+      let allSplitsQueryConstraints: any[] = [
+        orderBy('createdAt', 'desc'),
+        limit(limitCount * 2) // Get more to account for filtering
+      ];
+      
+      if (lastDoc && pageNumber > 1) {
+        allSplitsQueryConstraints.splice(-1, 0, startAfter(lastDoc));
+      }
+      
+      let allSplitsQuery = query(splitsRef, ...allSplitsQueryConstraints);
 
       const [creatorSnapshot, allSplitsSnapshot] = await Promise.all([
         getDocs(creatorQuery),
@@ -348,14 +420,39 @@ export class SplitStorageServiceClass {
         }
       });
 
-      // Sort by creation date
+      // Sort by creation date (newest first)
       splits.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      // Found splits - Removed log to prevent infinite logging
+      // Apply limit after merging to ensure we don't exceed the limit
+      const limitedSplits = splits.slice(0, limitCount);
+      
+      // Get the last document for pagination (from the most recent query)
+      // Use the last document from creatorSnapshot or allSplitsSnapshot
+      let lastDocument: QueryDocumentSnapshot | undefined;
+      if (creatorSnapshot.docs.length > 0) {
+        lastDocument = creatorSnapshot.docs[creatorSnapshot.docs.length - 1];
+      } else if (allSplitsSnapshot.docs.length > 0) {
+        // Find the last document that matches our user
+        for (let i = allSplitsSnapshot.docs.length - 1; i >= 0; i--) {
+          const doc = allSplitsSnapshot.docs[i];
+          const splitData = doc.data() as Split;
+          const userParticipant = splitData.participants.find(p => p.userId === userId);
+          if (userParticipant && (userParticipant.status === 'accepted' || userParticipant.status === 'paid' || userParticipant.status === 'locked')) {
+            lastDocument = doc;
+            break;
+          }
+        }
+      }
+      
+      // Check if there are more splits by trying to get one more
+      const hasMore = limitedSplits.length === limitCount;
 
       return {
         success: true,
-        splits,
+        splits: limitedSplits,
+        hasMore,
+        currentPage: pageNumber,
+        lastDoc: lastDocument,
       };
 
     } catch (error) {

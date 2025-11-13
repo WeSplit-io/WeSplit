@@ -18,7 +18,7 @@ export interface BillData {
     name?: string;
     address?: string;
   };
-  participants?: any[];
+  participants?: Array<Record<string, unknown>>;
 }
 
 export interface SplitData {
@@ -31,7 +31,7 @@ export interface SplitData {
     name?: string;
     address?: string;
   };
-  participants?: any[];
+  participants?: Array<Record<string, unknown>>;
   status?: string;
   splitType?: string;
 }
@@ -378,7 +378,12 @@ export class DataSourceService {
     });
 
     if (this.isUsingFallbackData(splitData, processedBillData, billData)) {
-      console.warn(`${contextStr}DataSourceService: WARNING - Using fallback data. This may indicate missing or invalid data.`);
+      logger.warn('Using fallback data', {
+        context: contextStr,
+        splitData: splitData ? { id: splitData.id, title: splitData.title } : null,
+        processedBillData: processedBillData ? { amount: processedBillData.amount } : null,
+        billData: billData ? { amount: billData.amount } : null
+      }, 'DataSourceService');
     }
   }
 }

@@ -10,6 +10,7 @@ import {
   LAMPORTS_PER_SOL,
   SystemProgram,
   Transaction,
+  VersionedTransaction,
   TransactionInstruction,
   ComputeBudgetProgram
 } from '@solana/web3.js';
@@ -23,22 +24,28 @@ import {
 import { USDC_CONFIG } from '../../shared/walletConstants';
 import { getConfig } from '../../../config/unified';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';  
-import { FeeService } from '../../../config/constants/feeConfig';
-import { TransactionUtils } from '../../shared/transactionUtils';
+import { FeeService, COMPANY_WALLET_CONFIG } from '../../../config/constants/feeConfig';
 import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimized';
 import { logger } from '../../analytics/loggingService';
 import { TransactionParams, TransactionResult } from './types';
+import { processUsdcTransfer } from './transactionSigningService';
+import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS } from '../../shared/blockhashUtils';
+import { verifyTransactionOnBlockchain } from '../../shared/transactionVerificationUtils';
 
 export class TransactionProcessor {
-  private connection: Connection;
   private isProduction: boolean;
 
   constructor() {
-    this.connection = new Connection(getConfig().blockchain.rpcUrl, {
-      commitment: getConfig().blockchain.commitment,
-      confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
-    });
+    // Connection management now handled by optimizedTransactionUtils
+    // This ensures we use optimized RPC endpoints with rotation and rate limit handling
     this.isProduction = !__DEV__;
+  }
+
+  /**
+   * Get optimized connection with RPC endpoint rotation
+   */
+  private async getConnection(): Promise<Connection> {
+    return await optimizedTransactionUtils.getConnection();
   }
 
   /**
@@ -99,8 +106,9 @@ export class TransactionProcessor {
 
       // Check if recipient has USDC token account, create if needed
       let createRecipientTokenAccountInstruction: TransactionInstruction | null = null;
+      const connection = await this.getConnection();
       try {
-        await getAccount(this.connection, toTokenAccount);
+        await getAccount(connection, toTokenAccount);
         logger.debug('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'TransactionProcessor');
       } catch (error) {
         // Token account doesn't exist, create it
@@ -126,7 +134,7 @@ export class TransactionProcessor {
         );
         
         try {
-          await getAccount(this.connection, companyTokenAccount);
+          await getAccount(connection, companyTokenAccount);
           logger.debug('Company wallet USDC token account exists', { companyTokenAccount: companyTokenAccount.toBase58() }, 'TransactionProcessor');
         } catch (error) {
           // Company wallet token account doesn't exist, create it
@@ -143,10 +151,41 @@ export class TransactionProcessor {
         }
       }
 
-      // Get recent blockhash
-      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(this.connection, 'confirmed');
+      // CRITICAL: Check SOL balances BEFORE getting blockhash to avoid delays after blockhash is obtained
+      // These async operations can take several seconds, especially on mainnet
+      let companySolBalance: number | null = null;
+      if (createRecipientTokenAccountInstruction || createCompanyTokenAccountInstruction) {
+        companySolBalance = await connection.getBalance(feePayerPublicKey);
+        const rentExemptionAmount = 2039280; // ~0.00203928 SOL for token account rent exemption
+        const totalRentNeeded = (createRecipientTokenAccountInstruction ? 1 : 0) + (createCompanyTokenAccountInstruction ? 1 : 0);
+        
+        if (companySolBalance < (rentExemptionAmount * totalRentNeeded)) {
+          return {
+            success: false,
+            error: `Company wallet has insufficient SOL for transaction. Required: ${((rentExemptionAmount * totalRentNeeded) / 1e9).toFixed(6)} SOL, Available: ${(companySolBalance / 1e9).toFixed(6)} SOL. Please contact support to fund the company wallet.`,
+            signature: '',
+            txId: ''
+          };
+        }
+      }
+
+      // IMPORTANT: Get fresh blockhash RIGHT BEFORE creating the transaction
+      // Blockhashes expire after ~60 seconds, so we get it as late as possible
+      // to minimize the time between creation and submission
+      // Best practice: Use shared utility for consistent blockhash handling
+      const blockhashData = await getFreshBlockhash(connection, 'confirmed');
+      const blockhash = blockhashData.blockhash;
+      const blockhashTimestamp = blockhashData.timestamp;
       
-      // Create the transaction with proper setup
+      logger.info('Got fresh blockhash right before transaction creation', {
+        blockhash: blockhash.substring(0, 8) + '...',
+        blockhashType: typeof blockhash,
+        blockhashLength: blockhash.length,
+        blockhashTimestamp,
+        lastValidBlockHeight: blockhashData.lastValidBlockHeight
+      }, 'TransactionProcessor');
+      
+      // Create the transaction with proper setup (using fresh blockhash)
       const transaction = new Transaction({
         recentBlockhash: blockhash,
         feePayer: feePayerPublicKey
@@ -163,39 +202,14 @@ export class TransactionProcessor {
       );
 
       // Add create recipient token account instruction if needed
+      // NOTE: Balance check was moved BEFORE blockhash to avoid delays
       if (createRecipientTokenAccountInstruction) {
-        // Check if company wallet has enough SOL for rent exemption
-        const companySolBalance = await this.connection.getBalance(feePayerPublicKey);
-        const rentExemptionAmount = 2039280; // ~0.00203928 SOL for token account rent exemption
-        
-        if (companySolBalance < rentExemptionAmount) {
-          return {
-            success: false,
-            error: `Company wallet has insufficient SOL for transaction. Required: ${(rentExemptionAmount / 1e9).toFixed(6)} SOL, Available: ${(companySolBalance / 1e9).toFixed(6)} SOL. Please contact support to fund the company wallet.`,
-            signature: '',
-            txId: ''
-          };
-        }
-        
         transaction.add(createRecipientTokenAccountInstruction);
       }
 
       // Add create company token account instruction if needed (must be before company fee transfer)
+      // NOTE: Balance check was moved BEFORE blockhash to avoid delays
       if (createCompanyTokenAccountInstruction) {
-        // Check if company wallet has enough SOL for rent exemption (for its own token account)
-        const companySolBalance = await this.connection.getBalance(feePayerPublicKey);
-        const rentExemptionAmount = 2039280; // ~0.00203928 SOL for token account rent exemption
-        const totalRentNeeded = createRecipientTokenAccountInstruction ? rentExemptionAmount * 2 : rentExemptionAmount;
-        
-        if (companySolBalance < totalRentNeeded) {
-          return {
-            success: false,
-            error: `Company wallet has insufficient SOL for transaction. Required: ${(totalRentNeeded / 1e9).toFixed(6)} SOL (for token account creation), Available: ${(companySolBalance / 1e9).toFixed(6)} SOL. Please contact support to fund the company wallet.`,
-            signature: '',
-            txId: ''
-          };
-        }
-        
         transaction.add(createCompanyTokenAccountInstruction);
       }
 
@@ -232,127 +246,318 @@ export class TransactionProcessor {
 
       // Add memo if provided
       if (params.memo) {
+        // Ensure memo is a string
+        const memoString = typeof params.memo === 'string' ? params.memo : String(params.memo);
+        if (memoString) {
         transaction.add(
           new TransactionInstruction({
             keys: [],
             programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
-            data: Buffer.from(params.memo, 'utf8'),
+              data: Buffer.from(memoString, 'utf8'),
           })
         );
+        }
       }
       
-      // Prepare signers array
-      const signers: Keypair[] = [keypair];
-      
-      // Add company wallet keypair for fee payment
-      const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
-      
-      if (COMPANY_WALLET_CONFIG.secretKey) {
-        try {
-          let companySecretKeyBuffer: Buffer;
-          
-          // Handle different secret key formats
-          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
-            const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
-            const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
-            companySecretKeyBuffer = Buffer.from(keyArray);
+      // Company wallet always pays SOL fees
+      // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
+      if (!COMPANY_WALLET_CONFIG.address) {
+        throw new Error('Company wallet address is not configured');
+      }
+
+      logger.info('Transaction ready for signing', {
+        signerPublicKey: keypair.publicKey.toBase58(),
+        feePayer: transaction.feePayer?.toBase58(),
+        instructionsCount: transaction.instructions.length,
+        hasRecentBlockhash: !!transaction.recentBlockhash
+      }, 'TransactionProcessor');
+
+      // Validate transaction has recent blockhash before signing
+      if (!transaction.recentBlockhash) {
+        throw new Error('Transaction missing recent blockhash');
+      }
+
+      // Convert Transaction to VersionedTransaction for Firebase Functions
+      // Firebase Functions expect VersionedTransaction format
+      // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+      // This avoids double signing and ensures clean signature handling
+      let versionedTransaction: VersionedTransaction;
+      try {
+        // Compile message and validate it's not null/undefined
+        const compiledMessage = transaction.compileMessage();
+        if (!compiledMessage) {
+          throw new Error('Failed to compile transaction message');
+        }
+        
+        logger.info('Transaction message compiled successfully', {
+          messageType: compiledMessage.constructor.name,
+          hasMessage: !!compiledMessage
+        }, 'TransactionProcessor');
+        
+        versionedTransaction = new VersionedTransaction(compiledMessage);
+        // Sign the versioned transaction with user keypair (only sign once)
+        versionedTransaction.sign([keypair]);
+        logger.info('Transaction converted to VersionedTransaction and signed', {
+          userAddress: keypair.publicKey.toBase58(),
+          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+        }, 'TransactionProcessor');
+      } catch (versionError) {
+        logger.error('Failed to convert transaction to VersionedTransaction', {
+          error: versionError,
+          errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+        }, 'TransactionProcessor');
+        throw new Error(`Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`);
+      }
+
+      // Serialize the partially signed transaction
+      let serializedTransaction: Uint8Array | Buffer;
+      try {
+        serializedTransaction = versionedTransaction.serialize();
+        logger.info('Transaction serialized successfully', {
+          serializedType: typeof serializedTransaction,
+          isUint8Array: serializedTransaction instanceof Uint8Array,
+          isBuffer: serializedTransaction instanceof Buffer,
+          hasLength: 'length' in serializedTransaction,
+          length: (serializedTransaction as any).length
+        }, 'TransactionProcessor');
+      } catch (serializeError) {
+        logger.error('Failed to serialize transaction', {
+          error: serializeError,
+          errorMessage: serializeError instanceof Error ? serializeError.message : String(serializeError)
+        }, 'TransactionProcessor');
+        throw new Error(`Failed to serialize transaction: ${serializeError instanceof Error ? serializeError.message : String(serializeError)}`);
+      }
+
+      // Ensure we have a proper Uint8Array
+      let txArray: Uint8Array;
+      try {
+        if (serializedTransaction instanceof Uint8Array) {
+          txArray = serializedTransaction;
+        } else if (serializedTransaction instanceof Buffer) {
+          // Convert Buffer to Uint8Array
+          txArray = new Uint8Array(serializedTransaction);
+        } else if (Array.isArray(serializedTransaction)) {
+          txArray = new Uint8Array(serializedTransaction);
+        } else if (serializedTransaction instanceof ArrayBuffer) {
+          txArray = new Uint8Array(serializedTransaction);
           } else {
-            companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
-          }
+          throw new Error(`Invalid serialized transaction type: ${typeof serializedTransaction}. Expected Uint8Array or Buffer.`);
+        }
+
+        logger.info('Transaction converted to Uint8Array', {
+          txArrayLength: txArray.length,
+          txArrayType: typeof txArray,
+          isUint8Array: txArray instanceof Uint8Array
+        }, 'TransactionProcessor');
+      } catch (conversionError) {
+        logger.error('Failed to convert serialized transaction to Uint8Array', {
+          error: conversionError,
+          errorMessage: conversionError instanceof Error ? conversionError.message : String(conversionError),
+          serializedType: typeof serializedTransaction
+        }, 'TransactionProcessor');
+        throw new Error(`Failed to convert transaction to Uint8Array: ${conversionError instanceof Error ? conversionError.message : String(conversionError)}`);
+      }
+
+      // CRITICAL: Check blockhash age before sending to Firebase
+      // Best practice: Use shared utility for consistent blockhash age checking
+      let currentTxArray = txArray;
+      
+      if (isBlockhashTooOld(blockhashTimestamp)) {
+        logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+          blockhashAge: Date.now() - blockhashTimestamp,
+          maxAge: BLOCKHASH_MAX_AGE_MS
+        }, 'TransactionProcessor');
+        
+        // Get fresh blockhash and rebuild transaction using shared utility
+        const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+        const freshBlockhash = freshBlockhashData.blockhash;
+        const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+        
+        // Rebuild transaction with fresh blockhash
+        const freshTransaction = new Transaction({
+          recentBlockhash: freshBlockhash,
+          feePayer: feePayerPublicKey
+        });
+        
+        // Re-add all instructions
+        transaction.instructions.forEach(ix => freshTransaction.add(ix));
+        
+        // Re-sign with fresh transaction
+        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+        freshVersionedTransaction.sign([keypair]);
+        currentTxArray = freshVersionedTransaction.serialize();
+        
+        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+          transactionSize: currentTxArray.length,
+          blockhashAge: Date.now() - blockhashTimestamp,
+          newBlockhashTimestamp: freshBlockhashTimestamp
+        }, 'TransactionProcessor');
+      }
+
+      // CRITICAL: Log blockhash age right before sending to Firebase
+      const finalBlockhashAge = Date.now() - blockhashTimestamp;
+      logger.info('Transaction ready for Firebase Function', {
+        transactionSize: currentTxArray.length,
+        transactionType: typeof currentTxArray,
+        isUint8Array: currentTxArray instanceof Uint8Array,
+        txArrayConstructor: currentTxArray.constructor.name,
+        firstBytes: Array.from(currentTxArray.slice(0, 10)),
+        blockhashAge: finalBlockhashAge,
+        blockhashAgeMs: finalBlockhashAge,
+        maxAgeMs: BLOCKHASH_MAX_AGE_MS,
+        isBlockhashFresh: finalBlockhashAge < BLOCKHASH_MAX_AGE_MS,
+        warning: finalBlockhashAge > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh'
+      }, 'TransactionProcessor');
+
+      // Use Firebase Function to add company wallet signature
+      // Use processUsdcTransfer which combines signing and submission in one Firebase call
+      // This minimizes blockhash expiration risk and reduces network round trips
+      let signature: string;
+      let submissionAttempts = 0;
+      const maxSubmissionAttempts = 2; // Retry once if blockhash expires
+      
+      while (submissionAttempts < maxSubmissionAttempts) {
+        try {
+          logger.info('Processing USDC transfer (sign and submit)', {
+            transactionSize: currentTxArray.length,
+            attempt: submissionAttempts + 1,
+            maxAttempts: maxSubmissionAttempts
+          }, 'TransactionProcessor');
           
-          // Validate and trim if needed
-          if (companySecretKeyBuffer.length === 65) {
-            companySecretKeyBuffer = companySecretKeyBuffer.slice(0, 64);
-          }
+          const result = await processUsdcTransfer(currentTxArray);
+          signature = result.signature;
+          logger.info('Transaction processed successfully', { signature }, 'TransactionProcessor');
+          break; // Success, exit retry loop
+        } catch (submissionError) {
+          const errorMessage = submissionError instanceof Error ? submissionError.message : String(submissionError);
+          const isBlockhashExpired = 
+            errorMessage.includes('blockhash has expired') ||
+            errorMessage.includes('blockhash expired') ||
+            errorMessage.includes('Blockhash not found') ||
+            errorMessage.includes('blockhash');
           
-          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
-          signers.push(companyKeypair);
-        } catch (error) {
-          throw new Error('Company wallet keypair not available for signing');
+          // If blockhash expired and we have retries left, rebuild transaction
+          if (isBlockhashExpired && submissionAttempts < maxSubmissionAttempts - 1) {
+            logger.warn('Transaction blockhash expired, rebuilding transaction with fresh blockhash', {
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts,
+              blockhashAge: Date.now() - blockhashTimestamp,
+              note: 'Rebuilding transaction with fresh blockhash and retrying'
+            }, 'TransactionProcessor');
+            
+            // Get fresh blockhash and rebuild transaction
+            const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+            const freshBlockhash = freshBlockhashData.blockhash;
+            const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+            
+            // Rebuild transaction with fresh blockhash
+            const freshTransaction = new Transaction({
+              recentBlockhash: freshBlockhash,
+              feePayer: feePayerPublicKey
+            });
+            
+            // Re-add all instructions
+            transaction.instructions.forEach(ix => freshTransaction.add(ix));
+            
+            // Re-sign with fresh transaction
+            const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+            freshVersionedTransaction.sign([keypair]);
+            currentTxArray = freshVersionedTransaction.serialize();
+            
+            logger.info('Transaction rebuilt with fresh blockhash for retry', {
+              transactionSize: currentTxArray.length,
+              newBlockhashTimestamp: freshBlockhashTimestamp,
+              timeSinceNewBlockhash: Date.now() - freshBlockhashTimestamp
+            }, 'TransactionProcessor');
+            
+            submissionAttempts++;
+            continue; // Retry with fresh blockhash
+          } else {
+            // Not a blockhash error or no retries left
+            logger.error('Transaction submission failed', { 
+              error: submissionError,
+              errorMessage,
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts,
+              isBlockhashExpired
+            }, 'TransactionProcessor');
+            throw submissionError;
+          }
         }
       }
 
-      // Send transaction with retry logic and timeout
-      let signature: string;
-      try {
-        signature = await Promise.race([
-          optimizedTransactionUtils.sendTransactionWithRetry(
-            transaction,
-            signers,
-            priority as 'low' | 'medium' | 'high'
-          ),
-          new Promise<string>((_, reject) => 
-            setTimeout(() => reject(new Error('Transaction send timeout after 30 seconds')), 30000)
-          )
-        ]);
-        
-        logger.info('Transaction sent successfully', {
+      // CRITICAL: On mainnet, we need to properly verify the transaction succeeded
+      // Don't assume success just because we got a signature - verify it actually confirmed
+      const config = getConfig();
+      const isMainnet = config.blockchain.network === 'mainnet';
+      
+      if (isMainnet) {
+        // On mainnet, use proper verification with delayed check
+        logger.info('Mainnet transaction submitted, verifying confirmation', {
           signature,
           transactionType,
-          priority
+          note: 'Will verify transaction status on mainnet'
         }, 'TransactionProcessor');
+        
+        // Wait a moment for transaction to be processed
+        // NOTE: This delay is AFTER transaction submission, so it doesn't affect blockhash expiration
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Verify transaction with proper mainnet-aware logic using shared utility
+        const verificationResult = await verifyTransactionOnBlockchain(connection, signature);
+        
+        if (!verificationResult.success) {
+          logger.error('Transaction verification failed on mainnet', {
+            signature,
+            error: verificationResult.error,
+            transactionType,
+            note: 'Transaction may have failed or is still processing'
+          }, 'TransactionProcessor');
+          
+          // Don't return success if verification explicitly failed (not just timeout)
+          if (verificationResult.error && !verificationResult.error.includes('timeout')) {
+            return {
+              signature,
+              txId: signature,
+              success: false,
+              error: verificationResult.error || 'Transaction verification failed on mainnet',
+              companyFee,
+              netAmount: recipientAmount
+            };
+          }
+          
+          // If it's just a timeout, assume success (transaction was accepted by network)
+          logger.warn('Transaction verification timed out on mainnet, assuming success', {
+            signature,
+            note: 'Transaction was accepted by network, verification timeout likely due to RPC rate limits'
+          }, 'TransactionProcessor');
+        } else {
+          logger.info('Transaction verified successfully on mainnet', {
+            signature,
+            transactionType
+          }, 'TransactionProcessor');
+        }
+      } else {
+        // On devnet, use faster confirmation
+      try {
+        const confirmed = await optimizedTransactionUtils.confirmTransactionWithTimeout(signature);
+        if (!confirmed) {
+          logger.warn('Transaction confirmation timed out, but transaction was sent', { 
+            signature,
+            note: 'Transaction may still be processing on the blockchain'
+          }, 'TransactionProcessor');
+        }
       } catch (sendError) {
-        logger.error('Transaction send failed', {
+        logger.error('Transaction confirmation failed', {
           error: sendError instanceof Error ? sendError.message : String(sendError),
           transactionType,
           priority
         }, 'TransactionProcessor');
-        throw sendError;
+        // Don't throw - transaction was already submitted
       }
-      
-      // Quick confirmation check - if it takes too long, just proceed
-      // The transaction was accepted by the network, and blockchain propagation can be slow
-      const confirmationTimeout = priority === 'high' ? 5000 : 8000; // Reduced timeouts: 5s for high priority, 8s for others
-      let confirmed = false;
-      
-      try {
-        confirmed = await Promise.race([
-          optimizedTransactionUtils.confirmTransactionWithTimeout(signature, confirmationTimeout).catch(() => false),
-          new Promise<boolean>((resolve) => 
-            setTimeout(() => {
-              logger.debug('Confirmation timeout, proceeding with transaction', { signature }, 'TransactionProcessor');
-              resolve(false); // Don't fail, just proceed
-            }, confirmationTimeout + 2000) // Extra 2 seconds buffer
-          )
-        ]);
-      } catch (confirmError) {
-        logger.debug('Confirmation check threw error, proceeding anyway', {
-          signature,
-          error: confirmError instanceof Error ? confirmError.message : String(confirmError)
-        }, 'TransactionProcessor');
-        confirmed = false;
-      }
-      
-      // Only do quick verification if not already confirmed - skip if it takes too long
-      if (!confirmed) {
-        try {
-          // Quick verification with fewer attempts for faster response
-          const verificationResult = await Promise.race([
-            this.verifyTransactionOnBlockchain(signature, transactionType),
-            new Promise<{ success: boolean; error?: string }>((resolve) =>
-              setTimeout(() => {
-                logger.debug('Verification timeout, assuming success', { signature }, 'TransactionProcessor');
-                resolve({ success: true }); // Assume success if verification takes too long
-              }, 3000) // 3 second timeout for verification
-            )
-          ]);
-          
-          if (verificationResult.success) {
-            logger.debug('Transaction verified on blockchain', { signature }, 'TransactionProcessor');
-          }
-        } catch (verifyError) {
-          logger.debug('Verification threw error, but transaction was sent successfully', {
-            signature,
-            error: verifyError instanceof Error ? verifyError.message : String(verifyError)
-          }, 'TransactionProcessor');
-          // Don't fail - transaction was sent and accepted by network
-        }
-      } else {
-        logger.debug('Transaction confirmed successfully', { signature }, 'TransactionProcessor');
       }
 
-      // Always return success if we got a signature - the transaction was accepted by the network
-      // Verification failures are likely due to network delays, not actual transaction failures
+      // Return success - transaction was submitted and verified (or assumed successful on timeout)
       return {
         signature,
         txId: signature,
@@ -373,101 +578,22 @@ export class TransactionProcessor {
   }
 
   /**
-   * Enhanced transaction verification (matching split logic)
+   * @deprecated Use shared verifyTransactionOnBlockchain from transactionVerificationUtils instead
+   * This method is kept for backward compatibility but will be removed
    */
   private async verifyTransactionOnBlockchain(
     signature: string, 
     transactionType: string
   ): Promise<{ success: boolean; error?: string }> {
-    try {
-      logger.info('Verifying transaction on blockchain', {
-        signature,
-        transactionType
-      }, 'TransactionProcessor');
-
-      // Quick verification with minimal attempts for faster response
-      const maxAttempts = 2; // Reduced to 2 attempts for faster response
-      const delayMs = 300; // Reduced to 300ms for faster response
-
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-          const status = await this.connection.getSignatureStatus(signature, {
-            searchTransactionHistory: true
-          });
-
-          if (status.value) {
-            if (status.value.err) {
-              logger.error('Transaction failed on blockchain', {
-                signature,
-                error: status.value.err,
-                attempt
-              }, 'TransactionProcessor');
+    // Use shared verification utility for consistent behavior
+    const connection = await this.getConnection();
+    const result = await verifyTransactionOnBlockchain(connection, signature);
               return {
-                success: false,
-                error: `Transaction failed: ${status.value.err.toString()}`
-              };
-            }
-
-            const confirmations = status.value.confirmations || 0;
-            if (confirmations > 0) {
-              logger.info('Transaction confirmed on blockchain', {
-                signature,
-                confirmations,
-                attempt
-              }, 'TransactionProcessor');
-              return { success: true };
-            }
+      success: result.success,
+      error: result.error
+    };
           }
-
-          if (attempt < maxAttempts) {
-            logger.info('Transaction not yet confirmed, retrying', {
-              signature,
-              attempt,
-              maxAttempts
-            }, 'TransactionProcessor');
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-        } catch (error) {
-          logger.warn('Verification attempt failed', {
-            signature,
-            attempt,
-            error: error instanceof Error ? error.message : String(error)
-          }, 'TransactionProcessor');
-          
-          if (attempt < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-        }
-      }
-
-      // If we reach here, all verification attempts failed
-      logger.warn('Transaction verification timeout', {
-        signature,
-        maxAttempts
-      }, 'TransactionProcessor');
-
-      // More lenient handling - if transaction was sent successfully, assume it succeeded
-      // Blockchain propagation can be slow, especially during high network activity
-      logger.warn('Transaction verification timeout, but transaction was sent successfully', {
-        signature,
-        transactionType,
-        maxAttempts
-      }, 'TransactionProcessor');
-      
-      // For all transaction types, assume success if we got a signature
-      // The transaction was accepted by the network, verification timeout is likely due to network delays
-      return { success: true };
-    } catch (error) {
-      logger.error('Transaction verification failed', {
-        signature,
-        error: error instanceof Error ? error.message : String(error)
-      }, 'TransactionProcessor');
-      return {
-        success: false,
-        error: 'Transaction verification failed'
-      };
-    }
-  }
+  
 
   /**
    * Get transaction fee estimate

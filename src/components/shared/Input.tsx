@@ -11,7 +11,6 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  StyleSheet,
   ViewStyle,
   TextStyle,
   TextInputProps,
@@ -49,19 +48,19 @@ const Input: React.FC<InputProps> = ({
   labelStyle,
   errorStyle,
   disabled = false,
-  required = false,
+  required: _required = false,
   variant = 'default',
   ...textInputProps
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  const handleFocus = (event: any) => {
+  const handleFocus = (event: Parameters<NonNullable<TextInputProps['onFocus']>>[0]) => {
     setIsFocused(true);
     textInputProps.onFocus?.(event);
   };
 
-  const handleBlur = (event: any) => {
+  const handleBlur = (event: Parameters<NonNullable<TextInputProps['onBlur']>>[0]) => {
     setIsFocused(false);
     textInputProps.onBlur?.(event);
   };
