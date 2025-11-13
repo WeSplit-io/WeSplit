@@ -309,6 +309,14 @@ const LeaderboardDetailScreen: React.FC = () => {
           showBackButton={true}
           onBackPress={() => rewardNav.goBack()}
           backgroundColor={colors.black}
+          rightElement={
+            <TouchableOpacity
+              onPress={() => rewardNav.goToHowItWorks()}
+              activeOpacity={0.7}
+            >
+              <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+            </TouchableOpacity>
+          }
         />
         <LoadingScreen
           message="Loading leaderboard..."
@@ -325,6 +333,14 @@ const LeaderboardDetailScreen: React.FC = () => {
         showBackButton={true}
         onBackPress={() => rewardNav.goBack()}
         backgroundColor={colors.black}
+        rightElement={
+          <TouchableOpacity
+            onPress={() => rewardNav.goToHowItWorks()}
+            activeOpacity={0.7}
+          >
+            <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+          </TouchableOpacity>
+        }
       />
 
       {/* Filter Segmented Control */}

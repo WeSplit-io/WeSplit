@@ -26,6 +26,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
+  fullWidthInput: {
+    width: '100%',
+  },
   title: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
@@ -121,6 +124,8 @@ export const styles = StyleSheet.create({
     color: colors.white50,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.regular,
+    marginBottom: spacing.sm,
+
   },
   referralCodeContainer: {
     flexDirection: 'row',

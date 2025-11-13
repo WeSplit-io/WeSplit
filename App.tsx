@@ -32,6 +32,7 @@ import LanguageScreen from './src/screens/Settings/Language/LanguageScreen';
 import RewardsScreen from './src/screens/Rewards/RewardsScreen';
 import LeaderboardDetailScreen from './src/screens/Rewards/LeaderboardDetailScreen';
 import HowToEarnPointsScreen from './src/screens/Rewards/HowToEarnPointsScreen';
+import HowItWorksScreen from './src/screens/Rewards/HowItWorks';
 import ReferralScreen from './src/screens/Rewards/ReferralScreen';
 import PointsHistoryScreen from './src/screens/Rewards/PointsHistoryScreen';
 import ChristmasCalendarScreen from './src/screens/Rewards/ChristmasCalendarScreen';
@@ -178,6 +179,7 @@ export default function App() {
                     <Stack.Screen name="Rewards" component={RewardsScreen} />
                     <Stack.Screen name="LeaderboardDetail" component={LeaderboardDetailScreen} />
                     <Stack.Screen name="HowToEarnPoints" component={HowToEarnPointsScreen} />
+                    <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
                     <Stack.Screen name="Referral" component={ReferralScreen} />
                     <Stack.Screen name="PointsHistory" component={PointsHistoryScreen} />
                     <Stack.Screen name="ChristmasCalendar" component={ChristmasCalendarScreen} />

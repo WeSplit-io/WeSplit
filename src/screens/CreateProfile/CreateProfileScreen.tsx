@@ -442,6 +442,7 @@ const CreateProfileScreen: React.FC = () => {
               
               {/* Pseudo Input */}
               <Input
+                containerStyle={styles.fullWidthInput}
                 label="Pseudo *"
                   placeholder="Enter your pseudo"
                   value={pseudo}
@@ -469,10 +470,7 @@ const CreateProfileScreen: React.FC = () => {
                       const cleaned = text.toUpperCase().replace(/\s/g, '');
                       setReferralCode(cleaned);
                     }}
-                  leftIcon="Handshake"
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    maxLength={12}
+                
                   />
                 <Text style={styles.referralCodeHint}>
                   Have a referral code? Enter it to earn bonus points for you and your friend!

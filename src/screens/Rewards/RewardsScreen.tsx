@@ -13,13 +13,14 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import NavBar from '../../components/shared/NavBar';
 import { Container, Header, LoadingScreen, Button } from '../../components/shared';
-import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import PhosphorIcon, { PhosphorIconName } from '../../components/shared/PhosphorIcon';
 import { useApp } from '../../context/AppContext';
 import { pointsService } from '../../services/rewards/pointsService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
@@ -30,7 +31,7 @@ import { userActionSyncService } from '../../services/rewards/userActionSyncServ
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 
 const RewardsScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<any>>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
   const { state, updateUser } = useApp();
   const { currentUser } = state;
@@ -134,7 +135,7 @@ const RewardsScreen: React.FC = () => {
   }, []);
 
   // Memoized icon map to prevent recreation
-  const iconMap = useMemo(() => ({
+  const iconMap = useMemo<Partial<Record<PointsTransaction['source'], PhosphorIconName>>>(() => ({
     'transaction_reward': 'CurrencyCircleDollar',
     'quest_completion': 'Star',
     'season_reward': 'Trophy',
@@ -142,8 +143,8 @@ const RewardsScreen: React.FC = () => {
     'admin_adjustment': 'Gear',
   }), []);
 
-  const getTransactionIcon = useCallback((source: PointsTransaction['source']) => {
-    return iconMap[source] || 'Circle';
+  const getTransactionIcon = useCallback((source: PointsTransaction['source']): PhosphorIconName => {
+    return (iconMap[source] ?? 'Circle') as PhosphorIconName;
   }, [iconMap]);
 
   // Memoized title map to prevent recreation
@@ -188,7 +189,7 @@ const RewardsScreen: React.FC = () => {
       />
     );
   }
- 
+
   return (
     <Container>
       <Header
@@ -197,7 +198,7 @@ const RewardsScreen: React.FC = () => {
         backgroundColor={colors.black}
         rightElement={
           <TouchableOpacity 
-            onPress={() => rewardNav.goToHowToEarnPoints()}
+            onPress={() => rewardNav.goToHowItWorks()}
             activeOpacity={0.7}
           >
             <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
@@ -224,7 +225,7 @@ const RewardsScreen: React.FC = () => {
           </Text>
           <Text style={styles.pointsLabel}>Split points</Text>
                 </View>
-
+        <View style={styles.featureCardsContainerWrapper}>
         {/* Invite Friends Button */}
         <TouchableOpacity
           style={styles.inviteButton}
@@ -237,14 +238,14 @@ const RewardsScreen: React.FC = () => {
             end={{ x: 1, y: 0 }}
             style={styles.inviteButtonGradient}
           >
-            <PhosphorIcon name="Handshake" size={24} color={colors.black} weight="fill" />
+            <PhosphorIcon name="Handshake" size={30} color={colors.black} weight="fill" />
             <View style={styles.inviteButtonContent}>
               <Text style={styles.inviteButtonTitle}>Invite your friends</Text>
               <Text style={styles.inviteButtonSubtitle}>
                 Earn points together and climb the ranks.
               </Text>
             </View>
-            <PhosphorIcon name="ArrowRight" size={20} color={colors.black} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={20} color={colors.black} weight="regular" />
           </LinearGradient>
         </TouchableOpacity>
 
@@ -256,7 +257,19 @@ const RewardsScreen: React.FC = () => {
             onPress={() => rewardNav.goToLeaderboardDetail()}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="Trophy" size={32} color={colors.green} weight="fill" />
+            <MaskedView
+              style={styles.gradientIconMask}
+              maskElement={
+                <PhosphorIcon name="Ranking" size={32} color={colors.black} weight="fill" />
+              }
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientIconFill}
+              />
+            </MaskedView>
             <Text style={styles.featureCardTitle}>Leaderboard</Text>
             <Text style={styles.featureCardSubtitle}>Climb, compete, conquer.</Text>
           </TouchableOpacity>
@@ -267,13 +280,28 @@ const RewardsScreen: React.FC = () => {
             onPress={() => rewardNav.goToHowToEarnPoints()}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="Coins" size={32} color={colors.green} weight="fill" />
+            <MaskedView
+              style={styles.gradientIconMask}
+              maskElement={
+                <PhosphorIcon name="Coins" size={32} color={colors.black} weight="fill" />
+              }
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientIconFill}
+              />
+            </MaskedView>
             <Text style={styles.featureCardTitle}>How to Earn Points</Text>
             <Text style={styles.featureCardSubtitle}>Do more, earn more.</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Christmas Calendar Button - Matches Referral Button Style */}
+        </View>
+        
+
+        {/* Christmas Calendar Button - Matches Referral Button Style 
         <TouchableOpacity
           style={styles.inviteButton}
           onPress={() => rewardNav.goToChristmasCalendar()}
@@ -294,7 +322,7 @@ const RewardsScreen: React.FC = () => {
             </View>
             <PhosphorIcon name="ArrowRight" size={20} color={colors.black} weight="regular" />
           </LinearGradient>
-        </TouchableOpacity>
+        </TouchableOpacity>*/}
 
         {/* Points History Section */}
         <View style={styles.historySection}>
@@ -308,14 +336,14 @@ const RewardsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           
-          {pointsHistory.length === 0 ? (
-            <View style={styles.emptyHistoryContainer}>
-              <PhosphorIcon name="Receipt" size={32} color={colors.textLightSecondary} />
-              <Text style={styles.emptyHistoryText}>No points history yet</Text>
-            </View>
-          ) : (
-            <View style={styles.historyList}>
-              {pointsHistory.map((transaction) => {
+          <View style={styles.historyList}>
+            {pointsHistory.length === 0 ? (
+              <View style={styles.emptyHistoryContainer}>
+                <PhosphorIcon name="Receipt" size={32} color={colors.textLightSecondary} />
+                <Text style={styles.emptyHistoryText}>No points history yet</Text>
+              </View>
+            ) : (
+              pointsHistory.map((transaction) => {
                 const iconName = getTransactionIcon(transaction.source);
                 const title = getTransactionTitle(transaction);
                 const date = formatDate(transaction.created_at);
@@ -324,7 +352,7 @@ const RewardsScreen: React.FC = () => {
                 return (
                   <View key={transaction.id} style={styles.historyItem}>
                     <View style={styles.historyItemIcon}>
-                      <PhosphorIcon name={iconName} size={20} color={colors.green} weight="regular" />
+                      <PhosphorIcon name={iconName} size={18} color={colors.white} weight="regular" />
                     </View>
                     <View style={styles.historyItemInfo}>
                       <Text style={styles.historyItemTitle} numberOfLines={1}>
@@ -338,13 +366,13 @@ const RewardsScreen: React.FC = () => {
                       <Text style={styles.historyItemPointsValue}>
                         +{transaction.amount}
                       </Text>
-                      <Text style={styles.historyItemPointsLabel}>PTS</Text>
+                      <Text style={styles.historyItemPointsLabel}>Split Points</Text>
                     </View>
                   </View>
                 );
-              })}
-            </View>
-          )}
+              })
+            )}
+          </View>
       </View>
       </ScrollView>
 
@@ -358,7 +386,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: 120, // Space for NavBar
   },
@@ -391,7 +418,6 @@ const styles = StyleSheet.create({
   inviteButton: {
     borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: spacing.lg,
   },
   inviteButtonGradient: {
     flexDirection: 'row',
@@ -413,9 +439,14 @@ const styles = StyleSheet.create({
     color: colors.black,
     opacity: 0.8,
   },
+  featureCardsContainerWrapper: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
   featureCardsContainer: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: 10,
     marginBottom: spacing.xl,
   },
   featureCard: {
@@ -423,7 +454,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.md,
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
     gap: spacing.sm,
   },
   featureCardTitle: {
@@ -435,7 +467,14 @@ const styles = StyleSheet.create({
   featureCardSubtitle: {
     fontSize: typography.fontSize.xs,
     color: colors.textLightSecondary,
-    textAlign: 'center',
+    textAlign: 'left',
+  },
+  gradientIconMask: {
+    width: 32,
+    height: 32,
+  },
+  gradientIconFill: {
+    flex: 1,
   },
   historySection: {
     marginBottom: spacing.lg,
@@ -452,25 +491,27 @@ const styles = StyleSheet.create({
     color: colors.textLight,
   },
   seeAllLink: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    fontSize: typography.fontSize.md,
+    color: colors.white70,
   },
   historyList: {
-    gap: spacing.sm,
+    gap: 10,
   },
   historyItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white5,
-    borderRadius: 12,
+    borderRadius: spacing.lg,
     padding: spacing.md,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   historyItemIcon: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: spacing.lg,
+    backgroundColor: colors.white10,
   },
   historyItemInfo: {
     flex: 1,
@@ -478,12 +519,12 @@ const styles = StyleSheet.create({
   historyItemTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 2,
   },
   historyItemSubtitle: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.white70,
   },
   historyItemPoints: {
     alignItems: 'flex-end',
@@ -495,17 +536,18 @@ const styles = StyleSheet.create({
   },
   historyItemPointsLabel: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     marginTop: 2,
   },
   emptyHistoryContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xl,
     gap: spacing.sm,
   },
   emptyHistoryText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.white70,
   },
 });
 
