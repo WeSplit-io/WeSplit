@@ -69,15 +69,17 @@ export interface WalletManagementEvent {
 }
 
 class SimplifiedWalletService {
-  private connection: Connection;
   private walletRecoveryCache = new Map<string, WalletCreationResult>();
   private recoveryInProgress = new Set<string>();
   private balanceCache = new Map<string, { balance: UserWalletBalance; timestamp: number }>();
   private readonly CACHE_DURATION = 30000; // 30 seconds cache
 
-  constructor() {
-    const config = getConfig();
-    this.connection = new Connection(config.blockchain.rpcUrl, 'confirmed');
+  /**
+   * Get connection using optimized transaction utils (with endpoint rotation)
+   */
+  private async getConnection(): Promise<Connection> {
+    const { optimizedTransactionUtils } = await import('../../shared/transactionUtilsOptimized');
+    return await optimizedTransactionUtils.getConnection();
   }
 
   /**
@@ -427,10 +429,12 @@ class SimplifiedWalletService {
    */
   async getUserWalletBalance(userId: string): Promise<UserWalletBalance | null> {
     try {
+      const config = getConfig();
+      
       // Check balance cache first
       const cachedBalance = this.balanceCache.get(userId);
       if (cachedBalance && (Date.now() - cachedBalance.timestamp) < this.CACHE_DURATION) {
-        logger.debug('Using cached balance', { userId }, 'SimplifiedWalletService');
+        logger.debug('Using cached balance', { userId, network: config.blockchain.network }, 'SimplifiedWalletService');
         return cachedBalance.balance;
       }
 
@@ -440,21 +444,44 @@ class SimplifiedWalletService {
       if (!walletResult.success || !walletResult.wallet) {
         logger.warn('Cannot get balance - wallet recovery failed', { 
           userId, 
-          error: walletResult.error 
+          error: walletResult.error,
+          network: config.blockchain.network
         }, 'SimplifiedWalletService');
         return null;
       }
 
+      logger.info('Getting balance for wallet', { 
+        userId,
+        address: walletResult.wallet.address,
+        network: config.blockchain.network,
+        rpcUrl: config.blockchain.rpcUrl
+      }, 'SimplifiedWalletService');
+
       const balance = await this.getBalanceForAddress(walletResult.wallet.address);
       
-      // Cache the balance
+      if (!balance) {
+        logger.warn('Balance fetch returned null - possible network mismatch', {
+          userId,
+          address: walletResult.wallet.address,
+          network: config.blockchain.network,
+          note: 'Wallet may exist on a different network. Check Solscan to verify network.'
+        }, 'SimplifiedWalletService');
+      }
+      
+      // Cache the balance (even if null, to avoid repeated failed attempts)
       if (balance) {
         this.balanceCache.set(userId, { balance, timestamp: Date.now() });
       }
       
       return balance;
     } catch (error) {
-      logger.error('Error getting user wallet balance', error, 'SimplifiedWalletService');
+      const config = getConfig();
+      logger.error('Error getting user wallet balance', { 
+        error,
+        userId,
+        network: config.blockchain.network,
+        rpcUrl: config.blockchain.rpcUrl
+      }, 'SimplifiedWalletService');
       return null;
     }
   }
@@ -482,10 +509,116 @@ class SimplifiedWalletService {
    */
   async getBalanceForAddress(address: string): Promise<UserWalletBalance | null> {
     try {
+      const config = getConfig();
+      logger.info('Fetching balance for address', { 
+        address, 
+        network: config.blockchain.network,
+        rpcUrl: config.blockchain.rpcUrl,
+        endpointCount: config.blockchain.rpcEndpoints?.length || 0
+      }, 'SimplifiedWalletService');
+      
+      const connection = await this.getConnection();
       const publicKey = new PublicKey(address);
       
-      // Get SOL balance
-      const solBalance = await this.connection.getBalance(publicKey);
+      logger.debug('Connection established', { 
+        rpcEndpoint: connection.rpcEndpoint,
+        commitment: (connection as any).commitment
+      }, 'SimplifiedWalletService');
+      
+      // Get SOL balance with retry logic for rate limits and 404 errors
+      let solBalance = 0;
+      const maxRetries = 3;
+      let lastError: Error | null = null;
+      
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const currentConnection = attempt === 0 ? connection : await this.getConnection();
+          logger.debug('Attempting to get balance', { 
+            attempt: attempt + 1, 
+            maxRetries,
+            endpoint: currentConnection.rpcEndpoint,
+            address 
+          }, 'SimplifiedWalletService');
+          
+          solBalance = await currentConnection.getBalance(publicKey);
+          
+          logger.info('Successfully retrieved SOL balance', { 
+            address, 
+            solBalance, 
+            solBalanceFormatted: solBalance / LAMPORTS_PER_SOL,
+            attempt: attempt + 1,
+            endpoint: currentConnection.rpcEndpoint
+          }, 'SimplifiedWalletService');
+          
+          break; // Success, exit retry loop
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          const errorMessage = lastError.message;
+          const errorString = String(error);
+          
+          // Check for rate limits, 404, or network errors
+          const isRateLimit = errorMessage.includes('429') || 
+                             errorMessage.includes('rate limit') || 
+                             errorMessage.includes('too many requests');
+          const is404 = errorMessage.includes('404') || 
+                       errorString.includes('404') ||
+                       errorMessage.includes('failed to get balance');
+          const isNetworkError = errorMessage.includes('fetch') ||
+                               errorMessage.includes('network') ||
+                               errorMessage.includes('ECONNREFUSED');
+          
+          if (isRateLimit || is404 || isNetworkError) {
+            if (attempt < maxRetries - 1) {
+              // Try rotating endpoint and retrying
+              logger.warn('Balance fetch error, rotating endpoint and retrying', { 
+                address, 
+                attempt: attempt + 1,
+                maxRetries,
+                error: errorMessage,
+                errorType: isRateLimit ? 'rate_limit' : is404 ? '404' : 'network'
+              }, 'SimplifiedWalletService');
+              
+              try {
+                const { optimizedTransactionUtils } = await import('../../shared/transactionUtilsOptimized');
+                await optimizedTransactionUtils.switchToNextEndpoint();
+                // Wait a bit before retry to avoid immediate rate limit
+                await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+              } catch (rotateError) {
+                logger.warn('Failed to rotate endpoint', { error: rotateError }, 'SimplifiedWalletService');
+              }
+              continue; // Retry with next endpoint
+            } else {
+              // Last attempt failed
+              logger.error('Failed to get balance after all retries', { 
+                address, 
+                attempts: maxRetries,
+                error: errorMessage,
+                errorString,
+                network: config.blockchain.network,
+                rpcEndpoints: config.blockchain.rpcEndpoints,
+                note: 'Check if wallet exists on the configured network (mainnet vs devnet)'
+              }, 'SimplifiedWalletService');
+              
+              // Don't throw - return null so UI can handle gracefully
+              // The wallet might exist on a different network than configured
+              return null;
+            }
+          } else {
+            // Not a retryable error, throw immediately
+            throw error;
+          }
+        }
+      }
+      
+      if (lastError && solBalance === 0) {
+        // If we still have an error and balance is 0, it might be a real 0 balance
+        // But log it for debugging
+        logger.warn('Balance fetch completed with 0, may be actual balance or error', { 
+          address,
+          error: lastError.message 
+        }, 'SimplifiedWalletService');
+      }
+      
       const solBalanceFormatted = solBalance / LAMPORTS_PER_SOL;
 
       // Get USDC balance
@@ -496,7 +629,7 @@ class SimplifiedWalletService {
           new PublicKey(config.blockchain.usdcMintAddress),
           publicKey
         );
-        const tokenAccount = await getAccount(this.connection, usdcTokenAddress);
+        const tokenAccount = await getAccount(connection, usdcTokenAddress);
         usdcBalance = Number(tokenAccount.amount) / Math.pow(10, 6); // USDC has 6 decimals
       } catch (error) {
         // Token account doesn't exist yet, balance is 0

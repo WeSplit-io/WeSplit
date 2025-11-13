@@ -682,8 +682,53 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
       transactionSize: serializedTransaction.length
     }, 'TransactionSigningService');
 
-    // Convert Uint8Array to base64 string
-    const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
+    // Ensure we have a proper Uint8Array
+    let txArray: Uint8Array;
+    if (serializedTransaction instanceof Uint8Array) {
+      txArray = serializedTransaction;
+    } else if (Array.isArray(serializedTransaction)) {
+      txArray = new Uint8Array(serializedTransaction);
+    } else if (serializedTransaction instanceof ArrayBuffer) {
+      txArray = new Uint8Array(serializedTransaction);
+    } else {
+      throw new Error(`Invalid transaction type: ${typeof serializedTransaction}. Expected Uint8Array.`);
+    }
+
+    // Convert Uint8Array to base64 string (React Native compatible)
+    let base64Transaction: string;
+    try {
+      if (typeof Buffer !== 'undefined' && Buffer.from) {
+        const buffer = Buffer.from(txArray);
+        base64Transaction = buffer.toString('base64');
+      } else if (typeof btoa !== 'undefined') {
+        // Use btoa for React Native
+        const binary = Array.from(txArray, byte => String.fromCharCode(byte)).join('');
+        if (binary.length === 0 && txArray.length > 0) {
+          throw new Error('Binary string conversion failed - empty result');
+        }
+        base64Transaction = btoa(binary);
+      } else {
+        // Fallback: manual base64 encoding
+        base64Transaction = manualBase64Encode(txArray);
+      }
+
+      if (!base64Transaction || typeof base64Transaction !== 'string') {
+        throw new Error(`Failed to convert transaction to base64 string. Got type: ${typeof base64Transaction}`);
+      }
+
+      if (base64Transaction.length === 0) {
+        throw new Error('Base64 conversion resulted in empty string');
+      }
+    } catch (conversionError) {
+      logger.error('Base64 conversion failed in processUsdcTransfer', {
+        error: conversionError,
+        errorMessage: conversionError instanceof Error ? conversionError.message : String(conversionError),
+        txArrayLength: txArray.length,
+        hasBuffer: typeof Buffer !== 'undefined',
+        hasBtoa: typeof btoa !== 'undefined'
+      }, 'TransactionSigningService');
+      throw new Error(`Failed to convert transaction to base64: ${conversionError instanceof Error ? conversionError.message : String(conversionError)}`);
+    }
 
     // Get the callable function (lazy initialization)
     const processUsdcTransferFunction = getProcessUsdcTransferFunction();

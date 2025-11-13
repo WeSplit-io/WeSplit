@@ -27,7 +27,7 @@ import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType 
 import { solanaWalletService } from '../wallet';
 import { logger } from '../../analytics/loggingService';
 import type { LinkedWallet } from '../wallet/LinkedWalletService';
-import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain, processUsdcTransfer } from './transactionSigningService';
+import { processUsdcTransfer } from './transactionSigningService';
 import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS, type BlockhashWithTimestamp } from '../../shared/blockhashUtils';
 import { verifyTransactionOnBlockchain } from '../../shared/transactionVerificationUtils';
 
@@ -408,7 +408,8 @@ class ExternalTransferService {
       // Use 'confirmed' commitment for faster response and better reliability
       // CRITICAL: Get blockhash immediately before transaction creation to minimize expiration risk
       // Best practice: Use shared utility for consistent blockhash handling
-      const blockhashData = await getFreshBlockhash(this.connection, 'confirmed');
+      const connection = await this.getConnection();
+      const blockhashData = await getFreshBlockhash(connection, 'confirmed');
       const blockhash = blockhashData.blockhash;
       const blockhashTimestamp = blockhashData.timestamp;
       logger.info('Got fresh blockhash right before transaction creation', {
@@ -607,30 +608,27 @@ class ExternalTransferService {
         ? serializedTransaction 
         : new Uint8Array(serializedTransaction);
       
-      // CRITICAL: Get fresh blockhash RIGHT before Firebase call to minimize expiration risk
-      // Even if blockhash was fresh when transaction was built, it might be expired by now
-      // Best practice: Always get fresh blockhash immediately before submission
-      logger.info('Getting fresh blockhash immediately before Firebase call', {
-        originalBlockhashAge: Date.now() - blockhashTimestamp,
-        note: 'Getting fresh blockhash to ensure it\'s valid when Firebase submits to Solana'
-      }, 'ExternalTransferService');
-      
-      const freshBlockhashData = await getFreshBlockhash(this.connection, 'confirmed');
-      const freshBlockhash = freshBlockhashData.blockhash;
-      let currentBlockhashTimestamp = freshBlockhashData.timestamp;
-      
-      // CRITICAL: Always rebuild transaction with fresh blockhash before Firebase call
-      // Even if blockhash is the same, we need to ensure the transaction uses the latest timestamp
+      // CRITICAL: Check blockhash age and rebuild if needed BEFORE Firebase call
+      // Mainnet is slower, so we need aggressive refresh (10 seconds threshold)
       // This minimizes the time between blockhash creation and Solana submission
-      let currentTxArray = txArray;
+      const blockhashAge = Date.now() - blockhashTimestamp;
+      const needsRebuild = isBlockhashTooOld(blockhashTimestamp);
       
-      // Always rebuild to ensure we have the freshest possible transaction
-      {
-        logger.info('Rebuilding transaction with fresh blockhash before Firebase call', {
+      let currentTxArray = txArray;
+      let currentBlockhashTimestamp = blockhashTimestamp;
+      
+      if (needsRebuild) {
+        logger.info('Blockhash is too old, rebuilding transaction with fresh blockhash before Firebase call', {
           oldBlockhash: blockhash.substring(0, 8) + '...',
-          newBlockhash: freshBlockhash.substring(0, 8) + '...',
-          blockhashAge: Date.now() - blockhashTimestamp
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS,
+          note: 'Rebuilding to ensure blockhash is fresh when Firebase submits'
         }, 'ExternalTransferService');
+        
+        // Get fresh blockhash
+        const freshBlockhashData = await getFreshBlockhash(this.connection, 'confirmed');
+        const freshBlockhash = freshBlockhashData.blockhash;
+        currentBlockhashTimestamp = freshBlockhashData.timestamp;
         
         // Rebuild transaction with fresh blockhash
         const freshTransaction = new Transaction({
@@ -717,8 +715,16 @@ class ExternalTransferService {
           timeSinceNewBlockhash: Date.now() - currentBlockhashTimestamp,
           blockhashChanged: freshBlockhash !== blockhash
         }, 'ExternalTransferService');
+      } else {
+        logger.info('Blockhash is still fresh, using existing transaction', {
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS,
+          note: 'Blockhash is within acceptable age, proceeding without rebuild'
+        }, 'ExternalTransferService');
       }
             
+      // CRITICAL: Log blockhash age right before sending to Firebase
+      const finalBlockhashAge = Date.now() - currentBlockhashTimestamp;
       logger.info('Transaction serialized, requesting company wallet signature', {
         transactionSize: currentTxArray.length,
         transactionType: typeof currentTxArray,
@@ -728,7 +734,11 @@ class ExternalTransferService {
         amount: recipientAmount,
         companyFee,
         totalAmount: params.amount,
-        blockhashAge: Date.now() - currentBlockhashTimestamp
+        blockhashAge: finalBlockhashAge,
+        blockhashAgeMs: finalBlockhashAge,
+        maxAgeMs: BLOCKHASH_MAX_AGE_MS,
+        isBlockhashFresh: finalBlockhashAge < BLOCKHASH_MAX_AGE_MS,
+        warning: finalBlockhashAge > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh'
             }, 'ExternalTransferService');
             
       // Use processUsdcTransfer which combines signing and submission in one Firebase call
@@ -740,8 +750,9 @@ class ExternalTransferService {
       
       while (submissionAttempts < maxSubmissionAttempts) {
         try {
+          const currentConnection = await this.getConnection();
           logger.info('Processing USDC transfer (sign and submit)', {
-            connectionEndpoint: this.connection.rpcEndpoint,
+            connectionEndpoint: currentConnection.rpcEndpoint,
             commitment: getConfig().blockchain.commitment,
             attempt: submissionAttempts + 1,
             transactionSize: currentTxArray.length
@@ -771,7 +782,8 @@ class ExternalTransferService {
             try {
               // Get fresh blockhash RIGHT before rebuilding using shared utility
               // Best practice: Use shared utility for consistent blockhash handling
-              const freshBlockhashData = await getFreshBlockhash(this.connection, 'confirmed');
+              const rebuildConnection = await this.getConnection();
+              const freshBlockhashData = await getFreshBlockhash(rebuildConnection, 'confirmed');
               const freshBlockhash = freshBlockhashData.blockhash;
               const freshBlockhashTimestamp = freshBlockhashData.timestamp;
               logger.info('Got fresh blockhash for transaction rebuild', {
@@ -1032,7 +1044,8 @@ class ExternalTransferService {
     error?: string;
   }> {
     try {
-      const status = await this.connection.getSignatureStatus(signature, {
+      const connection = await this.getConnection();
+      const status = await connection.getSignatureStatus(signature, {
         searchTransactionHistory: true
       });
 

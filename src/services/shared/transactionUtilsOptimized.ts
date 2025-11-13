@@ -125,70 +125,21 @@ export class OptimizedTransactionUtils {
     return new Connection(currentEndpoint, connectionOptions);
   }
 
+  /**
+   * @deprecated Use getFreshBlockhash from blockhashUtils instead
+   * This method is kept for backward compatibility but will be removed
+   */
   public async getLatestBlockhashWithRetry(commitment: 'confirmed' | 'finalized' = 'confirmed'): Promise<string> {
     await this.initialize();
     
-    const maxRetries = 5;
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
         if (!this.connection) {
           this.connection = await this.createConnection();
         }
 
-        const { blockhash } = await this.connection.getLatestBlockhash(commitment);
-        return blockhash;
-      } catch (error) {
-        lastError = error as Error;
-        const errorMessage = lastError.message;
-        
-        // Check if it's a network error that might benefit from RPC failover
-        const isNetworkError = error instanceof Error && (
-          errorMessage.includes('fetch') || 
-          errorMessage.includes('network') || 
-          errorMessage.includes('timeout') ||
-          errorMessage.includes('ECONNREFUSED') ||
-          errorMessage.includes('ENOTFOUND') ||
-          errorMessage.includes('AbortSignal') ||
-          errorMessage.includes('aborted') ||
-          errorMessage.includes('AbortError') ||
-          errorMessage.includes('Failed to fetch') ||
-          // Treat RPC auth/permission errors as failover triggers
-          errorMessage.includes('403') ||
-          errorMessage.includes('-32052') ||
-          errorMessage.toLowerCase().includes('api key is not allowed') ||
-          errorMessage.toLowerCase().includes('not allowed to access blockchain')
-        );
-        
-        if (isNetworkError) {
-          await this.switchToNextEndpoint();
-        }
-
-        // Wait before retry (exponential backoff with jitter)
-        if (attempt < maxRetries - 1) {
-          const baseDelay = 1000 * Math.pow(2, attempt);
-          const jitter = Math.random() * 1000;
-          const delay = baseDelay + jitter;
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    // If all attempts failed, try one more time with a different commitment level
-    if (commitment === 'confirmed') {
-      try {
-        if (!this.connection) {
-          this.connection = await this.createConnection();
-        }
-        const { blockhash } = await this.connection.getLatestBlockhash('finalized');
-        return blockhash;
-      } catch (finalError) {
-        // Ignore final error
-      }
-    }
-
-    throw new Error(`Failed to get blockhash after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
+    // Use shared utility for consistent blockhash handling with timestamp tracking
+    const { getFreshBlockhash } = await import('./blockhashUtils');
+    const blockhashData = await getFreshBlockhash(this.connection, commitment);
+    return blockhashData.blockhash;
   }
 
   public async sendTransactionWithRetry(
@@ -489,9 +440,27 @@ export class OptimizedTransactionUtils {
             
             if (isRateLimit) {
               consecutiveRateLimits++;
-              // Exponential backoff for rate limits
+              
+              // Immediately rotate to next endpoint on rate limit (if multiple endpoints available)
+              if (this.rpcEndpoints.length > 1 && consecutiveRateLimits <= 2) {
+                try {
+                  loggerForTimeout.info('Rate limit detected, rotating to next RPC endpoint', {
+                    signature,
+                    currentEndpoint: this.rpcEndpoints[this.currentEndpointIndex],
+                    consecutiveRateLimits,
+                    network: isMainnet ? 'mainnet' : 'devnet'
+                  }, 'OptimizedTransactionUtils');
+                  await this.switchToNextEndpoint();
+                  consecutiveRateLimits = 0; // Reset after rotation
+                } catch (rotateError) {
+                  loggerForTimeout.warn('Failed to rotate endpoint, using backoff instead', {
+                    error: rotateError
+                  }, 'OptimizedTransactionUtils');
+                }
+              }
+              
+              // Exponential backoff for rate limits (if rotation didn't help or not available)
               const backoffDelay = pollIntervalMs * Math.pow(2, Math.min(consecutiveRateLimits - 1, 3));
-              // Use logger from outer scope
               loggerForTimeout.warn('Rate limit during confirmation polling, backing off', {
                 signature,
                 consecutiveRateLimits,

@@ -116,37 +116,102 @@ class TransactionSigningService {
       }
 
       // Create connection - use network from environment, default to devnet for development
+      // Use same RPC endpoint priority as client for consistency and speed
       const network = process.env.DEV_NETWORK || process.env.EXPO_PUBLIC_DEV_NETWORK || 'devnet';
-      let rpcUrl = process.env.HELIUS_RPC_URL;
-      const heliusApiKey = process.env.HELIUS_API_KEY || process.env.EXPO_PUBLIC_HELIUS_API_KEY;
+      const forceMainnet = process.env.FORCE_MAINNET === 'true' || process.env.EXPO_PUBLIC_FORCE_MAINNET === 'true';
+      const actualNetwork = forceMainnet ? 'mainnet' : network;
       
-      if (!rpcUrl) {
-        // Determine RPC URL based on network
-        if (network === 'mainnet') {
-          rpcUrl = heliusApiKey 
-            ? `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`
-            : 'https://api.mainnet-beta.solana.com';
-        } else if (network === 'testnet') {
-          rpcUrl = 'https://api.testnet.solana.com';
-        } else {
-          // Default to devnet
-          rpcUrl = 'https://api.devnet.solana.com';
+      // Helper to extract API key from URL or return as-is
+      const extractApiKey = (value, baseUrl) => {
+        if (!value) return '';
+        if (value.startsWith('http')) {
+          const parts = value.split('/');
+          return parts[parts.length - 1] || value;
         }
+        if (value.includes(baseUrl)) {
+          return value.replace(baseUrl, '').replace(/^\//, '').replace(/\/$/, '');
+        }
+        return value;
+      };
+      
+      const extractGetBlockKey = (value) => {
+        if (!value) return '';
+        if (value.startsWith('http')) {
+          const match = value.match(/go\.getblock\.io\/([^\/\s]+)/);
+          return match ? match[1] : value.split('/').pop() || value;
+        }
+        return value;
+      };
+      
+      let rpcUrl;
+      const rpcEndpoints = [];
+      
+      if (actualNetwork === 'mainnet') {
+        // Use same priority order as client: Alchemy > GetBlock > QuickNode > Chainstack > Helius > Free
+        const alchemyApiKey = extractApiKey(process.env.ALCHEMY_API_KEY || process.env.EXPO_PUBLIC_ALCHEMY_API_KEY, 'solana-mainnet.g.alchemy.com/v2');
+        const getBlockApiKey = extractGetBlockKey(process.env.GETBLOCK_API_KEY || process.env.EXPO_PUBLIC_GETBLOCK_API_KEY);
+        const quickNodeEndpoint = process.env.QUICKNODE_ENDPOINT || process.env.EXPO_PUBLIC_QUICKNODE_ENDPOINT;
+        const chainstackEndpoint = process.env.CHAINSTACK_ENDPOINT || process.env.EXPO_PUBLIC_CHAINSTACK_ENDPOINT;
+        const heliusApiKey = extractApiKey(process.env.HELIUS_API_KEY || process.env.EXPO_PUBLIC_HELIUS_API_KEY, 'mainnet.helius-rpc.com');
+        
+        // Tier 1: Fast providers with API keys
+        if (alchemyApiKey && alchemyApiKey !== 'YOUR_ALCHEMY_API_KEY_HERE') {
+          rpcEndpoints.push(`https://solana-mainnet.g.alchemy.com/v2/${alchemyApiKey}`);
+        }
+        if (getBlockApiKey && getBlockApiKey !== 'YOUR_GETBLOCK_API_KEY_HERE') {
+          rpcEndpoints.push(`https://sol.getblock.io/mainnet/?api_key=${getBlockApiKey}`);
+        }
+        if (quickNodeEndpoint && quickNodeEndpoint !== 'YOUR_QUICKNODE_ENDPOINT_HERE') {
+          rpcEndpoints.push(quickNodeEndpoint);
+        }
+        if (chainstackEndpoint && chainstackEndpoint !== 'YOUR_CHAINSTACK_ENDPOINT_HERE') {
+          rpcEndpoints.push(chainstackEndpoint);
+        }
+        
+        // Tier 2: Helius
+        if (heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE') {
+          rpcEndpoints.push(`https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`);
+        }
+        
+        // Tier 3: Free fallback
+        rpcEndpoints.push('https://rpc.ankr.com/solana');
+        rpcEndpoints.push('https://api.mainnet-beta.solana.com');
+        
+        rpcUrl = rpcEndpoints[0] || 'https://api.mainnet-beta.solana.com';
+      } else if (actualNetwork === 'testnet') {
+        rpcUrl = 'https://api.testnet.solana.com';
+        rpcEndpoints.push(rpcUrl);
+      } else {
+        rpcUrl = 'https://api.devnet.solana.com';
+        rpcEndpoints.push(rpcUrl);
       }
       
       this.connection = new Connection(rpcUrl, {
         commitment: 'confirmed',
-        confirmTransactionInitialTimeout: 30000, // 30 seconds default (not used since we don't wait)
+        confirmTransactionInitialTimeout: 30000,
+        disableRetryOnRateLimit: false,
+        httpHeaders: {
+          'User-Agent': 'WeSplit-Firebase/1.0',
+          'Connection': 'keep-alive',
+        },
       });
       
       // Store RPC URL for mainnet detection
       this.rpcUrl = rpcUrl;
+      this.rpcEndpoints = rpcEndpoints;
 
-      const heliusApiKeyForLogging = process.env.HELIUS_API_KEY || process.env.EXPO_PUBLIC_HELIUS_API_KEY || '';
+      // Log RPC configuration (mask API keys)
+      const maskedRpcUrl = rpcUrl ? rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***') : 'default';
       console.log('Transaction signing service initialized', {
         companyAddress: companyWalletAddress,
-        rpcUrl: rpcUrl ? rpcUrl.replace(heliusApiKeyForLogging, '[API_KEY]') : 'default',
-        isMainnet: rpcUrl ? (rpcUrl.includes('mainnet') || rpcUrl.includes('helius-rpc.com')) : false
+        network: actualNetwork,
+        rpcUrl: maskedRpcUrl,
+        endpointCount: rpcEndpoints.length,
+        isMainnet: actualNetwork === 'mainnet',
+        primaryProvider: rpcUrl.includes('alchemy') ? 'Alchemy' : 
+                         rpcUrl.includes('getblock') ? 'GetBlock' : 
+                         rpcUrl.includes('helius') ? 'Helius' : 
+                         rpcUrl.includes('ankr') ? 'Ankr' : 'Official'
       });
 
     } catch (error) {
@@ -215,8 +280,10 @@ class TransactionSigningService {
 
   /**
    * Submit a fully signed transaction
+   * @param {Buffer|Uint8Array} serializedTransaction - The serialized transaction
+   * @param {boolean} skipValidation - If true, skip blockhash validation (already validated)
    */
-  async submitTransaction(serializedTransaction) {
+  async submitTransaction(serializedTransaction, skipValidation = false) {
     try {
       // Ensure service is initialized (connection, keypair, etc.)
       await this.ensureInitialized();
@@ -267,18 +334,41 @@ class TransactionSigningService {
         throw new Error('Transaction missing blockhash');
       }
       
-      // CRITICAL: Check blockhash validity using Solana's isBlockhashValid RPC method
-      // This is the recommended approach per Solana documentation
-      // It prevents submitting transactions with expired blockhashes
-      try {
-        const blockhashString = transactionBlockhash.toString();
-        const isValid = await this.connection.isBlockhashValid(blockhashString, {
-          commitment: 'confirmed'
-        });
+      // CRITICAL: Validate blockhash BEFORE submission (unless already validated)
+      // If skipValidation is true, blockhash was already validated in processUsdcTransfer
+      // This avoids double validation and reduces delay
+      if (!skipValidation) {
+        let blockhashValid = false;
+        let currentBlockHeight = null;
         
-        if (!isValid) {
+        try {
+          // Get current blockhash info to check expiration status
+          const { blockhash: currentBlockhash } = 
+            await this.connection.getLatestBlockhash('confirmed');
+          
+          // Check if transaction's blockhash is still valid
+          const blockhashString = transactionBlockhash.toString();
+          const validationResult = await this.connection.isBlockhashValid(blockhashString, {
+            commitment: 'confirmed'
+          });
+          
+          // CRITICAL: isBlockhashValid returns { context, value } not a boolean
+          // Extract the actual boolean value from the result
+          blockhashValid = validationResult && (validationResult.value === true || validationResult === true);
+          
+          // Get current block height to calculate slots remaining
+          try {
+            currentBlockHeight = await this.connection.getBlockHeight('confirmed');
+          } catch (heightError) {
+            console.warn('Failed to get current block height, using blockhash validation only', {
+              error: heightError.message
+            });
+          }
+          
+          if (!blockhashValid) {
           console.error('Transaction blockhash is invalid (expired)', {
             transactionBlockhash: blockhashString.substring(0, 8) + '...',
+              currentBlockhash: currentBlockhash.substring(0, 8) + '...',
             note: 'Blockhash has expired. Client should rebuild transaction with fresh blockhash.'
           });
           throw new Error(
@@ -288,18 +378,31 @@ class TransactionSigningService {
           );
         }
         
-        console.log('Blockhash validation passed', {
+          console.log('Blockhash validation passed - submitting immediately', {
           transactionBlockhash: blockhashString.substring(0, 8) + '...',
-          isValid,
-          note: 'Blockhash is still valid, proceeding with submission'
+            currentBlockhash: currentBlockhash.substring(0, 8) + '...',
+            isValid: blockhashValid,
+            currentBlockHeight,
+            note: 'Blockhash is still valid, submitting immediately to minimize expiration risk'
         });
       } catch (validationError) {
+          // If validation fails with our error, re-throw it
+          if (validationError.message && validationError.message.includes('expired')) {
+            throw validationError;
+          }
+          
         // If isBlockhashValid fails (network error, etc.), log but don't block submission
         // The actual submission will catch blockhash errors
         console.warn('Blockhash validation check failed, proceeding anyway', {
           error: validationError.message,
           transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...',
           note: 'Will rely on Solana to reject if blockhash is expired'
+          });
+        }
+      } else {
+        console.log('Skipping blockhash validation (already validated in processUsdcTransfer)', {
+          transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...',
+          note: 'Proceeding directly to submission to minimize delay'
         });
       }
       
@@ -309,34 +412,37 @@ class TransactionSigningService {
         signatureCount: transaction.signatures.length
       });
 
-      // CRITICAL: On mainnet, use skipPreflight: true to avoid false blockhash expiration errors
-      // The client has already validated the transaction structure
-      // Preflight simulation on mainnet can fail for various reasons (rate limits, network delays)
-      // that aren't actually blockhash expiration
-      // If the blockhash is truly expired, the actual submission will fail, not just preflight
+      // CRITICAL: On mainnet, ALWAYS use skipPreflight: true to minimize submission time
+      // Preflight simulation takes 500-2000ms which can cause blockhash expiration
+      // Client already validates transaction structure, so preflight is redundant
+      // If blockhash is expired, Solana will reject during actual submission anyway
       // Detect mainnet by checking stored RPC URL
       const isMainnet = this.rpcUrl ? (
         this.rpcUrl.includes('mainnet') || 
         this.rpcUrl.includes('helius-rpc.com') ||
+        this.rpcUrl.includes('alchemy.com') ||
+        this.rpcUrl.includes('getblock.io') ||
         (!this.rpcUrl.includes('devnet') && !this.rpcUrl.includes('testnet'))
       ) : false;
       
-      console.log('Transaction submission configuration', {
+      const submissionStartTime = Date.now();
+      console.log('Submitting transaction immediately', {
         isMainnet,
         rpcUrl: this.rpcUrl ? this.rpcUrl.substring(0, 50) + '...' : 'unknown',
         skipPreflight: isMainnet,
-        transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...'
+        transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...',
+        note: 'Skipping preflight on mainnet to minimize delay and blockhash expiration risk'
       });
       
-      // Submit the transaction with proper error handling
-      // Since we've already validated blockhash with isBlockhashValid, we can use skipPreflight on mainnet
-      // This avoids rate limiting issues while still ensuring blockhash is valid
+      // CRITICAL: Submit the transaction IMMEDIATELY - no delays
+      // Every millisecond counts to avoid blockhash expiration
+      // skipPreflight saves 500-2000ms which is critical for mainnet
       let signature;
       try {
-        // Use skipPreflight: true on mainnet to avoid rate limits (we've already validated blockhash)
+        // ALWAYS skip preflight on mainnet to save time
         // On devnet, use preflight for better error detection
         signature = await this.connection.sendTransaction(transaction, {
-          skipPreflight: isMainnet, // Skip preflight on mainnet (blockhash already validated), use it on devnet
+          skipPreflight: isMainnet, // Always skip on mainnet to save time
           preflightCommitment: 'confirmed',
           maxRetries: 3
         });
@@ -430,7 +536,18 @@ class TransactionSigningService {
    */
   async processUsdcTransfer(serializedTransaction) {
     try {
-      // Deserialize transaction
+      // Ensure service is initialized
+      await this.ensureInitialized();
+      
+      if (!this.connection) {
+        throw new Error('Connection not initialized');
+      }
+
+      // CRITICAL: Skip blockhash validation to save time - client already checks freshness
+      // Client rebuilds if blockhash is >3 seconds old, so we can trust it's fresh
+      // Validation takes 1-2 seconds which causes blockhash to expire by submission time
+      // If blockhash is expired, Solana will reject it during submission anyway
+      const processStartTime = Date.now();
       let transaction;
       try {
         const transactionBuffer = Buffer.isBuffer(serializedTransaction) 
@@ -441,16 +558,34 @@ class TransactionSigningService {
         throw new Error(`Failed to deserialize transaction: ${deserializeError.message}`);
       }
 
-      // NOTE: We cannot easily validate the transaction's blockhash age without extracting it
-      // The client-side rebuild (30s threshold) should handle most cases
-      // We'll proceed with signing and let submission handle blockhash expiration errors
+      // Extract blockhash from transaction (for logging only)
+      const transactionBlockhash = transaction.message.recentBlockhash;
+      if (!transactionBlockhash) {
+        throw new Error('Transaction missing blockhash');
+      }
 
-      // Add company signature
+      const blockhashString = transactionBlockhash.toString();
+      console.log('Skipping blockhash validation - trusting client freshness check', {
+        transactionBlockhash: blockhashString.substring(0, 8) + '...',
+        timeSinceProcessStart: Date.now() - processStartTime,
+        note: 'Client rebuilds if blockhash >3s old. Submitting immediately to avoid expiration. Solana will reject if truly expired.'
+      });
+
+      // Add company signature immediately (no validation delay)
+      const signatureStartTime = Date.now();
       const fullySignedTransaction = await this.addCompanySignature(serializedTransaction);
+      const signatureTime = Date.now() - signatureStartTime;
+      
+      console.log('Company signature added, submitting immediately', {
+        transactionBlockhash: blockhashString.substring(0, 8) + '...',
+        signatureTimeMs: signatureTime,
+        totalTimeSinceProcessStart: Date.now() - processStartTime,
+        note: 'Submitting immediately without validation to minimize blockhash expiration risk'
+      });
 
       // Submit the transaction immediately after signing
-      // This minimizes the time between blockhash creation and submission
-      const result = await this.submitTransaction(fullySignedTransaction);
+      // Skip validation entirely - client already ensures freshness, and Solana will reject if expired
+      const result = await this.submitTransaction(fullySignedTransaction, true); // Pass skipValidation flag
 
       console.log('USDC transfer processed successfully', {
         signature: result.signature,

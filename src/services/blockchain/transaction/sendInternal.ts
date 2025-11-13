@@ -26,10 +26,9 @@ import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../../../con
 import { solanaWalletService } from '../wallet';
 import { logger } from '../../analytics/loggingService';
 import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimized';
-import { TransactionUtils as transactionUtils } from '../../shared/transactionUtils';
 import { notificationUtils } from '../../shared/notificationUtils';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';
-import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from './transactionSigningService';
+import { processUsdcTransfer } from './transactionSigningService';
 import { VersionedTransaction } from '@solana/web3.js';
 import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS } from '../../shared/blockhashUtils';
 
@@ -401,26 +400,30 @@ class InternalTransferService {
         toTokenAccount: toTokenAccount.toBase58()
       }, 'InternalTransferService');
 
+      // CRITICAL: Get fresh blockhash FIRST, then do async operations
+      // This ensures blockhash is as fresh as possible when we send to Firebase
+      // Best practice: Get blockhash before any async operations that might delay
+      const connection = await optimizedTransactionUtils.getConnection();
+      const blockhashData = await getFreshBlockhash(connection, 'confirmed');
+      
       // Check if recipient has USDC token account, create if needed
+      // NOTE: This check happens AFTER getting blockhash to minimize delay
       let needsTokenAccountCreation = false;
       try {
-        await getAccount((await optimizedTransactionUtils.getConnection()), toTokenAccount);
+        await getAccount(connection, toTokenAccount);
         logger.info('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'InternalTransferService');
       } catch (error) {
         // Token account doesn't exist, we need to create it
         logger.warn('Recipient USDC token account does not exist, will create it', { toTokenAccount: toTokenAccount.toBase58() }, 'InternalTransferService');
         needsTokenAccountCreation = true;
       }
-
-      // IMPORTANT: Get fresh blockhash RIGHT BEFORE creating the transaction
-      // Blockhashes expire after ~60 seconds, so we get it as late as possible
-      // to minimize the time between creation and submission
-      const connection = await optimizedTransactionUtils.getConnection();
-      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
-      const blockhashTimestamp = Date.now(); // Track when we got the blockhash
+      const blockhash = blockhashData.blockhash;
+      const blockhashTimestamp = blockhashData.timestamp;
       logger.info('Got fresh blockhash right before transaction creation', { 
-        blockhash,
-        blockhashTimestamp
+        blockhash: blockhash.substring(0, 8) + '...',
+        blockhashTimestamp,
+        lastValidBlockHeight: blockhashData.lastValidBlockHeight,
+        note: 'Blockhash will expire after approximately 60 seconds'
       }, 'InternalTransferService');
 
       // Use company wallet for fees if configured, otherwise use user wallet
@@ -439,7 +442,7 @@ class InternalTransferService {
       }, 'InternalTransferService');
 
       // Add priority fee
-      const priorityFee = transactionUtils.getPriorityFee(params.priority || 'medium');
+      const priorityFee = this.getPriorityFee(params.priority || 'medium');
       if (priorityFee > 0) {
         transaction.add(
           ComputeBudgetProgram.setComputeUnitPrice({
@@ -589,6 +592,8 @@ class InternalTransferService {
       // CRITICAL: Check blockhash age before sending to Firebase
       // Best practice: Use shared utility for consistent blockhash age checking
       let currentTxArray = txArray;
+      let currentBlockhashTimestamp = blockhashTimestamp;
+      const blockhashAge = Date.now() - blockhashTimestamp;
       
       if (isBlockhashTooOld(blockhashTimestamp)) {
         logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
@@ -597,8 +602,9 @@ class InternalTransferService {
         }, 'InternalTransferService');
         
         // Get fresh blockhash and rebuild transaction
-        const freshBlockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
-        const freshBlockhashTimestamp = Date.now();
+        const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+        const freshBlockhash = freshBlockhashData.blockhash;
+        const freshBlockhashTimestamp = freshBlockhashData.timestamp;
         
         // Rebuild transaction with fresh blockhash
         const freshTransaction = new Transaction({
@@ -607,7 +613,7 @@ class InternalTransferService {
         });
         
         // Re-add all instructions
-        const priorityFee = transactionUtils.getPriorityFee(params.priority || 'medium');
+        const priorityFee = this.getPriorityFee(params.priority || 'medium');
         if (priorityFee > 0) {
           freshTransaction.add(
             ComputeBudgetProgram.setComputeUnitPrice({
@@ -671,46 +677,49 @@ class InternalTransferService {
         
         logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
           transactionSize: currentTxArray.length,
-          blockhashAge: blockhashAge,
-          newBlockhashTimestamp: freshBlockhashTimestamp
+          blockhashAge,
+          newBlockhashTimestamp: freshBlockhashTimestamp,
+          timeSinceNewBlockhash: Date.now() - freshBlockhashTimestamp
+        }, 'InternalTransferService');
+        
+        currentBlockhashTimestamp = freshBlockhashTimestamp;
+      } else {
+        logger.info('Blockhash is still fresh, using existing transaction', {
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS,
+          note: 'Blockhash is within acceptable age, proceeding without rebuild'
         }, 'InternalTransferService');
       }
 
+      // CRITICAL: Log blockhash age right before sending to Firebase
+      const finalBlockhashAge = Date.now() - currentBlockhashTimestamp;
       logger.info('Transaction serialized, requesting company wallet signature', {
         transactionSize: currentTxArray.length,
         transactionType: typeof currentTxArray,
         isUint8Array: currentTxArray instanceof Uint8Array,
-        blockhashAge: Date.now() - blockhashTimestamp
+        blockhashAge: finalBlockhashAge,
+        blockhashAgeMs: finalBlockhashAge,
+        maxAgeMs: BLOCKHASH_MAX_AGE_MS,
+        isBlockhashFresh: finalBlockhashAge < BLOCKHASH_MAX_AGE_MS,
+        warning: finalBlockhashAge > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh',
+        note: 'Sending to Firebase immediately to minimize blockhash expiration risk'
               }, 'InternalTransferService');
 
-      // Use Firebase Function to add company wallet signature
-      let fullySignedTransaction: Uint8Array;
-      try {
-        fullySignedTransaction = await signTransactionWithCompanyWallet(currentTxArray);
-        logger.info('Company wallet signature added successfully', {
-          transactionSize: fullySignedTransaction.length
-                }, 'InternalTransferService');
-      } catch (signingError) {
-        logger.error('Failed to add company wallet signature', { 
-          error: signingError,
-          errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
-            }, 'InternalTransferService');
-        throw new Error(`Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`);
-      }
-
-      // Submit the fully signed transaction
+      // Use processUsdcTransfer which combines signing and submission in one Firebase call
+      // This minimizes blockhash expiration risk and reduces network round trips
       let signature: string;
       try {
-        logger.info('Submitting fully signed transaction', {
+        logger.info('Processing USDC transfer (sign and submit)', {
           connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
           commitment: getConfig().blockchain.commitment,
-          priority: params.priority || 'medium'
+          priority: params.priority || 'medium',
+          transactionSize: currentTxArray.length
         }, 'InternalTransferService');
         
-        const result = await submitTransactionToBlockchain(fullySignedTransaction);
+        const result = await processUsdcTransfer(currentTxArray);
         signature = result.signature;
         
-        logger.info('Transaction submitted successfully', { signature }, 'InternalTransferService');
+        logger.info('Transaction processed successfully', { signature }, 'InternalTransferService');
       } catch (submissionError) {
         logger.error('Transaction submission failed', { 
           error: submissionError,
@@ -733,7 +742,7 @@ class InternalTransferService {
         // Try to check transaction status one more time after a short delay
         try {
           await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-          const status = await transactionUtils.getTransactionStatus(signature);
+          const status = await this.getTransactionStatus(signature);
           
           if (status.status === 'confirmed' || status.status === 'finalized') {
             logger.info('Transaction confirmed on retry check', { signature, status }, 'InternalTransferService');
@@ -809,10 +818,22 @@ class InternalTransferService {
 
 
   /**
+   * Get priority fee
+   */
+  private getPriorityFee(priority: 'low' | 'medium' | 'high'): number {
+    return TRANSACTION_CONFIG.priorityFees[priority];
+  }
+
+  /**
    * Estimate blockchain fee
    */
   private estimateBlockchainFee(transaction: Transaction): number {
-    return transactionUtils.estimateBlockchainFee(transaction);
+    // Rough estimate: 5000 lamports per signature + compute units
+    const signatureCount = transaction.signatures.length;
+    const computeUnits = TRANSACTION_CONFIG.computeUnits.tokenTransfer;
+    const feePerComputeUnit = 0.000001; // 1 micro-lamport per compute unit
+    
+    return (signatureCount * 5000 + computeUnits * feePerComputeUnit) / LAMPORTS_PER_SOL;
   }
 
 
@@ -857,7 +878,7 @@ class InternalTransferService {
       
       // Switch to next RPC endpoint if available
       if ((await optimizedTransactionUtils.getConnection())) {
-        await transactionUtils.switchToNextEndpoint();
+        await optimizedTransactionUtils.switchToNextEndpoint();
         // Retry once with new endpoint
         try {
           const retryStatus = await (await optimizedTransactionUtils.getConnection()).getSignatureStatus(signature, {
@@ -979,7 +1000,8 @@ class InternalTransferService {
 
       // Get recent blockhash with retry logic
       const connection = await optimizedTransactionUtils.getConnection();
-      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
+      const blockhashData = await getFreshBlockhash(connection, 'confirmed');
+      const blockhash = blockhashData.blockhash;
       const blockhashTimestamp = Date.now(); // Track when we got the blockhash
 
       // Use company wallet for fees if configured, otherwise use user wallet
@@ -992,7 +1014,7 @@ class InternalTransferService {
       });
 
       // Add priority fee
-      const priorityFee = transactionUtils.getPriorityFee(params.priority || 'medium');
+      const priorityFee = this.getPriorityFee(params.priority || 'medium');
       if (priorityFee > 0) {
         transaction.add(
           ComputeBudgetProgram.setComputeUnitPrice({
@@ -1193,6 +1215,8 @@ class InternalTransferService {
       // CRITICAL: Check blockhash age before sending to Firebase
       // Best practice: Use shared utility for consistent blockhash age checking
       let currentTxArray = txArray;
+      let currentBlockhashTimestamp = blockhashTimestamp;
+      const blockhashAge = Date.now() - blockhashTimestamp;
       
       if (isBlockhashTooOld(blockhashTimestamp)) {
         logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
@@ -1201,8 +1225,9 @@ class InternalTransferService {
         }, 'InternalTransferService');
         
         // Get fresh blockhash and rebuild transaction
-        const freshBlockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
-        const freshBlockhashTimestamp = Date.now();
+        const freshBlockhashData = await getFreshBlockhash(connection, 'confirmed');
+        const freshBlockhash = freshBlockhashData.blockhash;
+        const freshBlockhashTimestamp = freshBlockhashData.timestamp;
         
         // Rebuild transaction with fresh blockhash
         const freshTransaction = new Transaction({
@@ -1225,11 +1250,17 @@ class InternalTransferService {
         }, 'InternalTransferService');
       }
 
+      // CRITICAL: Log blockhash age right before sending to Firebase
+      const finalBlockhashAge2 = Date.now() - blockhashTimestamp;
       logger.info('Transaction serialized, requesting company wallet signature', {
         transactionSize: currentTxArray.length,
         transactionType: typeof currentTxArray,
         isUint8Array: currentTxArray instanceof Uint8Array,
-        blockhashAge: Date.now() - blockhashTimestamp
+        blockhashAge: finalBlockhashAge2,
+        blockhashAgeMs: finalBlockhashAge2,
+        maxAgeMs: BLOCKHASH_MAX_AGE_MS,
+        isBlockhashFresh: finalBlockhashAge2 < BLOCKHASH_MAX_AGE_MS,
+        warning: finalBlockhashAge2 > 5000 ? 'Blockhash age is high - may expire during Firebase processing' : 'Blockhash is fresh'
       }, 'InternalTransferService');
 
       // SECURITY: Company wallet secret key is not available in client-side code
@@ -1237,37 +1268,21 @@ class InternalTransferService {
       // This is a security requirement - secret keys should never be in client bundles
       // The transaction will be signed with company wallet via Firebase Functions after user signs
 
-      // Use Firebase Function to add company wallet signature
-      let fullySignedTransaction: Uint8Array;
-      try {
-        fullySignedTransaction = await signTransactionWithCompanyWallet(currentTxArray);
-        logger.info('Company wallet signature added successfully', {
-          transactionSize: fullySignedTransaction.length
-        }, 'InternalTransferService');
-      } catch (signingError) {
-        logger.error('Failed to add company wallet signature', { 
-          error: signingError,
-          errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
-        }, 'InternalTransferService');
-        return {
-          success: false,
-          error: `Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`
-        };
-      }
-
-      // Submit the fully signed transaction
+      // Use processUsdcTransfer which combines signing and submission in one Firebase call
+      // This minimizes blockhash expiration risk and reduces network round trips
       let signature: string;
       try {
-        logger.info('Submitting fully signed transaction', {
+        logger.info('Processing USDC transfer (sign and submit)', {
           connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
           commitment: getConfig().blockchain.commitment,
-          priority: params.priority || 'medium'
+          priority: params.priority || 'medium',
+          transactionSize: currentTxArray.length
         }, 'InternalTransferService');
         
-        const result = await submitTransactionToBlockchain(fullySignedTransaction);
+        const result = await processUsdcTransfer(currentTxArray);
         signature = result.signature;
         
-        logger.info('Transaction submitted successfully', { signature }, 'InternalTransferService');
+        logger.info('Transaction processed successfully', { signature }, 'InternalTransferService');
       } catch (submissionError) {
         logger.error('Transaction submission failed', { 
           error: submissionError,

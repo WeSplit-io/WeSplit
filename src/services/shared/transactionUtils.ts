@@ -1,7 +1,16 @@
-// Transaction Utilities
+/**
+ * Transaction Utilities
+ * 
+ * @deprecated This file is deprecated and no longer actively used.
+ * All transaction utilities have been migrated to transactionUtilsOptimized.ts.
+ * This file is kept for backward compatibility and global type declarations.
+ * 
+ * Use optimizedTransactionUtils from transactionUtilsOptimized.ts instead.
+ */
 
 import { Connection, Transaction, PublicKey, Keypair } from '@solana/web3.js';
 import { logger } from '../analytics/loggingService';
+import { getFreshBlockhash } from './blockhashUtils';
 
 export interface TransactionOptions {
   skipPreflight?: boolean;
@@ -32,9 +41,9 @@ export class TransactionUtils {
         commitment = 'confirmed'
       } = options;
 
-      // Get recent blockhash
-      const { blockhash } = await connection.getLatestBlockhash(commitment);
-      transaction.recentBlockhash = blockhash;
+      // Get fresh blockhash using shared utility for consistent handling
+      const blockhashData = await getFreshBlockhash(connection, commitment);
+      transaction.recentBlockhash = blockhashData.blockhash;
 
       // Sign transaction
       transaction.sign(...signers);
@@ -78,8 +87,9 @@ export class TransactionUtils {
     commitment: 'processed' | 'confirmed' | 'finalized' = 'confirmed'
   ) {
     try {
-      const { blockhash } = await connection.getLatestBlockhash(commitment);
-      transaction.recentBlockhash = blockhash;
+      // Get fresh blockhash using shared utility for consistent handling
+      const blockhashData = await getFreshBlockhash(connection, commitment);
+      transaction.recentBlockhash = blockhashData.blockhash;
 
       const simulation = await connection.simulateTransaction(transaction);
       return simulation;
@@ -89,19 +99,18 @@ export class TransactionUtils {
     }
   }
 
+  /**
+   * @deprecated Use getFreshBlockhash from blockhashUtils instead
+   * This method is kept for backward compatibility but will be removed
+   */
   static async getLatestBlockhashWithRetry(
     connection: Connection,
     commitment: 'processed' | 'confirmed' | 'finalized' = 'confirmed',
     maxRetries: number = 3
   ) {
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        return await connection.getLatestBlockhash(commitment);
-      } catch (error) {
-        if (i === maxRetries - 1) {throw error;}
-        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-      }
-    }
+    // Use shared utility for consistent blockhash handling
+    const blockhashData = await getFreshBlockhash(connection, commitment);
+    return blockhashData.blockhash;
   }
 }
 

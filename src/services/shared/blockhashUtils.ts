@@ -9,12 +9,18 @@ import { getConfig } from '../../config/unified';
 import { logger } from '../analytics/loggingService';
 
 /**
- * Maximum age for blockhash before rebuilding transaction (20 seconds)
- * Blockhashes expire after ~60 seconds, but network latency + Firebase processing
- * can take 10-15 seconds, so we rebuild at 20s to have sufficient buffer
- * This ensures transactions reach the backend with plenty of time remaining
+ * Maximum age for blockhash before rebuilding transaction (2 seconds)
+ * Blockhashes expire after ~60 seconds, but Firebase processing can take significant time:
+ * - Network latency to Firebase (100-500ms)
+ * - Firebase cold start (1-3 seconds on first call)
+ * - Transaction signing time (100-200ms)
+ * - Transaction submission time (500-2000ms)
+ * - Client-side async operations (token account checks, etc.) can add 500-2000ms
+ * Total: ~2-7 seconds, so 2s threshold ensures blockhash is extremely fresh
+ * CRITICAL: On mainnet, even with optimized RPC, async operations between blockhash and Firebase can take 1-2 seconds
+ * We rebuild at 2s to ensure blockhash is extremely fresh when Firebase processes it
  */
-export const BLOCKHASH_MAX_AGE_MS = 20000; // 20 seconds - reduced for better reliability
+export const BLOCKHASH_MAX_AGE_MS = 2000; // 2 seconds - extremely aggressive refresh for mainnet reliability
 
 /**
  * Blockhash with timestamp for age tracking
