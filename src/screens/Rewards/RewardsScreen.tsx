@@ -29,6 +29,7 @@ import { getPlatformInfo } from '../../utils/core/platformDetection';
 import { logger } from '../../services/analytics/loggingService';
 import { userActionSyncService } from '../../services/rewards/userActionSyncService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
+import { seasonService } from '../../services/rewards/seasonService';
 
 const RewardsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
@@ -49,10 +50,14 @@ const RewardsScreen: React.FC = () => {
     try {
       setLoading(true);
       
+      // Get current season (Season 1 starts today and lasts 6 months)
+      const currentSeason = seasonService.getCurrentSeason();
+      
       // Load data in parallel for better performance
+      // Filter to only show current season transactions
       const [points, history] = await Promise.all([
         pointsService.getUserPoints(currentUser.id),
-        pointsService.getPointsHistory(currentUser.id, 4) // Only show last 4 transactions
+        pointsService.getPointsHistory(currentUser.id, 4, currentSeason) // Only show last 4 transactions from current season
       ]);
 
       setUserPoints(points);
