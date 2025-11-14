@@ -452,18 +452,31 @@ export class SplitWalletQueries {
       // Calculate database-based completion
       const databaseCollectedAmount = wallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
       
-      // For single participant splits or when amounts are very close, use database amount
-      // This prevents rounding issues from blocking completion
+      // CRITICAL: Use the maximum of database amount and on-chain balance
+      // This handles cases where:
+      // 1. Transaction succeeded on-chain but database wasn't updated (verification timeout)
+      // 2. Database is out of sync with blockchain state
+      // We always want to use the actual funds available on-chain
       const tolerance = 0.001; // 0.001 USDC tolerance for rounding differences
       const isSingleParticipant = wallet.participants.length === 1;
       const isAmountClose = Math.abs(databaseCollectedAmount - actualOnChainBalance) <= tolerance;
       
       let collectedAmount: number;
-      if (isSingleParticipant || isAmountClose) {
-        // For single participant or when amounts are very close, use database amount
+      if (isAmountClose) {
+        // When amounts are very close, use database amount (prevents rounding issues)
         collectedAmount = databaseCollectedAmount;
+      } else if (actualOnChainBalance > databaseCollectedAmount) {
+        // If on-chain balance is higher, use it (transaction succeeded but DB not updated)
+        collectedAmount = actualOnChainBalance;
+        logger.info('Using on-chain balance (higher than database)', {
+          splitWalletId,
+          databaseCollectedAmount,
+          actualOnChainBalance,
+          difference: actualOnChainBalance - databaseCollectedAmount
+        }, 'SplitWalletQueries');
       } else {
-        // For multiple participants with significant differences, use the more conservative value
+        // If database amount is higher, use the more conservative value
+        // This prevents showing more funds than actually available
         collectedAmount = Math.min(databaseCollectedAmount, actualOnChainBalance);
       }
       
@@ -475,13 +488,20 @@ export class SplitWalletQueries {
       let participantsPaid = wallet.participants.filter(p => p.status === 'paid').length;
       
       // DIAGNOSTIC: Check if we have a data consistency issue
-      // If funds are collected but no participants are marked as paid, fix it
-      if (collectedAmount > 0 && participantsPaid === 0) {
-        logger.warn('Data consistency issue detected: funds collected but no participants marked as paid', {
+      // If funds are collected on-chain but database doesn't reflect it, try to fix it
+      const hasOnChainFunds = actualOnChainBalance > 0;
+      const hasDatabaseFunds = databaseCollectedAmount > 0;
+      const onChainBalanceHigher = actualOnChainBalance > databaseCollectedAmount + tolerance;
+      
+      if (hasOnChainFunds && (participantsPaid === 0 || onChainBalanceHigher)) {
+        logger.warn('Data consistency issue detected: on-chain funds exist but database not updated', {
           splitWalletId,
+          actualOnChainBalance,
+          databaseCollectedAmount,
           collectedAmount,
           totalParticipants,
           participantsPaid,
+          onChainBalanceHigher,
           participants: wallet.participants.map(p => ({
             userId: p.userId,
             name: p.name,
@@ -491,13 +511,14 @@ export class SplitWalletQueries {
           }))
         }, 'SplitWalletQueries');
         
-        // For single participant splits, automatically mark as paid if funds exist
-        if (totalParticipants === 1 && collectedAmount >= wallet.participants[0].amountOwed) {
-          logger.info('Auto-fixing single participant status: marking as paid', {
+        // Auto-fix: If on-chain balance >= total amount, mark all participants as paid
+        // This handles cases where transaction succeeded but database wasn't updated
+        if (actualOnChainBalance >= totalAmount - tolerance) {
+          logger.info('Auto-fixing participant status: on-chain balance covers full amount', {
             splitWalletId,
-            participantId: wallet.participants[0].userId,
-            collectedAmount,
-            amountOwed: wallet.participants[0].amountOwed
+            actualOnChainBalance,
+            totalAmount,
+            totalParticipants
           }, 'SplitWalletQueries');
           
           // Update the participant status in the database
@@ -506,7 +527,38 @@ export class SplitWalletQueries {
             const fixResult = await fixSplitWalletDataConsistency(splitWalletId);
             
             if (fixResult.success && fixResult.fixed) {
-              logger.info('Successfully auto-fixed participant status', { splitWalletId }, 'SplitWalletQueries');
+              logger.info('Successfully auto-fixed participant status from on-chain balance', { 
+                splitWalletId,
+                actualOnChainBalance,
+                totalAmount
+              }, 'SplitWalletQueries');
+              // Recalculate participants paid after fix
+              const updatedWalletResult = await this.getSplitWallet(splitWalletId);
+              if (updatedWalletResult.success && updatedWalletResult.wallet) {
+                participantsPaid = updatedWalletResult.wallet.participants.filter(p => p.status === 'paid').length;
+              }
+            }
+          } catch (error) {
+            logger.error('Failed to auto-fix participant status from on-chain balance', { 
+              error, 
+              splitWalletId 
+            }, 'SplitWalletQueries');
+          }
+        } else if (totalParticipants === 1 && collectedAmount >= wallet.participants[0].amountOwed) {
+          // Fallback: For single participant splits, mark as paid if collected amount covers their share
+          logger.info('Auto-fixing single participant status: collected amount covers share', {
+            splitWalletId,
+            participantId: wallet.participants[0].userId,
+            collectedAmount,
+            amountOwed: wallet.participants[0].amountOwed
+          }, 'SplitWalletQueries');
+          
+          try {
+            const { fixSplitWalletDataConsistency } = await import('./SplitWalletManagement');
+            const fixResult = await fixSplitWalletDataConsistency(splitWalletId);
+            
+            if (fixResult.success && fixResult.fixed) {
+              logger.info('Successfully auto-fixed single participant status', { splitWalletId }, 'SplitWalletQueries');
               participantsPaid = 1; // Update the count
             }
           } catch (error) {

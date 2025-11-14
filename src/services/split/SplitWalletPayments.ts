@@ -3145,6 +3145,34 @@ export class SplitWalletPayments {
         };
       }
 
+      // Save transaction to database using centralized helper
+      // Note: User wallet transfers are withdrawals, so no points awarded
+      try {
+        const { saveTransactionAndAwardPoints } = await import('../shared/transactionPostProcessing');
+        
+        await saveTransactionAndAwardPoints({
+          userId: wallet.creatorId,
+          toAddress: userWallet.address,
+          amount: amount,
+          signature: transactionResult.signature!,
+          transactionType: 'split_wallet_withdrawal',
+          companyFee: 0, // No fee for withdrawals
+          netAmount: amount,
+          memo: `User wallet transfer for ${wallet.id}`,
+          currency: wallet.currency as 'USDC' | 'SOL'
+        });
+        
+        logger.info('✅ User wallet transfer transaction saved', {
+          signature: transactionResult.signature,
+          creatorId: wallet.creatorId,
+          splitWalletId,
+          amount: amount
+        }, 'SplitWalletPayments');
+      } catch (saveError) {
+        logger.error('❌ Failed to save user wallet transfer transaction', saveError, 'SplitWalletPayments');
+        // Don't fail the transaction if database save fails
+      }
+
       logger.info('✅ User wallet transfer completed successfully', {
           splitWalletId,
         userId,
