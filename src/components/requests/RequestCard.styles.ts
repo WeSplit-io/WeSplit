@@ -134,4 +134,11 @@ export default StyleSheet.create({
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
   },
+  
+  // Unread request item styling
+  unreadRequestItem: {
+    backgroundColor: colors.white10,
+    borderWidth: 1,
+    borderColor: colors.white10,
+  },
 });

@@ -20,7 +20,9 @@ import {
   ArrowLineDown, 
   Link,
   QrCode,
-  Bell
+  Bell,
+  Eye,
+  EyeSlash
 } from 'phosphor-react-native';
 import { styles, BG_COLOR, GREEN } from './styles';
 import { colors, spacing } from '../../theme';
@@ -99,12 +101,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // UI State
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [deletedNotificationIds, setDeletedNotificationIds] = useState<Set<string>>(new Set());
+  const [lastNotificationsViewTimestamp, setLastNotificationsViewTimestamp] = useState<string | null>(null);
   const [walletSelectorVisible, setWalletSelectorVisible] = useState(false);
   const [showQRCodeScreen, setShowQRCodeScreen] = useState(false);
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [realTransactions, setRealTransactions] = useState<Transaction[]>([]);
   const [userNames, setUserNames] = useState<Map<string, string>>(new Map());
+  const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   
   // Loading States
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -305,13 +310,143 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Removed group-related balance calculations
 
-  // Load notification count from context notifications
+  // Load deleted notification IDs and last view timestamp from AsyncStorage
   useEffect(() => {
+    const loadStoredData = async () => {
+      try {
+        const [deletedIdsStored, lastViewStored] = await Promise.all([
+          AsyncStorage.getItem('deletedNotificationIds'),
+          AsyncStorage.getItem('lastNotificationsViewTimestamp')
+        ]);
+        
+        if (deletedIdsStored) {
+          const ids = JSON.parse(deletedIdsStored);
+          setDeletedNotificationIds(new Set(ids));
+        }
+        
+        if (lastViewStored) {
+          setLastNotificationsViewTimestamp(lastViewStored);
+        }
+      } catch (error) {
+        logger.error('Error loading stored notification data', error, 'DashboardScreen');
+      }
+    };
+    loadStoredData();
+  }, []);
+
+  // Load notification count from context notifications and Firebase payment requests
+  // Only count notifications that are NEW (created after last view timestamp)
+  const calculateUnreadNotifications = useCallback(async () => {
+    let unreadCount = 0;
+    
+    // If user has never viewed notifications, show all unread notifications
+    // Otherwise, only show notifications created after last view
+    const lastViewDate = lastNotificationsViewTimestamp ? new Date(lastNotificationsViewTimestamp) : null;
+    
+    // Count unread notifications from context (excluding deleted ones and old ones)
     if (notifications) {
-      const unreadCount = notifications.filter(n => !n.is_read).length;
-      setUnreadNotifications(unreadCount);
+      unreadCount += notifications.filter(n => {
+        // Exclude deleted notifications
+        if (deletedNotificationIds.has(n.id)) {
+          return false;
+        }
+        // Only count unread notifications
+        if (n.is_read || (n as any).read) {
+          return false;
+        }
+        // If we have a last view timestamp, only count notifications created after it
+        if (lastViewDate && n.created_at) {
+          const notificationDate = new Date(n.created_at);
+          if (notificationDate <= lastViewDate) {
+            return false; // Notification is older than last view
+          }
+        }
+        return true;
+      }).length;
     }
-  }, [notifications]);
+    
+    // Count unread payment requests from Firebase
+    // Only count those that don't have a corresponding notification marked as read
+    if (currentUser?.id && notifications) {
+      try {
+        const firebaseRequests = await getReceivedPaymentRequests(currentUser.id, 10);
+        const unreadFirebaseRequests = firebaseRequests.filter(req => {
+          // Check if this payment request was deleted
+          const firebaseRequestId = `firebase_${req.id}`;
+          if (deletedNotificationIds.has(firebaseRequestId)) {
+            return false;
+          }
+          
+          // Only count if not completed
+          if (req.amount <= 0 || req.status === 'completed') {
+            return false;
+          }
+          
+          // If we have a last view timestamp, only count requests created after it
+          if (lastViewDate && req.created_at) {
+            const requestDate = new Date(req.created_at);
+            if (requestDate <= lastViewDate) {
+              return false; // Request is older than last view
+            }
+          }
+          
+          // Check if there's a corresponding notification that's already marked as read
+          const correspondingNotification = notifications.find(
+            n => n.type === 'payment_request' && n.data?.requestId === req.id
+          );
+          // If there's a corresponding notification, use its read status
+          if (correspondingNotification) {
+            // Also check if the corresponding notification was deleted
+            if (deletedNotificationIds.has(correspondingNotification.id)) {
+              return false;
+            }
+            // If corresponding notification is read, don't count
+            if (correspondingNotification.is_read || (correspondingNotification as any).read) {
+              return false;
+            }
+            // If we have a last view timestamp, check if notification is new
+            if (lastViewDate && correspondingNotification.created_at) {
+              const notificationDate = new Date(correspondingNotification.created_at);
+              if (notificationDate <= lastViewDate) {
+                return false; // Notification is older than last view
+              }
+            }
+            return true;
+          }
+          // If no corresponding notification, consider it unread (if new)
+          return true;
+        }).length;
+        unreadCount += unreadFirebaseRequests;
+      } catch (error) {
+        logger.error('Error loading payment requests for notification count', error, 'DashboardScreen');
+      }
+    }
+    
+    setUnreadNotifications(unreadCount);
+  }, [notifications, currentUser?.id, deletedNotificationIds, lastNotificationsViewTimestamp]);
+
+  useEffect(() => {
+    calculateUnreadNotifications();
+  }, [calculateUnreadNotifications]);
+
+  // Refresh notification count when screen comes into focus
+  // Also reload last view timestamp in case it changed
+  useFocusEffect(
+    useCallback(() => {
+      const reloadLastViewTimestamp = async () => {
+        try {
+          const lastViewStored = await AsyncStorage.getItem('lastNotificationsViewTimestamp');
+          if (lastViewStored) {
+            setLastNotificationsViewTimestamp(lastViewStored);
+          }
+        } catch (error) {
+          logger.error('Error loading last notifications view timestamp', error, 'DashboardScreen');
+        }
+      };
+      reloadLastViewTimestamp();
+      calculateUnreadNotifications();
+    }, [calculateUnreadNotifications])
+  );
 
   // Live balance updates
   const { balance: liveBalance, isLoading: liveBalanceLoading, error: liveBalanceError } = useLiveBalance(
@@ -947,9 +1082,21 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           resizeMode="cover"
         >
           <View style={styles.balanceHeader}>
-            <Text style={styles.balanceLabel}>
-              WeSplit Wallet
-            </Text>
+            <View style={styles.balanceHeaderContent}>
+              <Text style={styles.balanceLabel}>
+                WeSplit Balance
+              </Text>
+              <TouchableOpacity
+                onPress={() => setIsBalanceHidden(!isBalanceHidden)}
+                style={{ padding: 4, marginLeft: 8 }}
+              >
+                {isBalanceHidden ? (
+                  <EyeSlash size={20} color={colors.white} />
+                ) : (
+                  <Eye size={20} color={colors.white} />
+                )}
+              </TouchableOpacity>
+            </View>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               {/* Auto-refresh Status Indicator */}
               {/* Removed as per edit hint */}
@@ -974,7 +1121,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 </View>
               ) : (
                 <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                  $ {effectiveBalance.toFixed(2)}
+                  {isBalanceHidden ? '$--.--' : `$ ${effectiveBalance.toFixed(2)}`}
                 </Text>
               )}
             </View>

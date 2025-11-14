@@ -56,9 +56,20 @@ const RequestCard: React.FC<RequestCardProps> = ({
       (requestData as unknown as Record<string, unknown>)?.requestId as string || 
       String(index);
     const senderId = requestData?.senderId || '';
+    
+    // Check if notification is read (handle both NotificationData and direct request structures)
+    const isRead = (request as unknown as { is_read?: boolean })?.is_read ?? 
+                   (request as unknown as NotificationData)?.is_read ?? 
+                   false;
+    const cardOpacity = isRead ? 0.7 : 1.0;
+    const isUnread = !isRead;
 
     return (
-      <View key={requestId} style={styles.requestItemNew}>
+      <View key={requestId} style={[
+        styles.requestItemNew, 
+        { opacity: cardOpacity },
+        isUnread && styles.unreadRequestItem
+      ]}>
         <Avatar
           userId={senderId}
           userName={senderName || 'U'}
