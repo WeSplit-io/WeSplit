@@ -98,4 +98,9 @@ export default StyleSheet.create({
     marginTop: 4,
     textDecorationLine: 'underline',
   },
+  unreadContainer: {
+    backgroundColor: colors.white10,
+    borderWidth: 1,
+    borderColor: colors.white10,
+  },
 });

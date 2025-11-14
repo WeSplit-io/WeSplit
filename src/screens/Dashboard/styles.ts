@@ -128,12 +128,17 @@ export const styles = StyleSheet.create({
     width: '100%',
     marginBottom: spacing.sm,
   },
-  
+
+  balanceHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   // "Your Balance" label
   balanceLabel: {
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.light,
+    paddingVertical: 4,
   },
   
   // QR code icon container

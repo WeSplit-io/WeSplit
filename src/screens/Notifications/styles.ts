@@ -1,11 +1,19 @@
 import { StyleSheet } from 'react-native';
-import { colors } from '../../theme';
+import { colors, spacing, typography } from '../../theme';
 
 export default StyleSheet.create({
   // Header
-  refreshButton: {
+  clearAllButton: {
     paddingHorizontal: 15,
     paddingVertical: 8,
+    minWidth: 80,
+    alignItems: 'flex-end',
+    zIndex: 1,
+  },
+  clearAllText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '500',
   },
   // Loading States
   loadingContainer: {
@@ -31,6 +39,15 @@ export default StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 150,
   },
+  emptyStateIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.white10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
   emptyStateIcon: {
     height: 150,
     objectFit: 'contain',
@@ -49,5 +66,25 @@ export default StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 40,
+  },
+  // Swipe to delete (Apple style)
+  swipeDeleteContainer: {
+    flex: 1,
+    backgroundColor: colors.white5,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: spacing.md,
+    borderRadius: spacing.md,
+    marginBottom: spacing.md,
+  },
+  swipeDeleteButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+  },
+  swipeDeleteText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
   },
 }); 

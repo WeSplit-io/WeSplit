@@ -72,7 +72,8 @@ export const NAVIGATION_ROUTES = {
   HOW_TO_EARN_POINTS: 'HowToEarnPoints',
   REFERRAL: 'Referral',
   POINTS_HISTORY: 'PointsHistory',
-  CHRISTMAS_CALENDAR: 'ChristmasCalendar'
+  CHRISTMAS_CALENDAR: 'ChristmasCalendar',
+  HOW_IT_WORKS: 'HowItWorks'
 } as const;
 
 /**
@@ -196,6 +197,14 @@ export class RewardNavigationHelper {
   goToHowToEarnPoints() {
     try {
       this.navigation.navigate(NAVIGATION_ROUTES.HOW_TO_EARN_POINTS);
+    } catch (error) {
+      // Navigation error handled silently
+    }
+  }
+
+  goToHowItWorks() {
+    try {
+      this.navigation.navigate(NAVIGATION_ROUTES.HOW_IT_WORKS);
     } catch (error) {
       // Navigation error handled silently
     }

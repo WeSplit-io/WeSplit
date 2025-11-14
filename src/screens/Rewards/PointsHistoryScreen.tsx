@@ -9,22 +9,61 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import { Container, Header, LoadingScreen } from '../../components/shared';
-import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import PhosphorIcon, { PhosphorIconName } from '../../components/shared/PhosphorIcon';
 import { useApp } from '../../context/AppContext';
 import { pointsService } from '../../services/rewards/pointsService';
 import { PointsTransaction } from '../../types/rewards';
 import { logger } from '../../services/analytics/loggingService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 
+const MOCK_TRANSACTIONS: PointsTransaction[] = [
+  {
+    id: 'mock-quest-1',
+    user_id: 'mock-user',
+    amount: 150,
+    source: 'quest_completion',
+    description: 'Completed onboarding quest',
+    created_at: new Date().toISOString(),
+    season: 1,
+  },
+  {
+    id: 'mock-transaction-1',
+    user_id: 'mock-user',
+    amount: 320,
+    source: 'transaction_reward',
+    description: 'Paid dinner with friends',
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    season: 1,
+  },
+  {
+    id: 'mock-referral-1',
+    user_id: 'mock-user',
+    amount: 500,
+    source: 'referral_reward',
+    description: 'Invited Sofia to WeSplit',
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    season: 1,
+  },
+  {
+    id: 'mock-season-1',
+    user_id: 'mock-user',
+    amount: 1000,
+    source: 'season_reward',
+    description: 'Season 1 leaderboard reward',
+    created_at: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
+    season: 1,
+  },
+];
+
 const PointsHistoryScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<any>>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
   const { state } = useApp();
   const { currentUser } = state;
@@ -43,7 +82,7 @@ const PointsHistoryScreen: React.FC = () => {
       const history = await pointsService.getPointsHistory(currentUser.id, 100);
       setTransactions(history);
     } catch (error) {
-      logger.error('Failed to load points history', error, 'PointsHistoryScreen');
+      logger.error('Failed to load points history', { error }, 'PointsHistoryScreen');
     } finally {
       setLoading(false);
     }
@@ -53,6 +92,12 @@ const PointsHistoryScreen: React.FC = () => {
     loadHistory();
   }, [loadHistory]);
 
+  useEffect(() => {
+    if (__DEV__ && !loading && transactions.length === 0) {
+      setTransactions(MOCK_TRANSACTIONS);
+    }
+  }, [loading, transactions.length]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadHistory();
@@ -60,16 +105,16 @@ const PointsHistoryScreen: React.FC = () => {
   }, [loadHistory]);
 
   // Memoized icon map to prevent recreation
-  const iconMap = useMemo(() => ({
-    'transaction_reward': 'CurrencyCircleDollar',
-    'quest_completion': 'Star',
-    'season_reward': 'Trophy',
-    'referral_reward': 'Handshake',
-    'admin_adjustment': 'Gear',
+  const iconMap = useMemo<Record<PointsTransaction['source'], PhosphorIconName>>(() => ({
+    transaction_reward: 'CurrencyCircleDollar',
+    quest_completion: 'Star',
+    season_reward: 'Trophy',
+    referral_reward: 'Handshake',
+    admin_adjustment: 'Gear',
   }), []);
 
   const getTransactionIcon = useCallback((source: PointsTransaction['source']) => {
-    return iconMap[source] || 'Circle';
+    return iconMap[source];
   }, [iconMap]);
 
   // Memoized title map to prevent recreation
@@ -126,7 +171,51 @@ const PointsHistoryScreen: React.FC = () => {
     }
   }, []);
 
-  const renderTransaction = (transaction: PointsTransaction, index: number) => {
+  const getMonthLabel = useCallback((dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'long',
+      });
+    } catch {
+      return '';
+    }
+  }, []);
+
+  const groupedTransactions = useMemo(() => {
+    if (transactions.length === 0) {
+      return [];
+    }
+
+    const sortedTransactions = [...transactions].sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateB - dateA;
+    });
+
+    const groups: { month: string; items: PointsTransaction[] }[] = [];
+    const monthGroups = new Map<string, { month: string; items: PointsTransaction[] }>();
+
+    sortedTransactions.forEach((transaction) => {
+      const month = getMonthLabel(transaction.created_at) || 'Unknown';
+      const existingGroup = monthGroups.get(month);
+
+      if (existingGroup) {
+        existingGroup.items.push(transaction);
+      } else {
+        const newGroup = {
+          month,
+          items: [transaction],
+        };
+        monthGroups.set(month, newGroup);
+        groups.push(newGroup);
+      }
+    });
+
+    return groups;
+  }, [transactions, getMonthLabel]);
+
+  const renderTransaction = (transaction: PointsTransaction) => {
     const iconName = getTransactionIcon(transaction.source);
     const title = getTransactionTitle(transaction);
     const date = formatDate(transaction.created_at);
@@ -135,7 +224,7 @@ const PointsHistoryScreen: React.FC = () => {
     return (
       <View key={transaction.id} style={styles.transactionCard}>
         <View style={styles.transactionIcon}>
-          <PhosphorIcon name={iconName} size={24} color={colors.green} weight="regular" />
+          <PhosphorIcon name={iconName} size={18} color={colors.white} weight="regular" />
         </View>
         <View style={styles.transactionInfo}>
           <Text style={styles.transactionTitle} numberOfLines={2}>
@@ -144,17 +233,17 @@ const PointsHistoryScreen: React.FC = () => {
           <Text style={styles.transactionDate}>
             {date} {time && `- ${time}`}
           </Text>
-          {transaction.season && (
+          {/*{transaction.season && (
             <Text style={styles.transactionSeason}>
               Season {transaction.season}
             </Text>
-          )}
+          )}*/}
         </View>
         <View style={styles.transactionPoints}>
           <Text style={styles.transactionPointsValue}>
             +{transaction.amount}
           </Text>
-          <Text style={styles.transactionPointsLabel}>pts</Text>
+          <Text style={styles.transactionPointsLabel}>Split Points</Text>
         </View>
       </View>
     );
@@ -168,6 +257,14 @@ const PointsHistoryScreen: React.FC = () => {
           showBackButton={true}
           onBackPress={() => rewardNav.goBack()}
           backgroundColor={colors.black}
+          rightElement={
+            <TouchableOpacity
+              onPress={() => rewardNav.goToHowItWorks()}
+              activeOpacity={0.7}
+            >
+              <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+            </TouchableOpacity>
+          }
         />
         <LoadingScreen
           message="Loading history..."
@@ -184,6 +281,14 @@ const PointsHistoryScreen: React.FC = () => {
         showBackButton={true}
         onBackPress={() => rewardNav.goBack()}
         backgroundColor={colors.black}
+        rightElement={
+          <TouchableOpacity
+            onPress={() => rewardNav.goToHowItWorks()}
+            activeOpacity={0.7}
+          >
+            <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+          </TouchableOpacity>
+        }
       />
 
       <ScrollView
@@ -198,7 +303,7 @@ const PointsHistoryScreen: React.FC = () => {
           />
         }
       >
-        {transactions.length === 0 ? (
+        {groupedTransactions.length === 0 ? (
           <View style={styles.emptyContainer}>
             <PhosphorIcon name="Receipt" size={48} color={colors.textLightSecondary} />
             <Text style={styles.emptyText}>No points history yet</Text>
@@ -208,7 +313,14 @@ const PointsHistoryScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.transactionsList}>
-            {transactions.map((transaction, index) => renderTransaction(transaction, index))}
+            {groupedTransactions.map(({ month, items }) => (
+              <View key={month} style={styles.monthSection}>
+                <Text style={styles.monthLabel}>{month}</Text>
+                <View style={styles.monthTransactions}>
+                  {items.map((transaction) => renderTransaction(transaction))}
+                </View>
+              </View>
+            ))}
           </View>
         )}
       </ScrollView>
@@ -221,7 +333,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.xxxl,
   },
@@ -237,21 +348,34 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   transactionsList: {
+    gap: spacing.lg,
+  },
+  monthSection: {
     gap: spacing.sm,
+  },
+  monthLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white70,
+  },
+  monthTransactions: {
+    gap: 10,
   },
   transactionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white5,
-    borderRadius: 12,
+    borderRadius: spacing.lg,
     padding: spacing.md,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   transactionIcon: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: spacing.lg,
+    backgroundColor: colors.white10,
   },
   transactionInfo: {
     flex: 1,
@@ -259,12 +383,12 @@ const styles = StyleSheet.create({
   transactionTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 2,
   },
   transactionDate: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.white70,
   },
   transactionSeason: {
     fontSize: typography.fontSize.xs,
@@ -275,13 +399,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   transactionPointsValue: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
     color: colors.green,
   },
   transactionPointsLabel: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     marginTop: 2,
   },
   emptyContainer: {
@@ -291,12 +415,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginTop: spacing.md,
   },
   emptySubtext: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     marginTop: spacing.xs,
     textAlign: 'center',
   },

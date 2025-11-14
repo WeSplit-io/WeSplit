@@ -9,9 +9,10 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import { Container, Header, LoadingScreen } from '../../components/shared';
@@ -20,19 +21,19 @@ import { useApp } from '../../context/AppContext';
 import { questService, QUEST_DEFINITIONS } from '../../services/rewards/questService';
 import { Quest } from '../../types/rewards';
 import { logger } from '../../services/analytics/loggingService';
-import { getSeasonReward, calculateRewardPoints } from '../../services/rewards/seasonRewardsConfig';
-import { seasonService } from '../../services/rewards/seasonService';
+import { getSeasonReward, calculateRewardPoints, SeasonReward } from '../../services/rewards/seasonRewardsConfig';
+import { seasonService, Season } from '../../services/rewards/seasonService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 
 const HowToEarnPointsScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<any>>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
   const { state } = useApp();
   const { currentUser } = state;
   
   const [userQuests, setUserQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentSeason, setCurrentSeason] = useState(1);
+  const [currentSeason, setCurrentSeason] = useState<Season>(1);
 
   useEffect(() => {
     setCurrentSeason(seasonService.getCurrentSeason());
@@ -48,7 +49,7 @@ const HowToEarnPointsScreen: React.FC = () => {
       const quests = await questService.getUserQuests(currentUser.id);
       setUserQuests(quests);
     } catch (error) {
-      logger.error('Failed to load quests', error, 'HowToEarnPointsScreen');
+      logger.error('Failed to load quests', { error }, 'HowToEarnPointsScreen');
     } finally {
       setLoading(false);
     }
@@ -59,7 +60,7 @@ const HowToEarnPointsScreen: React.FC = () => {
   }, [loadQuests]);
 
   // Memoized icon map to prevent recreation
-  const questIconMap = useMemo(() => ({
+  const questIconMap = useMemo<Record<string, React.ComponentProps<typeof PhosphorIcon>['name']>>(() => ({
     'export_seed_phrase': 'Key',
     'setup_account_pp': 'UserCircle',
     'first_split_with_friends': 'Users',
@@ -112,109 +113,129 @@ const HowToEarnPointsScreen: React.FC = () => {
           isCompleted && styles.questCardCompleted
         ]}
       >
-        <View style={styles.questHeader}>
-          <View style={styles.questIconContainer}>
-            {isCompleted ? (
-              <PhosphorIcon name="CheckCircle" size={32} color={colors.green} weight="fill" />
-            ) : (
-              <PhosphorIcon name={iconName} size={32} color={colors.textLightSecondary} weight="regular" />
-            )}
-          </View>
-          <View style={styles.questInfo}>
-            <Text
-              style={[
-                styles.questTitle,
-                isCompleted && styles.questTitleCompleted
-              ]}
-            >
-              {quest.title}
-            </Text>
-            <Text style={styles.questDescription}>
-              {quest.description}
-            </Text>
-            {isCompleted && quest.completed_at && (
-              <Text style={styles.questCompletedDate}>
-                Completed {new Date(quest.completed_at).toLocaleDateString()}
-              </Text>
-            )}
-          </View>
-          <View style={styles.questPoints}>
-            <Text
-              style={[
-                styles.questPointsValue,
-                isCompleted && styles.questPointsValueCompleted
-              ]}
-            >
-              +{points}
-            </Text>
-            <Text style={styles.questPointsLabel}>pts</Text>
-          </View>
+        <View style={styles.questIconContainer}>
+          {isCompleted ? (
+            <PhosphorIcon name="CheckCircle" size={25} color={colors.white} weight="fill" />
+          ) : (
+            <PhosphorIcon name={iconName} size={25} color={colors.white} weight="regular" />
+          )}
         </View>
-      </View>
-    );
-  };
-
-  const renderTransactionRewards = () => {
-    const isPartnership = currentUser?.is_partnership || false;
-    const reward = getSeasonReward('transaction_1_1_request', currentSeason, isPartnership);
-    const percentage = reward.type === 'percentage' ? reward.value : 0;
-
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <PhosphorIcon name="CurrencyCircleDollar" size={24} color={colors.green} weight="fill" />
-          <Text style={styles.sectionTitle}>Transaction Rewards</Text>
-        </View>
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            Earn {percentage}% of your transaction amount as points when you send money to other WeSplit users.
+        <View style={styles.questInfo}>
+          <Text
+            style={[
+              styles.questTitle,
+              isCompleted && styles.questTitleCompleted
+            ]}
+          >
+            {quest.title}
           </Text>
-          {isPartnership && (
-            <Text style={styles.partnershipBadge}>
-              Partnership Bonus Active
+          <Text style={styles.questDescription}>
+            {quest.description}
+          </Text>
+          {isCompleted && quest.completed_at && (
+            <Text style={styles.questCompletedDate}>
+              Completed {new Date(quest.completed_at).toLocaleDateString()}
             </Text>
           )}
         </View>
+        <View style={styles.questStatus}>
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.statusPill}
+          >
+            {isCompleted ? (
+              <>
+                <Text style={[styles.statusPillText, styles.statusPillTextClaimed]}>
+                  Claimed
+                </Text>
+              </>
+            ) : (
+              <Text style={[styles.statusPillText, styles.statusPillTextPoints]}>
+                {points} pts
+              </Text>
+            )}
+          </LinearGradient>
+        </View>
       </View>
     );
   };
 
-  const renderSplitRewards = () => {
+  const formatRewardValue = useCallback((reward: SeasonReward) => {
+    if (!reward) {
+      return '';
+    }
+    return reward.type === 'percentage'
+      ? `${reward.value}%`
+      : `${reward.value} pts`;
+  }, []);
+
+  const infoCards = useMemo(() => {
     const isPartnership = currentUser?.is_partnership || false;
+    const transactionReward = getSeasonReward('transaction_1_1_request', currentSeason, isPartnership);
+    const inviteFriendsPoints = getQuestPoints('invite_friends_create_account');
+    const friendSplitPoints = getQuestPoints('friend_do_first_split_over_10');
     const participateReward = getSeasonReward('participate_fair_split', currentSeason, isPartnership);
     const ownerReward = getSeasonReward('create_fair_split_owner_bonus', currentSeason, isPartnership);
     const degenWinReward = getSeasonReward('degen_split_win', currentSeason, isPartnership);
     const degenLoseReward = getSeasonReward('degen_split_lose', currentSeason, isPartnership);
 
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <PhosphorIcon name="Users" size={24} color={colors.green} weight="fill" />
-          <Text style={styles.sectionTitle}>Split Rewards</Text>
-        </View>
-        
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Fair Split</Text>
-          <Text style={styles.infoText}>
-            • Participate: {participateReward.type === 'percentage' ? `${participateReward.value}%` : `${participateReward.value} pts`}
-          </Text>
-          <Text style={styles.infoText}>
-            • Create (Owner Bonus): {ownerReward.type === 'percentage' ? `${ownerReward.value}%` : `${ownerReward.value} pts`}
-          </Text>
-        </View>
+    return [
+      {
+        id: 'invite_friends_info',
+        title: 'Earn big by inviting friends!',
+        icon: 'Handshake' as const,
+        bullets: [
+          `Invite friends who create an account: ${inviteFriendsPoints} Split points`,
+          `Friend completes a first split over $10: ${friendSplitPoints} Split points`,
+        ],
+      },
+      {
+        id: 'earn_every_action',
+        title: 'Earn points for every action',
+        icon: 'CurrencyCircleDollar' as const,
+        bullets: [
+          `Transaction 1:1 / Request: ${formatRewardValue(transactionReward)}`,
+          `Friend completes a first split over $10: ${friendSplitPoints} Split points`,
+        ],
+      },
+      {
+        id: 'split_rewards',
+        title: 'Earn points on every split',
+        icon: 'Users' as const,
+        bullets: [
+          `Participate in a Fair Split: ${formatRewardValue(participateReward)}`,
+          `Create a Fair Split (owner bonus): ${formatRewardValue(ownerReward)}`,
+          `Degen Split win: ${formatRewardValue(degenWinReward)}`,
+          `Degen Split lose: ${formatRewardValue(degenLoseReward)}`,
+        ],
+      },
+    ];
+  }, [currentUser?.is_partnership, currentSeason, formatRewardValue, getQuestPoints]);
 
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Degen Split</Text>
-          <Text style={styles.infoText}>
-            • Win: {degenWinReward.type === 'percentage' ? `${degenWinReward.value}%` : `${degenWinReward.value} pts`}
-          </Text>
-          <Text style={styles.infoText}>
-            • Lose: {degenLoseReward.type === 'percentage' ? `${degenLoseReward.value}%` : `${degenLoseReward.value} pts`}
-          </Text>
+  const renderInfoCard = (card: {
+    id: string;
+    title: string;
+    icon: React.ComponentProps<typeof PhosphorIcon>['name'];
+    bullets: string[];
+  }) => (
+    <View key={card.id} style={styles.infoCard}>
+      <View style={styles.infoCardHeader}>
+        <View style={styles.infoCardIcon}>
+          <PhosphorIcon name={card.icon} size={25} color={colors.white} weight="fill" />
         </View>
+        <Text style={styles.infoCardTitle}>{card.title}</Text>
       </View>
-    );
-  };
+      <View style={styles.infoCardBullets}>
+        {card.bullets.map((bullet, index) => (
+          <Text key={`${card.id}-bullet-${index}`} style={styles.infoCardBulletText}>
+            • {bullet}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
 
   if (loading) {
     return (
@@ -224,6 +245,14 @@ const HowToEarnPointsScreen: React.FC = () => {
           showBackButton={true}
           onBackPress={() => rewardNav.goBack()}
           backgroundColor={colors.black}
+          rightElement={
+            <TouchableOpacity
+              onPress={() => rewardNav.goToHowItWorks()}
+              activeOpacity={0.7}
+            >
+              <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+            </TouchableOpacity>
+          }
         />
         <LoadingScreen
           message="Loading..."
@@ -240,6 +269,19 @@ const HowToEarnPointsScreen: React.FC = () => {
       : { ...questDef, completed: false };
   });
 
+  const questOrder = [
+    'export_seed_phrase',
+    'setup_account_pp',
+    'first_split_with_friends',
+    'first_external_wallet_linked',
+    'invite_friends_create_account',
+    'friend_do_first_split_over_10',
+  ];
+
+  const orderedQuests = questOrder
+    .map(id => allQuests.find(quest => quest.id === id))
+    .filter((quest): quest is Quest => Boolean(quest));
+
   return (
     <Container>
       <Header
@@ -247,6 +289,14 @@ const HowToEarnPointsScreen: React.FC = () => {
         showBackButton={true}
         onBackPress={() => rewardNav.goBack()}
         backgroundColor={colors.black}
+        rightElement={
+          <TouchableOpacity
+            onPress={() => rewardNav.goToHowItWorks()}
+            activeOpacity={0.7}
+          >
+            <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+          </TouchableOpacity>
+        }
       />
 
       <ScrollView
@@ -254,36 +304,10 @@ const HowToEarnPointsScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Season Info */}
-        <View style={styles.seasonBadge}>
-          <Text style={styles.seasonText}>Season {currentSeason}</Text>
+        <View style={styles.cardsContainer}>
+          {orderedQuests.map(renderQuestCard)}
+          {infoCards.map(renderInfoCard)}
         </View>
-
-        {/* Get Started Quests */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Get Started</Text>
-          <View style={styles.questsContainer}>
-            {allQuests
-              .filter(q => ['export_seed_phrase', 'setup_account_pp', 'first_split_with_friends', 'first_external_wallet_linked'].includes(q.id))
-              .map(quest => renderQuestCard(quest))}
-          </View>
-        </View>
-
-        {/* Referral Quests */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Referral</Text>
-          <View style={styles.questsContainer}>
-            {allQuests
-              .filter(q => ['invite_friends_create_account', 'friend_do_first_split_over_10'].includes(q.id))
-              .map(quest => renderQuestCard(quest))}
-          </View>
-        </View>
-
-        {/* Transaction Rewards */}
-        {renderTransactionRewards()}
-
-        {/* Split Rewards */}
-        {renderSplitRewards()}
       </ScrollView>
     </Container>
   );
@@ -294,7 +318,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.xxxl,
   },
@@ -322,23 +345,8 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.black,
   },
-  section: {
-    marginBottom: spacing.xl,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
-    marginBottom: spacing.md,
-  },
-  questsContainer: {
-    gap: spacing.sm,
+  cardsContainer: {
+    gap: spacing.md,
   },
   questCard: {
     backgroundColor: colors.white5,
@@ -346,21 +354,20 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.white10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
   },
   questCardCompleted: {
-    borderColor: colors.green,
-    opacity: 0.7,
-  },
-  questHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+    opacity: 0.5,
   },
   questIconContainer: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.white10,
+    borderRadius: 100,
   },
   questInfo: {
     flex: 1,
@@ -372,12 +379,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs / 2,
   },
   questTitleCompleted: {
-    textDecorationLine: 'line-through',
-    color: colors.textLightSecondary,
+    color: colors.white70,
   },
   questDescription: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     lineHeight: 18,
   },
   questCompletedDate: {
@@ -385,44 +391,61 @@ const styles = StyleSheet.create({
     color: colors.green,
     marginTop: spacing.xs / 2,
   },
-  questPoints: {
-    alignItems: 'flex-end',
+  questStatus: {
+    justifyContent: 'center',
   },
-  questPointsValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.green,
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: spacing.sm,
+    gap: spacing.xs,
   },
-  questPointsValueCompleted: {
-    color: colors.textLightSecondary,
+  statusPillText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
-  questPointsLabel: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
-    marginTop: 2,
+  statusPillTextClaimed: {
+    color: colors.black,
+  },
+  statusPillTextPoints: {
+    color: colors.black,
   },
   infoCard: {
     backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.md,
-    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    gap: spacing.sm,
   },
-  infoTitle: {
-    fontSize: typography.fontSize.md,
+  infoCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  infoCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 100,
+    backgroundColor: colors.white10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoCardTitle: {
+    flex: 1,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textLight,
-    marginBottom: spacing.xs,
   },
-  infoText: {
+  infoCardBullets: {
+    gap: spacing.xs,
+  },
+  infoCardBulletText: {
     fontSize: typography.fontSize.sm,
     color: colors.textLightSecondary,
-    lineHeight: 18,
-  },
-  partnershipBadge: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.green,
-    marginTop: spacing.xs,
+    lineHeight: 20,
   },
 });
 

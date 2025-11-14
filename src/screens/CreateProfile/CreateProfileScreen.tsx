@@ -598,6 +598,7 @@ const CreateProfileScreen: React.FC = () => {
               {/* Pseudo Input */}
               <View style={styles.inputSection}>
               <Input
+                containerStyle={styles.fullWidthInput}
                 label="Pseudo *"
                   placeholder="Enter your pseudo"
                   value={pseudo}

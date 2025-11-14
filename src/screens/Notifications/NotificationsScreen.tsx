@@ -2,38 +2,27 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
-  StyleSheet,
   RefreshControl,
   Alert,
-  ActivityIndicator,
-  Image,
-  Dimensions,
-  StatusBar,
-  ScrollView
+  ScrollView,
+  Animated
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Icon from '../../components/Icon';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Swipeable } from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useFocusEffect } from '@react-navigation/native';
+
 import { NotificationCard } from '../../components/notifications';
 import RequestCard from '../../components/requests/RequestCard';
 import { useApp } from '../../context/AppContext';
-import { colors } from '../../theme/colors';
-import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { getReceivedPaymentRequests } from '../../services/payments/firebasePaymentRequestService';
 import { Container, LoadingScreen } from '../../components/shared';
 import Header from '../../components/shared/Header';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
-import { 
-  CheckCircle, 
-  ArrowClockwise, 
-  User, 
-  HandCoins, 
-  PiggyBank, 
-  Warning, 
-  WarningCircle 
-} from 'phosphor-react-native';
+import { colors } from '../../theme/colors';
 import styles from './styles';
 
 // Import the unified NotificationData interface
@@ -46,8 +35,41 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actionStates, setActionStates] = useState<Record<string, any>>({});
-  const [fadeAnimations, setFadeAnimations] = useState<Record<string, any>>({});
   const [filteredNotifications, setFilteredNotifications] = useState<NotificationData[]>([]);
+  const [viewedNotificationIds, setViewedNotificationIds] = useState<Set<string>>(new Set());
+  const [isClearingAll, setIsClearingAll] = useState(false);
+  const [deletedNotificationIds, setDeletedNotificationIds] = useState<Set<string>>(new Set());
+
+  // Load deleted notification IDs from AsyncStorage on mount
+  useEffect(() => {
+    const loadDeletedIds = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('deletedNotificationIds');
+        if (stored) {
+          const ids = JSON.parse(stored);
+          setDeletedNotificationIds(new Set(ids));
+        }
+      } catch (error) {
+        console.error('Error loading deleted notification IDs:', error);
+      }
+    };
+    loadDeletedIds();
+  }, []);
+
+  // Save deleted notification IDs to AsyncStorage whenever it changes
+  useEffect(() => {
+    const saveDeletedIds = async () => {
+      try {
+        const idsArray = Array.from(deletedNotificationIds);
+        await AsyncStorage.setItem('deletedNotificationIds', JSON.stringify(idsArray));
+      } catch (error) {
+        console.error('Error saving deleted notification IDs:', error);
+      }
+    };
+    if (deletedNotificationIds.size > 0) {
+      saveDeletedIds();
+    }
+  }, [deletedNotificationIds]);
 
   // Function to fetch user data from Firebase
   const fetchUserData = async (userId: string) => {
@@ -123,6 +145,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         data: notification.data,
         id: notification.id
       });
+
+      // Notification is already marked as read when it appears on screen
+      // No need to mark again on press
 
       // Navigate based on notification type
       if (notification.type === 'split_invite') {
@@ -286,13 +311,46 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   // Function to mark notification as read
-  const markAsRead = async (notificationId: string) => {
+  const markAsRead = async (notificationId: string, updateUI: boolean = true) => {
     try {
-      await updateDoc(doc(db, 'notifications', notificationId), {
-        read: true,
-        read_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      });
+      // Check if it's a Firebase payment request (starts with firebase_)
+      if (notificationId.startsWith('firebase_')) {
+        // For Firebase payment requests, we can't mark them as read in the payment_requests collection
+        // Instead, we'll refresh the notifications to update the UI
+        // The is_read status will be managed locally or through notifications collection
+        if (updateUI) {
+          // Update local state immediately
+          setFilteredNotifications(prev => 
+            prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+          );
+        }
+        if (refreshNotifications) {
+          await refreshNotifications();
+        }
+        if (updateUI) {
+          await loadAndProcessNotifications();
+        }
+      } else {
+        // Mark regular notification as read in Firebase
+        await updateDoc(doc(db, 'notifications', notificationId), {
+          read: true,
+          is_read: true,
+          read_at: serverTimestamp(),
+          updated_at: serverTimestamp()
+        });
+        
+        // Update local state immediately for instant UI update
+        if (updateUI) {
+          setFilteredNotifications(prev => 
+            prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+          );
+        }
+        
+        // Refresh notifications context in background
+        if (refreshNotifications) {
+          refreshNotifications().catch(err => console.error('Error refreshing notifications:', err));
+        }
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -301,74 +359,67 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   // Function to delete notification
   const deleteNotification = async (notificationId: string) => {
     try {
-      await deleteDoc(doc(db, 'notifications', notificationId));
+      // Add to deleted set to prevent it from reappearing
+      setDeletedNotificationIds(prev => new Set(prev).add(notificationId));
+      
+      // Remove from local state immediately for instant UI update
+      setFilteredNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      // Delete from Firebase in background
+      try {
+        if (notificationId.startsWith('firebase_')) {
+          const actualRequestId = notificationId.replace('firebase_', '');
+          // Delete from payment_requests collection
+          await deleteDoc(doc(db, 'payment_requests', actualRequestId));
+        } else {
+          // Delete from notifications collection
+          await deleteDoc(doc(db, 'notifications', notificationId));
+        }
+        
+        // Refresh notifications context in background
+        if (refreshNotifications) {
+          refreshNotifications().catch(err => console.error('Error refreshing notifications:', err));
+        }
+      } catch (error) {
+        console.error('Error deleting notification from Firebase:', error);
+        // Don't re-add to local state - keep it deleted
+        showToast('Failed to delete notification', 'error');
+      }
     } catch (error) {
       console.error('Error deleting notification:', error);
+      showToast('Failed to delete notification', 'error');
     }
   };
 
-  // Function to get notification icon
-  const getNotificationIcon = (type: string, size: number = 24) => {
-    switch (type) {
-      case 'payment_request':
-        return <HandCoins size={size} color={colors.warning} weight="fill" />;
-      case 'payment_sent':
-        return <ArrowClockwise size={size} color={colors.info} weight="fill" />;
-      case 'payment_received':
-        return <CheckCircle size={size} color={colors.green} weight="fill" />;
-      case 'split_invite':
-        return <User size={size} color={colors.primaryGreen} weight="fill" />;
-      case 'split_completed':
-        return <CheckCircle size={size} color={colors.green} weight="fill" />;
-      case 'split_payment_required':
-        return <HandCoins size={size} color={colors.red} weight="fill" />;
-      case 'split_lock_required':
-        return <HandCoins size={size} color={colors.red} weight="fill" />;
-      case 'payment_reminder':
-        return <Warning size={size} color={colors.warning} weight="fill" />;
-      case 'general':
-        return <WarningCircle size={size} color={colors.GRAY} weight="fill" />;
-      default:
-        return <WarningCircle size={size} color={colors.GRAY} weight="fill" />;
-    }
+  // Render swipe delete action (Apple style)
+  const renderRightActions = (notification: NotificationData, progress: Animated.AnimatedInterpolation<number>) => {
+    const trans = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [100, 0],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.swipeDeleteContainer,
+          {
+            transform: [{ translateX: trans }],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => {
+            deleteNotification(notification.id);
+          }}
+          style={styles.swipeDeleteButton}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.swipeDeleteText}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
   };
 
-  // Function to get notification color
-  const getNotificationColor = (type: string) => {
-    switch (type) {
-      case 'payment_request':
-        return colors.warning;
-      case 'payment_sent':
-        return colors.info;
-      case 'payment_received':
-        return colors.green;
-      case 'split_invite':
-        return colors.primaryGreen;
-      case 'split_completed':
-        return colors.green;
-      case 'split_payment_required':
-        return colors.red;
-      default:
-        return colors.GRAY;
-    }
-  };
-
-  // Function to format notification time
-  const formatNotificationTime = (timestamp: string) => {
-    const now = new Date();
-    const notificationTime = new Date(timestamp);
-    const diffInMinutes = Math.floor((now.getTime() - notificationTime.getTime()) / (1000 * 60));
-
-    if (diffInMinutes < 1) {
-      return 'Just now';
-    } else if (diffInMinutes < 60) {
-      return `${diffInMinutes}m ago`;
-    } else if (diffInMinutes < 1440) {
-      return `${Math.floor(diffInMinutes / 60)}h ago`;
-    } else {
-      return `${Math.floor(diffInMinutes / 1440)}d ago`;
-    }
-  };
 
   // Function to load and process notifications
   const loadAndProcessNotifications = useCallback(async () => {
@@ -399,6 +450,74 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
   // Function to handle refresh (alias for compatibility)
   const onRefresh = handleRefresh;
+
+  // Function to clear all notifications
+  const handleClearAll = useCallback(async () => {
+    Alert.alert(
+      'Clear All Notifications',
+      'Are you sure you want to delete all notifications?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsClearingAll(true);
+              
+              // Store current notifications before clearing
+              const notificationsToDelete = [...filteredNotifications];
+
+              // Add all IDs to deleted set to prevent them from reappearing
+              setDeletedNotificationIds(prev => {
+                const newSet = new Set(prev);
+                notificationsToDelete.forEach(n => newSet.add(n.id));
+                return newSet;
+              });
+
+              // Clear local state immediately
+              setFilteredNotifications([]);
+              setViewedNotificationIds(new Set());
+
+              // Delete all notifications from Firebase in background
+              // Don't wait for completion to keep UI responsive
+              Promise.all(notificationsToDelete.map(async (notification) => {
+                try {
+                  if (notification.id.startsWith('firebase_')) {
+                    const actualRequestId = notification.id.replace('firebase_', '');
+                    await deleteDoc(doc(db, 'payment_requests', actualRequestId));
+                  } else {
+                    await deleteDoc(doc(db, 'notifications', notification.id));
+                  }
+                } catch (error) {
+                  console.error(`Error deleting notification ${notification.id}:`, error);
+                }
+              })).catch(err => {
+                console.error('Error during batch deletion:', err);
+              });
+
+              // Refresh notifications context to sync with Firebase
+              if (refreshNotifications) {
+                refreshNotifications().catch(err => console.error('Error refreshing notifications:', err));
+              }
+
+              showToast('All notifications cleared', 'success');
+              setIsClearingAll(false);
+              
+              // Don't reload - keep the list empty
+              // The deletedNotificationIds will filter out any notifications that try to come back
+            } catch (error) {
+              console.error('Error clearing all notifications:', error);
+              showToast('Failed to clear all notifications', 'error');
+              setIsClearingAll(false);
+              // Reload notifications if clearing failed
+              await loadAndProcessNotifications();
+            }
+          },
+        },
+      ]
+    );
+  }, [filteredNotifications, refreshNotifications, loadAndProcessNotifications]);
 
   // Function to handle notification actions
   const notificationActionHandler = useCallback(async (notification: NotificationData) => {
@@ -499,7 +618,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       const standardizedData = standardizeNotificationData(request);
       console.log('📊 RequestCard standardized data:', standardizedData);
       console.log('📊 RequestCard raw request data:', request.data);
-      const { senderId: requesterId, amount, currency, requestId, description } = standardizedData;
+      const { senderId: requesterId, amount, requestId, description } = standardizedData;
       
       // Try to get description from multiple sources like RequestCard does
       const requestDescription = description || request.data?.description || request.data?.note || '';
@@ -581,16 +700,89 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
   // Process notifications when they change
   useEffect(() => {
-    if (notifications && state.currentUser?.id) {
+    if (notifications && state.currentUser?.id && !isClearingAll) {
       loadAndProcessNotifications();
     }
-  }, [notifications, state.currentUser?.id, loadAndProcessNotifications]);
+  }, [notifications, state.currentUser?.id, loadAndProcessNotifications, isClearingAll]);
+
+  // Save timestamp when user views notifications screen
+  useFocusEffect(
+    useCallback(() => {
+      const saveLastViewedTimestamp = async () => {
+        try {
+          const timestamp = new Date().toISOString();
+          await AsyncStorage.setItem('lastNotificationsViewTimestamp', timestamp);
+        } catch (error) {
+          console.error('Error saving last notifications view timestamp:', error);
+        }
+      };
+      saveLastViewedTimestamp();
+    }, [])
+  );
+
+  // Mark notifications as read when they appear on screen
+  useEffect(() => {
+    const markVisibleAsRead = async () => {
+      const unreadNotifications = filteredNotifications.filter(
+        n => !n.is_read && !viewedNotificationIds.has(n.id)
+      );
+
+      if (unreadNotifications.length > 0) {
+        // Mark all visible unread notifications as read
+        const newViewedIds = new Set(viewedNotificationIds);
+        const notificationIdsToMark = unreadNotifications.map(n => n.id);
+        
+        // Add to viewed set immediately to prevent duplicate processing
+        notificationIdsToMark.forEach(id => newViewedIds.add(id));
+        setViewedNotificationIds(newViewedIds);
+        
+        // Update local state immediately for all notifications
+        setFilteredNotifications(prev => 
+          prev.map(n => notificationIdsToMark.includes(n.id) ? { ...n, is_read: true } : n)
+        );
+        
+        // Mark as read in Firebase in background
+        const promises = unreadNotifications.map(async (notification) => {
+          try {
+            // Check if it's a Firebase payment request
+            if (notification.id.startsWith('firebase_')) {
+              if (refreshNotifications) {
+                await refreshNotifications();
+              }
+            } else {
+              // Mark regular notification as read in Firebase
+              await updateDoc(doc(db, 'notifications', notification.id), {
+                read: true,
+                is_read: true,
+                read_at: serverTimestamp(),
+                updated_at: serverTimestamp()
+              });
+              
+              // Refresh notifications context in background
+              if (refreshNotifications) {
+                refreshNotifications().catch(err => console.error('Error refreshing notifications:', err));
+              }
+            }
+          } catch (error) {
+            console.error('Error marking notification as read:', error);
+          }
+        });
+
+        await Promise.all(promises);
+      }
+    };
+
+    if (filteredNotifications.length > 0) {
+      markVisibleAsRead();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredNotifications]);
 
 
 
 
   // Transform real notifications to match NotificationData interface and create unified timeline
-  const getDisplayNotifications = async (): Promise<NotificationData[]> => {
+  const getDisplayNotifications = useCallback(async (): Promise<NotificationData[]> => {
     const realNotifications = notifications || [];
     
     // Load payment requests from Firebase (like DashboardScreen does)
@@ -618,28 +810,37 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     }
     
     // Transform Firebase payment requests to notification format
+    // Check if there's a corresponding notification in the notifications collection
     const firebaseRequestNotifications: NotificationData[] = firebasePaymentRequests
       .filter(req => req.amount > 0 && req.status !== 'completed')
-      .map(req => ({
-        id: `firebase_${req.id}`,
-        userId: state.currentUser?.id || '',
-        user_id: state.currentUser?.id || '',
-        type: 'payment_request' as const,
-        title: 'Payment Request',
-        message: `${req.senderName} has requested ${req.amount} ${req.currency}${req.description ? ` for ${req.description}` : ''}`,
-        created_at: req.created_at,
-        is_read: false,
-        status: req.status,
-        data: {
-          requestId: req.id,
-          senderId: req.senderId,
-          senderName: req.senderName,
-          amount: req.amount,
-          currency: req.currency,
-          description: req.description,
-          status: req.status
-        }
-      }));
+      .map(req => {
+        // Check if there's a corresponding notification that's already marked as read
+        const correspondingNotification = realNotifications.find(
+          (n: any) => n.type === 'payment_request' && n.data?.requestId === req.id
+        );
+        const isRead = correspondingNotification?.is_read || (correspondingNotification as any)?.read || false;
+        
+        return {
+          id: `firebase_${req.id}`,
+          userId: state.currentUser?.id || '',
+          user_id: state.currentUser?.id || '',
+          type: 'payment_request' as const,
+          title: 'Payment Request',
+          message: `${req.senderName} has requested ${req.amount} ${req.currency}${req.description ? ` for ${req.description}` : ''}`,
+          created_at: req.created_at,
+          is_read: isRead,
+          status: req.status,
+          data: {
+            requestId: req.id,
+            senderId: req.senderId,
+            senderName: req.senderName,
+            amount: req.amount,
+            currency: req.currency,
+            description: req.description,
+            status: req.status
+          }
+        };
+      });
     
     // Transform real notifications to match NotificationData interface
     const transformedNotifications: NotificationData[] = realNotifications.map((notification: any) => {
@@ -710,7 +911,13 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     });
     
     // Show all notifications including payment_request (no filtering by tabs)
+    // Filter out deleted notifications
     const filteredNotifications = allNotifications.filter((n: NotificationData) => {
+      // Don't show deleted notifications
+      if (deletedNotificationIds.has(n.id)) {
+        return false;
+      }
+      
       // Show payment_request if not completed
       if (n.type === 'payment_request') {
         return n.data?.status !== 'completed';
@@ -725,7 +932,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       const timeB = new Date(b.created_at).getTime();
       return timeB - timeA;
     });
-  };
+  }, [deletedNotificationIds, state.currentUser?.id]);
 
   // Debug: Log the notifications to understand what we're working with
   console.log('🔍 NotificationsScreen - Total:', notifications?.length || 0, 'Filtered:', filteredNotifications.length, 'Payment requests:', filteredNotifications.filter(n => n.type === 'payment_request').length);
@@ -747,28 +954,33 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         showBackButton={true}
         onBackPress={() => navigation.goBack()}
         rightElement={
-          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-            <PhosphorIcon name="ArrowClockwise" size={20} color={colors.white} />
-          </TouchableOpacity>
+          filteredNotifications.length > 0 ? (
+            <TouchableOpacity onPress={handleClearAll} style={styles.clearAllButton}>
+              <Text style={styles.clearAllText}>Clear All</Text>
+            </TouchableOpacity>
+          ) : null
         }
       />
 
 
       {/* Notifications List */}
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#A5EA15"
-            titleColor="#FFF"
-          />
-        }
-      >
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ScrollView
+          style={styles.scrollView}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#A5EA15"
+              titleColor="#FFF"
+            />
+          }
+        >
         {filteredNotifications.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fnotif-empty-state.png?alt=media&token=c2a67bb0-0e1b-40b0-9467-6e239f41a166' }} style={styles.emptyStateIcon} />
+            <View style={styles.emptyStateIconContainer}>
+              <PhosphorIcon name="Bell" size={48} color={colors.white70} weight="regular" />
+            </View>
             <Text style={styles.emptyTitle}>No notifications yet</Text>
             <Text style={styles.emptySubtitle}>
               You have no notifications yet.
@@ -780,29 +992,39 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             // Use RequestCard for payment_request notifications
             if (notification.type === 'payment_request') {
               return (
-                <RequestCard
+                <Swipeable
                   key={notification.id}
-                  request={notification}
-                  index={index}
-                  onSendPress={handleRequestCardSendPress}
-                />
+                  renderRightActions={(progress) => renderRightActions(notification, progress)}
+                  overshootRight={false}
+                >
+                  <RequestCard
+                    request={notification as any}
+                    index={index}
+                    onSendPress={handleRequestCardSendPress}
+                  />
+                </Swipeable>
               );
             }
             
             // Use NotificationCard for all other notification types
             return (
-              <NotificationCard
+              <Swipeable
                 key={notification.id}
-                notification={notification}
-                onPress={handleNotificationPress}
-                onActionPress={notificationActionHandler}
-                actionState={actionStates[notification.id]}
-                fadeAnimation={fadeAnimations[notification.id]}
-              />
+                renderRightActions={(progress) => renderRightActions(notification, progress)}
+                overshootRight={false}
+              >
+                <NotificationCard
+                  notification={notification}
+                  onPress={handleNotificationPress}
+                  onActionPress={notificationActionHandler}
+                  actionState={actionStates[notification.id]}
+                />
+              </Swipeable>
             );
           })
         )}
-      </ScrollView>
+        </ScrollView>
+      </GestureHandlerRootView>
     </Container>
   );
 };

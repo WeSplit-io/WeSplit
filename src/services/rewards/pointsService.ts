@@ -336,15 +336,32 @@ class PointsService {
 
   /**
    * Get user's points history
+   * @param userId - User ID
+   * @param limit - Maximum number of transactions to return
+   * @param seasonFilter - Optional season filter (1-5). If provided, only returns transactions from that season.
    */
-  async getPointsHistory(userId: string, limit: number = 50): Promise<PointsTransaction[]> {
+  async getPointsHistory(userId: string, limit: number = 50, seasonFilter?: Season): Promise<PointsTransaction[]> {
     try {
       const { collection, query, where, orderBy, limit: limitQuery, getDocs } = await import('firebase/firestore');
+      
+      // Build query with optional season filter
+      // Note: Firestore requires filters before orderBy
+      const queryConstraints: any[] = [
+        where('user_id', '==', userId)
+      ];
+
+      // Add season filter if provided (must come before orderBy)
+      if (seasonFilter !== undefined) {
+        queryConstraints.push(where('season', '==', seasonFilter));
+      }
+
+      // Add orderBy and limit
+      queryConstraints.push(orderBy('created_at', 'desc'));
+      queryConstraints.push(limitQuery(limit));
+
       const q = query(
         collection(db, 'points_transactions'),
-        where('user_id', '==', userId),
-        orderBy('created_at', 'desc'),
-        limitQuery(limit)
+        ...queryConstraints
       );
 
       const querySnapshot = await getDocs(q);

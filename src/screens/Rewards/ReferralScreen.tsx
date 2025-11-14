@@ -9,13 +9,12 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Share,
   Alert,
   Clipboard,
   ScrollView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
@@ -30,20 +29,19 @@ import { seasonService } from '../../services/rewards/seasonService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 
 const ReferralScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<any>>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
   const { state } = useApp();
   const { currentUser } = state;
   
   const [referralCode, setReferralCode] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [currentSeason, setCurrentSeason] = useState(1);
   const [inviteReward, setInviteReward] = useState(0);
   const [friendSplitReward, setFriendSplitReward] = useState(0);
+  const [referralCount, setReferralCount] = useState(0);
 
   useEffect(() => {
     const season = seasonService.getCurrentSeason();
-    setCurrentSeason(season);
     
     // Get reward amounts
     const inviteRewardConfig = getSeasonReward('invite_friends_create_account', season, false);
@@ -54,7 +52,7 @@ const ReferralScreen: React.FC = () => {
   }, []); // Only run once on mount
 
   useEffect(() => {
-    const loadReferralCode = async () => {
+    const loadReferralData = async () => {
       if (!currentUser?.id) {
         setLoading(false);
         return;
@@ -69,6 +67,10 @@ const ReferralScreen: React.FC = () => {
           userId: currentUser.id, 
           referralCode: code 
         }, 'ReferralScreen');
+        
+        // Load referral count
+        const referrals = await referralService.getUserReferrals(currentUser.id);
+        setReferralCount(referrals.length);
       } catch (error) {
         logger.error('Failed to load referral code', error, 'ReferralScreen');
         // Show error but don't block the screen
@@ -82,7 +84,7 @@ const ReferralScreen: React.FC = () => {
       }
     };
 
-    loadReferralCode();
+    loadReferralData();
   }, [currentUser?.id]);
 
   const handleCopyCode = useCallback(async () => {
@@ -92,7 +94,7 @@ const ReferralScreen: React.FC = () => {
       await Clipboard.setString(referralCode);
       Alert.alert('Copied!', 'Referral code copied to clipboard');
     } catch (error) {
-      logger.error('Failed to copy referral code', error, 'ReferralScreen');
+      logger.error('Failed to copy referral code', { error }, 'ReferralScreen');
       Alert.alert('Error', 'Failed to copy referral code');
     }
   }, [referralCode]);
@@ -101,21 +103,47 @@ const ReferralScreen: React.FC = () => {
     if (!referralCode) return;
     
     try {
-      const shareMessage = `Join WeSplit and earn points together! Use my referral code: ${referralCode}`;
+      const shareMessage = `Join WeSplit and earn points together! Downlaod the app here: https://t.me/+v-e8orBns-llNThk and use my referral code: ${referralCode}`;
       await Share.share({
         message: shareMessage,
         title: 'Invite to WeSplit',
       });
     } catch (error) {
-      logger.error('Failed to share referral code', error, 'ReferralScreen');
+      logger.error('Failed to share referral code', { error }, 'ReferralScreen');
     }
   }, [referralCode]);
+
+  const steps = useMemo(
+    () => [
+      {
+        id: 'share',
+        title: 'Share your referral code',
+        description: 'Send your code to a friend so they can join through you.',
+        icon: 'ShareNetwork' as const,
+      },
+      {
+        id: 'join',
+        title: 'They join WeSplit',
+        description: 'When they sign up with your code, you earn points instantly.',
+        icon: 'UserCircleCheck' as const,
+        points: inviteReward,
+      },
+      {
+        id: 'split',
+        title: 'They complete their first real split',
+        description: 'Once they make a split above $10, you unlock your big bonus.',
+        icon: 'Lightning' as const,
+        points: friendSplitReward,
+      },
+    ],
+    [inviteReward, friendSplitReward]
+  );
 
   if (loading) {
     return (
       <Container>
         <Header
-          title="Invite Friends"
+          title="Refer a friend"
           showBackButton={true}
           onBackPress={() => rewardNav.goBack()}
           backgroundColor={colors.black}
@@ -131,7 +159,7 @@ const ReferralScreen: React.FC = () => {
   return (
     <Container>
       <Header
-        title="Invite Friends"
+        title="Refer a friend"
         showBackButton={true}
         onBackPress={() => rewardNav.goBack()}
         backgroundColor={colors.black}
@@ -142,27 +170,33 @@ const ReferralScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.iconContainer}>
-            <PhosphorIcon name="Handshake" size={64} color={colors.green} weight="fill" />
-          </View>
-          <Text style={styles.heroTitle}>Earn Points Together</Text>
-          <Text style={styles.heroSubtitle}>
-            Invite your friends and climb the ranks together
-          </Text>
+        {/* Score Card */}
+        <View style={styles.scoreCard}>
+          <Text style={styles.scoreLabel}>Your score</Text>
+          <Text style={styles.scoreValue}>{referralCount}</Text>
+          <Text style={styles.scoreCaption}>Referrals</Text>
         </View>
 
         {/* Referral Code Section */}
         <View style={styles.referralCodeSection}>
           <Text style={styles.referralCodeLabel}>Your Referral Code</Text>
-          <View style={styles.referralCodeContainer}>
-            <Text style={styles.referralCodeText}>{referralCode}</Text>
-            <TouchableOpacity
-              style={styles.copyButton}
-              onPress={handleCopyCode}
-            >
-              <PhosphorIcon name="Copy" size={20} color={colors.black} weight="regular" />
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.referralCodeCard}
+          >
+            <Text style={styles.referralCodeText}>{referralCode || '------'}</Text>
+          </LinearGradient>
+
+          <View style={styles.referralActions}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleCopyCode}>
+              <PhosphorIcon name="CopySimple" size={20} color={colors.textLight} weight="regular" />
+              <Text style={styles.actionButtonText}>Copy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+              <PhosphorIcon name="ShareNetwork" size={20} color={colors.textLight} weight="regular" />
+              <Text style={styles.actionButtonText}>Share</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -170,52 +204,41 @@ const ReferralScreen: React.FC = () => {
         {/* Rewards Info */}
         <View style={styles.rewardsSection}>
           <Text style={styles.rewardsTitle}>How It Works</Text>
-          
-          <View style={styles.rewardCard}>
-            <View style={styles.rewardHeader}>
-              <PhosphorIcon name="UserPlus" size={24} color={colors.green} weight="fill" />
-              <Text style={styles.rewardTitle}>Friend Creates Account</Text>
-            </View>
-            <Text style={styles.rewardDescription}>
-              When your friend signs up using your referral code, you both earn points!
-            </Text>
-            <View style={styles.rewardPoints}>
-              <Text style={styles.rewardPointsValue}>+{inviteReward} pts</Text>
-              <Text style={styles.rewardPointsLabel}>for you</Text>
-            </View>
-          </View>
+          <View style={styles.stepsContainer}>
+            {steps.map((step, index) => (
+              <View key={step.id} style={styles.stepRow}>
+                <View style={styles.stepIconColumn}>
+                  {index !== 0 && <View style={styles.timelineConnectorTop} />}
+                  <View style={styles.stepIconCircle}>
+                    <PhosphorIcon
+                      name={step.icon}
+                      size={20}
+                      color={colors.white}
+                      weight="regular"
+                    />
+                  </View>
+                  {index !== steps.length - 1 && <View style={styles.timelineConnectorBottom} />}
+                </View>
 
-          <View style={styles.rewardCard}>
-            <View style={styles.rewardHeader}>
-              <PhosphorIcon name="Handshake" size={24} color={colors.green} weight="fill" />
-              <Text style={styles.rewardTitle}>Friend Does First Split {'>'} $10</Text>
-            </View>
-            <Text style={styles.rewardDescription}>
-              When your friend completes their first split over $10, you earn bonus points!
-            </Text>
-            <View style={styles.rewardPoints}>
-              <Text style={styles.rewardPointsValue}>+{friendSplitReward} pts</Text>
-              <Text style={styles.rewardPointsLabel}>for you</Text>
-            </View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>{step.title}</Text>
+                  <Text style={styles.stepDescription}>{step.description}</Text>
+                </View>
+
+                {step.points ? (
+                  <LinearGradient
+                    colors={[colors.gradientStart, colors.gradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.pointsBadge}
+                  >
+                    <Text style={styles.pointsBadgeText}>{`${step.points} pts`}</Text>
+                  </LinearGradient>
+                ) : null}
+              </View>
+            ))}
           </View>
         </View>
-
-        {/* Share Button */}
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={handleShare}
-        >
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.shareButtonGradient}
-          >
-            <PhosphorIcon name="Share" size={24} color={colors.black} weight="fill" />
-            <Text style={styles.shareButtonText}>Share Referral Code</Text>
-            <PhosphorIcon name="ArrowRight" size={20} color={colors.black} weight="regular" />
-          </LinearGradient>
-        </TouchableOpacity>
       </ScrollView>
     </Container>
   );
@@ -226,7 +249,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
@@ -241,24 +263,29 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     marginTop: spacing.md,
   },
-  heroSection: {
+  scoreCard: {
+    backgroundColor: colors.white5,
+    borderRadius: spacing.radiusLg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
     marginBottom: spacing.xl,
+    gap: spacing.sm,
   },
-  iconContainer: {
-    marginBottom: spacing.md,
-  },
-  heroTitle: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  heroSubtitle: {
-    fontSize: typography.fontSize.md,
+  scoreLabel: {
+    fontSize: typography.fontSize.sm,
     color: colors.textLightSecondary,
-    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  scoreValue: {
+    fontSize: typography.fontSize.hero,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+  },
+  scoreCaption: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLightSecondary,
+    marginTop: spacing.xs,
   },
   referralCodeSection: {
     marginBottom: spacing.xl,
@@ -269,86 +296,111 @@ const styles = StyleSheet.create({
     color: colors.textLightSecondary,
     marginBottom: spacing.sm,
   },
-  referralCodeContainer: {
-    flexDirection: 'row',
+  referralCodeCard: {
+    borderRadius: spacing.radiusLg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     alignItems: 'center',
-    backgroundColor: colors.white5,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.md,
+    justifyContent: 'center',
   },
   referralCodeText: {
-    flex: 1,
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    fontSize: typography.fontSize.xxl,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.black,
     letterSpacing: 2,
   },
-  copyButton: {
-    padding: spacing.xs,
-  },
-  rewardsSection: {
-    marginBottom: spacing.xl,
-  },
-  rewardsTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
-    marginBottom: spacing.md,
-  },
-  rewardCard: {
-    backgroundColor: colors.white5,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  rewardHeader: {
+  referralActions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  rewardTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
-  },
-  rewardDescription: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
-    lineHeight: 18,
-    marginBottom: spacing.sm,
-  },
-  rewardPoints: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.xs,
-  },
-  rewardPointsValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.green,
-  },
-  rewardPointsLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
-  },
-  shareButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
+    gap: spacing.md,
     marginTop: spacing.md,
   },
-  shareButtonGradient: {
+  actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.white5,
+    borderRadius: spacing.radiusLg,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
-  shareButtonText: {
+  actionButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+  },
+  rewardsSection: {
+    marginBottom: spacing.xl,
+    gap: spacing.lg,
+  },
+  rewardsTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textLightSecondary,
+
+  },
+  stepsContainer: {
+    borderRadius: spacing.radiusLg,
+    gap: spacing.lg,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  stepIconColumn: {
+    alignItems: 'center',
+    width: 40,
+    position: 'relative',
+  },
+  stepIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    backgroundColor: colors.blackWhite5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  timelineConnectorTop: {
+    position: 'absolute',
+    top: -spacing.lg,
+    left: 18,
+    width: 2,
+    height: spacing.lg + spacing.sm,
+    backgroundColor: colors.blackWhite5,
+  },
+  timelineConnectorBottom: {
+    position: 'absolute',
+    top: 40,
+    left: 18,
+    width: 2,
+    height: spacing.lg + spacing.sm,
+    backgroundColor: colors.blackWhite5,
+  },
+  stepContent: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  stepTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+  },
+  stepDescription: {
+    fontSize: typography.fontSize.xs,
+    color: colors.white70,
+    lineHeight: 20,
+  },
+  pointsBadge: {
+    borderRadius: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  pointsBadgeText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
     color: colors.black,
   },
 });

@@ -48,7 +48,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.black,
   },
   content: {
     flex: 1,

@@ -388,6 +388,10 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
 
   const actionConfig = getActionButtonConfig();
 
+  // Calculate opacity based on read status
+  const cardOpacity = notification.is_read ? 0.7 : 1.0;
+  const isUnread = !notification.is_read;
+
   return (
     <Animated.View
       style={{
@@ -395,7 +399,11 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         opacity: animationValue,
       }}
     >
-      <View style={styles.container}>
+      <View style={[
+        styles.container, 
+        { opacity: cardOpacity },
+        isUnread && styles.unreadContainer
+      ]}>
         <View style={styles.contentWrapper}>
           <View style={[
             styles.iconContainer,

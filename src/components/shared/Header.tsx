@@ -85,19 +85,24 @@ const styles = {
     paddingBottom: spacing.md,
   },
   backButton: {
-    width: 40,
+    width: 80,
     height: 40,
-    alignItems: 'center' as const,
+    alignItems: 'flex-start' as const,
     justifyContent: 'center' as const,
+    zIndex: 1,
   },
   headerTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     textAlign: 'center' as const,
     flex: 1,
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    zIndex: 0,
   },
   placeholder: {
-    width: 40,
+    width: 80,
     height: 40,
   },
   logoSection: {
