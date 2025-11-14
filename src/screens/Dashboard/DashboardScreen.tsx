@@ -65,6 +65,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authenticationError, setAuthenticationError] = useState<string | null>(null);
   const hasAuthenticatedRef = useRef(false);
+  const lastAuthenticatedUserIdRef = useRef<string | null>(null); // Track which user we authenticated for
 
   // Function to fetch user data from Firebase
   const fetchUserData = async (userId: string) => {
@@ -127,20 +128,36 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     refreshWallet
   } = useWalletState(currentUser?.id);
 
-  // Authenticate with Face ID before rendering dashboard (only once per session)
+  // Authenticate with Face ID before rendering dashboard (only once per user session)
+  // This runs only when the user changes, not on every screen focus
   useEffect(() => {
     const authenticate = async () => {
       if (!isAuthenticated || !currentUser?.id) {
         setIsAuthenticating(false);
         hasAuthenticatedRef.current = false;
+        lastAuthenticatedUserIdRef.current = null;
         return;
       }
 
-      // If already authenticated, skip re-authentication
-      if (hasAuthenticatedRef.current && isVaultAuthenticated()) {
-        logger.debug('Dashboard: Already authenticated, skipping re-authentication', null, 'DashboardScreen');
+      // ✅ CRITICAL: Only authenticate once per user session
+      // If we've already authenticated for this user and vault is still authenticated, skip
+      const isSameUser = lastAuthenticatedUserIdRef.current === currentUser.id;
+      if (isSameUser && hasAuthenticatedRef.current && isVaultAuthenticated()) {
+        logger.debug('Dashboard: Already authenticated for this user session, skipping re-authentication', {
+          userId: currentUser.id
+        }, 'DashboardScreen');
         setIsAuthenticating(false);
         return;
+      }
+
+      // If user changed, reset authentication state
+      if (!isSameUser) {
+        hasAuthenticatedRef.current = false;
+        lastAuthenticatedUserIdRef.current = currentUser.id;
+        logger.debug('Dashboard: User changed, resetting authentication state', {
+          previousUserId: lastAuthenticatedUserIdRef.current,
+          currentUserId: currentUser.id
+        }, 'DashboardScreen');
       }
 
       try {
@@ -154,15 +171,17 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         const authenticated = await secureVault.preAuthenticate();
         
         if (authenticated) {
-          logger.info('Authentication successful (biometrics or passcode)', null, 'DashboardScreen');
+          logger.info('Authentication successful (biometrics or passcode)', { userId: currentUser.id }, 'DashboardScreen');
           hasAuthenticatedRef.current = true;
+          lastAuthenticatedUserIdRef.current = currentUser.id;
           setIsAuthenticating(false);
         } else {
           // Keychain authentication failed (common in simulators or if user cancels)
           // This is okay - SecureStore fallback will work for vault access
           // Don't block the user, just log and continue
-          logger.info('Keychain authentication not available (using SecureStore fallback)', null, 'DashboardScreen');
+          logger.info('Keychain authentication not available (using SecureStore fallback)', { userId: currentUser.id }, 'DashboardScreen');
           hasAuthenticatedRef.current = true; // Mark as done even if Keychain failed
+          lastAuthenticatedUserIdRef.current = currentUser.id;
           setIsAuthenticating(false);
           // No error - app will work with SecureStore fallback
         }
@@ -175,7 +194,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     };
 
     authenticate();
-  }, [isAuthenticated, currentUser?.id]);
+  }, [isAuthenticated, currentUser?.id]); // Only re-run when user changes, not on every focus
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {

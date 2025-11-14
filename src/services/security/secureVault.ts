@@ -341,6 +341,13 @@ export const secureVault = {
   // Store cleartext using Keychain+MMKV, fallback to SecureStore cleartext
   async store(userId: string, name: 'mnemonic' | 'privateKey', value: string): Promise<boolean> {
     try {
+      // ✅ CRITICAL: Wait for any in-progress authentication before accessing vault
+      // This prevents multiple Face ID prompts when multiple operations happen simultaneously
+      if (authenticationPromise) {
+        logger.debug('secureVault: Authentication in progress, waiting...', { platform: Platform.OS }, 'SecureVault');
+        await authenticationPromise;
+      }
+      
       // ✅ Check cache first to avoid unnecessary Keychain access on Android
       // Only call getOrCreateAesKey if we don't have a valid cached key
       let key: Uint8Array | null = null;
@@ -382,6 +389,14 @@ export const secureVault = {
 
   async get(userId: string, name: 'mnemonic' | 'privateKey'): Promise<string | null> {
     try {
+      // ✅ CRITICAL: Wait for any in-progress authentication before accessing vault
+      // This prevents multiple Face ID prompts when DashboardScreen and walletService
+      // both try to access the vault simultaneously on first login
+      if (authenticationPromise) {
+        logger.debug('secureVault: Authentication in progress, waiting...', { platform: Platform.OS }, 'SecureVault');
+        await authenticationPromise;
+      }
+      
       // ✅ Check cache first to avoid unnecessary Keychain access on Android
       // Only call getOrCreateAesKey if we don't have a valid cached key
       let key: Uint8Array | null = null;

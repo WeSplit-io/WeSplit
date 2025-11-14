@@ -1,12 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ViewStyle, StyleProp, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, StyleProp, Dimensions } from 'react-native';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HouseLine, PiggyBank, ArrowsSplit, Medal, Users } from 'phosphor-react-native';
 import { colors, spacing, typography } from '../../theme';
 import platformUtils from '../../utils/core/platformUtils';
 import { logger } from '../../services/core';
-import { getPlatformInfo } from '../../utils/core/platformDetection';
 
 const styles = StyleSheet.create({
 
@@ -148,19 +147,6 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
 
     try {
       logger.info('Navigating to route', { route: String(route) }, 'NavBar');
-      
-      // Block Rewards access in production
-      if (route === 'Rewards') {
-        const platformInfo = getPlatformInfo();
-        if (platformInfo.isProduction) {
-          Alert.alert(
-            'Coming Soon! 🚀',
-            'We\'re working on the Rewards feature and it will be available in a few weeks. Stay tuned!',
-            [{ text: 'Got it!', style: 'default' }]
-          );
-          return;
-        }
-      }
       
       if (route === 'Contacts') {
         navigation.navigate('Contacts' as never, {} as never);

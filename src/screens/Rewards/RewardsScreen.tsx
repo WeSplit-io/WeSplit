@@ -3,7 +3,7 @@
  * Main rewards screen with points display, invite button, feature cards, and points history
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,6 @@ import { useApp } from '../../context/AppContext';
 import { pointsService } from '../../services/rewards/pointsService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { PointsTransaction } from '../../types/rewards';
-import { getPlatformInfo } from '../../utils/core/platformDetection';
 import { logger } from '../../services/analytics/loggingService';
 import { userActionSyncService } from '../../services/rewards/userActionSyncService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
@@ -40,6 +39,7 @@ const RewardsScreen: React.FC = () => {
   const [pointsHistory, setPointsHistory] = useState<PointsTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const isLoadingRef = useRef(false);
 
   const loadData = useCallback(async () => {
     if (!currentUser?.id) {
@@ -47,7 +47,13 @@ const RewardsScreen: React.FC = () => {
       return;
     }
 
+    // Prevent multiple simultaneous loads
+    if (isLoadingRef.current) {
+      return;
+    }
+
     try {
+      isLoadingRef.current = true;
       setLoading(true);
       
       // Get current season (Season 1 starts today and lasts 6 months)
@@ -87,17 +93,16 @@ const RewardsScreen: React.FC = () => {
       logger.error('Error loading rewards data', error, 'RewardsScreen');
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   }, [currentUser?.id, updateUser]);
 
   useEffect(() => {
-    const platformInfo = getPlatformInfo();
-    if (platformInfo.isProduction) {
-      // Block access in production - show coming soon
-      return;
-    }
+    if (currentUser?.id && !isLoadingRef.current) {
       loadData();
-  }, [loadData]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]); // Only depend on currentUser.id to prevent multiple loads
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -167,24 +172,6 @@ const RewardsScreen: React.FC = () => {
     }
     return titleMap[transaction.source] || 'Points Awarded';
   }, [titleMap]);
-
-  // Block access in production
-  const platformInfo = getPlatformInfo();
-  if (platformInfo.isProduction) {
-    return (
-      <Container>
-        <Header
-          title="Rewards"
-          showBackButton={false}
-          backgroundColor={colors.black}
-        />
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Rewards coming soon!</Text>
-        </View>
-        <NavBar currentRoute="Rewards" navigation={navigation} />
-      </Container>
-    );
-  }
 
   if (loading && !refreshing) {
     return (
