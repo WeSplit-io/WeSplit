@@ -2,9 +2,19 @@
  * Server-side Transaction Signing Service for Firebase Functions
  * Handles company fee payer signatures for USDC transfers
  * NEVER exposes company private keys to client
+ * 
+ * Best Practices Implemented:
+ * - Retry logic with exponential backoff for RPC calls
+ * - Performance monitoring for all operations
+ * - Structured error handling
+ * - Connection pooling (singleton pattern)
+ * - Timeout handling for all async operations
  */
 
 const { Connection, PublicKey, VersionedTransaction, Keypair } = require('@solana/web3.js');
+const { retryRpcOperation, isRetryableError } = require('./utils/rpcRetry');
+const { performanceMonitor, withPerformanceMonitoring } = require('./utils/performanceMonitor');
+const { handleError, ErrorTypes, withErrorHandling } = require('./utils/errorHandler');
 
 class TransactionSigningService {
   constructor() {
@@ -12,6 +22,8 @@ class TransactionSigningService {
     this.companyKeypair = null;
     this.initialized = false;
     this.rpcUrl = null; // Store RPC URL for mainnet detection
+    this.rpcEndpoints = []; // Store all available RPC endpoints for rotation
+    this.currentEndpointIndex = 0; // Track which endpoint we're currently using
     // Initialize asynchronously - will be called when first function is invoked
   }
 
@@ -19,25 +31,38 @@ class TransactionSigningService {
    * Ensure service is initialized
    */
   async ensureInitialized() {
+    console.log('🔄 TransactionSigningService.ensureInitialized: Starting', {
+      alreadyInitialized: this.initialized,
+      hasConnection: !!this.connection,
+      hasKeypair: !!this.companyKeypair
+    });
+    
     if (!this.initialized) {
       try {
+        console.log('🔄 TransactionSigningService: Calling initialize()');
         await this.initialize();
         this.initialized = true;
-        console.log('Transaction signing service initialized successfully', {
+        console.log('✅ Transaction signing service initialized successfully', {
           hasConnection: !!this.connection,
           hasKeypair: !!this.companyKeypair,
-          connectionType: this.connection?.constructor?.name
+          connectionType: this.connection?.constructor?.name,
+          rpcUrl: this.rpcUrl ? this.rpcUrl.substring(0, 50) + '...' : 'N/A'
         });
       } catch (error) {
-        console.error('Failed to initialize transaction signing service:', {
+        console.error('❌ Failed to initialize transaction signing service:', {
           error: error.message,
-          errorStack: error.stack,
+          errorName: error?.name,
+          errorCode: error?.code,
+          errorStack: error.stack ? error.stack.substring(0, 500) : 'No stack trace',
           hasConnection: !!this.connection,
-          hasKeypair: !!this.companyKeypair
+          hasKeypair: !!this.companyKeypair,
+          timestamp: new Date().toISOString()
         });
         // Don't set initialized to true if initialization failed
         throw new Error(`Failed to initialize transaction signing service: ${error.message}`);
       }
+    } else {
+      console.log('✅ TransactionSigningService: Already initialized, skipping');
     }
     
     // Double-check that connection exists after initialization
@@ -55,28 +80,46 @@ class TransactionSigningService {
    * Uses Firebase Secrets (not deprecated config)
    */
   async initialize() {
+    console.log('🔵 TransactionSigningService.initialize: STARTING', {
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       // Get company wallet configuration from Firebase Secrets
       // Firebase Secrets are automatically available as process.env variables when deployed
       const companyWalletAddress = process.env.COMPANY_WALLET_ADDRESS?.trim();
       const companyWalletSecretKey = process.env.COMPANY_WALLET_SECRET_KEY?.trim();
       
-      console.log('Initializing transaction signing service', {
+      console.log('🔄 TransactionSigningService.initialize: Checking secrets', {
         hasAddress: !!companyWalletAddress,
         addressLength: companyWalletAddress?.length,
         addressPreview: companyWalletAddress ? companyWalletAddress.substring(0, 8) + '...' : 'missing',
         hasSecretKey: !!companyWalletSecretKey,
         secretKeyLength: companyWalletSecretKey?.length,
+        addressIsString: typeof companyWalletAddress === 'string',
+        secretKeyIsString: typeof companyWalletSecretKey === 'string',
         // SECURITY: Never log secret key previews - even partial keys can be security risk
       });
       
       if (!companyWalletAddress || !companyWalletSecretKey) {
+        console.error('❌ TransactionSigningService.initialize: Secrets missing', {
+          hasAddress: !!companyWalletAddress,
+          hasSecretKey: !!companyWalletSecretKey,
+          addressValue: companyWalletAddress || 'MISSING',
+          secretKeyValue: companyWalletSecretKey ? 'PRESENT' : 'MISSING',
+          allEnvKeys: Object.keys(process.env).filter(k => k.includes('COMPANY') || k.includes('WALLET'))
+        });
         throw new Error(
           'Company wallet configuration missing. ' +
           'Set COMPANY_WALLET_ADDRESS and COMPANY_WALLET_SECRET_KEY as Firebase Secrets. ' +
           'Use: firebase functions:secrets:set COMPANY_WALLET_ADDRESS'
         );
       }
+      
+      console.log('✅ TransactionSigningService.initialize: Secrets found', {
+        addressLength: companyWalletAddress.length,
+        secretKeyLength: companyWalletSecretKey.length
+      });
 
       // Create company keypair from secret key
       let secretKeyArray;
@@ -115,11 +158,98 @@ class TransactionSigningService {
         throw new Error(`Company wallet public key mismatch. Expected: ${companyWalletAddress}, Derived: ${derivedAddress}`);
       }
 
-      // Create connection - use network from environment, default to devnet for development
-      // Use same RPC endpoint priority as client for consistency and speed
-      const network = process.env.DEV_NETWORK || process.env.EXPO_PUBLIC_DEV_NETWORK || 'devnet';
-      const forceMainnet = process.env.FORCE_MAINNET === 'true' || process.env.EXPO_PUBLIC_FORCE_MAINNET === 'true';
-      const actualNetwork = forceMainnet ? 'mainnet' : network;
+      // Create connection - use network from environment
+      // Priority: SOLANA_NETWORK > EXPO_PUBLIC_FORCE_MAINNET > FORCE_MAINNET > EXPO_PUBLIC_DEV_NETWORK > DEV_NETWORK > default 'devnet'
+      // This ensures backend matches frontend network selection
+      let actualNetwork = 'devnet'; // Default to devnet for safety
+      
+      // Debug: Log all relevant environment variables
+      console.log('Checking network environment variables', {
+        SOLANA_NETWORK: process.env.SOLANA_NETWORK,
+        NETWORK: process.env.NETWORK,
+        EXPO_PUBLIC_FORCE_MAINNET: process.env.EXPO_PUBLIC_FORCE_MAINNET,
+        FORCE_MAINNET: process.env.FORCE_MAINNET,
+        EXPO_PUBLIC_DEV_NETWORK: process.env.EXPO_PUBLIC_DEV_NETWORK,
+        DEV_NETWORK: process.env.DEV_NETWORK
+      });
+      
+      // Check explicit network setting (highest priority)
+      if (process.env.SOLANA_NETWORK) {
+        actualNetwork = process.env.SOLANA_NETWORK.toLowerCase().trim();
+        console.log('Using SOLANA_NETWORK:', actualNetwork);
+      } else if (process.env.NETWORK) {
+        actualNetwork = process.env.NETWORK.toLowerCase().trim();
+        console.log('Using NETWORK:', actualNetwork);
+      }
+      // Check EXPO_PUBLIC_FORCE_MAINNET (matches frontend variable name)
+      else if (process.env.EXPO_PUBLIC_FORCE_MAINNET === 'true' || process.env.EXPO_PUBLIC_FORCE_MAINNET === '1') {
+        actualNetwork = 'mainnet';
+        console.log('Using EXPO_PUBLIC_FORCE_MAINNET=true, setting network to mainnet');
+      }
+      // Check FORCE_MAINNET (backend variable)
+      else if (process.env.FORCE_MAINNET === 'true' || process.env.FORCE_MAINNET === '1') {
+        actualNetwork = 'mainnet';
+        console.log('Using FORCE_MAINNET=true, setting network to mainnet');
+      }
+      // Check EXPO_PUBLIC_DEV_NETWORK (frontend variable - can be 'mainnet' or 'devnet')
+      else if (process.env.EXPO_PUBLIC_DEV_NETWORK) {
+        const frontendNetwork = process.env.EXPO_PUBLIC_DEV_NETWORK.toLowerCase().trim();
+        // Handle both 'mainnet'/'devnet' strings
+        if (frontendNetwork === 'mainnet') {
+          actualNetwork = 'mainnet';
+        } else if (frontendNetwork === 'devnet') {
+          actualNetwork = 'devnet';
+        } else {
+          // If it's 'true'/'false', treat as boolean
+          if (frontendNetwork === 'true' || frontendNetwork === '1') {
+            actualNetwork = 'devnet'; // true = devnet
+          } else if (frontendNetwork === 'false' || frontendNetwork === '0') {
+            actualNetwork = 'mainnet'; // false = mainnet
+          } else {
+            actualNetwork = frontendNetwork; // Use as-is if it's a valid network name
+          }
+        }
+        console.log('Using EXPO_PUBLIC_DEV_NETWORK:', frontendNetwork, '->', actualNetwork);
+      }
+      // Check legacy DEV_NETWORK variable
+      else if (process.env.DEV_NETWORK) {
+        const devNetwork = process.env.DEV_NETWORK.toLowerCase().trim();
+        if (devNetwork === 'mainnet') {
+          actualNetwork = 'mainnet';
+        } else if (devNetwork === 'devnet') {
+          actualNetwork = 'devnet';
+        } else if (devNetwork === 'true' || devNetwork === '1') {
+          actualNetwork = 'devnet';
+        } else if (devNetwork === 'false' || devNetwork === '0') {
+          actualNetwork = 'mainnet';
+        } else {
+          actualNetwork = devNetwork;
+        }
+        console.log('Using DEV_NETWORK:', devNetwork, '->', actualNetwork);
+      } else {
+        console.log('No network environment variable found, using default: devnet');
+      }
+      
+      // Validate network value
+      if (!['mainnet', 'devnet', 'testnet'].includes(actualNetwork)) {
+        console.warn('Invalid network value, defaulting to devnet', {
+          provided: actualNetwork,
+          envVars: {
+            SOLANA_NETWORK: process.env.SOLANA_NETWORK,
+            NETWORK: process.env.NETWORK,
+            EXPO_PUBLIC_FORCE_MAINNET: process.env.EXPO_PUBLIC_FORCE_MAINNET,
+            FORCE_MAINNET: process.env.FORCE_MAINNET,
+            EXPO_PUBLIC_DEV_NETWORK: process.env.EXPO_PUBLIC_DEV_NETWORK,
+            DEV_NETWORK: process.env.DEV_NETWORK
+          }
+        });
+        actualNetwork = 'devnet';
+      }
+      
+      console.log('Final network selection:', {
+        network: actualNetwork,
+        isMainnet: actualNetwork === 'mainnet'
+      });
       
       // Helper to extract API key from URL or return as-is
       const extractApiKey = (value, baseUrl) => {
@@ -148,36 +278,64 @@ class TransactionSigningService {
       
       if (actualNetwork === 'mainnet') {
         // Use same priority order as client: Alchemy > GetBlock > QuickNode > Chainstack > Helius > Free
-        const alchemyApiKey = extractApiKey(process.env.ALCHEMY_API_KEY || process.env.EXPO_PUBLIC_ALCHEMY_API_KEY, 'solana-mainnet.g.alchemy.com/v2');
-        const getBlockApiKey = extractGetBlockKey(process.env.GETBLOCK_API_KEY || process.env.EXPO_PUBLIC_GETBLOCK_API_KEY);
-        const quickNodeEndpoint = process.env.QUICKNODE_ENDPOINT || process.env.EXPO_PUBLIC_QUICKNODE_ENDPOINT;
-        const chainstackEndpoint = process.env.CHAINSTACK_ENDPOINT || process.env.EXPO_PUBLIC_CHAINSTACK_ENDPOINT;
-        const heliusApiKey = extractApiKey(process.env.HELIUS_API_KEY || process.env.EXPO_PUBLIC_HELIUS_API_KEY, 'mainnet.helius-rpc.com');
+        // SECURITY: Use Firebase Secrets only - never use EXPO_PUBLIC_ variables in production
+        // Set USE_PAID_RPC=true to enable paid RPC providers
+        const usePaidRpc = process.env.USE_PAID_RPC === 'true';
         
-        // Tier 1: Fast providers with API keys
-        if (alchemyApiKey && alchemyApiKey !== 'YOUR_ALCHEMY_API_KEY_HERE') {
-          rpcEndpoints.push(`https://solana-mainnet.g.alchemy.com/v2/${alchemyApiKey}`);
-        }
-        if (getBlockApiKey && getBlockApiKey !== 'YOUR_GETBLOCK_API_KEY_HERE') {
-          rpcEndpoints.push(`https://sol.getblock.io/mainnet/?api_key=${getBlockApiKey}`);
-        }
-        if (quickNodeEndpoint && quickNodeEndpoint !== 'YOUR_QUICKNODE_ENDPOINT_HERE') {
-          rpcEndpoints.push(quickNodeEndpoint);
-        }
-        if (chainstackEndpoint && chainstackEndpoint !== 'YOUR_CHAINSTACK_ENDPOINT_HERE') {
-          rpcEndpoints.push(chainstackEndpoint);
+        // SECURITY: Only use Firebase Secrets (process.env.ALCHEMY_API_KEY) - not EXPO_PUBLIC_ variables
+        // EXPO_PUBLIC_ variables are for client-side only and should not be used in Firebase Functions
+        const alchemyApiKey = extractApiKey(process.env.ALCHEMY_API_KEY, 'solana-mainnet.g.alchemy.com/v2');
+        const getBlockApiKey = extractGetBlockKey(process.env.GETBLOCK_API_KEY);
+        const quickNodeEndpoint = process.env.QUICKNODE_ENDPOINT;
+        const chainstackEndpoint = process.env.CHAINSTACK_ENDPOINT;
+        const heliusApiKey = extractApiKey(process.env.HELIUS_API_KEY, 'mainnet.helius-rpc.com');
+        
+        // Log API key availability for debugging
+        console.log('RPC API keys check', {
+          usePaidRpc,
+          usePaidRpcRaw: process.env.USE_PAID_RPC,
+          hasAlchemy: !!alchemyApiKey && alchemyApiKey !== 'YOUR_ALCHEMY_API_KEY_HERE',
+          hasGetBlock: !!getBlockApiKey && getBlockApiKey !== 'YOUR_GETBLOCK_API_KEY_HERE',
+          hasHelius: !!heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE',
+          hasQuickNode: !!quickNodeEndpoint && quickNodeEndpoint !== 'YOUR_QUICKNODE_ENDPOINT_HERE',
+          hasChainstack: !!chainstackEndpoint && chainstackEndpoint !== 'YOUR_CHAINSTACK_ENDPOINT_HERE'
+        });
+        
+        // Tier 1: Fast providers with API keys (only if USE_PAID_RPC=true)
+        if (usePaidRpc) {
+          if (alchemyApiKey && alchemyApiKey !== 'YOUR_ALCHEMY_API_KEY_HERE') {
+            rpcEndpoints.push(`https://solana-mainnet.g.alchemy.com/v2/${alchemyApiKey}`);
+          }
+          if (getBlockApiKey && getBlockApiKey !== 'YOUR_GETBLOCK_API_KEY_HERE') {
+            rpcEndpoints.push(`https://sol.getblock.io/mainnet/?api_key=${getBlockApiKey}`);
+          }
+          if (quickNodeEndpoint && quickNodeEndpoint !== 'YOUR_QUICKNODE_ENDPOINT_HERE') {
+            rpcEndpoints.push(quickNodeEndpoint);
+          }
+          if (chainstackEndpoint && chainstackEndpoint !== 'YOUR_CHAINSTACK_ENDPOINT_HERE') {
+            rpcEndpoints.push(chainstackEndpoint);
+          }
+          
+          // Tier 2: Helius
+          if (heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE') {
+            rpcEndpoints.push(`https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`);
+          }
         }
         
-        // Tier 2: Helius
-        if (heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE') {
-          rpcEndpoints.push(`https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`);
-        }
-        
-        // Tier 3: Free fallback
-        rpcEndpoints.push('https://rpc.ankr.com/solana');
+        // Tier 3: Free fallback (always included, used first if USE_PAID_RPC is not set)
+        // NOTE: Removed Ankr as it's returning 403 errors - use official Solana RPC only
         rpcEndpoints.push('https://api.mainnet-beta.solana.com');
         
         rpcUrl = rpcEndpoints[0] || 'https://api.mainnet-beta.solana.com';
+        
+        console.log('RPC endpoint selection', {
+          usePaidRpc,
+          usePaidRpcRaw: process.env.USE_PAID_RPC,
+          totalEndpoints: rpcEndpoints.length,
+          selectedEndpoint: rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***'),
+          allEndpoints: rpcEndpoints.map(url => url.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***')),
+          note: usePaidRpc ? 'Using paid RPC providers' : 'Using free RPC endpoints (set USE_PAID_RPC=true to enable paid providers)'
+        });
       } else if (actualNetwork === 'testnet') {
         rpcUrl = 'https://api.testnet.solana.com';
         rpcEndpoints.push(rpcUrl);
@@ -211,7 +369,12 @@ class TransactionSigningService {
         primaryProvider: rpcUrl.includes('alchemy') ? 'Alchemy' : 
                          rpcUrl.includes('getblock') ? 'GetBlock' : 
                          rpcUrl.includes('helius') ? 'Helius' : 
-                         rpcUrl.includes('ankr') ? 'Ankr' : 'Official'
+                         rpcUrl.includes('ankr') ? 'Ankr' : 'Official',
+        networkSource: process.env.SOLANA_NETWORK ? 'SOLANA_NETWORK' :
+                       process.env.NETWORK ? 'NETWORK' :
+                       process.env.FORCE_MAINNET ? 'FORCE_MAINNET' :
+                       process.env.EXPO_PUBLIC_DEV_NETWORK ? 'EXPO_PUBLIC_DEV_NETWORK' :
+                       process.env.DEV_NETWORK ? 'DEV_NETWORK' : 'default (devnet)'
       });
 
     } catch (error) {
@@ -345,11 +508,20 @@ class TransactionSigningService {
       }
 
       // Quick validation - use 'confirmed' commitment for faster response
+      // Best Practice: Use retry logic for RPC calls
       const blockhashString = transactionBlockhash.toString();
       // Use 'confirmed' commitment for faster validation (vs 'finalized' which is slower)
-      const isValid = await this.connection.isBlockhashValid(blockhashString, { 
-        commitment: 'confirmed' // Faster than 'finalized'
-      });
+      const isValid = await retryRpcOperation(
+        () => this.connection.isBlockhashValid(blockhashString, { 
+          commitment: 'confirmed' // Faster than 'finalized'
+        }),
+        {
+          maxRetries: 2, // Fewer retries for quick validation
+          initialDelay: 50,
+          maxDelay: 500,
+          timeout: 2000
+        }
+      );
       const isValidValue = isValid && (typeof isValid === 'boolean' ? isValid : isValid.value === true);
       
       return { 
@@ -452,79 +624,16 @@ class TransactionSigningService {
         note: 'Using the ACTUAL blockhash from the transaction for validation'
       });
       
-      // CRITICAL: Validate blockhash BEFORE submission (unless already validated)
-      // If skipValidation is true, blockhash was already validated in processUsdcTransfer
-      // This avoids double validation and reduces delay
-      if (!skipValidation) {
-        let blockhashValid = false;
-        let currentBlockHeight = null;
-        
-        try {
-          // Get current blockhash info to check expiration status
-          const { blockhash: currentBlockhash } = 
-            await this.connection.getLatestBlockhash('confirmed');
-          
-          // Check if transaction's blockhash is still valid
-          const blockhashString = transactionBlockhash.toString();
-          const validationResult = await this.connection.isBlockhashValid(blockhashString, {
-            commitment: 'confirmed'
-          });
-          
-          // CRITICAL: isBlockhashValid returns { context, value } not a boolean
-          // Extract the actual boolean value from the result
-          blockhashValid = validationResult && (validationResult.value === true || validationResult === true);
-          
-          // Get current block height to calculate slots remaining
-          try {
-            currentBlockHeight = await this.connection.getBlockHeight('confirmed');
-          } catch (heightError) {
-            console.warn('Failed to get current block height, using blockhash validation only', {
-              error: heightError.message
-            });
-          }
-          
-          if (!blockhashValid) {
-          console.error('Transaction blockhash is invalid (expired)', {
-            transactionBlockhash: blockhashString.substring(0, 8) + '...',
-              currentBlockhash: currentBlockhash.substring(0, 8) + '...',
-            note: 'Blockhash has expired. Client should rebuild transaction with fresh blockhash.'
-          });
-          throw new Error(
-            'Transaction blockhash has expired. The transaction was created too long ago. ' +
-            'Please create a new transaction with a fresh blockhash. ' +
-            'Blockhashes expire after approximately 60 seconds.'
-          );
-        }
-        
-          console.log('Blockhash validation passed - submitting immediately', {
-          transactionBlockhash: blockhashString.substring(0, 8) + '...',
-            currentBlockhash: currentBlockhash.substring(0, 8) + '...',
-            isValid: blockhashValid,
-            currentBlockHeight,
-            note: 'Blockhash is still valid, submitting immediately to minimize expiration risk'
-        });
-      } catch (validationError) {
-          // If validation fails with our error, re-throw it
-          if (validationError.message && validationError.message.includes('expired')) {
-            throw validationError;
-          }
-          
-        // If isBlockhashValid fails (network error, etc.), log but don't block submission
-        // The actual submission will catch blockhash errors
-        console.warn('Blockhash validation check failed, proceeding anyway', {
-          error: validationError.message,
-          transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...',
-          note: 'Will rely on Solana to reject if blockhash is expired'
-          });
-        }
-      } else {
-        // skipValidation is false - we'll validate right before submission instead
-        // This is more efficient than validating early, as we catch expiration at the last moment
-        console.log('Will validate blockhash right before submission', {
-          transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...',
-          note: 'Validation will happen immediately before sendTransaction to catch expiration'
-        });
-      }
+      // CRITICAL: Skip blockhash validation to save 100-300ms
+      // Client already validates blockhash right before sending (0-100ms old)
+      // Redundant validation here causes blockhash to expire during processing
+      // Solana network will reject expired blockhashes during submission anyway
+      // This saves critical time and prevents timeout issues on mainnet
+      const blockhashString = transactionBlockhash.toString();
+      console.log('Skipping blockhash validation - submitting immediately', {
+        transactionBlockhash: blockhashString.substring(0, 8) + '...',
+        note: 'Client already validated blockhash. Submitting immediately to prevent expiration.'
+      });
       
       console.log('Preparing transaction submission', {
         transactionBlockhash: transactionBlockhash.toString().substring(0, 8) + '...',
@@ -532,11 +641,12 @@ class TransactionSigningService {
         signatureCount: transaction.signatures.length
       });
 
-      // CRITICAL: On mainnet, ALWAYS use skipPreflight: true to minimize submission time
-      // Preflight simulation takes 500-2000ms which can cause blockhash expiration
+      // CRITICAL: ALWAYS use skipPreflight: true on both mainnet and devnet to minimize submission time
+      // Preflight simulation takes 200-2000ms which can cause blockhash expiration
+      // Preflight can also fail with "Blockhash not found" even if blockhash is valid (RPC timing issues)
       // Client already validates transaction structure, so preflight is redundant
       // If blockhash is expired, Solana will reject during actual submission anyway
-      // Detect mainnet by checking stored RPC URL
+      // Detect mainnet by checking stored RPC URL (for logging purposes)
       const isMainnet = this.rpcUrl ? (
         this.rpcUrl.includes('mainnet') || 
         this.rpcUrl.includes('helius-rpc.com') ||
@@ -545,48 +655,145 @@ class TransactionSigningService {
         (!this.rpcUrl.includes('devnet') && !this.rpcUrl.includes('testnet'))
       ) : false;
       
-      // CRITICAL: Skip blockhash validation to save time - submit IMMEDIATELY
-      // Validation takes 100-300ms which can cause blockhash to expire during validation itself
-      // Client already sends fresh blockhash (0-100ms old), so validation is redundant
-      // If blockhash is expired, Solana will reject during submission anyway
-      // This saves 100-300ms and reduces blockhash expiration risk
-      const blockhashString = transactionBlockhash.toString();
+      // CRITICAL: Submit IMMEDIATELY - no validation delays
+      // Client already validated blockhash (0-100ms old when sent)
+      // Every millisecond counts to prevent blockhash expiration
       const submissionStartTime = Date.now();
-      console.log('Submitting transaction immediately (no pre-submission validation)', {
+      console.log('Submitting transaction immediately', {
         isMainnet,
         rpcUrl: this.rpcUrl ? this.rpcUrl.substring(0, 50) + '...' : 'unknown',
-        skipPreflight: true,
+        skipPreflight: true, // Always skip preflight to save time and avoid false negatives
         transactionBlockhash: blockhashString.substring(0, 8) + '...',
-        note: 'Skipping pre-submission validation to minimize delay. Solana will reject if blockhash expired.'
+        note: 'Submitting immediately to minimize blockhash expiration risk. Preflight skipped on both networks.'
       });
       
       // CRITICAL: Submit the transaction IMMEDIATELY - no delays
       // Every millisecond counts to avoid blockhash expiration
-      // On mainnet, we skip preflight to save time, but this means we need to verify after submission
+      // Skip preflight on both mainnet and devnet to save time and avoid false negatives
       // Preflight simulation checks blockhash validity, which can fail if blockhash expired
       // By skipping preflight, we submit immediately and let Solana handle validation
+      // On devnet, preflight can also fail due to RPC slowness or blockhash timing issues
+      // Best Practice: Use retry logic with exponential backoff for RPC calls
       let signature;
+      const submitTimer = performanceMonitor.startOperation('submitTransaction');
       try {
-        // Skip preflight on mainnet to save 500-2000ms and prevent blockhash expiration
-        // Preflight simulation takes 500-2000ms and can cause blockhash to expire
-        // If blockhash is expired, Solana will reject during actual submission anyway
-        // We'll verify the transaction exists on-chain after submission
-        signature = await this.connection.sendTransaction(transaction, {
-          skipPreflight: isMainnet, // Skip preflight on mainnet only
-          maxRetries: 3
-        });
+        // Best Practice: Retry RPC calls with exponential backoff
+        // CRITICAL: Skip preflight on both networks to avoid blockhash expiration issues
+        // Preflight adds 200-500ms delay and can fail even with valid blockhashes
+        signature = await retryRpcOperation(
+          () => this.connection.sendTransaction(transaction, {
+            skipPreflight: true, // Skip preflight on both mainnet and devnet to save time
+            maxRetries: 0 // We handle retries ourselves
+          }),
+          {
+            maxRetries: 3,
+            initialDelay: 100,
+            maxDelay: 1000,
+            timeout: 5000
+          }
+        );
+        submitTimer.end();
       } catch (sendError) {
+        submitTimer.end();
+        performanceMonitor.recordError('submitTransaction', sendError);
         // Check if it's a blockhash-related error
+        // CRITICAL: Be specific - only match actual Solana blockhash errors
+        // Don't match generic "expired" which could be from other errors
         const errorMessage = sendError.message || String(sendError);
         const errorString = String(sendError).toLowerCase();
+        
+        // Check for RPC API key errors (403 Forbidden)
+        const isApiKeyError = 
+          errorMessage.includes('403') ||
+          errorMessage.includes('Forbidden') ||
+          errorMessage.includes('API key is not allowed') ||
+          errorMessage.includes('API key') && (errorMessage.includes('not allowed') || errorMessage.includes('invalid')) ||
+          errorString.includes('403') ||
+          errorString.includes('forbidden') ||
+          (sendError.code && sendError.code === 403) ||
+          (sendError.response && sendError.response.status === 403);
+        
+        if (isApiKeyError) {
+          // RPC API key doesn't have permission - try next endpoint
+          const currentIndex = this.currentEndpointIndex;
+          const nextIndex = currentIndex + 1;
+          
+          if (this.rpcEndpoints && nextIndex < this.rpcEndpoints.length) {
+            // Try next endpoint
+            console.warn('⚠️ RPC endpoint failed with 403, rotating to next endpoint', {
+              failedEndpoint: this.rpcUrl ? this.rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***') : 'unknown',
+              currentIndex,
+              nextIndex,
+              totalEndpoints: this.rpcEndpoints.length,
+              nextEndpoint: this.rpcEndpoints[nextIndex].replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***')
+            });
+            
+            // Switch to next endpoint
+            this.currentEndpointIndex = nextIndex;
+            this.rpcUrl = this.rpcEndpoints[nextIndex];
+            this.connection = new Connection(this.rpcUrl, {
+              commitment: 'confirmed',
+              confirmTransactionInitialTimeout: 30000,
+              disableRetryOnRateLimit: false,
+              httpHeaders: {
+                'User-Agent': 'WeSplit-Firebase/1.0',
+                'Connection': 'keep-alive',
+              },
+            });
+            
+            // Retry with new endpoint (only once to avoid infinite loops)
+            try {
+              signature = await this.connection.sendTransaction(transaction, {
+                skipPreflight: true,
+                maxRetries: 0
+              });
+              submitTimer.end();
+              console.log('✅ Transaction submitted successfully after endpoint rotation', {
+                endpoint: this.rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***'),
+                signature: signature?.substring(0, 16) + '...'
+              });
+              // Continue to verification below - don't return early
+            } catch (retryError) {
+              // If retry also fails, throw original error
+              console.error('❌ All RPC endpoints failed', {
+                totalEndpoints: this.rpcEndpoints.length,
+                triedEndpoints: nextIndex + 1,
+                lastError: retryError.message?.substring(0, 200)
+              });
+              throw new Error(
+                `RPC endpoint API key error: All ${this.rpcEndpoints.length} endpoints failed. ` +
+                `Last error: ${retryError.message?.substring(0, 200) || errorMessage.substring(0, 200)}`
+              );
+            }
+          } else {
+            // No more endpoints to try
+            console.error('❌ RPC API key error - all endpoints exhausted', {
+              error: errorMessage.substring(0, 300),
+              rpcUrl: this.rpcUrl ? this.rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***') : 'unknown',
+              availableEndpoints: this.rpcEndpoints ? this.rpcEndpoints.length : 0,
+              triedEndpoints: this.currentEndpointIndex + 1
+            });
+            throw new Error(
+              `RPC endpoint API key error: All ${this.rpcEndpoints?.length || 0} endpoints failed. ` +
+              `The API key for ${this.rpcUrl ? this.rpcUrl.split('/')[2] : 'RPC endpoint'} does not have permission to access the blockchain. ` +
+              `Please check your RPC API key configuration. ` +
+              `Error: ${errorMessage.substring(0, 200)}`
+            );
+          }
+        }
+        
+        // Solana-specific blockhash error patterns
         const isBlockhashError = 
           errorMessage.includes('Blockhash not found') || 
-          errorMessage.includes('blockhash') ||
-          errorMessage.includes('block hash') ||
-          errorMessage.includes('expired') ||
+          errorMessage.includes('blockhash not found') ||
+          errorMessage.includes('blockhash expired') ||
+          errorMessage.includes('blockhash has expired') ||
           errorString.includes('blockhash not found') ||
           errorString.includes('blockhash expired') ||
-          (errorString.includes('simulation failed') && errorString.includes('blockhash'));
+          errorString.includes('blockhash has expired') ||
+          (errorString.includes('simulation failed') && errorString.includes('blockhash')) ||
+          // Solana RPC error codes for blockhash issues
+          (sendError.code && (sendError.code === -32002 || sendError.code === -32004));
 
         if (isBlockhashError) {
           // Blockhash expired - this is a real error from Solana
@@ -613,7 +820,8 @@ class TransactionSigningService {
         console.error('Transaction submission failed', {
           error: errorMessage,
           errorType: sendError.constructor?.name,
-          isMainnet
+          isMainnet,
+          rpcUrl: this.rpcUrl ? this.rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***') : 'unknown'
         });
         throw sendError;
       }
@@ -626,127 +834,173 @@ class TransactionSigningService {
       // CRITICAL: Verify transaction was actually accepted by network
       // With skipPreflight: true, sendTransaction can return signature even if transaction will be rejected
       // We MUST verify the transaction exists on-chain before returning success
-      // On mainnet, RPC indexing can be slow (1-3 seconds), so we need multiple attempts
+      // Network-aware verification: devnet is faster, mainnet needs more time
       const verificationStartTime = Date.now();
       
-      // Wait 300ms for RPC to index the transaction initially
-      // Mainnet RPC endpoints can be slow to index transactions
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Network-aware verification timing
+      // Mainnet: Transactions can take 1-5 seconds to be indexed by RPCs, especially during high traffic
+      // Devnet: Transactions appear faster, but RPC can be unreliable/slow
+      // Reuse isMainnet from earlier in function
+      
+      // Mainnet needs MORE initial wait - RPCs can be slow to index during high traffic
+      const initialWait = isMainnet ? 1000 : 500; // Mainnet: 1s, Devnet: 500ms
+      await new Promise(resolve => setTimeout(resolve, initialWait));
       
       let transactionFound = false;
       let transactionError = null;
-      const maxVerificationAttempts = 6; // Reduced to 6 attempts (faster failure)
-      const verificationDelay = 300; // 300ms between attempts (faster)
-      const verificationTimeout = 1500; // 1.5 seconds per attempt (faster)
+      // Mainnet needs more attempts - RPC indexing can be slow
+      const maxVerificationAttempts = isMainnet ? 5 : 5; // Same attempts, but mainnet has longer delays
+      // Mainnet needs longer delays between attempts - give RPC time to index
+      const verificationDelay = isMainnet ? 1000 : 500; // Mainnet: 1s, Devnet: 500ms
+      // Mainnet needs longer timeout per attempt - RPC can be slow
+      const verificationTimeout = isMainnet ? 2000 : 1500; // Mainnet: 2s, Devnet: 1.5s
       
       // Try multiple times to find the transaction
       // On mainnet, transactions can take 1-5 seconds to be indexed
-      for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
-        try {
-          // Check with longer timeout per attempt (2 seconds)
-          // Mainnet RPC can be slow, so we need more patience
-          const status = await Promise.race([
+      // Best Practice: Use retry logic with exponential backoff
+      const verifyTimer = performanceMonitor.startOperation('verifyTransaction');
+      try {
+        const status = await retryRpcOperation(
+          () => Promise.race([
             this.connection.getSignatureStatus(signature, {
               searchTransactionHistory: true
             }),
             new Promise((_, reject) => 
               setTimeout(() => reject(new Error('Verification timeout')), verificationTimeout)
             )
-          ]);
+          ]),
+          {
+            maxRetries: maxVerificationAttempts - 1, // Already doing one attempt
+            initialDelay: verificationDelay,
+            maxDelay: verificationTimeout,
+            timeout: verificationTimeout
+          }
+        );
+        
+        // Process status result
+        if (status && status.value) {
+          transactionFound = true;
           
-          if (status.value) {
-            transactionFound = true;
-            
-            // Transaction found - check if it has an error
-            if (status.value.err) {
-              transactionError = status.value.err;
-              const verificationTime = Date.now() - verificationStartTime;
-              console.error('Transaction failed on-chain', {
-                signature,
-                error: transactionError,
-                verificationTimeMs: verificationTime,
-                attempt,
-                note: 'Transaction was submitted but failed during execution.'
-              });
-              throw new Error(
-                `Transaction failed on-chain: ${JSON.stringify(transactionError)}. ` +
-                'The transaction was submitted but failed during execution.'
-              );
-            }
-            
-            // Transaction found and no error - success!
+          // Transaction found - check if it has an error
+          if (status.value.err) {
+            transactionError = status.value.err;
             const verificationTime = Date.now() - verificationStartTime;
-            console.log('Transaction verified on-chain', {
+            verifyTimer.end();
+            console.error('Transaction failed on-chain', {
               signature,
+              error: transactionError,
               verificationTimeMs: verificationTime,
-              attempt,
-              confirmationStatus: status.value.confirmationStatus,
-              note: 'Transaction was successfully submitted and verified on-chain.'
+              note: 'Transaction was submitted but failed during execution.'
             });
-            break; // Success - exit retry loop
-          } else {
-            // Transaction not found yet - might need more time
-            if (attempt < maxVerificationAttempts) {
-              console.log(`Transaction not found yet (attempt ${attempt}/${maxVerificationAttempts}), retrying...`, {
-                signature,
-                attempt,
-                note: 'RPC may need more time to index. Will retry with longer delay.'
-              });
-              await new Promise(resolve => setTimeout(resolve, verificationDelay));
-            }
-          }
-        } catch (checkError) {
-          const errorMessage = checkError.message || String(checkError);
-          
-          // If it's our custom error (transaction failed), throw it immediately
-          if (errorMessage.includes('Transaction failed on-chain')) {
-            throw checkError;
+            throw handleError(
+              new Error(`Transaction failed on-chain: ${JSON.stringify(transactionError)}`),
+              { signature, operation: 'verifyTransaction' }
+            );
           }
           
-          // If timeout and not last attempt, retry with longer delay
-          if (attempt < maxVerificationAttempts) {
-            console.log(`Verification timeout (attempt ${attempt}/${maxVerificationAttempts}), retrying...`, {
-              signature,
-              attempt,
-              error: errorMessage,
-              note: 'RPC may be slow. Will retry with longer delay.'
-            });
-            await new Promise(resolve => setTimeout(resolve, verificationDelay));
-            continue;
-          }
-          
-          // Last attempt failed - transaction was likely rejected
+          // Transaction found and no error - success!
           const verificationTime = Date.now() - verificationStartTime;
-          console.error('Transaction not found after all verification attempts', {
+          verifyTimer.end();
+          console.log('Transaction verified on-chain', {
             signature,
             verificationTimeMs: verificationTime,
-            attempts: maxVerificationAttempts,
-            error: errorMessage,
-            note: 'Transaction was likely rejected by Solana network. sendTransaction with skipPreflight can return signature even if transaction is rejected.'
+            confirmationStatus: status.value.confirmationStatus,
+            note: 'Transaction was successfully submitted and verified on-chain.'
           });
           
-          // Don't assume success - fail if we can't verify
-          throw new Error(
-            'Transaction was rejected by Solana network. The transaction signature was returned but the transaction was not accepted. ' +
-            'This may be due to an expired blockhash, insufficient funds, or invalid transaction parameters. Please try again with a fresh transaction.'
+          performanceMonitor.recordOperation('verifyTransaction', true);
+          
+        } else {
+          // Transaction not found after all retries
+          const verificationTime = Date.now() - verificationStartTime;
+          verifyTimer.end();
+          
+          // On devnet, be more lenient - transaction might still be processing
+          // On mainnet, if we can't find it after retries, it's likely rejected
+          if (!isMainnet) {
+            console.warn('Transaction not found on devnet after retries (may still be processing)', {
+              signature,
+              verificationTimeMs: verificationTime,
+              note: 'Devnet RPC can be slow. Transaction may still be processing. Returning signature for client-side verification.'
+            });
+            
+            // On devnet, return signature anyway - client can verify asynchronously
+            // This prevents false negatives from slow RPC indexing
+            return {
+              signature,
+              confirmation: null,
+              note: 'Transaction submitted. Verification timeout on devnet - client will verify asynchronously.'
+            };
+          }
+          
+          // On mainnet, be more strict - if we can't verify after reasonable time, transaction likely failed
+          // Mainnet RPC indexing can be slow, but if we've waited 5+ seconds and still can't find it,
+          // the transaction was likely rejected (blockhash expired, insufficient funds, etc.)
+          console.error('❌ Transaction not found on mainnet after verification attempts', {
+            signature,
+            verificationTimeMs: verificationTime,
+            maxAttempts: maxVerificationAttempts,
+            note: 'Transaction was likely rejected by Solana network (blockhash expired, insufficient funds, or invalid transaction).'
+          });
+          
+          // Throw error instead of returning invalid signature
+          throw handleError(
+            new Error(
+              `Transaction verification failed: Transaction signature ${signature.substring(0, 16)}... was returned but transaction was not found on-chain after ${verificationTime}ms. ` +
+              `This usually means the transaction was rejected (blockhash expired, insufficient funds, or invalid transaction). ` +
+              `Please check the transaction on Solana Explorer: https://solscan.io/tx/${signature}`
+            ),
+            { signature, operation: 'verifyTransaction' }
           );
         }
-      }
-      
-      // If we get here without transactionFound, it means all attempts failed
-      if (!transactionFound && !transactionError) {
-        const verificationTime = Date.now() - verificationStartTime;
-        console.error('Transaction verification failed after all attempts', {
-          signature,
-          verificationTimeMs: verificationTime,
-          attempts: maxVerificationAttempts,
-          note: 'Transaction was likely rejected by Solana network.'
-        });
-        throw new Error(
-          'Transaction was rejected by Solana network. The transaction signature was returned but the transaction was not accepted. ' +
-          'This may be due to an expired blockhash, insufficient funds, or invalid transaction parameters. Please try again with a fresh transaction.'
-        );
-      }
+      } catch (verifyError) {
+        verifyTimer.end();
+          performanceMonitor.recordError('verifyTransaction', verifyError);
+          
+          // If it's a transaction failure error, throw it
+          if (verifyError.message && verifyError.message.includes('Transaction failed on-chain')) {
+            throw verifyError;
+          }
+          
+          // If error is not retryable, throw immediately
+          if (!isRetryableError(verifyError)) {
+            throw handleError(verifyError, { signature, operation: 'verifyTransaction' });
+          }
+          
+          // Retry logic is handled by retryRpcOperation
+          // If we get here, all retries failed
+          const verificationTime = Date.now() - verificationStartTime;
+          
+          // On devnet, be more lenient - RPC can be slow or rate-limited
+          if (!isMainnet) {
+            console.warn('Transaction verification failed on devnet (may be RPC issue)', {
+              signature,
+              verificationTimeMs: verificationTime,
+              error: verifyError.message,
+              note: 'Devnet RPC can be slow. Returning signature for client-side verification.'
+            });
+            
+            // On devnet, return signature anyway - client can verify asynchronously
+            return {
+              signature,
+              confirmation: null,
+              note: 'Transaction submitted. Verification failed on devnet - client will verify asynchronously.'
+            };
+          }
+          
+          // On mainnet, be stricter
+          console.error('Transaction verification failed after all retries', {
+            signature,
+            verificationTimeMs: verificationTime,
+            error: verifyError.message,
+            note: 'Transaction was likely rejected by Solana network.'
+          });
+          
+          throw handleError(
+            new Error('Transaction was rejected by Solana network. The transaction signature was returned but the transaction was not accepted.'),
+            { signature, operation: 'verifyTransaction', originalError: verifyError }
+          );
+        }
 
       // Return signature - transaction was submitted and verified
       console.log('Transaction submitted successfully to Solana network', {
@@ -763,7 +1017,8 @@ class TransactionSigningService {
 
     } catch (error) {
       console.error('Failed to submit transaction:', error);
-      throw new Error(`Failed to submit transaction: ${error.message}`);
+      // Best Practice: Use structured error handling
+      throw handleError(error, { operation: 'submitTransaction' });
     }
   }
 
@@ -772,19 +1027,40 @@ class TransactionSigningService {
    * Combines signing and submission in one call to minimize blockhash expiration
    */
   async processUsdcTransfer(serializedTransaction) {
+    // CRITICAL: Log immediately at method entry
+    console.log('🔵 TransactionSigningService.processUsdcTransfer CALLED', {
+      timestamp: new Date().toISOString(),
+      hasSerializedTransaction: !!serializedTransaction,
+      serializedTransactionType: typeof serializedTransaction,
+      serializedTransactionLength: serializedTransaction?.length,
+      isBuffer: Buffer.isBuffer(serializedTransaction)
+    });
+    
+    const processStartTime = Date.now();
     try {
-      // Ensure service is initialized
+      // CRITICAL: Ensure service is initialized FIRST (before any other operations)
+      // This can take 50-200ms on cold start, so do it immediately
+      console.log('🔄 TransactionSigningService: Starting initialization check');
+      const initStartTime = Date.now();
       await this.ensureInitialized();
+      const initTime = Date.now() - initStartTime;
+      
+      console.log('✅ TransactionSigningService: Initialization complete', {
+        initTimeMs: initTime,
+        hasConnection: !!this.connection,
+        hasKeypair: !!this.companyKeypair
+      });
+      
+      if (initTime > 500) {
+        console.warn('Service initialization took longer than expected', {
+          initTimeMs: initTime,
+          note: 'This may cause blockhash expiration'
+        });
+      }
       
       if (!this.connection) {
         throw new Error('Connection not initialized');
       }
-
-      // CRITICAL: Skip blockhash validation to save time - client already checks freshness
-      // Client rebuilds if blockhash is >3 seconds old, so we can trust it's fresh
-      // Validation takes 1-2 seconds which causes blockhash to expire by submission time
-      // If blockhash is expired, Solana will reject it during submission anyway
-      const processStartTime = Date.now();
       
       // Convert to Buffer if needed - declare outside try block so it's accessible later
       const transactionBuffer = Buffer.isBuffer(serializedTransaction) 
@@ -840,11 +1116,23 @@ class TransactionSigningService {
         note: 'This is the ACTUAL blockhash from the transaction being signed. It MUST match what client sent.'
       });
 
-      console.log('Processing transaction - will validate blockhash right before submission', {
+      const timeSinceProcessStart = Date.now() - processStartTime;
+      console.log('Processing transaction - submitting immediately without validation', {
         transactionBlockhash: blockhashString.substring(0, 8) + '...',
-        timeSinceProcessStart: Date.now() - processStartTime,
-        note: 'Client rebuilds if blockhash >1s old. Will validate right before submission to catch any expiration.'
+        timeSinceProcessStart,
+        initTimeMs: initTime,
+        note: 'Client already validated blockhash. Submitting immediately to prevent expiration.'
       });
+      
+      // CRITICAL: If processing has taken >2 seconds, blockhash may be expired
+      // Log warning but proceed - Solana will reject if truly expired
+      if (timeSinceProcessStart > 2000) {
+        console.warn('WARNING: Processing time exceeds 2 seconds - blockhash may expire', {
+          timeSinceProcessStart,
+          blockhashAge: 'unknown (client sent fresh)',
+          note: 'Proceeding anyway - Solana will reject if blockhash expired'
+        });
+      }
 
       // CRITICAL: Add company signature and submit IMMEDIATELY - no delays
       // Every millisecond counts - Firebase processing already takes time
@@ -857,14 +1145,29 @@ class TransactionSigningService {
       console.log('Company signature added, submitting IMMEDIATELY', {
         transactionBlockhash: blockhashString.substring(0, 8) + '...',
         signatureTimeMs: signatureTime,
+        initTimeMs: initTime,
         totalTimeBeforeSubmission,
         note: 'Submitting immediately - no delays. Blockhash age: ~' + totalTimeBeforeSubmission + 'ms'
       });
+      
+      // CRITICAL: If total time >2.5 seconds, blockhash is likely expired
+      // Blockhashes expire based on slot height, not just time
+      // Mainnet slots are ~400ms, so 2.5 seconds = ~6 slots = likely expired
+      if (totalTimeBeforeSubmission > 2500) {
+        console.error('CRITICAL: Total processing time exceeds 2.5 seconds - blockhash likely expired', {
+          totalTimeBeforeSubmission,
+          initTimeMs: initTime,
+          signatureTimeMs: signatureTime,
+          note: 'Blockhash expires after ~60 seconds or ~150 slots. 2.5 seconds = ~6 slots = likely expired on mainnet.'
+        });
+      }
 
       // CRITICAL: Submit the transaction IMMEDIATELY - skip all validation
       // Validation takes 100-300ms which causes blockhash expiration
       // Client already sends fresh blockhash (0-100ms old), so validation is redundant
       // If blockhash expired, Solana will reject it, but we've minimized delay
+      // Note: We cannot rebuild transaction here - it's already signed by user and company
+      // If blockhash expired, client will retry with fresh blockhash
       const result = await this.submitTransaction(fullySignedTransaction, true); // Skip validation to save time
 
       console.log('USDC transfer processed successfully', {
@@ -875,8 +1178,20 @@ class TransactionSigningService {
       return result;
 
     } catch (error) {
-      console.error('Failed to process USDC transfer:', error);
-      throw error;
+      // Log detailed error information for debugging
+      console.error('Failed to process USDC transfer:', {
+        error: error?.message || String(error),
+        errorName: error?.name,
+        errorCode: error?.code,
+        errorType: error?.type,
+        errorStack: error?.stack?.substring(0, 500), // Limit stack trace length
+        operation: 'processUsdcTransfer',
+        hasConnection: !!this.connection,
+        hasKeypair: !!this.companyKeypair
+      });
+      
+      // Best Practice: Use structured error handling
+      throw handleError(error, { operation: 'processUsdcTransfer' });
     }
   }
 
@@ -891,7 +1206,16 @@ class TransactionSigningService {
         throw new Error('Service not initialized');
       }
 
-      const balance = await this.connection.getBalance(this.companyKeypair.publicKey);
+      // Best Practice: Use retry logic for RPC calls
+      const balance = await retryRpcOperation(
+        () => this.connection.getBalance(this.companyKeypair.publicKey),
+        {
+          maxRetries: 3,
+          initialDelay: 100,
+          maxDelay: 1000,
+          timeout: 5000
+        }
+      );
       const solBalance = balance / 1000000000; // Convert lamports to SOL
 
       console.log('Company wallet balance retrieved', {
@@ -1009,7 +1333,17 @@ class TransactionSigningService {
       }
 
       const transaction = VersionedTransaction.deserialize(serializedTransaction);
-      const feeEstimate = await this.connection.getFeeForMessage(transaction.message);
+      
+      // Best Practice: Retry RPC calls with exponential backoff
+      const feeEstimate = await retryRpcOperation(
+        () => this.connection.getFeeForMessage(transaction.message),
+        {
+          maxRetries: 3,
+          initialDelay: 100,
+          maxDelay: 1000,
+          timeout: 5000
+        }
+      );
 
       if (feeEstimate.value === null) {
         throw new Error('Unable to estimate transaction fee');

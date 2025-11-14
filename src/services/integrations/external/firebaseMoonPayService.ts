@@ -1,4 +1,4 @@
-  import { getFunctions, httpsCallable } from 'firebase/functions';
+  import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeApp } from 'firebase/app';
 import Constants from 'expo-constants';
 import { logger } from '../../analytics/loggingService';
@@ -61,6 +61,26 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase Functions with us-central1 region
 const functions = getFunctions(app, 'us-central1');
+
+// Connect to emulator in development mode
+if (__DEV__ && !process.env.EXPO_PUBLIC_USE_PROD_FUNCTIONS) {
+  try {
+    const emulatorHost = process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST || 'localhost';
+    const emulatorPort = parseInt(process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_PORT || '5001');
+    connectFunctionsEmulator(functions, emulatorHost, emulatorPort);
+    logger.info('🔧 Connected to Firebase Functions Emulator', {
+      host: emulatorHost,
+      port: emulatorPort
+    });
+  } catch (error: any) {
+    if (error.code !== 'functions/already-initialized') {
+      logger.warn('Failed to connect to Functions emulator', {
+        error: error.message,
+        note: 'Using production Functions'
+      });
+    }
+  }
+}
 
 // MoonPay transaction interface
 export interface MoonPayTransaction {

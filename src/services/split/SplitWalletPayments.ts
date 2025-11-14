@@ -1965,6 +1965,37 @@ export class SplitWalletPayments {
             };
           }
 
+      // Save transaction to database and award points using centralized helper
+      try {
+        const { saveTransactionAndAwardPoints } = await import('../shared/transactionPostProcessing');
+        const { FeeService } = await import('../../config/constants/feeConfig');
+        
+        // Calculate company fee for split payment
+        const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(roundedAmount, 'split_payment');
+        
+        await saveTransactionAndAwardPoints({
+          userId: participantId,
+          toAddress: wallet.walletAddress,
+          amount: roundedAmount,
+          signature: transactionResult.signature!,
+          transactionType: 'split_payment',
+          companyFee: companyFee,
+          netAmount: recipientAmount,
+          memo: `Degen Split fund locking - ${wallet.id}`,
+          currency: 'USDC'
+        });
+        
+        logger.info('✅ Degen split funding transaction saved and points awarded', {
+          signature: transactionResult.signature,
+          participantId,
+          splitWalletId,
+          amount: roundedAmount
+        }, 'SplitWalletPayments');
+      } catch (saveError) {
+        logger.error('❌ Failed to save degen split funding transaction', saveError, 'SplitWalletPayments');
+        // Don't fail the transaction if database save fails
+      }
+
       // Update participant status to 'locked' (not 'paid' for degen splits)
       // Use transaction signature from result, or fallback to provided signature
       const finalTransactionSignature = transactionResult.signature || transactionSignature;
@@ -2179,6 +2210,37 @@ export class SplitWalletPayments {
             success: false,
           error: userFriendlyError,
         };
+      }
+
+      // Save transaction to database and award points using centralized helper
+      try {
+        const { saveTransactionAndAwardPoints } = await import('../shared/transactionPostProcessing');
+        const { FeeService } = await import('../../config/constants/feeConfig');
+        
+        // Calculate company fee for split payment
+        const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(roundedAmount, 'split_payment');
+        
+        await saveTransactionAndAwardPoints({
+          userId: participantId,
+          toAddress: wallet.walletAddress,
+          amount: roundedAmount,
+          signature: transactionResult.signature!,
+          transactionType: 'split_payment',
+          companyFee: companyFee,
+          netAmount: recipientAmount,
+          memo: `Fair Split participant payment - ${wallet.id}`,
+          currency: 'USDC'
+        });
+        
+        logger.info('✅ Fair split funding transaction saved and points awarded', {
+          signature: transactionResult.signature,
+          participantId,
+          splitWalletId,
+          amount: roundedAmount
+        }, 'SplitWalletPayments');
+      } catch (saveError) {
+        logger.error('❌ Failed to save fair split funding transaction', saveError, 'SplitWalletPayments');
+        // Don't fail the transaction if database save fails
       }
 
       // Update participant status to 'paid'
@@ -2431,6 +2493,34 @@ export class SplitWalletPayments {
         };
       }
 
+      // Save transaction to database using centralized helper
+      // Note: Split withdrawals don't award points (they're money out of splits, not user-to-user transfers)
+      try {
+        const { saveTransactionAndAwardPoints } = await import('../shared/transactionPostProcessing');
+        
+        await saveTransactionAndAwardPoints({
+          userId: creatorId,
+          toAddress: recipientAddress,
+          amount: withdrawalAmount,
+          signature: transactionResult.signature!,
+          transactionType: 'split_wallet_withdrawal',
+          companyFee: 0, // No fee for withdrawals
+          netAmount: withdrawalAmount,
+          memo: description || `Fair Split funds extraction for bill ${wallet.billId}`,
+          currency: wallet.currency as 'USDC' | 'SOL'
+        });
+        
+        logger.info('✅ Fair split withdrawal transaction saved', {
+          signature: transactionResult.signature,
+          creatorId,
+          splitWalletId,
+          amount: withdrawalAmount
+        }, 'SplitWalletPayments');
+      } catch (saveError) {
+        logger.error('❌ Failed to save fair split withdrawal transaction', saveError, 'SplitWalletPayments');
+        // Don't fail the transaction if database save fails
+      }
+
       // Update wallet status to completed
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
       await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
@@ -2602,6 +2692,34 @@ export class SplitWalletPayments {
         };
       }
 
+      // Save transaction to database using centralized helper
+      // Note: Degen winner payouts are withdrawals, so no points awarded
+      try {
+        const { saveTransactionAndAwardPoints } = await import('../shared/transactionPostProcessing');
+        
+        await saveTransactionAndAwardPoints({
+          userId: winnerUserId,
+          toAddress: winnerAddress,
+          amount: actualTotalAmount,
+          signature: transactionResult.signature!,
+          transactionType: 'split_wallet_withdrawal',
+          companyFee: 0, // No fee for withdrawals
+          netAmount: actualTotalAmount,
+          memo: description || `Degen Split winner payout for ${winnerUserId}`,
+          currency: wallet.currency as 'USDC' | 'SOL'
+        });
+        
+        logger.info('✅ Degen winner payout transaction saved', {
+          signature: transactionResult.signature,
+          winnerUserId,
+          splitWalletId,
+          amount: actualTotalAmount
+        }, 'SplitWalletPayments');
+      } catch (saveError) {
+        logger.error('❌ Failed to save degen winner payout transaction', saveError, 'SplitWalletPayments');
+        // Don't fail the transaction if database save fails
+      }
+
       // Update winner participant status to 'paid' and mark wallet as completed
       const updatedParticipants = wallet.participants.map(p => 
         p.userId === winnerUserId 
@@ -2746,6 +2864,34 @@ export class SplitWalletPayments {
         };
       }
 
+      // Save transaction to database using centralized helper
+      // Note: Degen loser refunds are withdrawals, so no points awarded
+      try {
+        const { saveTransactionAndAwardPoints } = await import('../shared/transactionPostProcessing');
+        
+        await saveTransactionAndAwardPoints({
+          userId: loserUserId,
+          toAddress: userWallet.address,
+          amount: totalAmount,
+          signature: transactionResult.signature!,
+          transactionType: 'split_wallet_withdrawal',
+          companyFee: 0, // No fee for withdrawals
+          netAmount: totalAmount,
+          memo: description || `Degen Split loser refund for ${loserUserId}`,
+          currency: wallet.currency as 'USDC' | 'SOL'
+        });
+        
+        logger.info('✅ Degen loser refund transaction saved', {
+          signature: transactionResult.signature,
+          loserUserId,
+          splitWalletId,
+          amount: totalAmount
+        }, 'SplitWalletPayments');
+      } catch (saveError) {
+        logger.error('❌ Failed to save degen loser refund transaction', saveError, 'SplitWalletPayments');
+        // Don't fail the transaction if database save fails
+      }
+
       // Update loser participant status to 'paid'
       const updatedParticipants = wallet.participants.map(p => 
         p.userId === loserUserId 
@@ -2884,6 +3030,34 @@ export class SplitWalletPayments {
           success: false,
           error: transactionResult.error || 'Transaction failed',
         };
+      }
+
+      // Save transaction to database using centralized helper
+      // Note: Cast account transfers are withdrawals, so no points awarded
+      try {
+        const { saveTransactionAndAwardPoints } = await import('../shared/transactionPostProcessing');
+        
+        await saveTransactionAndAwardPoints({
+          userId: wallet.creatorId,
+          toAddress: castAccountAddress,
+          amount: availableBalance,
+          signature: transactionResult.signature!,
+          transactionType: 'split_wallet_withdrawal',
+          companyFee: 0, // No fee for withdrawals
+          netAmount: availableBalance,
+          memo: description || `Cast account transfer for ${wallet.id}`,
+          currency: wallet.currency as 'USDC' | 'SOL'
+        });
+        
+        logger.info('✅ Cast account transfer transaction saved', {
+          signature: transactionResult.signature,
+          creatorId: wallet.creatorId,
+          splitWalletId,
+          amount: availableBalance
+        }, 'SplitWalletPayments');
+      } catch (saveError) {
+        logger.error('❌ Failed to save cast account transfer transaction', saveError, 'SplitWalletPayments');
+        // Don't fail the transaction if database save fails
       }
 
       logger.info('✅ Cast account transfer completed successfully', {

@@ -9,6 +9,34 @@
  * - aiService.js: AI service functions
  */
 
+// Load environment variables from root .env file (for local emulator development)
+// In production, Firebase Secrets are automatically available as process.env variables
+// Priority: 1) Root .env, 2) Local .env (for backward compatibility), 3) Firebase Secrets
+if (process.env.FUNCTIONS_EMULATOR === 'true' || process.env.NODE_ENV !== 'production') {
+  try {
+    const path = require('path');
+    const rootEnvPath = path.join(__dirname, '../../../.env');
+    const localEnvPath = path.join(__dirname, '../.env');
+    
+    // Try root .env first (centralized location)
+    try {
+      require('dotenv').config({ path: rootEnvPath });
+      console.log('✅ Loaded environment variables from root .env file');
+    } catch (rootError) {
+      // Fallback to local .env if root doesn't exist
+      try {
+        require('dotenv').config({ path: localEnvPath });
+        console.log('✅ Loaded environment variables from local .env file (firebase-functions/.env)');
+      } catch (localError) {
+        console.log('ℹ️  No .env file found, using environment variables from shell/Firebase Secrets');
+      }
+    }
+  } catch (error) {
+    // dotenv is optional - if it fails, we'll use environment variables from shell or Firebase Secrets
+    console.log('ℹ️  dotenv not available, using environment variables from shell/Firebase Secrets');
+  }
+}
+
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin (only once)

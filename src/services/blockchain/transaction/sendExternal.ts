@@ -158,31 +158,30 @@ class ExternalTransferService {
         // Update last used timestamp for linked wallet
         await this.updateLinkedWalletLastUsed(params.to, params.userId);
         
-        // Save transaction to database for history
+        // Save transaction to database and award points (if applicable) using centralized helper
         try {
-          const { firebaseDataService } = await import('../../data');
+          const { saveTransactionAndAwardPoints } = await import('../../shared/transactionPostProcessing');
           
-          const transactionData = {
-            type: 'withdraw' as const,
+          // Get user's wallet address for transaction record
+          const { walletService } = await import('../wallet');
+          const walletResult = await walletService.ensureUserWallet(params.userId);
+          const fromWalletAddress = walletResult.success && walletResult.wallet 
+            ? walletResult.wallet.address 
+            : expectedWalletAddress;
+          
+          await saveTransactionAndAwardPoints({
+            userId: params.userId,
+            toAddress: params.to,
             amount: params.amount,
-            currency: params.currency,
-            from_user: params.userId,
-            to_user: params.to, // External wallet address
-            from_wallet: expectedWalletAddress, // User's wallet address
-            to_wallet: params.to,
-            tx_hash: result.signature!,
-            note: params.memo || 'External wallet transfer',
-            status: 'completed' as const,
-            company_fee: result.companyFee || 0,
-            net_amount: result.netAmount || params.amount,
-            gas_fee: result.blockchainFee || 0, // Blockchain fee (SOL)
-            blockchain_network: 'solana',
-            confirmation_count: 0, // Will be updated if needed
-            block_height: 0 // Will be updated if needed
-          };
+            signature: result.signature!,
+            transactionType: params.transactionType || 'external_payment',
+            companyFee: result.companyFee,
+            netAmount: result.netAmount,
+            memo: params.memo || 'External wallet transfer',
+            currency: params.currency
+          });
           
-          await firebaseDataService.transaction.createTransaction(transactionData);
-          logger.info('✅ External transfer saved to database', {
+          logger.info('✅ External transfer post-processing completed', {
             signature: result.signature,
             userId: params.userId,
             amount: params.amount

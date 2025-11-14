@@ -3,7 +3,7 @@
  * Calls Firebase Cloud Functions to sign transactions with company wallet
  */
 
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeApp } from 'firebase/app';
 import Constants from 'expo-constants';
 import { logger } from '../../analytics/loggingService';
@@ -124,12 +124,59 @@ const getFirebaseApp = () => {
 
 // Initialize Firebase Functions
 // IMPORTANT: Lazy initialization to ensure Firebase app is ready
+// In development, connect to local emulator for faster testing
 const getFirebaseFunctions = () => {
   try {
     const app = getFirebaseApp();
-    return getFunctions(app, 'us-central1');
+    const functions = getFunctions(app, 'us-central1');
+    
+    // Connect to emulator in development mode
+    // Set EXPO_PUBLIC_USE_PROD_FUNCTIONS=true to force production even in dev
+    if (__DEV__ && !process.env.EXPO_PUBLIC_USE_PROD_FUNCTIONS) {
+      try {
+        // For iOS Simulator/Android Emulator: use localhost
+        // For physical device: use your computer's local IP (e.g., 192.168.1.100)
+        // You can set EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST to override
+        const emulatorHost = process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST || 'localhost';
+        const emulatorPort = parseInt(process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_PORT || '5001');
+        
+        connectFunctionsEmulator(functions, emulatorHost, emulatorPort);
+        logger.info('🔧 Connected to Firebase Functions Emulator', {
+          host: emulatorHost,
+          port: emulatorPort,
+          isDev: __DEV__,
+          useProdFunctions: process.env.EXPO_PUBLIC_USE_PROD_FUNCTIONS
+        }, 'TransactionSigningService');
+      } catch (error: any) {
+        // Already connected or connection failed - ignore
+        if (error.code !== 'functions/already-initialized') {
+          logger.warn('⚠️ Failed to connect to Functions emulator', {
+            error: error.message,
+            errorCode: error.code,
+            errorName: error.name,
+            note: 'Using production Functions'
+          }, 'TransactionSigningService');
+        } else {
+          logger.info('✅ Functions emulator already connected', {
+            host: emulatorHost,
+            port: emulatorPort
+          }, 'TransactionSigningService');
+        }
+      }
+    } else {
+      logger.info('🌐 Using production Firebase Functions', {
+        isDev: __DEV__,
+        useProdFunctions: process.env.EXPO_PUBLIC_USE_PROD_FUNCTIONS
+      }, 'TransactionSigningService');
+    }
+    
+    return functions;
   } catch (error) {
-    logger.error('Failed to initialize Firebase Functions', error, 'TransactionSigningService');
+    logger.error('❌ Failed to initialize Firebase Functions', {
+      error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined
+    }, 'TransactionSigningService');
     throw new Error('Firebase app not initialized');
   }
 };
@@ -156,9 +203,31 @@ const getSubmitTransactionFunction = () => {
 };
 
 const getProcessUsdcTransferFunction = () => {
-  return httpsCallable(getFirebaseFunctions(), 'processUsdcTransfer', {
-    timeout: 90000 // 90 seconds timeout (longer for sign + submit)
-  });
+  try {
+    const functions = getFirebaseFunctions();
+    logger.info('🔵 Creating processUsdcTransfer callable function', {
+      hasFunctions: !!functions,
+      functionName: 'processUsdcTransfer',
+      timeout: 90000
+    }, 'TransactionSigningService');
+    
+    const callableFunction = httpsCallable(functions, 'processUsdcTransfer', {
+      timeout: 90000 // 90 seconds timeout (longer for sign + submit)
+    });
+    
+    logger.info('✅ processUsdcTransfer callable function created', {
+      functionType: typeof callableFunction,
+      isFunction: typeof callableFunction === 'function'
+    }, 'TransactionSigningService');
+    
+    return callableFunction;
+  } catch (error) {
+    logger.error('❌ Failed to create processUsdcTransfer callable function', {
+      error,
+      errorMessage: error instanceof Error ? error.message : String(error)
+    }, 'TransactionSigningService');
+    throw error;
+  }
 };
 
 const getValidateTransactionFunction = () => {
@@ -733,11 +802,57 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
     // Get the callable function (lazy initialization)
     const processUsdcTransferFunction = getProcessUsdcTransferFunction();
     
-    // Call Firebase Function
-    const result = await processUsdcTransferFunction({ serializedTransaction: base64Transaction });
+    // Call Firebase Function with detailed error handling
+    let result;
+    try {
+      logger.info('🔵 Calling Firebase Function processUsdcTransfer', {
+        base64Length: base64Transaction.length,
+        base64Preview: base64Transaction.substring(0, 50) + '...',
+        functionType: typeof processUsdcTransferFunction,
+        isFunction: typeof processUsdcTransferFunction === 'function'
+      }, 'TransactionSigningService');
+      
+      result = await processUsdcTransferFunction({ serializedTransaction: base64Transaction });
+      
+      logger.info('✅ Firebase Function processUsdcTransfer returned', {
+        hasResult: !!result,
+        hasData: !!result?.data,
+        resultDataType: typeof result?.data,
+        resultDataKeys: result?.data ? Object.keys(result.data) : []
+      }, 'TransactionSigningService');
+    } catch (firebaseError: any) {
+      // CRITICAL: Log full error details to understand what's happening
+      logger.error('❌ Firebase Function processUsdcTransfer FAILED', {
+        error: firebaseError,
+        errorMessage: firebaseError?.message || 'No error message',
+        errorName: firebaseError?.name || 'Unknown',
+        errorCode: firebaseError?.code || 'NO_CODE',
+        errorDetails: firebaseError?.details || {},
+        errorStack: firebaseError?.stack ? firebaseError.stack.substring(0, 500) : 'No stack trace',
+        isFirebaseError: firebaseError?.code !== undefined,
+        base64Length: base64Transaction.length,
+        base64Preview: base64Transaction.substring(0, 50) + '...',
+        functionType: typeof processUsdcTransferFunction
+      }, 'TransactionSigningService');
+      
+      // Re-throw with more context
+      const errorMessage = firebaseError?.message || 'Unknown Firebase Function error';
+      const errorCode = firebaseError?.code || 'UNKNOWN';
+      throw new Error(`Firebase Function error (${errorCode}): ${errorMessage}`);
+    }
+    
     const response = result.data as { success: boolean; signature: string; confirmation: any };
 
-    if (!response.success || !response.signature) {
+    if (!response || !response.success || !response.signature) {
+      logger.error('❌ Invalid response from processUsdcTransfer function', {
+        hasResponse: !!response,
+        responseKeys: response ? Object.keys(response) : [],
+        hasSuccess: !!response?.success,
+        successValue: response?.success,
+        hasSignature: !!response?.signature,
+        signatureValue: response?.signature,
+        fullResponse: response
+      }, 'TransactionSigningService');
       throw new Error('Invalid response from processUsdcTransfer function');
     }
 

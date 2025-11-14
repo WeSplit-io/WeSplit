@@ -335,10 +335,19 @@ app.post('/api/transactions/submit',
         confirmation: result.confirmation
       });
     } catch (error) {
-      console.error('Error submitting transaction:', error);
-      res.status(500).json({ 
+      console.error('Error submitting transaction:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Best Practice: Structured error response
+      const statusCode = error.message?.includes('validation') ? 400 : 500;
+      res.status(statusCode).json({ 
+        success: false,
         error: 'Failed to submit transaction',
-        message: error.message 
+        message: error.message,
+        timestamp: new Date().toISOString()
       });
     }
   }
@@ -375,10 +384,19 @@ app.post('/api/transactions/process',
         confirmation: result.confirmation
       });
     } catch (error) {
-      console.error('Error processing USDC transfer:', error);
-      res.status(500).json({ 
+      console.error('Error processing USDC transfer:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Best Practice: Structured error response
+      const statusCode = error.message?.includes('validation') ? 400 : 500;
+      res.status(statusCode).json({ 
+        success: false,
         error: 'Failed to process USDC transfer',
-        message: error.message 
+        message: error.message,
+        timestamp: new Date().toISOString()
       });
     }
   }

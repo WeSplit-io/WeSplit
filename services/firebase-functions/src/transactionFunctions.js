@@ -393,13 +393,50 @@ exports.submitTransaction = functions.runWith({
  * Secrets are explicitly bound using runWith
  */
 exports.processUsdcTransfer = functions.runWith({
-  secrets: ['COMPANY_WALLET_ADDRESS', 'COMPANY_WALLET_SECRET_KEY'],
+  secrets: [
+    'COMPANY_WALLET_ADDRESS', 
+    'COMPANY_WALLET_SECRET_KEY',
+    'ALCHEMY_API_KEY',
+    'GETBLOCK_API_KEY',
+    'HELIUS_API_KEY',
+    'USE_PAID_RPC'
+  ],
   timeoutSeconds: 30,
   memory: '512MB'
 }).https.onCall(async (data, context) => {
+  // CRITICAL: Use try-catch at the very top level to catch ANY errors before they become "internal"
+  try {
+    // CRITICAL: Log immediately at function entry - this helps diagnose if function is being called
+    console.log('🔵 processUsdcTransfer FUNCTION CALLED', {
+      timestamp: new Date().toISOString(),
+      hasData: !!data,
+      dataType: typeof data,
+      dataKeys: data ? Object.keys(data) : [],
+      hasContext: !!context,
+      contextAuth: context?.auth ? 'authenticated' : 'not authenticated',
+      contextRawRequest: context?.rawRequest ? 'present' : 'missing',
+      nodeVersion: process.version,
+      functionName: 'processUsdcTransfer'
+    });
+  } catch (logError) {
+    // Even logging can fail - catch it and log to stderr
+    console.error('❌ CRITICAL: Failed to log function entry', {
+      error: logError.message,
+      errorStack: logError.stack
+    });
+  }
+  
   const functionStartTime = Date.now();
   
   try {
+    // Log data structure before processing
+    console.log('📥 processUsdcTransfer: Received data', {
+      hasSerializedTransaction: !!data?.serializedTransaction,
+      serializedTransactionType: typeof data?.serializedTransaction,
+      serializedTransactionLength: data?.serializedTransaction?.length,
+      allDataKeys: Object.keys(data || {})
+    });
+    
     const { serializedTransaction } = data;
     
     // Validate input
@@ -447,32 +484,35 @@ exports.processUsdcTransfer = functions.runWith({
     // CRITICAL: Skip Firestore checks entirely to prevent blockhash expiration
     // Blockhash expiration is more critical than Firestore security checks
     // Firestore operations take 2-3 seconds which causes blockhash to expire
-    // For internal transfers, we can skip these checks to ensure transaction succeeds
     // Security is maintained through:
     // 1. Transaction validation (ensures only valid transactions are signed)
     // 2. User authentication (Firebase Auth ensures only authenticated users can call)
     // 3. Transaction structure validation (invalid transactions are rejected)
+    // 4. Solana network validation (rejects invalid/duplicate transactions)
     console.log('Skipping Firestore checks to prevent blockhash expiration', {
-      note: 'Blockhash expiration is critical. Firestore checks take 2-3 seconds which causes expiration. Security maintained through transaction validation and Firebase Auth.'
+      note: 'Blockhash expiration is critical. Firestore checks take 2-3 seconds which causes expiration. Security maintained through transaction validation, Firebase Auth, and Solana network validation.'
     });
     
-    // Fire-and-forget Firestore operations (non-blocking)
-    // These run in background and don't block transaction processing
-    Promise.all([
-      checkTransactionHash(transactionBuffer, db).catch(err => {
-        console.warn('Background transaction hash check failed', { error: err.message });
-      }),
-      checkRateLimit(transactionBuffer, db).catch(err => {
-        console.warn('Background rate limit check failed', { error: err.message });
-      })
-    ]).catch(() => {
-      // Ignore errors - these are background operations
+    // Fire-and-forget Firestore operations (truly non-blocking)
+    // These run in background and don't block transaction processing at all
+    // Use setImmediate to ensure they don't block the event loop
+    setImmediate(() => {
+      Promise.all([
+        checkTransactionHash(transactionBuffer, db).catch(err => {
+          console.warn('Background transaction hash check failed', { error: err.message });
+        }),
+        checkRateLimit(transactionBuffer, db).catch(err => {
+          console.warn('Background rate limit check failed', { error: err.message });
+        })
+      ]).catch(() => {
+        // Ignore errors - these are background operations
+      });
     });
 
     const checksTime = Date.now() - functionStartTime;
-    console.log('Firestore checks completed in parallel', {
+    console.log('Firestore checks skipped (non-blocking)', {
       checksTimeMs: checksTime,
-      note: 'Running checks in parallel to minimize blockhash expiration risk'
+      note: 'Firestore checks run in background to prevent blockhash expiration'
     });
 
     // Process USDC transfer (sign and submit) - this is where blockhash expiration happens
@@ -495,16 +535,49 @@ exports.processUsdcTransfer = functions.runWith({
     };
   } catch (error) {
     const totalTime = Date.now() - functionStartTime;
-    console.error('Error processing USDC transfer:', {
-      error: error.message,
-      totalTimeMs: totalTime
+    
+    // CRITICAL: Log error immediately with full details
+    console.error('❌ processUsdcTransfer: ERROR CAUGHT', {
+      timestamp: new Date().toISOString(),
+      errorMessage: error?.message || 'No error message',
+      errorName: error?.name || 'Unknown',
+      errorCode: error?.code || 'NO_CODE',
+      errorType: error?.type || 'NO_TYPE',
+      isHttpsError: error instanceof functions.https.HttpsError,
+      httpsErrorCode: error instanceof functions.https.HttpsError ? error.code : 'N/A',
+      httpsErrorMessage: error instanceof functions.https.HttpsError ? error.message : 'N/A',
+      errorStack: error?.stack ? error.stack.substring(0, 1000) : 'No stack trace',
+      totalTimeMs: totalTime,
+      errorDetails: error?.details || error?.context || {},
+      hasSerializedTransaction: !!data?.serializedTransaction,
+      serializedTransactionLength: data?.serializedTransaction?.length
     });
     
+    // If it's already an HttpsError, re-throw it (it already has proper formatting)
     if (error instanceof functions.https.HttpsError) {
+      console.error('❌ processUsdcTransfer: Re-throwing HttpsError', {
+        code: error.code,
+        message: error.message
+      });
       throw error;
     }
     
-    throw new functions.https.HttpsError('internal', `Failed to process USDC transfer: ${error.message}`);
+    // Preserve original error message and details for better debugging
+    const errorMessage = error?.message || 'Unknown error occurred';
+    const errorDetails = error?.details || error?.context || {};
+    
+    // Include error details in the message for better debugging
+    const detailedMessage = errorDetails.originalError 
+      ? `Failed to process USDC transfer: ${errorMessage} (${errorDetails.originalError})`
+      : `Failed to process USDC transfer: ${errorMessage}`;
+    
+    console.error('❌ processUsdcTransfer: Throwing internal error', {
+      detailedMessage,
+      originalError: errorMessage,
+      errorDetails
+    });
+    
+    throw new functions.https.HttpsError('internal', detailedMessage);
   }
 });
 

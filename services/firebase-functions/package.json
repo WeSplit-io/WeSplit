@@ -6,6 +6,8 @@
   "scripts": {
     "build": "echo 'No build step needed for JavaScript'",
     "serve": "firebase emulators:start --only functions",
+    "emulator": "./start-emulator.sh",
+    "dev": "./start-emulator.sh",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
@@ -17,15 +19,16 @@
   "dependencies": {
     "@moonpay/react-native-moonpay-sdk": "^1.1.4",
     "@solana/web3.js": "^1.95.4",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
     "firebase-admin": "^11.11.1",
     "firebase-functions": "^4.8.1",
     "nodemailer": "^6.10.1",
+    "openai": "^4.20.0",
     "react-native-inappbrowser-reborn": "^3.7.0",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-webview": "^13.15.0",
-    "openai": "^4.20.0",
-    "sharp": "^0.32.6",
-    "cors": "^2.8.5"
+    "sharp": "^0.32.6"
   },
   "devDependencies": {
     "@types/nodemailer": "^6.4.14"

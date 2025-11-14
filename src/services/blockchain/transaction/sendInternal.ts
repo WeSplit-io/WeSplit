@@ -214,56 +214,37 @@ class InternalTransferService {
           companyFee: result.companyFee
         }, 'InternalTransferService');
 
-        // Save transaction to Firebase for history
+        // Save transaction and award points using centralized helper
+        // This replaces the old notificationUtils.saveTransactionToFirestore call
         try {
-          await notificationUtils.saveTransactionToFirestore({
+          const { saveTransactionAndAwardPoints } = await import('../../shared/transactionPostProcessing');
+          const { FeeService } = await import('../../../config/constants/feeConfig');
+          
+          // Calculate company fee for transaction
+          const transactionType = params.transactionType || 'send';
+          const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
+          
+          await saveTransactionAndAwardPoints({
             userId: params.userId,
-            to: params.to,
+            toAddress: params.to,
             amount: params.amount,
-            currency: params.currency,
             signature: result.signature!,
-            companyFee: result.companyFee!,
-            netAmount: result.netAmount!,
+            transactionType: transactionType,
+            companyFee: companyFee,
+            netAmount: recipientAmount,
             memo: params.memo,
-            groupId: params.groupId
+            groupId: params.groupId,
+            currency: params.currency
           });
-
-          // Award points for wallet-to-wallet transfer (only for internal transfers)
-          // Check if recipient is a registered user to confirm it's an internal transfer
-          try {
-            const { firebaseDataService } = await import('../../data/firebaseDataService');
-            const recipientUser = await firebaseDataService.user.getUserByWalletAddress(params.to);
-            
-            if (recipientUser) {
-              // This is an internal wallet-to-wallet transfer, award points
-              const { pointsService } = await import('../../rewards/pointsService');
-              const pointsResult = await pointsService.awardTransactionPoints(
-                params.userId,
-                params.amount,
-                result.signature!,
-                'send'
-              );
-              
-              if (pointsResult.success) {
-                logger.info('✅ Points awarded for internal transfer', {
-                  userId: params.userId,
-                  pointsAwarded: pointsResult.pointsAwarded,
-                  totalPoints: pointsResult.totalPoints,
-                  transactionAmount: params.amount
-                }, 'InternalTransferService');
-              }
-
-              // DISABLED: Old quest (first_transaction) - replaced by season-based system
-              // Transaction points are now awarded via awardTransactionPoints() which uses season-based rewards
-              // No need to complete old quest
-            }
-          } catch (pointsError) {
-            logger.error('❌ Error awarding points for internal transfer', pointsError, 'InternalTransferService');
-            // Don't fail the transaction if points award fails
-          }
-        } catch (error) {
-          logger.warn('Failed to save transaction to Firebase', { error, signature: result.signature }, 'InternalTransferService');
-          // Don't fail the transaction if Firebase save fails
+          
+          logger.info('✅ Internal transfer post-processing completed', {
+            signature: result.signature,
+            userId: params.userId,
+            transactionType
+          }, 'InternalTransferService');
+        } catch (postProcessingError) {
+          logger.error('❌ Error in internal transfer post-processing', postProcessingError, 'InternalTransferService');
+          // Don't fail the transaction if post-processing fails
         }
       } else {
         logger.error('Internal transfer failed', {
@@ -1487,8 +1468,9 @@ class InternalTransferService {
         memo: params.memo
       });
 
-      // Send money sent notification to sender only (no recipient lookup)
-      await notificationUtils.sendMoneySentNotification({
+      // Send money sent notification to sender only (non-blocking)
+      // Don't await - run in background to avoid blocking transaction
+      notificationUtils.sendMoneySentNotification({
         userId: params.userId,
         to: params.to,
         amount: params.amount,
@@ -1497,6 +1479,8 @@ class InternalTransferService {
         companyFee,
         netAmount: recipientAmount,
         memo: params.memo
+      }).catch(error => {
+        logger.error('❌ Background notification failed (non-blocking)', error, 'InternalTransferService');
       });
 
       logger.info('Internal transfer to address completed successfully', {

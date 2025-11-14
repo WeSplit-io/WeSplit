@@ -3,7 +3,7 @@
  * Uses Firebase Functions instead of local backend
  */
 
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { getApp } from 'firebase/app';
 import { logger } from '../analytics/loggingService';
 
@@ -30,6 +30,26 @@ try {
 // Initialize Firebase Functions with the existing app
 // Set the region to us-central1 for your specific function
 const functionsRegion = getFunctions(app, 'us-central1');
+
+// Connect to emulator in development mode
+if (__DEV__ && !process.env.EXPO_PUBLIC_USE_PROD_FUNCTIONS) {
+  try {
+    const emulatorHost = process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST || 'localhost';
+    const emulatorPort = parseInt(process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_PORT || '5001');
+    connectFunctionsEmulator(functionsRegion, emulatorHost, emulatorPort);
+    logger.info('🔧 Connected to Firebase Functions Emulator', {
+      host: emulatorHost,
+      port: emulatorPort
+    }, 'firebaseFunctionsService');
+  } catch (error: any) {
+    if (error.code !== 'functions/already-initialized') {
+      logger.warn('Failed to connect to Functions emulator', {
+        error: error.message,
+        note: 'Using production Functions'
+      }, 'firebaseFunctionsService');
+    }
+  }
+}
 
 // Firebase Functions callable functions with increased timeout
 const sendVerificationEmailFunction = httpsCallable(functionsRegion, 'sendVerificationEmail', {

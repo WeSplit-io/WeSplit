@@ -124,114 +124,37 @@ class ConsolidatedTransactionService {
         error: result.error
       });
       
-      // Save transaction to database if successful
+      // Save transaction and award points using centralized helper
       if (result.success && result.signature) {
         try {
-          const { firebaseDataService } = await import('../../data/firebaseDataService');
+          const { saveTransactionAndAwardPoints } = await import('../../shared/transactionPostProcessing');
+          const { FeeService } = await import('../../../config/constants/feeConfig');
           
-          // Find recipient user by wallet address to get their user ID
-          const recipientUser = await firebaseDataService.user.getUserByWalletAddress(params.to);
-          const recipientUserId = recipientUser ? recipientUser.id.toString() : params.to;
+          // Calculate company fee for transaction
+          const transactionType = params.transactionType || 'send';
+          const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
           
-          // Create sender transaction record
-          const senderTransactionData = {
-            id: `${result.signature}_sender`,
-            type: 'send' as const,
+          await saveTransactionAndAwardPoints({
+            userId: params.userId,
+            toAddress: params.to,
             amount: params.amount,
-            currency: params.currency,
-            from_user: params.userId,
-            to_user: recipientUserId,
-            from_wallet: keypairResult.keypair.publicKey.toBase58(),
-            to_wallet: params.to,
-            tx_hash: result.signature,
-            note: params.memo || 'USDC Transfer',
-            status: 'completed' as const,
-            group_id: params.groupId || null,
-            company_fee: result.companyFee || 0,
-            net_amount: result.netAmount || params.amount,
-            gas_fee: 0, // Gas fees are covered by the company
-            blockchain_network: 'solana',
-            confirmation_count: 0,
-            block_height: 0
-          };
+            signature: result.signature,
+            transactionType: transactionType,
+            companyFee: companyFee,
+            netAmount: recipientAmount,
+            memo: params.memo,
+            groupId: params.groupId,
+            currency: params.currency
+          });
           
-          // Create recipient transaction record (only if recipient is a registered user)
-          const recipientTransactionData = {
-            id: `${result.signature}_recipient`,
-            type: 'receive' as const,
-            amount: params.amount,
-            currency: params.currency,
-            from_user: params.userId,
-            to_user: recipientUserId,
-            from_wallet: keypairResult.keypair.publicKey.toBase58(),
-            to_wallet: params.to,
-            tx_hash: result.signature,
-            note: params.memo || 'USDC Transfer',
-            status: 'completed' as const,
-            group_id: params.groupId || null,
-            company_fee: 0, // Recipient doesn't pay company fees
-            net_amount: params.amount, // Recipient gets full amount
-            gas_fee: 0, // Gas fees are covered by the company
-            blockchain_network: 'solana',
-            confirmation_count: 0,
-            block_height: 0
-          };
-          
-          // Save both transaction records
-          await firebaseDataService.transaction.createTransaction(senderTransactionData);
-          
-          // Only create recipient transaction if recipient is a registered user
-          if (recipientUser) {
-            await firebaseDataService.transaction.createTransaction(recipientTransactionData);
-            logger.info('✅ Both sender and recipient transactions saved to database', {
-              signature: result.signature,
-              userId: params.userId,
-              recipientUserId: recipientUserId,
-              amount: params.amount
-            }, 'ConsolidatedTransactionService');
-
-            // Award points for wallet-to-wallet transfer (only for internal transfers)
-            try {
-              const { pointsService } = await import('../../rewards/pointsService');
-              const pointsResult = await pointsService.awardTransactionPoints(
-                params.userId,
-                params.amount,
-                result.signature,
-                'send'
-              );
-              
-              if (pointsResult.success) {
-                logger.info('✅ Points awarded for transaction', {
-                  userId: params.userId,
-                  pointsAwarded: pointsResult.pointsAwarded,
-                  totalPoints: pointsResult.totalPoints,
-                  transactionAmount: params.amount
-                }, 'ConsolidatedTransactionService');
-              } else {
-                logger.warn('⚠️ Failed to award points for transaction', {
-                  userId: params.userId,
-                  error: pointsResult.error
-                }, 'ConsolidatedTransactionService');
-              }
-            } catch (pointsError) {
-              logger.error('❌ Error awarding points for transaction', pointsError, 'ConsolidatedTransactionService');
-              // Don't fail the transaction if points award fails
-            }
-
-            // DISABLED: Old quest (first_transaction) - replaced by season-based system
-            // Transaction points are now awarded via awardTransactionPoints() which uses season-based rewards
-            // No need to complete old quest
-          } else {
-            logger.info('✅ Sender transaction saved to database (recipient not registered)', {
-              signature: result.signature,
-              userId: params.userId,
-              amount: params.amount
-            }, 'ConsolidatedTransactionService');
-          }
-          
-        } catch (saveError) {
-          logger.error('❌ Failed to save transaction to database', saveError, 'ConsolidatedTransactionService');
-          // Don't fail the transaction if database save fails - transaction was successful on blockchain
+          logger.info('✅ Transaction post-processing completed', {
+            signature: result.signature,
+            userId: params.userId,
+            transactionType
+          }, 'ConsolidatedTransactionService');
+        } catch (postProcessingError) {
+          logger.error('❌ Error in transaction post-processing', postProcessingError, 'ConsolidatedTransactionService');
+          // Don't fail the transaction if post-processing fails
         }
 
         // Process payment request if this transaction was from a request
@@ -262,32 +185,32 @@ class ConsolidatedTransactionService {
                 transactionId: result.signature
               }, 'ConsolidatedTransactionService');
 
-              // Send personalized settlement notifications to both users
+              // Send personalized settlement notifications to both users (non-blocking)
+              // Don't await - run in background to avoid blocking transaction
               if (requestDetails) {
-                try {
-                  const { notificationService } = await import('../../notifications/notificationService');
-                  await notificationService.instance.sendPaymentRequestCompletionNotifications(
-                    params.requestId,
-                    requestDetails.senderId,
-                    requestDetails.senderName || 'Unknown User',
-                    requestDetails.recipientId,
-                    requestDetails.recipientName || 'Unknown User',
-                    requestDetails.amount,
-                    requestDetails.currency,
-                    result.signature
-                  );
+                const { notificationService } = await import('../../notifications/notificationService');
+                notificationService.instance.sendPaymentRequestCompletionNotifications(
+                  params.requestId,
+                  requestDetails.senderId,
+                  requestDetails.senderName || 'Unknown User',
+                  requestDetails.recipientId,
+                  requestDetails.recipientName || 'Unknown User',
+                  requestDetails.amount,
+                  requestDetails.currency,
+                  result.signature
+                ).then(() => {
                   logger.info('✅ Settlement notifications sent successfully', {
                     requestId: params.requestId,
                     senderId: requestDetails.senderId,
                     recipientId: requestDetails.recipientId
                   }, 'ConsolidatedTransactionService');
-                } catch (notificationError) {
-                  logger.error('❌ Failed to send settlement notifications', {
+                }).catch(notificationError => {
+                  logger.error('❌ Failed to send settlement notifications (non-blocking)', {
                     requestId: params.requestId,
                     error: notificationError
                   }, 'ConsolidatedTransactionService');
                   // Don't fail the transaction if notifications fail
-                }
+                });
               }
             } else {
               logger.error('❌ Payment request processing failed', {

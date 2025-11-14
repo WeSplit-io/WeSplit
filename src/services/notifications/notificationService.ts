@@ -142,13 +142,19 @@ class NotificationServiceClass {
     data: Record<string, unknown> = {}
   ): Promise<void> {
     try {
+      // Filter out undefined values from data to prevent Firestore errors
+      // Firestore doesn't allow undefined values in documents
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+      
       // Store in Firestore
       const notificationRef = await addDoc(collection(db, 'notifications'), {
         userId,
         title,
         message,
         type,
-        data,
+        data: cleanData, // Use cleaned data without undefined values
         is_read: false,
         created_at: serverTimestamp()
       });
