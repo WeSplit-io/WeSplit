@@ -128,8 +128,10 @@ async function executeFairSplitTransaction(
     } catch (error) {
         // Create associated token account if it doesn't exist
         // Use company wallet as payer since it's the fee payer
+        // Get company wallet address from Firebase Secrets (not EAS secrets)
         const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-        const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
+        const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+        const companyPublicKey = new PublicKey(companyWalletAddress);
         
         transaction.add(
           createAssociatedTokenAccountInstruction(
@@ -153,8 +155,10 @@ async function executeFairSplitTransaction(
       
       // Add company fee transfer instruction to company wallet
       if (companyFeeAmount > 0) {
+        // Get company wallet address from Firebase Secrets (not EAS secrets)
         const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-        const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(COMPANY_WALLET_CONFIG.address));
+        const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+        const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(companyWalletAddress));
         
         transaction.add(
           createTransferInstruction(
@@ -217,13 +221,14 @@ async function executeFairSplitTransaction(
     // Use company wallet as fee payer
     // SECURITY: Company wallet secret key is not available in client-side code
     // All secret key operations must be performed on backend services
+    // Get company wallet address from Firebase Secrets (not EAS secrets)
     const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-    const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
+    const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
     
     if (!companyWalletAddress) {
       return {
         success: false,
-        error: 'Company wallet address is not configured'
+        error: 'Company wallet address is not available from Firebase Secrets'
       };
     }
     
@@ -601,8 +606,10 @@ async function executeFastTransaction(
         }, 'SplitWalletPayments');
         
         // Create associated token account if it doesn't exist
+        // Get company wallet address from Firebase Secrets (not EAS secrets)
         const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-        const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
+        const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+        const companyPublicKey = new PublicKey(companyWalletAddress);
         
         transaction.add(
           createAssociatedTokenAccountInstruction(
@@ -640,8 +647,10 @@ async function executeFastTransaction(
         
         // Add company fee transfer instruction to company wallet
         if (companyFeeAmount > 0) {
+          // Get company wallet address from Firebase Secrets (not EAS secrets)
           const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-          const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(COMPANY_WALLET_CONFIG.address));
+          const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+          const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(companyWalletAddress));
           
           // CRITICAL: Use actualFromTokenAccount (might be different if fallback method was used)
           transaction.add(
@@ -720,13 +729,14 @@ async function executeFastTransaction(
     // Use company wallet as fee payer
     // SECURITY: Company wallet secret key is not available in client-side code
     // All secret key operations must be performed on backend services
+    // Get company wallet address from Firebase Secrets (not EAS secrets)
     const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-    const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
+    const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
     
     if (!companyWalletAddress) {
       return {
         success: false,
-        error: 'Company wallet address is not configured'
+        error: 'Company wallet address is not available from Firebase Secrets'
       };
     }
     
@@ -1244,7 +1254,9 @@ async function executeDegenSplitTransaction(
       } catch (error) {
       // Create associated token account if it doesn't exist
       const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-      const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
+      // Get company wallet address from Firebase Secrets (not EAS secrets)
+      const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+      const companyPublicKey = new PublicKey(companyWalletAddress);
       
       transaction.add(
         createAssociatedTokenAccountInstruction(
@@ -1268,8 +1280,10 @@ async function executeDegenSplitTransaction(
         
         // Add company fee transfer instruction to company wallet
         if (companyFeeAmount > 0) {
+          // Get company wallet address from Firebase Secrets (not EAS secrets)
           const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-          const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(COMPANY_WALLET_CONFIG.address));
+          const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+          const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(companyWalletAddress));
           
           transaction.add(
             createTransferInstruction(
@@ -1331,7 +1345,8 @@ async function executeDegenSplitTransaction(
     // SECURITY: Company wallet secret key is not available in client-side code
     // All secret key operations must be performed on backend services
     const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-    const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
+    // Get company wallet address from Firebase Secrets (not EAS secrets)
+    const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
     
     if (!companyWalletAddress) {
             return {

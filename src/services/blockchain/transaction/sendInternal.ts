@@ -416,12 +416,13 @@ class InternalTransferService {
       }, 'InternalTransferService');
 
       // Use company wallet for fees if configured, otherwise use user wallet
-      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
+      // Fetch from Firebase Secrets (not EAS secrets)
+      const feePayerPublicKey = await FeeService.getFeePayerPublicKey(fromPublicKey);
       
       // Create transaction (using fresh blockhash)
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: feePayerPublicKey // User or company pays fees based on configuration
+        feePayer: feePayerPublicKey // Company wallet pays fees (fetched from Firebase)
       });
 
       logger.info('Transaction created', {
@@ -480,15 +481,18 @@ class InternalTransferService {
       if (companyFee > 0) {
         const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
         
+        // Get company wallet address from Firebase Secrets (not EAS secrets)
+        const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+        
         // Get company wallet's USDC token account
-        const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(COMPANY_WALLET_CONFIG.address));
+        const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(companyWalletAddress));
         
         logger.info('Adding company fee transfer instruction', { 
           companyFeeAmount, 
           companyFee,
           fromTokenAccount: fromTokenAccount.toBase58(),
           companyTokenAccount: companyTokenAccount.toBase58(),
-          companyWalletAddress: COMPANY_WALLET_CONFIG.address,
+          companyWalletAddress: companyWalletAddress,
           authority: fromPublicKey.toBase58()
         }, 'InternalTransferService');
         
@@ -532,9 +536,11 @@ class InternalTransferService {
 
       // Company wallet always pays SOL fees
       // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
+      // Get company wallet address from Firebase Secrets (not EAS secrets)
+      const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
       logger.info('Company wallet configuration check', {
         companyWalletRequired: true,
-        companyWalletAddress: COMPANY_WALLET_CONFIG.address,
+        companyWalletAddress: companyWalletAddress,
         feePayerAddress: feePayerPublicKey.toBase58()
       }, 'InternalTransferService');
 
@@ -1065,12 +1071,13 @@ class InternalTransferService {
       const blockhashTimestamp = blockhashData.timestamp; // Use actual blockhash timestamp, not Date.now()
 
       // Use company wallet for fees if configured, otherwise use user wallet
-      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromKeypair.publicKey);
+      // Fetch from Firebase Secrets (not EAS secrets)
+      const feePayerPublicKey = await FeeService.getFeePayerPublicKey(fromKeypair.publicKey);
 
       // Create transaction with proper blockhash and fee payer
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: feePayerPublicKey // Company or user pays fees based on configuration
+        feePayer: feePayerPublicKey // Company wallet pays fees (fetched from Firebase)
       });
 
       // Add priority fee
@@ -1157,9 +1164,11 @@ class InternalTransferService {
 
         // Add company fee transfer if applicable
         if (companyFee > 0) {
+          // Get company wallet address from Firebase Secrets (not EAS secrets)
+          const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
           const companyTokenAccount = await getAssociatedTokenAddress(
             new PublicKey(getConfig().blockchain.usdcMintAddress),
-            new PublicKey(COMPANY_WALLET_CONFIG.address)
+            new PublicKey(companyWalletAddress)
           );
 
           const companyFeeAmount = Math.floor(companyFee * 1000000 + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding

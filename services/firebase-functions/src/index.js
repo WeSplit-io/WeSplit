@@ -69,4 +69,10 @@ exports.submitTransaction = transactionFunctions.submitTransaction;
 exports.processUsdcTransfer = transactionFunctions.processUsdcTransfer;
 exports.validateTransaction = transactionFunctions.validateTransaction;
 exports.getTransactionFeeEstimate = transactionFunctions.getTransactionFeeEstimate;
+exports.getCompanyWalletAddress = transactionFunctions.getCompanyWalletAddress;
 exports.getCompanyWalletBalance = transactionFunctions.getCompanyWalletBalance;
+
+// Import and export external payment integration functions
+const externalPaymentIntegration = require('./externalPaymentIntegration');
+exports.createSplitFromPayment = externalPaymentIntegration.createSplitFromPayment;
+exports.testCreateSplitFromPayment = externalPaymentIntegration.testCreateSplitFromPayment;

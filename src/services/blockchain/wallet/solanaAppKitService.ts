@@ -720,7 +720,8 @@ export class SolanaAppKitService {
       const blockhashTimestamp = blockhashData.timestamp;
 
       // Use centralized fee payer logic - Company pays SOL gas fees
-      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
+      // Fetch company wallet address from Firebase Secrets (not EAS secrets)
+      const feePayerPublicKey = await FeeService.getFeePayerPublicKey(fromPublicKey);
       
       // Create transaction
       const transaction = new Transaction({

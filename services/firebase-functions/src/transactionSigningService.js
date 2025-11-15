@@ -87,38 +87,110 @@ class TransactionSigningService {
     try {
       // Get company wallet configuration from Firebase Secrets
       // Firebase Secrets are automatically available as process.env variables when deployed
-      const companyWalletAddress = process.env.COMPANY_WALLET_ADDRESS?.trim();
-      const companyWalletSecretKey = process.env.COMPANY_WALLET_SECRET_KEY?.trim();
+      // CRITICAL: Handle all edge cases - undefined, null, empty string, whitespace-only
+      const rawAddress = process.env.COMPANY_WALLET_ADDRESS;
+      const rawSecretKey = process.env.COMPANY_WALLET_SECRET_KEY;
       
-      console.log('🔄 TransactionSigningService.initialize: Checking secrets', {
-        hasAddress: !!companyWalletAddress,
-        addressLength: companyWalletAddress?.length,
-        addressPreview: companyWalletAddress ? companyWalletAddress.substring(0, 8) + '...' : 'missing',
-        hasSecretKey: !!companyWalletSecretKey,
-        secretKeyLength: companyWalletSecretKey?.length,
-        addressIsString: typeof companyWalletAddress === 'string',
-        secretKeyIsString: typeof companyWalletSecretKey === 'string',
-        // SECURITY: Never log secret key previews - even partial keys can be security risk
+      // Trim and validate - handle undefined, null, empty string
+      const companyWalletAddress = rawAddress && typeof rawAddress === 'string' 
+        ? rawAddress.trim() 
+        : null;
+      const companyWalletSecretKey = rawSecretKey && typeof rawSecretKey === 'string' 
+        ? rawSecretKey.trim() 
+        : null;
+      
+      // Enhanced logging for debugging production issues
+      // SECURITY: Never log secret key values, previews, or any part of the key
+      // Only log metadata (existence, length, type) to prevent exposure
+      console.log('🔄 TransactionSigningService.initialize: Checking Firebase Secrets', {
+        hasAddressRaw: !!rawAddress,
+        hasAddressTrimmed: !!companyWalletAddress,
+        addressType: typeof rawAddress,
+        addressLength: companyWalletAddress?.length || 0,
+        addressPreview: companyWalletAddress 
+          ? companyWalletAddress.substring(0, 8) + '...' + companyWalletAddress.substring(companyWalletAddress.length - 8) 
+          : 'MISSING',
+        hasSecretKeyRaw: !!rawSecretKey,
+        hasSecretKeyTrimmed: !!companyWalletSecretKey,
+        secretKeyType: typeof rawSecretKey,
+        secretKeyLength: companyWalletSecretKey?.length || 0,
+        // Check for common issues
+        addressIsEmptyString: rawAddress === '',
+        secretKeyIsEmptyString: rawSecretKey === '',
+        addressIsWhitespaceOnly: rawAddress && rawAddress.trim() === '',
+        secretKeyIsWhitespaceOnly: rawSecretKey && rawSecretKey.trim() === '',
+        // List all COMPANY/WALLET related env vars (for debugging) - but NOT their values
+        relatedEnvKeys: Object.keys(process.env).filter(k => 
+          k.includes('COMPANY') || k.includes('WALLET') || k.includes('COMPANY_WALLET')
+        ),
+        // SECURITY: Never log secret key values, previews, or any part of the key
+        // SECURITY: Never log secret key in error messages or stack traces
+        // SECURITY: Secret key must remain in memory only, never serialized to logs
       });
       
-      if (!companyWalletAddress || !companyWalletSecretKey) {
-        console.error('❌ TransactionSigningService.initialize: Secrets missing', {
-          hasAddress: !!companyWalletAddress,
-          hasSecretKey: !!companyWalletSecretKey,
-          addressValue: companyWalletAddress || 'MISSING',
-          secretKeyValue: companyWalletSecretKey ? 'PRESENT' : 'MISSING',
-          allEnvKeys: Object.keys(process.env).filter(k => k.includes('COMPANY') || k.includes('WALLET'))
-        });
+      // Detailed validation with specific error messages
+      if (!companyWalletAddress) {
+        const errorDetails = {
+          hasRawAddress: !!rawAddress,
+          rawAddressType: typeof rawAddress,
+          rawAddressValue: rawAddress === '' ? 'EMPTY_STRING' : rawAddress ? 'HAS_VALUE_BUT_INVALID' : 'UNDEFINED',
+          allEnvKeys: Object.keys(process.env).filter(k => k.includes('COMPANY') || k.includes('WALLET')),
+          nodeEnv: process.env.NODE_ENV,
+          functionsEmulator: process.env.FUNCTIONS_EMULATOR
+        };
+        
+        console.error('❌ TransactionSigningService.initialize: COMPANY_WALLET_ADDRESS missing or invalid', errorDetails);
+        
         throw new Error(
-          'Company wallet configuration missing. ' +
-          'Set COMPANY_WALLET_ADDRESS and COMPANY_WALLET_SECRET_KEY as Firebase Secrets. ' +
-          'Use: firebase functions:secrets:set COMPANY_WALLET_ADDRESS'
+          'Company wallet address (COMPANY_WALLET_ADDRESS) is missing or invalid. ' +
+          'This secret must be set in Firebase Secrets for production. ' +
+          'To set it, run: echo "YOUR_WALLET_ADDRESS" | firebase functions:secrets:set COMPANY_WALLET_ADDRESS ' +
+          'Or use: firebase functions:secrets:set COMPANY_WALLET_ADDRESS ' +
+          `Current value: ${rawAddress === '' ? 'EMPTY_STRING' : rawAddress ? 'HAS_VALUE_BUT_INVALID' : 'UNDEFINED'}`
         );
       }
       
+      if (!companyWalletSecretKey) {
+        const errorDetails = {
+          hasRawSecretKey: !!rawSecretKey,
+          rawSecretKeyType: typeof rawSecretKey,
+          rawSecretKeyValue: rawSecretKey === '' ? 'EMPTY_STRING' : rawSecretKey ? 'HAS_VALUE_BUT_INVALID' : 'UNDEFINED',
+          allEnvKeys: Object.keys(process.env).filter(k => k.includes('COMPANY') || k.includes('WALLET')),
+          nodeEnv: process.env.NODE_ENV,
+          functionsEmulator: process.env.FUNCTIONS_EMULATOR
+        };
+        
+        console.error('❌ TransactionSigningService.initialize: COMPANY_WALLET_SECRET_KEY missing or invalid', errorDetails);
+        
+        throw new Error(
+          'Company wallet secret key (COMPANY_WALLET_SECRET_KEY) is missing or invalid. ' +
+          'This secret must be set in Firebase Secrets for production. ' +
+          'To set it, run: echo "[YOUR_SECRET_KEY_ARRAY]" | firebase functions:secrets:set COMPANY_WALLET_SECRET_KEY ' +
+          'Or use: firebase functions:secrets:set COMPANY_WALLET_SECRET_KEY ' +
+          `Current value: ${rawSecretKey === '' ? 'EMPTY_STRING' : rawSecretKey ? 'HAS_VALUE_BUT_INVALID' : 'UNDEFINED'}`
+        );
+      }
+      
+      // Validate address format (Solana addresses are 32-44 characters base58)
+      if (companyWalletAddress.length < 32 || companyWalletAddress.length > 44) {
+        console.error('❌ TransactionSigningService.initialize: Invalid address length', {
+          addressLength: companyWalletAddress.length,
+          expectedRange: '32-44 characters'
+        });
+        throw new Error(
+          `Company wallet address has invalid length: ${companyWalletAddress.length} characters. ` +
+          `Expected 32-44 characters (Solana base58 address). ` +
+          `Address preview: ${companyWalletAddress.substring(0, 8)}...`
+        );
+      }
+      
+      // SECURITY: Only log metadata, never the actual secret key value
       console.log('✅ TransactionSigningService.initialize: Secrets found', {
         addressLength: companyWalletAddress.length,
-        secretKeyLength: companyWalletSecretKey.length
+        addressPreview: companyWalletAddress.substring(0, 8) + '...' + companyWalletAddress.substring(companyWalletAddress.length - 8),
+        secretKeyLength: companyWalletSecretKey.length,
+        secretKeyExists: true
+        // SECURITY: Never log secretKey value, preview, or any part of it
       });
 
       // Create company keypair from secret key
@@ -174,26 +246,30 @@ class TransactionSigningService {
       });
       
       // Check explicit network setting (highest priority)
+      // Trim whitespace/newlines from environment variables to handle Firebase Secrets formatting
       if (process.env.SOLANA_NETWORK) {
-        actualNetwork = process.env.SOLANA_NETWORK.toLowerCase().trim();
+        actualNetwork = (process.env.SOLANA_NETWORK || '').trim().toLowerCase();
         console.log('Using SOLANA_NETWORK:', actualNetwork);
       } else if (process.env.NETWORK) {
-        actualNetwork = process.env.NETWORK.toLowerCase().trim();
+        actualNetwork = (process.env.NETWORK || '').trim().toLowerCase();
         console.log('Using NETWORK:', actualNetwork);
       }
       // Check EXPO_PUBLIC_FORCE_MAINNET (matches frontend variable name)
-      else if (process.env.EXPO_PUBLIC_FORCE_MAINNET === 'true' || process.env.EXPO_PUBLIC_FORCE_MAINNET === '1') {
+      // Trim whitespace/newlines from environment variable to handle Firebase Secrets formatting
+      else if ((process.env.EXPO_PUBLIC_FORCE_MAINNET || '').trim() === 'true' || (process.env.EXPO_PUBLIC_FORCE_MAINNET || '').trim() === '1') {
         actualNetwork = 'mainnet';
         console.log('Using EXPO_PUBLIC_FORCE_MAINNET=true, setting network to mainnet');
       }
       // Check FORCE_MAINNET (backend variable)
-      else if (process.env.FORCE_MAINNET === 'true' || process.env.FORCE_MAINNET === '1') {
+      // Trim whitespace/newlines from environment variable to handle Firebase Secrets formatting
+      else if ((process.env.FORCE_MAINNET || '').trim() === 'true' || (process.env.FORCE_MAINNET || '').trim() === '1') {
         actualNetwork = 'mainnet';
         console.log('Using FORCE_MAINNET=true, setting network to mainnet');
       }
       // Check EXPO_PUBLIC_DEV_NETWORK (frontend variable - can be 'mainnet' or 'devnet')
+      // Trim whitespace/newlines from environment variable to handle Firebase Secrets formatting
       else if (process.env.EXPO_PUBLIC_DEV_NETWORK) {
-        const frontendNetwork = process.env.EXPO_PUBLIC_DEV_NETWORK.toLowerCase().trim();
+        const frontendNetwork = (process.env.EXPO_PUBLIC_DEV_NETWORK || '').trim().toLowerCase();
         // Handle both 'mainnet'/'devnet' strings
         if (frontendNetwork === 'mainnet') {
           actualNetwork = 'mainnet';
@@ -212,8 +288,9 @@ class TransactionSigningService {
         console.log('Using EXPO_PUBLIC_DEV_NETWORK:', frontendNetwork, '->', actualNetwork);
       }
       // Check legacy DEV_NETWORK variable
+      // Trim whitespace/newlines from environment variable to handle Firebase Secrets formatting
       else if (process.env.DEV_NETWORK) {
-        const devNetwork = process.env.DEV_NETWORK.toLowerCase().trim();
+        const devNetwork = (process.env.DEV_NETWORK || '').trim().toLowerCase();
         if (devNetwork === 'mainnet') {
           actualNetwork = 'mainnet';
         } else if (devNetwork === 'devnet') {
@@ -252,25 +329,30 @@ class TransactionSigningService {
       });
       
       // Helper to extract API key from URL or return as-is
+      // Trim whitespace/newlines to handle Firebase Secrets formatting
       const extractApiKey = (value, baseUrl) => {
         if (!value) return '';
-        if (value.startsWith('http')) {
-          const parts = value.split('/');
-          return parts[parts.length - 1] || value;
+        // Trim whitespace/newlines from the value
+        const trimmedValue = value.trim();
+        if (trimmedValue.startsWith('http')) {
+          const parts = trimmedValue.split('/');
+          return (parts[parts.length - 1] || trimmedValue).trim();
         }
-        if (value.includes(baseUrl)) {
-          return value.replace(baseUrl, '').replace(/^\//, '').replace(/\/$/, '');
+        if (trimmedValue.includes(baseUrl)) {
+          return trimmedValue.replace(baseUrl, '').replace(/^\//, '').replace(/\/$/, '').trim();
         }
-        return value;
+        return trimmedValue;
       };
       
       const extractGetBlockKey = (value) => {
         if (!value) return '';
-        if (value.startsWith('http')) {
-          const match = value.match(/go\.getblock\.io\/([^\/\s]+)/);
-          return match ? match[1] : value.split('/').pop() || value;
+        // Trim whitespace/newlines from the value
+        const trimmedValue = value.trim();
+        if (trimmedValue.startsWith('http')) {
+          const match = trimmedValue.match(/go\.getblock\.io\/([^\/\s]+)/);
+          return match ? match[1].trim() : (trimmedValue.split('/').pop() || trimmedValue).trim();
         }
-        return value;
+        return trimmedValue;
       };
       
       let rpcUrl;
@@ -280,14 +362,16 @@ class TransactionSigningService {
         // Use same priority order as client: Alchemy > GetBlock > QuickNode > Chainstack > Helius > Free
         // SECURITY: Use Firebase Secrets only - never use EXPO_PUBLIC_ variables in production
         // Set USE_PAID_RPC=true to enable paid RPC providers
-        const usePaidRpc = process.env.USE_PAID_RPC === 'true';
+        // Trim whitespace/newlines from environment variable to handle Firebase Secrets formatting
+        const usePaidRpc = (process.env.USE_PAID_RPC || '').trim() === 'true';
         
         // SECURITY: Only use Firebase Secrets (process.env.ALCHEMY_API_KEY) - not EXPO_PUBLIC_ variables
         // EXPO_PUBLIC_ variables are for client-side only and should not be used in Firebase Functions
+        // Trim whitespace/newlines from environment variables to handle Firebase Secrets formatting
         const alchemyApiKey = extractApiKey(process.env.ALCHEMY_API_KEY, 'solana-mainnet.g.alchemy.com/v2');
         const getBlockApiKey = extractGetBlockKey(process.env.GETBLOCK_API_KEY);
-        const quickNodeEndpoint = process.env.QUICKNODE_ENDPOINT;
-        const chainstackEndpoint = process.env.CHAINSTACK_ENDPOINT;
+        const quickNodeEndpoint = process.env.QUICKNODE_ENDPOINT ? process.env.QUICKNODE_ENDPOINT.trim() : undefined;
+        const chainstackEndpoint = process.env.CHAINSTACK_ENDPOINT ? process.env.CHAINSTACK_ENDPOINT.trim() : undefined;
         const heliusApiKey = extractApiKey(process.env.HELIUS_API_KEY, 'mainnet.helius-rpc.com');
         
         // Log API key availability for debugging
@@ -426,14 +510,74 @@ class TransactionSigningService {
         throw new Error('Cannot add company signature: transaction missing blockhash');
       }
 
+      // CRITICAL: Validate company wallet is a required signer BEFORE attempting to sign
+      // This prevents "Cannot sign with non signer key" errors
+      const companyWalletAddress = this.companyKeypair.publicKey.toBase58();
+      const staticAccountKeys = transaction.message.staticAccountKeys;
+      const numRequiredSignatures = transaction.message.header.numRequiredSignatures;
+      const feePayer = staticAccountKeys[0];
+      
+      // Log transaction structure for debugging
+      console.log('Validating transaction structure before signing', {
+        messageVersion: transaction.version,
+        numSignatures: transaction.signatures.length,
+        numRequiredSignatures,
+        staticAccountKeysCount: staticAccountKeys.length,
+        feePayerAddress: feePayer?.toBase58(),
+        companyWalletAddress,
+        feePayerMatchesCompany: feePayer?.toBase58() === companyWalletAddress,
+        requiredSignerAccounts: staticAccountKeys.slice(0, numRequiredSignatures).map(key => key.toBase58()),
+        companyWalletInRequiredSigners: staticAccountKeys.slice(0, numRequiredSignatures).some(key => key.toBase58() === companyWalletAddress),
+        blockhash: blockhashBeforeSigning.toString().substring(0, 8) + '...'
+      });
+
+      // Validate fee payer is company wallet
+      if (!feePayer || feePayer.toBase58() !== companyWalletAddress) {
+        console.error('❌ Transaction fee payer is not company wallet', {
+          feePayerAddress: feePayer?.toBase58(),
+          companyWalletAddress,
+          staticAccountKeys: staticAccountKeys.map(key => key.toBase58()),
+          numRequiredSignatures
+        });
+        throw new Error(
+          `Transaction fee payer is not company wallet. ` +
+          `Expected: ${companyWalletAddress}, ` +
+          `Got: ${feePayer?.toBase58() || 'undefined'}. ` +
+          `The transaction must have the company wallet (${companyWalletAddress}) as the fee payer.`
+        );
+      }
+
+      // Validate company wallet is in required signers (should be at index 0)
+      const requiredSignerAccounts = staticAccountKeys.slice(0, numRequiredSignatures);
+      const companyWalletInRequiredSigners = requiredSignerAccounts.some(key => key.toBase58() === companyWalletAddress);
+      
+      if (!companyWalletInRequiredSigners) {
+        console.error('❌ Company wallet is not in required signers list', {
+          companyWalletAddress,
+          numRequiredSignatures,
+          requiredSignerAccounts: requiredSignerAccounts.map(key => key.toBase58()),
+          allStaticAccountKeys: staticAccountKeys.map(key => key.toBase58()),
+          feePayerIndex: 0,
+          feePayerAddress: feePayer.toBase58()
+        });
+        throw new Error(
+          `Company wallet (${companyWalletAddress}) is not in the required signers list. ` +
+          `Fee payer is at index 0, but numRequiredSignatures is ${numRequiredSignatures}. ` +
+          `Required signers: ${requiredSignerAccounts.map(key => key.toBase58()).join(', ')}. ` +
+          `This usually means the transaction was not properly compiled with the company wallet as fee payer.`
+        );
+      }
+
       // CRITICAL: Sign immediately - no validation delays here
       // Validation happens before Firestore checks and right before submission
       // Every millisecond counts to prevent blockhash expiration
-      console.log('Adding company signature to transaction', {
+      console.log('✅ Transaction validation passed, adding company signature', {
         messageVersion: transaction.version,
         numSignatures: transaction.signatures.length,
+        numRequiredSignatures,
+        companyWalletAddress,
+        feePayerAddress: feePayer.toBase58(),
         blockhash: blockhashBeforeSigning.toString().substring(0, 8) + '...',
-        blockhashFull: blockhashBeforeSigning.toString(), // Log full blockhash for verification
         note: 'Signing transaction with blockhash from client. This blockhash will be validated before submission.'
       });
 

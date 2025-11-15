@@ -120,8 +120,79 @@ export const COMPANY_FEE_CONFIG = TRANSACTION_FEE_CONFIGS.default;
 // Company Wallet Configuration
 // SECURITY: Secret key is NOT stored in client-side code
 // All secret key operations must be performed on backend services
+// Address is fetched from Firebase Secrets instead of EAS secrets
+let cachedCompanyWalletAddress: string | null = null;
+let addressFetchPromise: Promise<string> | null = null;
+
+/**
+ * Get company wallet address from Firebase Secrets
+ * Falls back to environment variable if Firebase fetch fails
+ */
+async function getCompanyWalletAddress(): Promise<string> {
+  // Return cached value if available
+  if (cachedCompanyWalletAddress) {
+    return cachedCompanyWalletAddress;
+  }
+
+  // If already fetching, return the existing promise
+  if (addressFetchPromise) {
+    return addressFetchPromise;
+  }
+
+  // Try to fetch from Firebase first
+  addressFetchPromise = (async () => {
+    try {
+      // Dynamically import to avoid circular dependencies
+      const { getCompanyWalletAddress } = await import('../../services/blockchain/transaction/transactionSigningService');
+      const address = await getCompanyWalletAddress();
+      cachedCompanyWalletAddress = address;
+      return address;
+    } catch (error: any) {
+      // In production, we MUST have the address from Firebase - no fallback
+      if (!__DEV__) {
+        throw new Error(
+          `Company wallet address not available from Firebase: ${error?.message || String(error)}. ` +
+          `This is required in production. Ensure getCompanyWalletAddress function is deployed.`
+        );
+      }
+      
+      // In development, allow fallback to env var for testing
+      const envAddress = getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS');
+      if (envAddress) {
+        cachedCompanyWalletAddress = envAddress.trim();
+        return cachedCompanyWalletAddress;
+      }
+      throw new Error(
+        `Company wallet address not available: ${error?.message || String(error)}. ` +
+        `Firebase function failed and no environment variable found.`
+      );
+    }
+  })();
+
+  return addressFetchPromise;
+}
+
+/**
+ * Company Wallet Configuration
+ * Address is fetched from Firebase Secrets (not stored in EAS secrets)
+ */
 export const COMPANY_WALLET_CONFIG = {
-  address: getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS'),
+  // Address is fetched dynamically from Firebase
+  get address(): string {
+    // This is a getter that will throw if accessed synchronously
+    // Use getCompanyWalletAddress() async function instead
+    if (cachedCompanyWalletAddress) {
+      return cachedCompanyWalletAddress;
+    }
+    // Fallback to env var for synchronous access (backward compatibility)
+    const envAddress = getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS');
+    if (envAddress) {
+      return envAddress;
+    }
+    throw new Error('Company wallet address not available. Call getCompanyWalletAddress() first or set EXPO_PUBLIC_COMPANY_WALLET_ADDRESS');
+  },
+  // Async method to get address (preferred)
+  getAddress: getCompanyWalletAddress,
   // secretKey removed - must be handled by backend services only
   minSolReserve: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE') || '1.0'),
   gasFeeEstimate: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE') || '0.001'),
@@ -213,38 +284,49 @@ export class FeeService {
   }
 
   /**
-   * Check if company wallet is configured
+   * Check if company wallet is configured (synchronous check - uses cached or env var)
+   * For async check, use getFeePayerPublicKey() which fetches from Firebase
    */
   static isCompanyWalletConfigured(): boolean {
-    return !!(COMPANY_WALLET_CONFIG.address && COMPANY_WALLET_CONFIG.address.trim() !== '');
+    // Check cached value or env var (for backward compatibility)
+    try {
+      return !!(COMPANY_WALLET_CONFIG.address && COMPANY_WALLET_CONFIG.address.trim() !== '');
+    } catch {
+      return false;
+    }
   }
 
   /**
    * Get fee payer public key for SOL gas fees
    * Company wallet ALWAYS pays SOL gas fees - no exceptions
+   * Fetches address from Firebase Secrets if not cached
    */
-  static getFeePayerPublicKey(_userPublicKey: PublicKey): PublicKey {
-    if (!this.isCompanyWalletConfigured()) {
+  static async getFeePayerPublicKey(_userPublicKey: PublicKey): Promise<PublicKey> {
+    // Get address from Firebase (with fallback to env var)
+    const address = await COMPANY_WALLET_CONFIG.getAddress();
+    if (!address) {
       throw new Error('Company wallet not configured. SOL gas fees must be paid by company wallet.');
     }
-    return new PublicKey(COMPANY_WALLET_CONFIG.address);
+    return new PublicKey(address);
   }
 
   /**
    * Validate company wallet has sufficient SOL for gas fees
    */
   static async validateCompanyWalletSolBalance(connection: any): Promise<{ isValid: boolean; balance: number; required: number; error?: string }> {
-    if (!this.isCompanyWalletConfigured()) {
-      return {
-        isValid: false,
-        balance: 0,
-        required: COMPANY_WALLET_CONFIG.minSolReserve,
-        error: 'Company wallet not configured'
-      };
-    }
-
     try {
-      const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
+      // Get company wallet address from Firebase Secrets (not EAS secrets)
+      const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+      if (!companyWalletAddress) {
+        return {
+          isValid: false,
+          balance: 0,
+          required: COMPANY_WALLET_CONFIG.minSolReserve,
+          error: 'Company wallet not configured'
+        };
+      }
+
+      const companyPublicKey = new PublicKey(companyWalletAddress);
       const balance = await connection.getBalance(companyPublicKey);
       const balanceInSol = balance / 1000000000; // Convert lamports to SOL
       

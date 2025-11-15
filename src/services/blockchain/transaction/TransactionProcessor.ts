@@ -99,7 +99,8 @@ export class TransactionProcessor {
       const companyFeeAmount = Math.floor(companyFee * 1_000_000 + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
 
       // Use company wallet for fees if configured, otherwise use user wallet
-      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
+      // Fetch from Firebase Secrets (not EAS secrets)
+      const feePayerPublicKey = await FeeService.getFeePayerPublicKey(fromPublicKey);
       const usdcMintPublicKey = new PublicKey(USDC_CONFIG.mintAddress);
       
       // Get associated token addresses
@@ -270,9 +271,8 @@ export class TransactionProcessor {
       
       // Company wallet always pays SOL fees
       // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
-      if (!COMPANY_WALLET_CONFIG.address) {
-        throw new Error('Company wallet address is not configured');
-      }
+      // Address is fetched from Firebase Secrets (not EAS secrets) via getFeePayerPublicKey above
+      // No need to check here since getFeePayerPublicKey will throw if not available
 
       logger.info('Transaction ready for signing', {
         signerPublicKey: keypair.publicKey.toBase58(),

@@ -368,7 +368,8 @@ class ExternalTransferService {
       // Company wallet configuration will be validated by FeeService.getFeePayerPublicKey
 
       // Use centralized fee payer logic - Company pays SOL gas fees (same as internal transfers)
-      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
+      // Fetch from Firebase Secrets (not EAS secrets)
+      const feePayerPublicKey = await FeeService.getFeePayerPublicKey(fromPublicKey);
       logger.info('Using company wallet as fee payer', { 
         feePayerAddress: feePayerPublicKey.toBase58() 
       }, 'ExternalTransferService');
@@ -464,36 +465,34 @@ class ExternalTransferService {
       if (companyFee > 0) {
         const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
         
-        // Use the already imported COMPANY_WALLET_CONFIG
-        const localCompanyConfig = COMPANY_WALLET_CONFIG;
+        // Get company wallet address from Firebase Secrets (not EAS secrets)
+        const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
         
         // Debug company wallet config
         logger.info('Company wallet config debug', {
-          hasCompanyWalletConfig: !!localCompanyConfig,
-          companyWalletAddress: localCompanyConfig?.address,
-          companyWalletConfigKeys: localCompanyConfig ? Object.keys(localCompanyConfig) : 'undefined'
+          hasCompanyWalletAddress: !!companyWalletAddress,
+          companyWalletAddress: companyWalletAddress
         }, 'ExternalTransferService');
         
-        if (!localCompanyConfig || !localCompanyConfig.address) {
-          logger.error('Company wallet config is undefined or missing address', {
-            hasConfig: !!localCompanyConfig,
-            hasAddress: !!localCompanyConfig?.address
+        if (!companyWalletAddress) {
+          logger.error('Company wallet address is missing', {
+            hasAddress: !!companyWalletAddress
           }, 'ExternalTransferService');
           return {
             success: false,
-            error: 'Company wallet configuration is not properly loaded'
+            error: 'Company wallet address is not available from Firebase Secrets'
           };
         }
         
         // Get company wallet's USDC token account - following internal transfer pattern
-        const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(localCompanyConfig.address));
+        const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(companyWalletAddress));
         
         logger.info('Adding company fee transfer instruction', { 
           companyFeeAmount, 
           companyFee,
           fromTokenAccount: fromTokenAccount.toBase58(),
           companyTokenAccount: companyTokenAccount.toBase58(),
-          companyWalletAddress: localCompanyConfig.address
+          companyWalletAddress: companyWalletAddress
         }, 'ExternalTransferService');
         
         transaction.add(
@@ -565,9 +564,11 @@ class ExternalTransferService {
 
       // Company wallet always pays SOL fees
       // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
+      // Get company wallet address from Firebase Secrets (not EAS secrets) for logging
+      const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
       logger.info('Company wallet configuration check', {
         companyWalletRequired: true,
-        companyWalletAddress: COMPANY_WALLET_CONFIG.address,
+        companyWalletAddress: companyWalletAddress,
         feePayerAddress: feePayerPublicKey.toBase58()
       }, 'ExternalTransferService');
 

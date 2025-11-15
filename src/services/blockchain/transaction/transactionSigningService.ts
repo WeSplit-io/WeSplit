@@ -248,6 +248,12 @@ const getCompanyWalletBalanceFunction = () => {
   });
 };
 
+const getCompanyWalletAddressFunction = () => {
+  return httpsCallable(getFirebaseFunctions(), 'getCompanyWalletAddress', {
+    timeout: 10000 // 10 seconds timeout (simple call)
+  });
+};
+
 /**
  * Add company signature to partially signed transaction
  */
@@ -949,6 +955,124 @@ export async function getTransactionFeeEstimate(serializedTransaction: Uint8Arra
     logger.error('Failed to estimate transaction fee', error, 'TransactionSigningService');
     throw error;
   }
+}
+
+/**
+ * Get company wallet address from Firebase Secrets
+ * This fetches the address from Firebase instead of using EAS secrets
+ * Cached to avoid repeated calls
+ */
+let cachedCompanyWalletAddress: string | null = null;
+let addressFetchPromise: Promise<string> | null = null;
+
+export async function getCompanyWalletAddress(): Promise<string> {
+  // Return cached value if available
+  if (cachedCompanyWalletAddress) {
+    return cachedCompanyWalletAddress;
+  }
+
+  // If already fetching, return the existing promise
+  if (addressFetchPromise) {
+    return addressFetchPromise;
+  }
+
+  // Fetch from Firebase
+  addressFetchPromise = (async () => {
+    try {
+      logger.info('Fetching company wallet address from Firebase', null, 'TransactionSigningService');
+
+      // Get the callable function (lazy initialization)
+      const companyWalletAddressFunction = getCompanyWalletAddressFunction();
+      
+      // Call Firebase Function
+      const result = await companyWalletAddressFunction({});
+      const response = result.data as { success: boolean; address: string };
+
+      if (!response || !response.success || !response.address) {
+        const errorDetails = {
+          hasResponse: !!response,
+          responseKeys: response ? Object.keys(response) : [],
+          hasSuccess: !!response?.success,
+          successValue: response?.success,
+          hasAddress: !!response?.address,
+          responseType: typeof response,
+          fullResponse: response
+        };
+        logger.error('Invalid response from getCompanyWalletAddress function', errorDetails, 'TransactionSigningService');
+        throw new Error('Invalid response from getCompanyWalletAddress function');
+      }
+
+      // Validate address format
+      const address = response.address.trim();
+      if (address.length < 32 || address.length > 44) {
+        throw new Error(`Invalid address format: length ${address.length} (expected 32-44)`);
+      }
+
+      // Cache the address
+      cachedCompanyWalletAddress = address;
+
+      logger.info('Company wallet address retrieved from Firebase', {
+        address: address.substring(0, 8) + '...' + address.substring(address.length - 8),
+        addressLength: address.length
+      }, 'TransactionSigningService');
+
+      return address;
+    } catch (error: any) {
+      // Enhanced error logging
+      const errorCode = error?.code || 'unknown';
+      const errorMessage = error?.message || String(error);
+      const isNotFound = errorCode === 'functions/not-found' || errorCode === 'not-found' || errorMessage.includes('not-found');
+      
+      logger.error('Failed to get company wallet address from Firebase', {
+        errorCode,
+        errorMessage,
+        errorName: error?.name,
+        isNotFound,
+        isProduction: !__DEV__,
+        note: isNotFound 
+          ? 'Function may not be deployed. Run: firebase deploy --only functions:getCompanyWalletAddress'
+          : 'Check Firebase Functions deployment and network connectivity'
+      }, 'TransactionSigningService');
+      
+      // In production, we MUST have the address from Firebase - no fallback
+      if (!__DEV__) {
+        // Clear the promise so we can retry
+        addressFetchPromise = null;
+        throw new Error(
+          `Company wallet address not available from Firebase: ${errorMessage}. ` +
+          `This is required in production. Ensure getCompanyWalletAddress function is deployed.`
+        );
+      }
+      
+      // In development, allow fallback to env var for testing
+      logger.warn('Falling back to environment variable in development', {
+        hasEnvVar: !!getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS')
+      }, 'TransactionSigningService');
+      
+      const envAddress = getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS');
+      if (envAddress) {
+        cachedCompanyWalletAddress = envAddress.trim();
+        return cachedCompanyWalletAddress;
+      }
+      
+      // Clear the promise so we can retry
+      addressFetchPromise = null;
+      throw new Error(
+        `Company wallet address not available: ${errorMessage}. ` +
+        `Firebase function failed and no environment variable found.`
+      );
+    }
+  })();
+
+  return addressFetchPromise;
+}
+
+/**
+ * Clear cached company wallet address (useful for testing or if address changes)
+ */
+export function clearCompanyWalletAddressCache(): void {
+  cachedCompanyWalletAddress = null;
+  addressFetchPromise = null;
 }
 
 /**

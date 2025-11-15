@@ -678,6 +678,40 @@ exports.getTransactionFeeEstimate = functions.runWith({
 });
 
 /**
+ * Get company wallet address (public only - no secret key)
+ * This allows clients to fetch the company wallet address from Firebase Secrets
+ * without storing it in EAS secrets or client-side code
+ */
+exports.getCompanyWalletAddress = functions.runWith({
+  secrets: ['COMPANY_WALLET_ADDRESS']
+}).https.onCall(async (data, context) => {
+  try {
+    // Get company wallet address from Firebase Secrets
+    const companyWalletAddress = process.env.COMPANY_WALLET_ADDRESS?.trim();
+    
+    if (!companyWalletAddress) {
+      throw new functions.https.HttpsError(
+        'internal',
+        'Company wallet address is not configured in Firebase Secrets'
+      );
+    }
+
+    return {
+      success: true,
+      address: companyWalletAddress
+    };
+  } catch (error) {
+    console.error('Error getting company wallet address:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError('internal', `Failed to get company wallet address: ${error.message}`);
+  }
+});
+
+/**
  * Get company wallet balance
  * Secrets are explicitly bound using runWith
  */
