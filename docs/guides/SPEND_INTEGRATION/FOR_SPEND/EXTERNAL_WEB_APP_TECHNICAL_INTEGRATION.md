@@ -42,22 +42,45 @@ WESPLIT_API_URL=https://us-central1-[PROJECT-ID].cloudfunctions.net
 
 #### Step 3: Make Your First Request
 
-**Node.js Example:**
+**Node.js Example for Amazon Purchase:**
 ```javascript
 const axios = require('axios');
 require('dotenv').config();
 
-async function createSplit(email, invoiceId, amount) {
+async function createSplitForAmazonPurchase(orderData) {
   const response = await axios.post(
     `${process.env.WESPLIT_API_URL}/createSplitFromPayment`,
     {
-      email: email,
-      invoiceId: invoiceId,
-      amount: amount,
-      currency: 'USD',
-      merchant: { name: 'Your Business Name' },
-      transactionDate: new Date().toISOString(),
-      source: 'your-app-name'
+      email: orderData.userEmail,
+      walletAddress: orderData.userWalletAddress, // User's USDC wallet from spend
+      invoiceId: `AMZ-${orderData.orderId}`, // Unique order ID
+      invoiceNumber: orderData.orderNumber,
+      amount: orderData.totalUsdc, // Total in USDC
+      currency: 'USDC', // Payment is in USDC
+      merchant: { 
+        name: 'Amazon',
+        address: '410 Terry Avenue North, Seattle, WA 98109'
+      },
+      transactionDate: orderData.purchaseDate.toISOString(),
+      items: orderData.items.map(item => ({
+        name: item.productName,
+        price: item.priceUsdc,
+        quantity: item.quantity,
+        category: item.category || 'General'
+      })),
+      subtotal: orderData.subtotalUsdc,
+      tax: orderData.taxUsdc || 0,
+      source: 'spend-amazon', // Your source identifier
+      callbackUrl: `https://spend.com/orders/${orderData.orderId}/success`,
+      metadata: {
+        orderId: orderData.orderId,
+        amazonOrderNumber: orderData.amazonOrderNumber,
+        items: orderData.items.map(item => ({
+          asin: item.asin,
+          productUrl: item.productUrl,
+          seller: item.seller
+        }))
+      }
     },
     {
       headers: {
@@ -69,39 +92,128 @@ async function createSplit(email, invoiceId, amount) {
   return response.data;
 }
 
-// Usage
-createSplit('user@example.com', 'INV-001', 100.00)
-  .then(result => console.log('Split created:', result.data.splitId))
+// Usage example
+const orderData = {
+  userEmail: 'customer@example.com',
+  userWalletAddress: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+  orderId: 'ORD-2024-001234',
+  orderNumber: 'ORD-2024-001234',
+  totalUsdc: 89.99,
+  subtotalUsdc: 89.99,
+  taxUsdc: 0,
+  purchaseDate: new Date(),
+  items: [
+    {
+      productName: 'Wireless Bluetooth Headphones',
+      priceUsdc: 79.99,
+      quantity: 1,
+      category: 'Electronics',
+      asin: 'B08XYZ1234',
+      productUrl: 'https://amazon.com/dp/B08XYZ1234',
+      seller: 'Amazon.com'
+    },
+    {
+      productName: 'USB-C Charging Cable (2 pack)',
+      priceUsdc: 10.00,
+      quantity: 1,
+      category: 'Electronics',
+      asin: 'B09ABC5678',
+      productUrl: 'https://amazon.com/dp/B09ABC5678',
+      seller: 'Amazon.com'
+    }
+  ],
+  amazonOrderNumber: '123-4567890-1234567'
+};
+
+createSplitForAmazonPurchase(orderData)
+  .then(result => {
+    console.log('Split created:', result.data.splitId);
+    // Redirect user to WeSplit app
+    const deepLink = `wesplit://view-split?splitId=${result.data.data.splitId}&userId=${result.data.data.userId}`;
+    window.location.href = deepLink;
+  })
   .catch(error => console.error('Error:', error.response?.data || error.message));
 ```
 
-**Python Example:**
+**Python Example for Amazon Purchase:**
 ```python
 import requests
 import os
 from datetime import datetime
 
-def create_split(email, invoice_id, amount):
+def create_split_for_amazon_purchase(order_data):
     url = f"{os.getenv('WESPLIT_API_URL')}/createSplitFromPayment"
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f"Bearer {os.getenv('WESPLIT_API_KEY')}"
     }
     data = {
-        'email': email,
-        'invoiceId': invoice_id,
-        'amount': amount,
-        'currency': 'USD',
-        'merchant': {'name': 'Your Business Name'},
-        'transactionDate': datetime.now().isoformat(),
-        'source': 'your-app-name'
+        'email': order_data['user_email'],
+        'walletAddress': order_data['user_wallet_address'],
+        'invoiceId': f"AMZ-{order_data['order_id']}",
+        'invoiceNumber': order_data['order_number'],
+        'amount': order_data['total_usdc'],
+        'currency': 'USDC',
+        'merchant': {
+            'name': 'Amazon',
+            'address': '410 Terry Avenue North, Seattle, WA 98109'
+        },
+        'transactionDate': order_data['purchase_date'].isoformat(),
+        'items': [
+            {
+                'name': item['product_name'],
+                'price': item['price_usdc'],
+                'quantity': item['quantity'],
+                'category': item.get('category', 'General')
+            }
+            for item in order_data['items']
+        ],
+        'subtotal': order_data['subtotal_usdc'],
+        'tax': order_data.get('tax_usdc', 0),
+        'source': 'spend-amazon',
+        'callbackUrl': f"https://spend.com/orders/{order_data['order_id']}/success",
+        'metadata': {
+            'orderId': order_data['order_id'],
+            'amazonOrderNumber': order_data.get('amazon_order_number'),
+            'items': [
+                {
+                    'asin': item.get('asin'),
+                    'productUrl': item.get('product_url'),
+                    'seller': item.get('seller')
+                }
+                for item in order_data['items']
+            ]
+        }
     }
     response = requests.post(url, json=data, headers=headers)
     response.raise_for_status()
     return response.json()
 
-# Usage
-result = create_split('user@example.com', 'INV-001', 100.00)
+# Usage example
+order_data = {
+    'user_email': 'customer@example.com',
+    'user_wallet_address': '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+    'order_id': 'ORD-2024-001234',
+    'order_number': 'ORD-2024-001234',
+    'total_usdc': 89.99,
+    'subtotal_usdc': 89.99,
+    'tax_usdc': 0,
+    'purchase_date': datetime.now(),
+    'items': [
+        {
+            'product_name': 'Wireless Bluetooth Headphones',
+            'price_usdc': 79.99,
+            'quantity': 1,
+            'category': 'Electronics',
+            'asin': 'B08XYZ1234',
+            'product_url': 'https://amazon.com/dp/B08XYZ1234',
+            'seller': 'Amazon.com'
+        }
+    ],
+    'amazon_order_number': '123-4567890-1234567'
+}
+
+result = create_split_for_amazon_purchase(order_data)
 print(f"Split created: {result['data']['splitId']}")
 ```
 
@@ -112,13 +224,21 @@ Use the test endpoint first (doesn't create real data):
 ```javascript
 const testUrl = `${process.env.WESPLIT_API_URL}/testCreateSplitFromPayment`;
 const testResponse = await axios.post(testUrl, {
-  email: 'test@example.com',
-  invoiceId: 'TEST-001',
+  email: 'test@spend.com',
+  invoiceId: 'AMZ-TEST-001',
   amount: 50.00,
-  currency: 'USD',
-  merchant: { name: 'Test Merchant' },
+  currency: 'USDC',
+  merchant: { name: 'Amazon' },
   transactionDate: new Date().toISOString(),
-  source: 'test'
+  source: 'spend-amazon',
+  items: [
+    {
+      name: 'Test Product',
+      price: 50.00,
+      quantity: 1,
+      category: 'Electronics'
+    }
+  ]
 }, { headers });
 ```
 
@@ -157,37 +277,60 @@ Content-Type: application/json
 Authorization: Bearer YOUR_API_KEY
 ```
 
-**Request Body:**
+**Request Body (Amazon Purchase Example):**
 ```json
 {
-  "email": "user@example.com",
+  "email": "customer@example.com",
   "walletAddress": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-  "invoiceId": "INV-2024-001",
-  "invoiceNumber": "2024-001",
-  "amount": 100.00,
-  "currency": "USD",
+  "invoiceId": "AMZ-ORD-2024-001234",
+  "invoiceNumber": "ORD-2024-001234",
+  "amount": 89.99,
+  "currency": "USDC",
   "merchant": {
-    "name": "Example Restaurant",
-    "address": "123 Main St, City, State 12345",
-    "phone": "+1234567890"
+    "name": "Amazon",
+    "address": "410 Terry Avenue North, Seattle, WA 98109",
+    "phone": ""
   },
-  "transactionDate": "2024-01-15T12:30:00Z",
+  "transactionDate": "2024-01-15T14:30:00Z",
   "items": [
     {
-      "name": "Burger",
-      "price": 15.00,
-      "quantity": 2,
-      "category": "Food"
+      "name": "Wireless Bluetooth Headphones - Premium Sound Quality",
+      "price": 79.99,
+      "quantity": 1,
+      "category": "Electronics"
+    },
+    {
+      "name": "USB-C Charging Cable (2 pack)",
+      "price": 10.00,
+      "quantity": 1,
+      "category": "Electronics"
     }
   ],
-  "subtotal": 35.00,
-  "tax": 3.50,
-  "tip": 7.00,
-  "receiptNumber": "RCP-12345",
-  "source": "external-web-app",
-  "callbackUrl": "https://your-app.com/success",
+  "subtotal": 89.99,
+  "tax": 0,
+  "tip": 0,
+  "receiptNumber": "AMZ-RCP-2024-001234",
+  "source": "spend-amazon",
+  "callbackUrl": "https://spend.com/orders/AMZ-ORD-2024-001234/success",
   "metadata": {
-    "orderId": "ORD-123"
+    "orderId": "AMZ-ORD-2024-001234",
+    "amazonOrderNumber": "123-4567890-1234567",
+    "items": [
+      {
+        "asin": "B08XYZ1234",
+        "productUrl": "https://amazon.com/dp/B08XYZ1234",
+        "seller": "Amazon.com",
+        "imageUrl": "https://m.media-amazon.com/images/I/..."
+      },
+      {
+        "asin": "B09ABC5678",
+        "productUrl": "https://amazon.com/dp/B09ABC5678",
+        "seller": "Amazon.com",
+        "imageUrl": "https://m.media-amazon.com/images/I/..."
+      }
+    ],
+    "shippingAddress": "123 Main St, City, State 12345",
+    "deliveryDate": "2024-01-20"
   }
 }
 ```
@@ -225,24 +368,32 @@ Authorization: Bearer YOUR_API_KEY
   "success": true,
   "data": {
     "userId": "user_abc123",
-    "userEmail": "user@example.com",
+    "userEmail": "customer@example.com",
     "walletAddress": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
     "splitId": "split_1234567890_abc",
     "splitStatus": "pending",
-    "totalAmount": 100.00,
+    "totalAmount": 89.99,
     "currency": "USDC",
-    "createdAt": "2024-01-15T12:30:00Z"
+    "createdAt": "2024-01-15T14:30:00Z"
   },
-  "redirectUrl": "https://your-app.com/success?splitId=split_1234567890_abc&userId=user_abc123&status=success"
+  "redirectUrl": "https://spend.com/orders/AMZ-ORD-2024-001234/success?splitId=split_1234567890_abc&userId=user_abc123&status=success"
 }
 ```
 
+**📱 App Redirection**: After receiving the response, redirect users to the WeSplit mobile app using:
+```
+wesplit://view-split?splitId=split_1234567890_abc&userId=user_abc123
+```
+
+See [App Redirection Guide](#app-redirection) for complete implementation details.
+
 **Error Responses:**
 
-- **400 Bad Request**: Validation failed
-- **401 Unauthorized**: Invalid API key
-- **429 Too Many Requests**: Rate limit exceeded
-- **500 Internal Server Error**: Server error
+- **400 Bad Request**: Validation failed (missing/invalid fields)
+- **401 Unauthorized**: Invalid or missing API key
+- **405 Method Not Allowed**: Request method must be POST
+- **429 Too Many Requests**: Rate limit exceeded (100 requests per 15 minutes)
+- **500 Internal Server Error**: Server error (retry with exponential backoff)
 
 ### Rate Limiting
 
@@ -250,9 +401,201 @@ Authorization: Bearer YOUR_API_KEY
 - Rate limit headers in responses: `X-RateLimit-Limit`, `X-RateLimit-Remaining`
 - Implement exponential backoff for retries
 
+---
+
+## App Redirection
+
+After successfully creating a split, you can redirect users to the WeSplit mobile app to view their split.
+
+### Deep Link Format
+
+**URL Scheme**: `wesplit://view-split?splitId={splitId}&userId={userId}`
+
+**Example**:
+```
+wesplit://view-split?splitId=split_1234567890_abc&userId=user_abc123
+```
+
+### Implementation
+
+```javascript
+// After receiving API response
+const { splitId, userId } = response.data.data;
+
+// Build deep link
+const params = new URLSearchParams({
+  splitId: splitId,
+  userId: userId
+});
+const deepLink = `wesplit://view-split?${params.toString()}`;
+
+// Redirect user
+window.location.href = deepLink;
+
+// Fallback: If app not installed
+setTimeout(() => {
+  if (document.hasFocus()) {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroid = /Android/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      window.location.href = 'https://apps.apple.com/app/wesplit';
+    } else if (isAndroid) {
+      window.location.href = 'https://play.google.com/store/apps/details?id=com.wesplit.app';
+    }
+  }
+}, 2000);
+```
+
+### Complete Implementation with App Redirection
+
+Here's a complete example that includes API integration and app redirection:
+
+```javascript
+// services/wesplit-integration.js
+const axios = require('axios');
+require('dotenv').config();
+
+const WESPLIT_API_KEY = process.env.WESPLIT_API_KEY;
+const WESPLIT_API_URL = process.env.WESPLIT_API_URL;
+
+/**
+ * Create split in WeSplit with retry logic
+ */
+async function createSplitInWeSplit(paymentData, maxRetries = 3) {
+  const url = `${WESPLIT_API_URL}/createSplitFromPayment`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${WESPLIT_API_KEY}`
+  };
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await axios.post(url, paymentData, {
+        headers: headers,
+        timeout: 15000
+      });
+      
+      if (response.status === 200 && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          redirectUrl: response.data.redirectUrl
+        };
+      }
+    } catch (error) {
+      if (error.response?.status === 429 && attempt < maxRetries - 1) {
+        const waitTime = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      if (error.response?.status >= 500 && attempt < maxRetries - 1) {
+        const waitTime = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+/**
+ * Build WeSplit deep link URL
+ */
+function buildWeSplitDeepLink(splitId, userId) {
+  const params = new URLSearchParams({
+    splitId: splitId,
+    userId: userId
+  });
+  return `wesplit://view-split?${params.toString()}`;
+}
+
+/**
+ * Redirect user to WeSplit app
+ */
+function redirectToWeSplitApp(splitId, userId) {
+  const deepLink = buildWeSplitDeepLink(splitId, userId);
+  window.location.href = deepLink;
+  
+  // Fallback: If app not installed
+  setTimeout(() => {
+    if (document.hasFocus()) {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      
+      if (isIOS) {
+        window.location.href = 'https://apps.apple.com/app/wesplit';
+      } else if (isAndroid) {
+        window.location.href = 'https://play.google.com/store/apps/details?id=com.wesplit.app';
+      } else {
+        alert('Please install the WeSplit mobile app to view your split.');
+      }
+    }
+  }, 2000);
+}
+
+module.exports = {
+  createSplitInWeSplit,
+  buildWeSplitDeepLink,
+  redirectToWeSplitApp
+};
+```
+
+### Complete Integration Example
+
+```javascript
+// Handle Amazon purchase
+async function handleAmazonPurchase(orderData) {
+  // 1. Prepare WeSplit data
+  const splitData = {
+    email: orderData.user.email,
+    walletAddress: orderData.user.usdcWallet,
+    invoiceId: `AMZ-${orderData.orderId}`,
+    amount: orderData.totalUsdc,
+    currency: 'USDC',
+    merchant: { name: 'Amazon' },
+    transactionDate: orderData.purchaseDate.toISOString(),
+    items: orderData.items.map(item => ({
+      name: item.productName,
+      price: item.priceUsdc,
+      quantity: item.quantity
+    })),
+    source: 'spend-amazon',
+    callbackUrl: `https://spend.com/orders/${orderData.orderId}/success`,
+    metadata: {
+      orderId: orderData.orderId,
+      amazonOrderNumber: orderData.amazonOrderNumber
+    }
+  };
+  
+  // 2. Create split in WeSplit (async, don't block payment)
+  createSplitInWeSplit(splitData)
+    .then(result => {
+      // Store WeSplit IDs
+      saveWeSplitIds(orderData.orderId, result.data.userId, result.data.splitId);
+      
+      // 3. Redirect user to WeSplit app
+      if (typeof window !== 'undefined') {
+        redirectToWeSplitApp(result.data.splitId, result.data.userId);
+      }
+    })
+    .catch(err => {
+      console.error('WeSplit integration failed:', err);
+      // Don't fail the purchase
+    });
+  
+  return { success: true, orderId: orderData.orderId };
+}
+```
+
 ### Currency Support
 
-All currencies are automatically converted to USDC. Supports ISO 4217 currency codes (USD, EUR, GBP, CAD, AUD, etc.).
+**Important**: Currency conversion is currently limited:
+- **USD and USDC**: Converted 1:1 (no conversion needed)
+- **Other currencies**: Currently returns amount as-is (assumes USD equivalent)
+- **For "spend"**: Since payments are in USDC, set `currency: "USDC"` - no conversion needed
+
+**Future Enhancement**: Full currency conversion API integration planned.
 
 ---
 
@@ -345,13 +688,13 @@ You **MUST** provide the following data for each payment transaction:
 
 | Field | Type | Why We Need It | Example |
 |-------|------|----------------|---------|
-| `email` | string | To identify/create user account | `"user@example.com"` |
+| `email` | string | To identify/create user account | `"customer@example.com"` |
 | `invoiceId` | string | Unique transaction identifier | `"INV-2024-001"` |
 | `amount` | number | Total payment amount | `100.00` |
 | `currency` | string | Original currency (converted to USDC) | `"USD"` |
 | `merchant.name` | string | Business name for the split | `"My Restaurant"` |
 | `transactionDate` | string | When the transaction occurred | `"2024-01-15T12:30:00Z"` |
-| `source` | string | Your app identifier | `"your-app-name"` |
+| `source` | string | Your app identifier | `"spend-amazon"` |
 
 **Why each field is required:**
 - **email**: We use this to find existing users or create new accounts. This is the primary identifier.
@@ -465,15 +808,15 @@ const transaction = {
   userEmail: user.email,           // User's email
   userWallet: user.solanaWallet,   // Optional: User's wallet if they have one
   totalAmount: 100.00,             // Total payment amount
-  currency: 'USD',                 // Payment currency
+  currency: 'USDC',                // Payment currency (USDC for spend)
   merchant: {
-    name: 'Your Business Name',
-    address: '123 Main St',        // Optional
-    phone: '+1234567890'           // Optional
+    name: 'Amazon',
+    address: '410 Terry Avenue North, Seattle, WA 98109',  // Optional
+    phone: ''                      // Optional
   },
   items: [                         // Optional: Line items
-    { name: 'Product 1', price: 50.00, quantity: 1 },
-    { name: 'Product 2', price: 50.00, quantity: 1 }
+    { name: 'Wireless Bluetooth Headphones', price: 79.99, quantity: 1, category: 'Electronics' },
+    { name: 'USB-C Charging Cable (2 pack)', price: 10.00, quantity: 1, category: 'Electronics' }
   ],
   subtotal: 90.00,                 // Optional
   tax: 10.00,                      // Optional
@@ -600,7 +943,7 @@ function sanitizeString(str) {
 1. Use HTTPS only (never HTTP)
 2. Include API key in Authorization header
 3. Set proper Content-Type header
-4. Set reasonable timeout (10-15 seconds)
+4. Set reasonable timeout (10-15 seconds recommended)
 
 ```javascript
 async function sendToWeSplit(paymentData) {
@@ -718,38 +1061,52 @@ async function createSplitWithRetry(paymentData, maxRetries = 3) {
 // Your payment processing endpoint
 app.post('/api/payments/process', async (req, res) => {
   try {
-    // 1. Process payment on your platform
-    const transaction = await processPayment(req.body);
+    // 1. Process Amazon purchase on your platform
+    const orderData = await processAmazonPurchase(req.body);
     
     // 2. Create split in WeSplit (async, don't block payment)
     // Don't fail payment if WeSplit integration fails
     createSplitWithRetry({
-      email: transaction.user.email,
-      walletAddress: transaction.user.solanaWallet,
-      invoiceId: transaction.id,
-      invoiceNumber: transaction.invoiceNumber,
-      amount: transaction.totalAmount,
-      currency: transaction.currency,
+      email: orderData.user.email,
+      walletAddress: orderData.user.usdcWallet, // User's USDC wallet from spend
+      invoiceId: `AMZ-${orderData.orderId}`,
+      invoiceNumber: orderData.orderNumber,
+      amount: orderData.totalUsdc, // Total in USDC
+      currency: 'USDC', // Payment is in USDC
       merchant: {
-        name: 'Your Business Name',
-        address: transaction.merchantAddress,
-        phone: transaction.merchantPhone
+        name: 'Amazon',
+        address: '410 Terry Avenue North, Seattle, WA 98109',
+        phone: ''
       },
-      transactionDate: transaction.createdAt.toISOString(),
-      items: transaction.items,
-      subtotal: transaction.subtotal,
-      tax: transaction.tax,
-      tip: transaction.tip,
-      receiptNumber: transaction.receiptNumber,
-      source: 'your-app-name',
-      callbackUrl: `https://your-app.com/payment/${transaction.id}/success`
+      transactionDate: orderData.purchaseDate.toISOString(),
+      items: orderData.items.map(item => ({
+        name: item.productName,
+        price: item.priceUsdc,
+        quantity: item.quantity,
+        category: item.category || 'General'
+      })),
+      subtotal: orderData.subtotalUsdc,
+      tax: orderData.taxUsdc || 0,
+      tip: 0, // Not applicable for Amazon
+      receiptNumber: `AMZ-RCP-${orderData.orderId}`,
+      source: 'spend-amazon',
+      callbackUrl: `https://spend.com/orders/${orderData.orderId}/success`,
+      metadata: {
+        orderId: orderData.orderId,
+        amazonOrderNumber: orderData.amazonOrderNumber,
+        items: orderData.items.map(item => ({
+          asin: item.asin,
+          productUrl: item.productUrl,
+          seller: item.seller
+        }))
+      }
     }).then(result => {
       // Store WeSplit IDs
-      saveWeSplitIds(transaction.id, result.userId, result.splitId);
+      saveWeSplitIds(orderData.orderId, result.data.userId, result.data.splitId);
     }).catch(err => {
       // Log error but don't fail payment
       logger.error('WeSplit integration failed', {
-        transactionId: transaction.id,
+        orderId: orderData.orderId,
         error: err.message
       });
     });
@@ -757,7 +1114,7 @@ app.post('/api/payments/process', async (req, res) => {
     // 3. Return success to user
     res.json({ 
       success: true, 
-      transactionId: transaction.id 
+      orderId: orderData.orderId 
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -806,13 +1163,13 @@ See [Production Deployment](#production-deployment) section for deployment check
 
 | Field | Type | Description | Example |
 |-------|------|-------------|---------|
-| `email` | string | User's email address | `"user@example.com"` |
-| `invoiceId` | string | Unique invoice/transaction ID | `"INV-2024-001"` |
-| `amount` | number | Total payment amount | `100.00` |
-| `currency` | string | ISO 4217 currency code | `"USD"` |
-| `merchant.name` | string | Your business name | `"My Restaurant"` |
-| `transactionDate` | string | ISO 8601 date string | `"2024-01-15T12:30:00Z"` |
-| `source` | string | Your app identifier | `"my-app-name"` |
+| `email` | string | User's email address | `"customer@example.com"` |
+| `invoiceId` | string | Unique invoice/transaction ID | `"AMZ-ORD-2024-001234"` |
+| `amount` | number | Total payment amount | `89.99` |
+| `currency` | string | ISO 4217 currency code | `"USDC"` |
+| `merchant.name` | string | Merchant name | `"Amazon"` |
+| `transactionDate` | string | ISO 8601 date string | `"2024-01-15T14:30:00Z"` |
+| `source` | string | Your app identifier | `"spend-amazon"` |
 
 ### Optional Fields
 
@@ -1078,6 +1435,39 @@ logger.info('WeSplit API Response', {
 
 ---
 
+## Common Questions
+
+### What happens if I send the same invoiceId twice?
+
+**Answer**: Each request creates a new split. The API is **NOT idempotent**. To prevent duplicate splits:
+- Ensure `invoiceId` is unique per transaction
+- Use a combination of order ID + timestamp if needed
+- Check if split already exists before sending (store WeSplit IDs in your database)
+
+### How does currency conversion work?
+
+**Answer**: 
+- **USD/USDC**: Converted 1:1 (no conversion)
+- **Other currencies**: Currently returns amount as-is (assumes USD)
+- **For USDC payments**: Set `currency: "USDC"` - no conversion needed
+
+### What is the maximum amount allowed?
+
+**Answer**: There is no maximum amount enforced in the API. However, ensure amounts are reasonable and match your business logic.
+
+### Is the API idempotent?
+
+**Answer**: No. Each request creates a new split. Use unique `invoiceId` values to prevent duplicates.
+
+### What should I do with rate limit headers?
+
+**Answer**: Monitor `X-RateLimit-Remaining` header:
+- If remaining is low (< 20), implement client-side rate limiting
+- Implement exponential backoff when you receive 429 errors
+- Track rate limit usage to optimize request patterns
+
+---
+
 ## Troubleshooting
 
 ### Common Issues
@@ -1142,34 +1532,43 @@ require('dotenv').config();
 const API_KEY = process.env.WESPLIT_API_KEY;
 const API_URL = process.env.WESPLIT_API_URL;
 
-async function integrateWeSplit(transaction) {
+async function integrateWeSplit(orderData) {
   try {
     // Prepare payment data
     const paymentData = {
-      email: transaction.user.email,
-      walletAddress: transaction.user.solanaWallet, // Optional
-      invoiceId: transaction.id,
-      invoiceNumber: transaction.invoiceNumber,
-      amount: transaction.totalAmount,
-      currency: transaction.currency,
+      email: orderData.user.email,
+      walletAddress: orderData.user.usdcWallet, // User's USDC wallet from spend
+      invoiceId: `AMZ-${orderData.orderId}`,
+      invoiceNumber: orderData.orderNumber,
+      amount: orderData.totalUsdc, // Total in USDC
+      currency: 'USDC', // Payment is in USDC
       merchant: {
-        name: 'Your Business Name',
-        address: 'Your Business Address',
-        phone: 'Your Business Phone'
+        name: 'Amazon',
+        address: '410 Terry Avenue North, Seattle, WA 98109',
+        phone: ''
       },
-      transactionDate: transaction.createdAt.toISOString(),
-      items: transaction.items.map(item => ({
-        name: item.name,
-        price: item.price,
+      transactionDate: orderData.purchaseDate.toISOString(),
+      items: orderData.items.map(item => ({
+        name: item.productName,
+        price: item.priceUsdc,
         quantity: item.quantity,
-        category: item.category
+        category: item.category || 'General'
       })),
-      subtotal: transaction.subtotal,
-      tax: transaction.tax,
-      tip: transaction.tip,
-      receiptNumber: transaction.receiptNumber,
-      source: 'your-app-name',
-      callbackUrl: `https://your-app.com/payment/${transaction.id}/success`
+      subtotal: orderData.subtotalUsdc,
+      tax: orderData.taxUsdc || 0,
+      tip: 0, // Not applicable for Amazon
+      receiptNumber: `AMZ-RCP-${orderData.orderId}`,
+      source: 'spend-amazon',
+      callbackUrl: `https://spend.com/orders/${orderData.orderId}/success`,
+      metadata: {
+        orderId: orderData.orderId,
+        amazonOrderNumber: orderData.amazonOrderNumber,
+        items: orderData.items.map(item => ({
+          asin: item.asin,
+          productUrl: item.productUrl,
+          seller: item.seller
+        }))
+      }
     };
     
     // Send to WeSplit
@@ -1241,14 +1640,217 @@ app.post('/api/payments/process', async (req, res) => {
 
 ---
 
+## Amazon Purchase Integration Example
+
+### Use Case: Amazon Articles Paid with USDC
+
+If you're integrating Amazon purchases (e.g., users buying Amazon products with USDC), here's a specific example:
+
+#### Example Request for Amazon Purchase
+
+```javascript
+const amazonPurchase = {
+  email: "customer@example.com",
+  walletAddress: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", // User's USDC wallet
+  invoiceId: "AMZ-ORD-2024-001234", // Your unique order ID
+  invoiceNumber: "ORD-2024-001234",
+  amount: 89.99, // Total in USDC (already USDC, no conversion needed)
+  currency: "USDC", // Since payment is in USDC
+  merchant: {
+    name: "Amazon", // Use "Amazon" as merchant name
+    address: "410 Terry Avenue North, Seattle, WA 98109", // Amazon HQ (optional)
+    phone: "" // Not applicable for Amazon
+  },
+  transactionDate: "2024-01-15T14:30:00Z",
+  items: [
+    {
+      name: "Wireless Bluetooth Headphones - Premium Sound Quality",
+      price: 79.99,
+      quantity: 1,
+      category: "Electronics"
+    },
+    {
+      name: "USB-C Charging Cable (2 pack)",
+      price: 10.00,
+      quantity: 1,
+      category: "Electronics"
+    }
+  ],
+  subtotal: 89.99,
+  tax: 0, // No tax if applicable, or include if charged
+  tip: 0, // Not applicable for Amazon
+  receiptNumber: "AMZ-RCP-2024-001234",
+  source: "spend-amazon", // Your source identifier
+  callbackUrl: "https://spend.com/order/AMZ-ORD-2024-001234/success",
+  metadata: {
+    // Amazon-specific metadata (optional but recommended)
+    orderId: "AMZ-ORD-2024-001234",
+    amazonOrderNumber: "123-4567890-1234567", // Amazon's order number
+    items: [
+      {
+        asin: "B08XYZ1234", // Amazon ASIN
+        productUrl: "https://amazon.com/dp/B08XYZ1234",
+        seller: "Amazon.com", // Or actual seller name
+        imageUrl: "https://m.media-amazon.com/images/..." // Product image (optional)
+      },
+      {
+        asin: "B09ABC5678",
+        productUrl: "https://amazon.com/dp/B09ABC5678",
+        seller: "Amazon.com",
+        imageUrl: "https://m.media-amazon.com/images/..."
+      }
+    ],
+    shippingAddress: "123 Main St, City, State 12345", // Optional
+    deliveryDate: "2024-01-20" // Expected delivery date (optional)
+  }
+};
+
+// Send to WeSplit
+const response = await axios.post(
+  `${API_URL}/createSplitFromPayment`,
+  amazonPurchase,
+  {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${API_KEY}`
+    }
+  }
+);
+```
+
+#### Key Points for Amazon Integration
+
+1. **Currency**: Since users pay with USDC, set `currency: "USDC"` - no conversion needed
+2. **Merchant Name**: Use `"Amazon"` as the merchant name
+3. **Items**: Include product details in the `items` array
+4. **Metadata**: Store Amazon-specific data (ASIN, product URLs) in the `metadata` field
+5. **Invoice ID**: Use your unique order ID (must be unique per transaction)
+6. **Source**: Use a descriptive source like `"spend-amazon"` for tracking
+
+#### What Users Will See
+
+After you send this data:
+- ✅ **User account automatically created** (if new user)
+- ✅ **Split automatically created** and appears in user's WeSplit app
+- ✅ Title: "Invoice ORD-2024-001234"
+- ✅ Merchant: "Amazon"
+- ✅ Items: Both products listed with prices
+- ⚠️ **WeSplit Wallet**: Created automatically when user first opens the app (one-time setup)
+- ✅ User can invite others to split the cost
+- ✅ User can create split wallet to collect payments from others
+
+**Important Notes:**
+- **Account Creation**: ✅ Fully automatic - no user action needed
+- **Split Creation**: ✅ Fully automatic - no user action needed  
+- **WeSplit Wallet**: ⚠️ Created automatically when user opens app for first time (requires app to be opened once)
+- **External Wallet**: If you provide `walletAddress`, it's linked immediately (this is the user's USDC wallet from "spend", not a WeSplit wallet)
+
+#### Complete Integration Flow
+
+```javascript
+// 1. User completes Amazon purchase on your platform with USDC
+async function handleAmazonPurchase(orderData) {
+  // 2. Prepare WeSplit data
+  const splitData = {
+    email: orderData.user.email,
+    walletAddress: orderData.user.usdcWallet, // User's USDC wallet
+    invoiceId: `AMZ-${orderData.orderId}`,
+    invoiceNumber: orderData.orderNumber,
+    amount: orderData.totalUsdc, // Already in USDC
+    currency: "USDC",
+    merchant: {
+      name: "Amazon"
+    },
+    transactionDate: orderData.purchaseDate.toISOString(),
+    items: orderData.items.map(item => ({
+      name: item.productName,
+      price: item.priceUsdc,
+      quantity: item.quantity,
+      category: item.category || "General"
+    })),
+    subtotal: orderData.subtotalUsdc,
+    tax: orderData.taxUsdc || 0,
+    source: "spend-amazon",
+    callbackUrl: `https://spend.com/orders/${orderData.orderId}/success`,
+    metadata: {
+      orderId: orderData.orderId,
+      amazonOrderNumber: orderData.amazonOrderNumber,
+      items: orderData.items.map(item => ({
+        asin: item.asin,
+        productUrl: item.productUrl,
+        seller: item.seller
+      }))
+    }
+  };
+  
+  // 3. Send to WeSplit (async, don't block payment)
+  createSplitWithRetry(splitData)
+    .then(result => {
+      // Store WeSplit IDs in your database
+      saveWeSplitIds(orderData.orderId, result.userId, result.splitId);
+      console.log('Split created:', result.splitId);
+    })
+    .catch(err => {
+      // Log error but don't fail the purchase
+      console.error('WeSplit integration failed:', err);
+    });
+  
+  // 4. Complete purchase on your platform
+  return { success: true, orderId: orderData.orderId };
+}
+```
+
+---
+
+## Implementation Checklist
+
+### Pre-Implementation
+
+- [ ] Contact WeSplit for API key (api-support@wesplit.com)
+- [ ] Store API key in environment variables
+- [ ] Add `.env` to `.gitignore`
+- [ ] Review all required fields
+- [ ] Review app redirection guide
+
+### Implementation
+
+- [ ] Create helper functions (validate, sanitize, createSplit)
+- [ ] Implement retry logic with exponential backoff
+- [ ] Add error handling
+- [ ] Implement app redirection
+- [ ] Add fallback for app not installed
+- [ ] Store WeSplit IDs in database
+- [ ] Add logging
+
+### Testing
+
+- [ ] Test with test endpoint
+- [ ] Test with valid data
+- [ ] Test error scenarios
+- [ ] Test app redirection on iOS
+- [ ] Test app redirection on Android
+- [ ] Test fallback behavior
+
+### Deployment
+
+- [ ] Deploy to staging
+- [ ] Test in staging
+- [ ] Deploy to production
+- [ ] Monitor API responses
+- [ ] Monitor error rates
+- [ ] Set up alerts
+
+---
+
 ## Next Steps
 
 1. **Obtain API Key**: Contact WeSplit to get your API key
 2. **Set Up Environment**: Configure environment variables
 3. **Test Integration**: Use test endpoint to verify
 4. **Implement in Code**: Add integration to your payment flow
-5. **Deploy to Production**: Test thoroughly before going live
-6. **Monitor**: Set up monitoring and logging
+5. **Implement App Redirection**: Add deep link redirection
+6. **Deploy to Production**: Test thoroughly before going live
+7. **Monitor**: Set up monitoring and logging
 
 For questions or support, contact: api-support@wesplit.com
 

@@ -1,0 +1,25 @@
+title: WeSplit X Spend Documentation
+description: Integration guide for WeSplit and spend partnership - Amazon purchases with USDC
+language: en
+
+root: ./
+
+structure:
+  readme: README.md
+  summary: SUMMARY.md
+
+plugins:
+  - theme-default
+  - search
+  - sharing
+  - code
+
+pluginsConfig:
+  theme-default:
+    showLevel: true
+  sharing:
+    facebook: false
+    twitter: false
+    google: false
+    all: []
+

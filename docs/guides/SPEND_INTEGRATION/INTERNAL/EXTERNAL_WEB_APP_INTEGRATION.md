@@ -257,18 +257,20 @@ if (!emailQuery.empty) {
 
 **If user doesn't exist:**
 
-**Scenario A: Wallet address provided**
+**Scenario A: Wallet address provided (External Wallet)**
 - ✅ Create new user with provided wallet
 - ✅ Set `wallet_type` to 'external'
 - ✅ Set `wallet_status` to 'healthy'
 - ✅ Set `hasCompletedOnboarding` to false
+- ⚠️ **Note**: This is an external wallet (e.g., from "spend"). WeSplit wallet will be created when user opens app.
 
 **Scenario B: No wallet address provided**
 - ✅ Create new user without wallet
 - ✅ Set `wallet_type` to 'app-generated'
 - ✅ Set `wallet_status` to 'no_wallet'
-- ✅ Wallet will be created when user first uses the app
+- ⚠️ **Important**: WeSplit wallet will be created when user first opens the app
 - ✅ Set `hasCompletedOnboarding` to false
+- ✅ Split can still be created (works with empty wallet address)
 
 **Implementation:**
 ```javascript
@@ -582,6 +584,12 @@ return res.status(200).json(response);
 - Split card in their splits list
 - Can tap to open split details
 - Can see it's their split (marked as "Owner")
+
+**⚠️ Important: WeSplit Wallet Creation**
+- If user doesn't have a WeSplit wallet yet, they will be prompted to create one when they first open the app
+- This is a one-time setup that happens automatically when they open the app
+- The split is already created and visible - wallet creation is just for payment collection
+- User can view the split immediately, even before wallet is created
 
 #### 6.2 User Opens Split Details
 

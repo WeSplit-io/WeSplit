@@ -10,7 +10,7 @@ import { logger } from '../analytics/loggingService';
 import { User } from '../../types';
 
 export interface DeepLinkData {
-  action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split';
+  action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split' | 'view-split';
   inviteId?: string;
   groupId?: string;
   groupName?: string;
@@ -25,6 +25,7 @@ export interface DeepLinkData {
   oauthCode?: string;
   oauthError?: string;
   splitInvitationData?: string; // JSON string for split invitation data
+  splitId?: string; // Split ID for view-split action
 }
 
 /**
@@ -140,6 +141,29 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
           };
         } catch (urlError) {
           console.warn('🔥 Error parsing join-split URL:', urlError);
+          return null;
+        }
+      
+      case 'view-split':
+        // Handle viewing a split from external source (e.g., "spend" integration)
+        // Format: wesplit://view-split?splitId=xxx&userId=xxx
+        try {
+          const urlObj = new URL(url);
+          const splitId = urlObj.searchParams.get('splitId');
+          const userId = urlObj.searchParams.get('userId');
+          
+          if (!splitId) {
+            console.warn('🔥 View-split action missing splitId parameter');
+            return null;
+          }
+          
+          return {
+            action: 'view-split',
+            splitId: splitId,
+            userId: userId || undefined
+          };
+        } catch (urlError) {
+          console.warn('🔥 Error parsing view-split URL:', urlError);
           return null;
         }
       
@@ -429,6 +453,27 @@ export function setupDeepLinkListeners(
           console.error('🔥 Error processing split invitation:', error);
           Alert.alert('Invalid Link', 'This split invitation link is corrupted or invalid.');
         }
+        break;
+      
+      case 'view-split':
+        // Handle viewing a split from external source (e.g., "spend" integration)
+        if (!linkData.splitId) {
+          console.warn('🔥 Missing splitId for view-split action');
+          Alert.alert('Invalid Link', 'This split link is not valid.');
+          return;
+        }
+        
+        logger.info('Navigating to split from deep link', { 
+          splitId: linkData.splitId,
+          userId: linkData.userId
+        }, 'deepLinkHandler');
+        
+        // Navigate to SplitDetails screen
+        navigation.navigate('SplitDetails', {
+          splitId: linkData.splitId,
+          isFromDeepLink: true,
+          isFromExternalSource: true
+        });
         break;
       
       default:

@@ -290,7 +290,7 @@ export class FeeService {
   static isCompanyWalletConfigured(): boolean {
     // Check cached value or env var (for backward compatibility)
     try {
-      return !!(COMPANY_WALLET_CONFIG.address && COMPANY_WALLET_CONFIG.address.trim() !== '');
+    return !!(COMPANY_WALLET_CONFIG.address && COMPANY_WALLET_CONFIG.address.trim() !== '');
     } catch {
       return false;
     }
@@ -318,13 +318,13 @@ export class FeeService {
       // Get company wallet address from Firebase Secrets (not EAS secrets)
       const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
       if (!companyWalletAddress) {
-        return {
-          isValid: false,
-          balance: 0,
-          required: COMPANY_WALLET_CONFIG.minSolReserve,
-          error: 'Company wallet not configured'
-        };
-      }
+      return {
+        isValid: false,
+        balance: 0,
+        required: COMPANY_WALLET_CONFIG.minSolReserve,
+        error: 'Company wallet not configured'
+      };
+    }
 
       const companyPublicKey = new PublicKey(companyWalletAddress);
       const balance = await connection.getBalance(companyPublicKey);
