@@ -331,10 +331,60 @@ export class TransactionBasedContactService {
 
   /**
    * Get manually added contacts (from the contacts collection)
+   * Resolves actual user IDs by looking up users by email or wallet address
    */
   private static async getManualContacts(userId: string): Promise<UserContact[]> {
     try {
-      return await firebaseDataService.contact.getContacts(userId);
+      const contacts = await firebaseDataService.contact.getContacts(userId);
+      
+      // Resolve user IDs for manual contacts in parallel
+      // Manual contacts have id = contact document ID, but we need the actual user ID
+      const resolvePromises = contacts.map(async (contact) => {
+        let actualUserId: string | null = null;
+        
+        // Try to find user by email first
+        if (contact.email) {
+          try {
+            const user = await firebaseDataService.user.getUserByEmail(contact.email);
+            if (user) {
+              actualUserId = user.id;
+            }
+          } catch (error) {
+            // User not found by email, continue to wallet lookup
+          }
+        }
+        
+        // If not found by email, try wallet address
+        if (!actualUserId && contact.wallet_address) {
+          try {
+            const user = await firebaseDataService.user.getUserByWalletAddress(contact.wallet_address);
+            if (user) {
+              actualUserId = user.id;
+            }
+          } catch (error) {
+            // User not found by wallet, skip this contact
+            logger.warn('Manual contact user not found', {
+              contactId: contact.id,
+              email: contact.email,
+              walletAddress: contact.wallet_address
+            }, 'TransactionBasedContactService');
+          }
+        }
+        
+        // Return contact with resolved user ID, or null if not found
+        if (actualUserId) {
+          return {
+            ...contact,
+            id: actualUserId // Replace contact document ID with actual user ID
+          };
+        }
+        return null;
+      });
+      
+      const resolvedContacts = await Promise.all(resolvePromises);
+      
+      // Filter out null values (contacts where user wasn't found)
+      return resolvedContacts.filter((contact): contact is UserContact => contact !== null);
     } catch (error) {
       logger.error('Failed to get manual contacts', error, 'TransactionBasedContactService');
       return [];

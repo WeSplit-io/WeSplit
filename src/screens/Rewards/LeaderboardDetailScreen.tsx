@@ -30,6 +30,7 @@ import { logger } from '../../services/analytics/loggingService';
 import BadgeDisplay from '../../components/profile/BadgeDisplay';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
+import { TransactionBasedContactService } from '../../services/contacts/transactionBasedContactService';
 
 type LeaderboardFilter = 'friends' | 'global';
 
@@ -58,9 +59,9 @@ const LeaderboardDetailScreen: React.FC = () => {
     if (!currentUser?.id) return [];
 
     try {
-      // Get user's contacts/connections
-      // UserContact extends User, so contact.id is the user ID
-      const contacts = await firebaseDataService.contact.getContacts(currentUser.id);
+      // Get user's contacts/connections using TransactionBasedContactService
+      // This service returns contacts with proper user IDs (contact.id is the user ID)
+      const contacts = await TransactionBasedContactService.getTransactionBasedContacts(currentUser.id);
 
       // Extract user IDs from contacts
       // contact.id is the user ID (Firebase document ID of the user)
@@ -71,6 +72,11 @@ const LeaderboardDetailScreen: React.FC = () => {
       // Always include current user in friends list
       const friendIdsSet = new Set(friendIds);
       friendIdsSet.add(currentUser.id);
+
+      logger.info('Loaded friends list for leaderboard', {
+        totalContacts: contacts.length,
+        friendIdsCount: friendIdsSet.size
+      }, 'LeaderboardDetailScreen');
 
       return Array.from(friendIdsSet);
     } catch (error) {
