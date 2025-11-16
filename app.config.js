@@ -15,7 +15,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      buildNumber: "1",
+      buildNumber: "2",
       deploymentTarget: "15.1",
       infoPlist: {
         LSApplicationQueriesSchemes: [
@@ -41,19 +41,27 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      versionCode: 1,
+      versionCode: 10019,
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"
       },
-      compileSdkVersion: 34,
-      targetSdkVersion: 34,
-      minSdkVersion: 21,
+      // Updated to match last successful build (versionCode 10018, versionName 1.1.1)
+      // These values ensure compatibility with existing users
+      compileSdkVersion: 36,
+      targetSdkVersion: 36,
+      minSdkVersion: 24,
+      // Permissions matching last successful build to ensure required features match
       permissions: [
         "android.permission.CAMERA",
+        "android.permission.INTERNET",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.WAKE_LOCK"
