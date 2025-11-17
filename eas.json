@@ -11,6 +11,10 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "development",
+        "EXPO_PUBLIC_NETWORK": "devnet"
       }
     },
     "preview": {
@@ -31,9 +35,12 @@
       },
       "env": {
         "NODE_ENV": "production",
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_NETWORK": "mainnet",
         "EXPO_PUBLIC_FORCE_MAINNET": "true",
         "EXPO_PUBLIC_DEV_NETWORK": "mainnet"
-      }
+      },
+      "prebuildCommand": "node scripts/validate-network-config.js"
     },
     "mass-distribution": {
       "distribution": "store",
@@ -45,9 +52,12 @@
       },
       "env": {
         "NODE_ENV": "production",
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_NETWORK": "mainnet",
         "EXPO_PUBLIC_FORCE_MAINNET": "true",
         "EXPO_PUBLIC_DEV_NETWORK": "mainnet"
-      }
+      },
+      "prebuildCommand": "node scripts/validate-network-config.js"
     },
     "testflight": {
       "distribution": "store",
@@ -59,9 +69,12 @@
       },
       "env": {
         "NODE_ENV": "production",
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_NETWORK": "mainnet",
         "EXPO_PUBLIC_FORCE_MAINNET": "true",
         "EXPO_PUBLIC_DEV_NETWORK": "mainnet"
-      }
+      },
+      "prebuildCommand": "node scripts/validate-network-config.js"
     },
     "internal-testing": {
       "distribution": "internal",

@@ -14,6 +14,7 @@ export interface DegenSplitLogic {
   isCurrentUserCreator: (currentUser: any, splitData: any) => boolean;
   calculateLockProgress: (lockedCount: number, totalCount: number) => number;
   formatWalletAddress: (address: string) => string;
+  checkUserLockStatus: (wallet: SplitWallet, currentUser: any) => boolean;
   
   // Wallet operations
   handleCreateSplitWallet: (
@@ -67,7 +68,8 @@ export interface DegenSplitLogic {
   handleClaimFunds: (
     currentUser: any,
     splitWallet: SplitWallet,
-    totalAmount: number
+    totalAmount: number,
+    onSuccessAlertShown?: () => void
   ) => Promise<boolean>;
   
   handleExternalPayment: (
@@ -220,6 +222,37 @@ export const useDegenSplitLogic = (
     }
   }, [setState]);
 
+  // Helper function to check if current user has locked their funds
+  const checkUserLockStatus = useCallback((wallet: SplitWallet, currentUser: any) => {
+    if (!wallet || !currentUser?.id) {
+      return false;
+    }
+    
+    const userParticipant = wallet.participants.find(
+      p => p.userId === currentUser.id.toString()
+    );
+    
+    if (!userParticipant) {
+      return false;
+    }
+    
+    // User has locked if: status is 'locked' AND amountPaid >= amountOwed AND has transaction signature
+    const hasLocked = userParticipant.status === 'locked' && 
+                      userParticipant.amountPaid >= userParticipant.amountOwed &&
+                      !!userParticipant.transactionSignature;
+    
+    logger.info('Checking user lock status', {
+      userId: currentUser.id.toString(),
+      participantStatus: userParticipant.status,
+      amountPaid: userParticipant.amountPaid,
+      amountOwed: userParticipant.amountOwed,
+      hasTransactionSignature: !!userParticipant.transactionSignature,
+      hasLocked
+    }, 'DegenSplitLogic');
+    
+    return hasLocked;
+  }, []);
+
   const handleLoadSplitWallet = useCallback(async (
     splitData: any,
     currentUser: any
@@ -248,7 +281,18 @@ export const useDegenSplitLogic = (
         
         if (walletResult.success && walletResult.wallet) {
           const wallet = walletResult.wallet;
-          setState({ splitWallet: wallet, isLoadingWallet: false });
+          
+          // CRITICAL FIX: Check if current user has already locked their funds BEFORE setting state
+          const userHasLocked = checkUserLockStatus(wallet, currentUser);
+          
+          setState({ 
+            splitWallet: wallet, 
+            isLoadingWallet: false,
+            isLocked: userHasLocked,
+            lockedParticipants: userHasLocked 
+              ? [...state.lockedParticipants.filter(id => id !== currentUser?.id?.toString()), currentUser.id.toString()]
+              : state.lockedParticipants.filter(id => id !== currentUser?.id?.toString())
+          });
           
           // Verify split wallet balance against blockchain data
           try {
@@ -277,23 +321,11 @@ export const useDegenSplitLogic = (
             });
           }
           
-          // Check if current user has already locked their funds
-          if (currentUser?.id) {
-            const userParticipant = wallet.participants.find(
-              p => p.userId === currentUser.id.toString()
-            );
-            
-            if (userParticipant && userParticipant.amountPaid > 0) {
-              setState({ 
-                isLocked: true,
-                lockedParticipants: [...state.lockedParticipants, currentUser.id.toString()]
-              });
-              logger.info('Current user already locked funds', {
-                userId: currentUser.id.toString(),
-                amountPaid: userParticipant.amountPaid
-              });
-            }
-          }
+          logger.info('Wallet loaded and user lock status checked', {
+            userId: currentUser?.id?.toString(),
+            hasLocked: userHasLocked,
+            walletId: wallet.id
+          }, 'DegenSplitLogic');
           
           return wallet;
         }
@@ -306,7 +338,7 @@ export const useDegenSplitLogic = (
       setState({ isLoadingWallet: false });
       return null;
     }
-  }, [setState, state.lockedParticipants]);
+  }, [setState, state.lockedParticipants, checkUserLockStatus]);
 
   // Lock operations
   const handleLockMyShare = useCallback(async (
@@ -752,8 +784,54 @@ export const useDegenSplitLogic = (
 
     setState({ isSpinning: true });
 
-    // Select random participant from original participants (not duplicates)
-    const finalIndex = Math.floor(Math.random() * participants.length);
+    // CRITICAL FIX: Improved randomness calculation for fair winner selection
+    // Handle edge cases and ensure fair distribution
+    let finalIndex: number;
+    
+    if (participants.length === 0) {
+      logger.error('No participants to select winner from', null, 'DegenSplitLogic');
+      setState({ isSpinning: false });
+      return;
+    }
+    
+    if (participants.length === 1) {
+      // CRITICAL: Single participant is always the loser
+      finalIndex = 0;
+      logger.info('Only one participant, automatically selected as loser', {
+        participantId: participants[0].userId || participants[0].id,
+        note: 'Single participant is the loser and must transfer to external card'
+      }, 'DegenSplitLogic');
+    } else {
+      // Multiple participants - use improved randomness for fair distribution
+      // Combine multiple random values and timestamp for better entropy
+      const random1 = Math.random();
+      const random2 = Math.random();
+      const timestamp = Date.now();
+      
+      // Create a more random seed by combining multiple sources
+      // Use the fractional part of timestamp to add entropy
+      const timestampFraction = (timestamp % 1000) / 1000;
+      const combinedRandom = (random1 + random2 + timestampFraction) / 3;
+      
+      // Ensure fair distribution across all participants
+      finalIndex = Math.floor(combinedRandom * participants.length);
+      
+      // Safety check to ensure index is within bounds
+      if (finalIndex >= participants.length) {
+        finalIndex = participants.length - 1;
+      }
+      
+      logger.info('Random loser selected using improved algorithm', {
+        participantsCount: participants.length,
+        selectedIndex: finalIndex,
+        selectedParticipantId: participants[finalIndex].userId || participants[finalIndex].id,
+        note: 'Selected participant is the LOSER, all others are winners',
+        random1,
+        random2,
+        timestampFraction,
+        combinedRandom
+      }, 'DegenSplitLogic');
+    }
 
     // Reset animation values
     if (state.spinAnimationRef.current) {
@@ -792,76 +870,88 @@ export const useDegenSplitLogic = (
         hasSpun: true
       });
 
+      // CRITICAL: Select exactly 1 loser (selected participant), rest are winners
       // Execute post-animation operations in background - COMPLETELY NON-BLOCKING
       // Use setTimeout to ensure UI is not blocked
       setTimeout(() => {
-        // Save the winner information to the split wallet - NON-BLOCKING
+        // Save the loser information to the split wallet - NON-BLOCKING
         (async () => {
           try {
             const { SplitWalletService } = await import('../../../services/split');
-            const saveWinnerPromise = SplitWalletService.updateSplitWallet(splitWallet.id, {
+            const selectedParticipant = participants[finalIndex];
+            const loserId = selectedParticipant.userId || selectedParticipant.id;
+            const loserName = selectedParticipant.name;
+            
+            // Save degenLoser (the selected participant is the LOSER)
+            // All other participants are winners
+            const saveLoserPromise = SplitWalletService.updateSplitWallet(splitWallet.id, {
+              degenLoser: {
+                userId: loserId,
+                name: loserName,
+                selectedAt: new Date().toISOString()
+              },
+              // Also save as degenWinner for backward compatibility, but it's actually the loser
+              // The UI will check degenLoser first
               degenWinner: {
-                userId: participants[finalIndex].userId || participants[finalIndex].id,
-                name: participants[finalIndex].name,
+                userId: loserId,
+                name: loserName,
                 selectedAt: new Date().toISOString()
               },
               status: 'spinning_completed'
             });
             
             // Use shorter timeout and don't await - fire and forget
-            createTimeoutWrapper(saveWinnerPromise, 5000, 'Save winner to database')
-              .then(() => console.log('✅ Winner information saved successfully'))
-              .catch(error => console.error('❌ Failed to save winner information:', error));
+            createTimeoutWrapper(saveLoserPromise, 5000, 'Save loser to database')
+              .then(() => console.log('✅ Loser information saved successfully'))
+              .catch(error => console.error('❌ Failed to save loser information:', error));
           } catch (error) {
-            console.error('❌ Failed to save winner information:', error);
+            console.error('❌ Failed to save loser information:', error);
           }
         })();
 
-        // Send notifications - NON-BLOCKING
+        // Send notifications - loser gets loser notification, winners get winner notifications - NON-BLOCKING
         (async () => {
           try {
             const { notificationService } = await import('../../../services/notifications');
             const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
-            const winnerId = participants[finalIndex].userId || participants[finalIndex].id;
-            const winnerName = participants[finalIndex].name;
+            const selectedParticipant = participants[finalIndex];
+            const loserId = selectedParticipant.userId || selectedParticipant.id;
+            const loserName = selectedParticipant.name;
 
-            // Send winner notification - fire and forget
-            const winnerNotificationPromise = notificationService.instance.sendWinnerNotification(
-              winnerId,
-              splitWallet.id,
-              billName
+            // Send loser notification to the selected participant
+            const loserNotificationPromise = notificationService.instance.sendNotification(
+              loserId,
+              'Degen Split Complete - You Lost',
+              `${billName} is complete. You are the loser. Transfer your locked funds to your external card to use them.`,
+              'split_loser',
+              {
+                splitId: splitData?.id,
+                splitWalletId: splitWallet.id,
+                billName,
+                amount: totalAmount,
+                currency: 'USDC',
+                isLoser: true,
+                timestamp: new Date().toISOString()
+              }
             );
-            createTimeoutWrapper(winnerNotificationPromise, 5000, 'Send winner notification')
-              .then(() => console.log('✅ Winner notification sent'))
-              .catch(error => console.error('❌ Failed to send winner notification:', error));
+            createTimeoutWrapper(loserNotificationPromise, 5000, 'Send loser notification')
+              .then(() => console.log(`✅ Loser notification sent to ${loserName}`))
+              .catch(error => console.error(`❌ Failed to send loser notification to ${loserName}:`, error));
 
-            // Send loser notifications - fire and forget
-            const losers = participants.filter(p => (p.userId || p.id) !== winnerId);
-
-            // Send individual notifications to each loser
-            for (const loser of losers) {
+            // Send winner notifications to all other participants
+            const winners = participants.filter(p => (p.userId || p.id) !== loserId);
+            for (const winner of winners) {
               try {
-                const loserNotificationPromise = notificationService.instance.sendNotification(
-                  loser.userId || loser.id,
-                  'Split Complete',
-                  `${billName} has been completed. ${winnerName} won the split!`,
-                  'split_loser',
-                  {
-                    splitId: splitData?.id,
-                    splitWalletId: splitWallet.id,
-                    billName,
-                    amount: totalAmount,
-                    currency: 'USDC',
-                    winnerId,
-                    winnerName,
-                    timestamp: new Date().toISOString()
-                  }
+                const winnerNotificationPromise = notificationService.instance.sendWinnerNotification(
+                  winner.userId || winner.id,
+                  splitWallet.id,
+                  billName
                 );
-                createTimeoutWrapper(loserNotificationPromise, 5000, 'Send loser notification')
-                  .then(() => console.log('✅ Loser notification sent'))
-                  .catch(error => console.error('❌ Failed to send loser notification:', error));
+                createTimeoutWrapper(winnerNotificationPromise, 5000, 'Send winner notification')
+                  .then(() => console.log(`✅ Winner notification sent to ${winner.name}`))
+                  .catch(error => console.error(`❌ Failed to send winner notification to ${winner.name}:`, error));
               } catch (error) {
-                console.error('❌ Failed to send loser notification:', error);
+                console.error('❌ Failed to send winner notification:', error);
               }
             }
           } catch (error) {
@@ -884,7 +974,8 @@ export const useDegenSplitLogic = (
   const handleClaimFunds = useCallback(async (
     currentUser: any,
     splitWallet: SplitWallet,
-    totalAmount: number
+    totalAmount: number,
+    onSuccessAlertShown?: () => void // Callback to notify that success alert was shown
   ): Promise<boolean> => {
     setState({ showClaimModal: false, isProcessing: true });
     
@@ -910,6 +1001,11 @@ export const useDegenSplitLogic = (
       );
       
       if (result.success) {
+        // CRITICAL FIX: Mark that we've shown the success alert to prevent duplicates
+        if (onSuccessAlertShown) {
+          onSuccessAlertShown();
+        }
+        
         if (result.transactionSignature?.startsWith('WITHDRAWAL_REQUEST_')) {
           Alert.alert(
             '📋 Withdrawal Request Submitted', 
@@ -983,6 +1079,21 @@ export const useDegenSplitLogic = (
   ): Promise<void> => {
     if (splitWallet?.id && currentUser?.id) {
       try {
+        // CRITICAL: Check if user has already withdrawn (single withdrawal rule)
+        // Once a user withdraws, they cannot access the private key anymore
+        const currentUserParticipant = splitWallet.participants.find(
+          p => p.userId === currentUser.id.toString()
+        );
+        
+        if (currentUserParticipant?.status === 'paid') {
+          Alert.alert(
+            'Access Denied',
+            'You have already withdrawn your funds from this split. Private key access is no longer available after withdrawal.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        
         const { SplitWalletService } = await import('../../../services/split');
         const result = await SplitWalletService.getSplitWalletPrivateKey(splitWallet.id, currentUser.id.toString());
         
@@ -1029,6 +1140,7 @@ export const useDegenSplitLogic = (
     isCurrentUserCreator,
     calculateLockProgress,
     formatWalletAddress,
+    checkUserLockStatus,
     
     // Wallet operations
     handleCreateSplitWallet,

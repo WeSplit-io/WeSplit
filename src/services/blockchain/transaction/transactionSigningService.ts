@@ -125,27 +125,49 @@ const getFirebaseApp = () => {
 // Initialize Firebase Functions
 // IMPORTANT: Lazy initialization to ensure Firebase app is ready
 // In development, connect to local emulator for faster testing
+
+// Cache for emulator connection status
+let emulatorConnectionAttempted = false;
+let emulatorConnected = false;
+
+// Singleton Firebase Functions instance to ensure emulator connection happens once
+let firebaseFunctionsInstance: any = null;
+
 const getFirebaseFunctions = () => {
+  // Return cached instance if already initialized
+  if (firebaseFunctionsInstance) {
+    return firebaseFunctionsInstance;
+  }
+
   try {
     const app = getFirebaseApp();
     const functions = getFunctions(app, 'us-central1');
     
     // Connect to emulator in development mode
     // Set EXPO_PUBLIC_USE_PROD_FUNCTIONS=true to force production even in dev
-    if (__DEV__ && !process.env.EXPO_PUBLIC_USE_PROD_FUNCTIONS) {
+    // Use getEnvVar to properly read from Expo Constants
+    const useProdFunctionsEnv = getEnvVar('EXPO_PUBLIC_USE_PROD_FUNCTIONS');
+    const useProdFunctions = useProdFunctionsEnv === 'true' || useProdFunctionsEnv === '1';
+    
+    // For iOS Simulator/Android Emulator: use localhost
+    // For physical device: use your computer's local IP (e.g., 192.168.1.100)
+    // You can set EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST to override
+    const emulatorHost = getEnvVar('EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST') || 'localhost';
+    const emulatorPort = parseInt(getEnvVar('EXPO_PUBLIC_FUNCTIONS_EMULATOR_PORT') || '5001');
+    
+    // CRITICAL: connectFunctionsEmulator MUST be called before any httpsCallable calls
+    if (__DEV__ && !useProdFunctions) {
       try {
-        // For iOS Simulator/Android Emulator: use localhost
-        // For physical device: use your computer's local IP (e.g., 192.168.1.100)
-        // You can set EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST to override
-        const emulatorHost = process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST || 'localhost';
-        const emulatorPort = parseInt(process.env.EXPO_PUBLIC_FUNCTIONS_EMULATOR_PORT || '5001');
-        
         connectFunctionsEmulator(functions, emulatorHost, emulatorPort);
+        emulatorConnected = true;
         logger.info('🔧 Connected to Firebase Functions Emulator', {
           host: emulatorHost,
           port: emulatorPort,
           isDev: __DEV__,
-          useProdFunctions: process.env.EXPO_PUBLIC_USE_PROD_FUNCTIONS
+          useProdFunctions: useProdFunctions,
+          envVar: useProdFunctionsEnv,
+          emulatorUrl: `http://${emulatorHost}:${emulatorPort}`,
+          note: 'Emulator connection established BEFORE any function calls'
         }, 'TransactionSigningService');
       } catch (error: any) {
         // Already connected or connection failed - ignore
@@ -154,22 +176,32 @@ const getFirebaseFunctions = () => {
             error: error.message,
             errorCode: error.code,
             errorName: error.name,
-            note: 'Using production Functions'
+            host: emulatorHost,
+            port: emulatorPort,
+            note: 'Using production Functions - check if emulator is running on port 5001'
           }, 'TransactionSigningService');
+          emulatorConnected = false;
         } else {
+          emulatorConnected = true;
           logger.info('✅ Functions emulator already connected', {
             host: emulatorHost,
-            port: emulatorPort
+            port: emulatorPort,
+            emulatorUrl: `http://${emulatorHost}:${emulatorPort}`
           }, 'TransactionSigningService');
         }
       }
     } else {
+      emulatorConnected = false;
       logger.info('🌐 Using production Firebase Functions', {
         isDev: __DEV__,
-        useProdFunctions: process.env.EXPO_PUBLIC_USE_PROD_FUNCTIONS
+        useProdFunctions: useProdFunctions,
+        envVar: useProdFunctionsEnv,
+        reason: !__DEV__ ? 'Not in dev mode' : useProdFunctions ? 'EXPO_PUBLIC_USE_PROD_FUNCTIONS is true' : 'Unknown'
       }, 'TransactionSigningService');
     }
     
+    // Cache the instance
+    firebaseFunctionsInstance = functions;
     return functions;
   } catch (error) {
     logger.error('❌ Failed to initialize Firebase Functions', {
@@ -204,12 +236,23 @@ const getSubmitTransactionFunction = () => {
 
 const getProcessUsdcTransferFunction = () => {
   try {
+    // Ensure emulator connection is attempted before creating function
     const functions = getFirebaseFunctions();
-    logger.info('🔵 Creating processUsdcTransfer callable function', {
-      hasFunctions: !!functions,
-      functionName: 'processUsdcTransfer',
-      timeout: 90000
-    }, 'TransactionSigningService');
+    
+    // Log connection status for debugging
+    if (!emulatorConnectionAttempted) {
+      emulatorConnectionAttempted = true;
+      logger.info('🔵 Creating processUsdcTransfer callable function', {
+        hasFunctions: !!functions,
+        functionName: 'processUsdcTransfer',
+        timeout: 90000,
+        isDev: __DEV__,
+        useProdFunctions: getEnvVar('EXPO_PUBLIC_USE_PROD_FUNCTIONS') === 'true' || getEnvVar('EXPO_PUBLIC_USE_PROD_FUNCTIONS') === '1',
+        emulatorHost: getEnvVar('EXPO_PUBLIC_FUNCTIONS_EMULATOR_HOST') || 'localhost',
+        emulatorPort: getEnvVar('EXPO_PUBLIC_FUNCTIONS_EMULATOR_PORT') || '5001',
+        emulatorConnected: emulatorConnected
+      }, 'TransactionSigningService');
+    }
     
     const callableFunction = httpsCallable(functions, 'processUsdcTransfer', {
       timeout: 90000 // 90 seconds timeout (longer for sign + submit)
@@ -217,7 +260,8 @@ const getProcessUsdcTransferFunction = () => {
     
     logger.info('✅ processUsdcTransfer callable function created', {
       functionType: typeof callableFunction,
-      isFunction: typeof callableFunction === 'function'
+      isFunction: typeof callableFunction === 'function',
+      emulatorConnected: emulatorConnected
     }, 'TransactionSigningService');
     
     return callableFunction;

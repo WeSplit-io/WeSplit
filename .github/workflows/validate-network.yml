@@ -1,0 +1,44 @@
+name: Validate Network Configuration
+
+on:
+  pull_request:
+    paths:
+      - 'src/config/network/**'
+      - 'app.config.js'
+      - '.env*'
+      - 'scripts/validate-network-config.js'
+      - 'services/firebase-functions/**'
+      - 'services/backend/**'
+  push:
+    branches:
+      - main
+      - Dev
+    paths:
+      - 'src/config/network/**'
+      - 'app.config.js'
+      - '.env*'
+      - 'scripts/validate-network-config.js'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Validate Network Config
+        run: node scripts/validate-network-config.js
+        env:
+          EAS_BUILD_PROFILE: ${{ github.base_ref == 'main' && 'production' || 'development' }}
+          EXPO_PUBLIC_NETWORK: ${{ github.base_ref == 'main' && 'mainnet' || 'devnet' }}
+      
+      - name: Check for Network-Related Changes
+        run: |
+          if git diff --name-only ${{ github.event.pull_request.base.sha }} HEAD 2>/dev/null | grep -E '(network|Network|NETWORK)' || true; then
+            echo "⚠️ Network-related changes detected. Please verify network configuration."
+            echo "::notice::Network-related changes detected. Ensure EXPO_PUBLIC_NETWORK is set correctly."
+          fi

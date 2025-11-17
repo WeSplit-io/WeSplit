@@ -6,6 +6,11 @@
 
 import Constants from 'expo-constants';
 import { logger } from '../services/analytics/loggingService';
+import { 
+  getNetworkConfig as getSolanaNetworkConfig, 
+  getNetworkConfigSync,
+  type NetworkConfig as SolanaNetworkConfig 
+} from './network/solanaNetworkConfig';
 
 // ============================================================================
 // ENVIRONMENT TYPES
@@ -141,37 +146,111 @@ export function getUnifiedConfig(): UnifiedConfig {
   const quickNodeEndpoint = getEnvVar('QUICKNODE_ENDPOINT');
   const chainstackEndpoint = getEnvVar('CHAINSTACK_ENDPOINT');
   
-  // Use environment network setting - check both DEV_NETWORK and FORCE_MAINNET
-  // FORCE_MAINNET takes precedence if set to 'true'
-  const devNetwork = getEnvVar('DEV_NETWORK');
-  const forceMainnet = getEnvVar('FORCE_MAINNET') === 'true' || getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
+  // Use new solanaNetworkConfig module for network selection (with fallback for sync initialization)
+  // Try to get network from new module, fallback to legacy logic if not initialized yet
   let network: 'devnet' | 'testnet' | 'mainnet' = 'devnet';
+  let networkConfig: SolanaNetworkConfig;
   
-  if (forceMainnet) {
-    network = 'mainnet';
-  } else if (devNetwork) {
-    // Normalize the network value
-    const normalized = devNetwork.toLowerCase().trim();
-    if (normalized === 'mainnet' || normalized === 'mainnet-beta') {
+  try {
+    // Try to get cached config (if already initialized)
+    networkConfig = getNetworkConfigSync();
+    network = networkConfig.network;
+  } catch {
+    // Fallback to legacy logic if network config not initialized yet
+    // This ensures backward compatibility during module load
+    const devNetwork = getEnvVar('DEV_NETWORK');
+    const forceMainnet = getEnvVar('FORCE_MAINNET') === 'true' || getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
+    
+    if (forceMainnet) {
       network = 'mainnet';
-    } else if (normalized === 'testnet') {
-      network = 'testnet';
-    } else {
-      network = 'devnet';
+    } else if (devNetwork) {
+      // Normalize the network value
+      const normalized = devNetwork.toLowerCase().trim();
+      if (normalized === 'mainnet' || normalized === 'mainnet-beta') {
+        network = 'mainnet';
+      } else if (normalized === 'testnet') {
+        network = 'testnet';
+      } else {
+        network = 'devnet';
+      }
+    } else if (isProduction) {
+      // Production defaults to mainnet
+      network = 'mainnet';
     }
+    
+    // Build network config from legacy logic (temporary fallback)
+    // This will be replaced once solanaNetworkConfig is initialized
+    const getLegacyNetworkConfig = () => {
+      switch (network) {
+        case 'mainnet':
+          const mainnetEndpoints: string[] = [];
+          if (alchemyApiKey && alchemyApiKey !== 'YOUR_ALCHEMY_API_KEY_HERE') {
+            mainnetEndpoints.push(`https://solana-mainnet.g.alchemy.com/v2/${alchemyApiKey}`);
+          }
+          if (getBlockApiKey && getBlockApiKey !== 'YOUR_GETBLOCK_API_KEY_HERE') {
+            mainnetEndpoints.push(`https://sol.getblock.io/mainnet/?api_key=${getBlockApiKey}`);
+          }
+          if (quickNodeEndpoint && quickNodeEndpoint !== 'YOUR_QUICKNODE_ENDPOINT_HERE') {
+            mainnetEndpoints.push(quickNodeEndpoint);
+          }
+          if (chainstackEndpoint && chainstackEndpoint !== 'YOUR_CHAINSTACK_ENDPOINT_HERE') {
+            mainnetEndpoints.push(chainstackEndpoint);
+          }
+          if (heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE') {
+            mainnetEndpoints.push(`https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`);
+          }
+          mainnetEndpoints.push('https://rpc.ankr.com/solana');
+          mainnetEndpoints.push('https://api.mainnet-beta.solana.com');
+          mainnetEndpoints.push('https://solana-api.projectserum.com');
+          if (!alchemyApiKey || alchemyApiKey === 'YOUR_ALCHEMY_API_KEY_HERE') {
+            mainnetEndpoints.push('https://solana-mainnet.g.alchemy.com/v2/demo');
+          }
+          return {
+            rpcUrl: mainnetEndpoints[0] || 'https://api.mainnet-beta.solana.com',
+            rpcEndpoints: mainnetEndpoints,
+            usdcMintAddress: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            commitment: 'confirmed' as const,
+            timeout: isProduction ? 25000 : 15000,
+            retries: isProduction ? 4 : 3,
+          };
+        case 'testnet':
+          return {
+            rpcUrl: 'https://api.testnet.solana.com',
+            rpcEndpoints: ['https://api.testnet.solana.com', 'https://testnet.helius-rpc.com'],
+            usdcMintAddress: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+            commitment: 'confirmed' as const,
+            timeout: 20000,
+            retries: 2,
+          };
+        default: // devnet
+          return {
+            rpcUrl: 'https://api.devnet.solana.com',
+            rpcEndpoints: ['https://api.devnet.solana.com', 'https://devnet.helius-rpc.com'],
+            usdcMintAddress: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+            commitment: 'confirmed' as const,
+            timeout: 20000,
+            retries: 2,
+          };
+      }
+    };
+    
+    networkConfig = getLegacyNetworkConfig() as SolanaNetworkConfig;
+    
+    // Initialize async config in background (won't block)
+    getSolanaNetworkConfig().catch(err => {
+      logger.warn('Failed to initialize network config asynchronously', { error: err }, 'unified');
+    });
   }
   
   // Log RPC provider configuration for debugging
   logger.info('Network configuration', { 
     network, 
-    devNetwork, 
-    forceMainnet,
     hasAlchemy: !!alchemyApiKey && alchemyApiKey !== 'YOUR_ALCHEMY_API_KEY_HERE',
     hasGetBlock: !!getBlockApiKey && getBlockApiKey !== 'YOUR_GETBLOCK_API_KEY_HERE',
     hasHelius: !!heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE',
     hasQuickNode: !!quickNodeEndpoint && quickNodeEndpoint !== 'YOUR_QUICKNODE_ENDPOINT_HERE',
     hasChainstack: !!chainstackEndpoint && chainstackEndpoint !== 'YOUR_CHAINSTACK_ENDPOINT_HERE',
-    note: 'Network determined from DEV_NETWORK and FORCE_MAINNET environment variables'
+    note: 'Network determined from solanaNetworkConfig module (supports EXPO_PUBLIC_NETWORK and legacy vars)'
   }, 'unified');
   
   // Configuration loaded
@@ -186,7 +265,9 @@ export function getUnifiedConfig(): UnifiedConfig {
     }
   }
   
-  // Network-specific configuration
+  // networkConfig is already set above from either solanaNetworkConfig module or legacy fallback
+  // Remove duplicate function - networkConfig variable is set in try/catch block above
+  /*
   const getNetworkConfig = () => {
     switch (network) {
       case 'mainnet':
@@ -272,6 +353,7 @@ export function getUnifiedConfig(): UnifiedConfig {
   };
   
   const networkConfig = getNetworkConfig();
+  */
   
   return {
     environment,

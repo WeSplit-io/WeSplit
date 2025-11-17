@@ -173,9 +173,10 @@ export class SplitWalletService {
     return SplitWalletPayments.processDegenWinnerPayout(splitWalletId, winnerUserId, winnerAddress, totalAmount, description);
   }
 
-  static async processDegenLoserPayment(splitWalletId: string, loserUserId: string, paymentMethod: any, totalAmount: number, description?: string) {
+  static async processDegenLoserPayment(splitWalletId: string, loserUserId: string, paymentMethod: any, totalAmount: number, description?: string, cardId?: string) {
     await loadModules();
-    return SplitWalletPayments.processDegenLoserPayment(splitWalletId, loserUserId, totalAmount, description);
+    // CRITICAL: All participants are losers, funds go to external cards
+    return SplitWalletPayments.processDegenLoserPayment(splitWalletId, loserUserId, totalAmount, description, cardId);
   }
 
   static async payParticipantShare(splitWalletId: string, participantId: string, amount: number) {
@@ -235,6 +236,14 @@ export class SplitWalletService {
   ) {
     await loadModules();
     return SplitWalletSecurity.deleteSplitWalletPrivateKeyForAllParticipants(splitWalletId, participants);
+  }
+
+  static async syncSharedPrivateKeyParticipants(
+    splitWalletId: string,
+    participants: { userId: string; name?: string }[]
+  ) {
+    await loadModules();
+    return SplitWalletSecurity.syncSharedPrivateKeyParticipants(splitWalletId, participants);
   }
 
   static async listStoredPrivateKeys(creatorId: string) {

@@ -451,18 +451,29 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
               currentUserId: currentUser?.id?.toString()
             });
 
-            // Degen Split is disabled - redirect to FairSplit instead
+            const baseParams = {
+              splitData: split,
+              billData: null,
+              processedBillData: null,
+              participants: split.participants,
+              totalAmount: split.totalAmount,
+              splitWallet: wallet,
+            };
+
             if ((wallet.status === 'completed' || wallet.status === 'spinning_completed') && wallet.degenWinner) {
-              logger.info('Degen Split is disabled, redirecting to FairSplit', null, 'SplitsListScreen');
-              console.warn('Degen Split is disabled, redirecting to FairSplit');
-              
-              // Redirect to FairSplit instead
-              navigation.navigate('FairSplit', {
-                splitData: split,
-                splitWallet: wallet,
+              navigation.navigate('DegenResult', {
+                ...baseParams,
+                selectedParticipant: {
+                  id: wallet.degenWinner.userId,
+                  name: wallet.degenWinner.name,
+                  userId: wallet.degenWinner.userId
+                }
               });
               return;
             }
+
+            navigation.navigate('DegenLock', baseParams);
+            return;
           }
         } catch (walletError) {
           console.error('🔍 SplitsListScreen: Error checking wallet status:', walletError);

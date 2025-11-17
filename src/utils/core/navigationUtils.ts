@@ -124,30 +124,24 @@ export class SplitNavigationHelper {
   }
 
   /**
-   * Navigate to degen lock - DISABLED
+   * Navigate to degen lock
    */
   goToDegenLock(params: any) {
-    console.warn('Degen Split is disabled');
-    // Degen Split is disabled - redirect to FairSplit instead
-    this.navigation.navigate(NAVIGATION_ROUTES.FAIR_SPLIT, params);
+    this.navigation.navigate(NAVIGATION_ROUTES.DEGEN_LOCK, params);
   }
 
   /**
-   * Navigate to degen spin - DISABLED
+   * Navigate to degen spin
    */
   goToDegenSpin(params: any) {
-    console.warn('Degen Split is disabled');
-    // Degen Split is disabled - redirect to FairSplit instead
-    this.navigation.navigate(NAVIGATION_ROUTES.FAIR_SPLIT, params);
+    this.navigation.navigate(NAVIGATION_ROUTES.DEGEN_SPIN, params);
   }
 
   /**
-   * Navigate to degen result - DISABLED
+   * Navigate to degen result
    */
   goToDegenResult(params: any) {
-    console.warn('Degen Split is disabled');
-    // Degen Split is disabled - redirect to FairSplit instead
-    this.navigation.navigate(NAVIGATION_ROUTES.FAIR_SPLIT, params);
+    this.navigation.navigate(NAVIGATION_ROUTES.DEGEN_RESULT, params);
   }
 
   /**

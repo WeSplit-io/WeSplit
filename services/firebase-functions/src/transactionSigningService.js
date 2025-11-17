@@ -194,16 +194,35 @@ class TransactionSigningService {
       });
 
       // Create company keypair from secret key
+      // Support multiple formats: JSON array, base64-encoded JSON array, or base64-encoded Uint8Array
       let secretKeyArray;
       try {
-        // Parse JSON array, handling potential whitespace
+        // First, try to parse as JSON array directly (for backward compatibility)
         secretKeyArray = JSON.parse(companyWalletSecretKey);
-      } catch (parseError) {
-        console.error('Failed to parse secret key as JSON', {
-          error: parseError.message
-          // SECURITY: Never log secret key previews - even partial keys can be security risk
+      } catch (jsonError) {
+        // If JSON parsing fails, try base64 decoding first
+        try {
+          // Decode from base64
+          const decoded = Buffer.from(companyWalletSecretKey, 'base64');
+          
+          // Try to parse the decoded value as JSON (in case it's base64-encoded JSON)
+          try {
+            secretKeyArray = JSON.parse(decoded.toString('utf8'));
+          } catch (nestedJsonError) {
+            // If that fails, treat the decoded bytes as the raw secret key array
+            // Convert Buffer to array of numbers
+            secretKeyArray = Array.from(decoded);
+          }
+        } catch (base64Error) {
+          console.error('Failed to parse secret key', {
+            jsonError: jsonError.message,
+            base64Error: base64Error.message,
+            secretKeyLength: companyWalletSecretKey.length,
+            secretKeyStartsWith: companyWalletSecretKey.substring(0, 10) // First 10 chars for debugging
+            // SECURITY: Never log full secret key or significant portions
         });
-        throw new Error(`Invalid secret key format: ${parseError.message}`);
+          throw new Error(`Invalid secret key format: Expected JSON array or base64-encoded key. JSON error: ${jsonError.message}`);
+        }
       }
       
       if (!Array.isArray(secretKeyArray) || secretKeyArray.length !== 64) {
@@ -231,9 +250,15 @@ class TransactionSigningService {
       }
 
       // Create connection - use network from environment
-      // Priority: SOLANA_NETWORK > EXPO_PUBLIC_FORCE_MAINNET > FORCE_MAINNET > EXPO_PUBLIC_DEV_NETWORK > DEV_NETWORK > default 'devnet'
-      // This ensures backend matches frontend network selection
-      let actualNetwork = 'devnet'; // Default to devnet for safety
+      // CRITICAL: Production must use mainnet, emulator can use devnet
+      // Priority: SOLANA_NETWORK > environment detection > EXPO_PUBLIC_FORCE_MAINNET > FORCE_MAINNET > EXPO_PUBLIC_DEV_NETWORK > DEV_NETWORK > default based on environment
+      
+      // Detect environment: emulator = dev, production = mainnet
+      const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
+      const isProduction = !isEmulator && (process.env.NODE_ENV === 'production' || process.env.GCLOUD_PROJECT?.includes('prod'));
+      
+      // Default based on environment: production = mainnet, emulator/dev = devnet
+      let actualNetwork = isProduction ? 'mainnet' : 'devnet';
       
       // Debug: Log all relevant environment variables
       console.log('Checking network environment variables', {
@@ -242,7 +267,13 @@ class TransactionSigningService {
         EXPO_PUBLIC_FORCE_MAINNET: process.env.EXPO_PUBLIC_FORCE_MAINNET,
         FORCE_MAINNET: process.env.FORCE_MAINNET,
         EXPO_PUBLIC_DEV_NETWORK: process.env.EXPO_PUBLIC_DEV_NETWORK,
-        DEV_NETWORK: process.env.DEV_NETWORK
+        DEV_NETWORK: process.env.DEV_NETWORK,
+        FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
+        NODE_ENV: process.env.NODE_ENV,
+        GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
+        isEmulator,
+        isProduction,
+        defaultNetwork: actualNetwork
       });
       
       // Check explicit network setting (highest priority)
@@ -253,6 +284,19 @@ class TransactionSigningService {
       } else if (process.env.NETWORK) {
         actualNetwork = (process.env.NETWORK || '').trim().toLowerCase();
         console.log('Using NETWORK:', actualNetwork);
+      } else if (process.env.EXPO_PUBLIC_NETWORK) {
+        // Check EXPO_PUBLIC_NETWORK (new standard, matches client)
+        const expoNetwork = (process.env.EXPO_PUBLIC_NETWORK || '').trim().toLowerCase();
+        if (expoNetwork === 'mainnet' || expoNetwork === 'mainnet-beta') {
+          actualNetwork = 'mainnet';
+        } else if (expoNetwork === 'devnet') {
+          actualNetwork = 'devnet';
+        } else if (expoNetwork === 'testnet') {
+          actualNetwork = 'testnet';
+        } else {
+          actualNetwork = expoNetwork;
+        }
+        console.log('Using EXPO_PUBLIC_NETWORK:', expoNetwork, '->', actualNetwork);
       }
       // Check EXPO_PUBLIC_FORCE_MAINNET (matches frontend variable name)
       // Trim whitespace/newlines from environment variable to handle Firebase Secrets formatting
@@ -304,7 +348,21 @@ class TransactionSigningService {
         }
         console.log('Using DEV_NETWORK:', devNetwork, '->', actualNetwork);
       } else {
-        console.log('No network environment variable found, using default: devnet');
+        // No explicit network variable found - use environment-based default
+        if (isProduction) {
+          actualNetwork = 'mainnet';
+          console.log('No network environment variable found, using production default: mainnet');
+        } else {
+          actualNetwork = 'devnet';
+          console.log('No network environment variable found, using development default: devnet');
+        }
+      }
+      
+      // SAFETY CHECK: Prevent devnet in production (unless explicitly overridden)
+      if (isProduction && actualNetwork === 'devnet' && !process.env.SOLANA_NETWORK) {
+        console.error('⚠️  WARNING: Production environment detected but network is devnet!');
+        console.error('⚠️  This is unsafe. Setting to mainnet. Set SOLANA_NETWORK=mainnet explicitly to suppress this warning.');
+        actualNetwork = 'mainnet';
       }
       
       // Validate network value
@@ -454,11 +512,15 @@ class TransactionSigningService {
                          rpcUrl.includes('getblock') ? 'GetBlock' : 
                          rpcUrl.includes('helius') ? 'Helius' : 
                          rpcUrl.includes('ankr') ? 'Ankr' : 'Official',
-        networkSource: process.env.SOLANA_NETWORK ? 'SOLANA_NETWORK' :
-                       process.env.NETWORK ? 'NETWORK' :
-                       process.env.FORCE_MAINNET ? 'FORCE_MAINNET' :
-                       process.env.EXPO_PUBLIC_DEV_NETWORK ? 'EXPO_PUBLIC_DEV_NETWORK' :
-                       process.env.DEV_NETWORK ? 'DEV_NETWORK' : 'default (devnet)'
+        networkSource: process.env.SOLANA_NETWORK ? 'SOLANA_NETWORK (primary)' :
+                       process.env.NETWORK ? 'NETWORK (secondary)' :
+                       process.env.EXPO_PUBLIC_NETWORK ? 'EXPO_PUBLIC_NETWORK (matches client)' :
+                       process.env.FORCE_MAINNET ? 'FORCE_MAINNET (legacy)' :
+                       process.env.EXPO_PUBLIC_DEV_NETWORK ? 'EXPO_PUBLIC_DEV_NETWORK (legacy)' :
+                       process.env.DEV_NETWORK ? 'DEV_NETWORK (legacy)' :
+                       isProduction ? 'environment-based default (production=mainnet)' :
+                       'environment-based default (development=devnet)',
+        note: 'Backend network must match client network. Use SOLANA_NETWORK env var (matches client EXPO_PUBLIC_NETWORK)'
       });
 
     } catch (error) {

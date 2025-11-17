@@ -81,28 +81,32 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           if (currentUserParticipant?.status === 'paid') {
             console.log('✅ Real-time update: User status changed to paid, exiting loading state');
             
-            // OPTIMIZED: Only show success message if we were actually processing
-            // This prevents duplicate alerts when the user navigates back to the screen
+            // CRITICAL FIX: Only show success message if we were actually processing AND haven't already shown an alert
+            // This prevents duplicate alerts when the transaction succeeds immediately
             const wasProcessing = degenState.isProcessing;
             degenState.setIsProcessing(false);
             
-            if (wasProcessing) {
-              if (isWinner) {
+            // Only show alert if we were processing AND haven't already shown a success alert
+            if (wasProcessing && !hasShownSuccessAlertRef.current) {
+              hasShownSuccessAlertRef.current = true;
+              
+              // Show appropriate alert based on winner/loser status
+              if (isLoser) {
                 Alert.alert(
-                  '🎉 Winner Payout Complete!', 
-                  `Congratulations! You've received the full amount of ${formatUsdcForDisplay(totalAmount)} USDC from the degen split. Your locked funds have been returned to you.`,
-                  [{ text: 'OK' }]
-                );
-              } else {
-                Alert.alert(
-                  '✅ Payment Confirmed!', 
-                  `Your locked funds (${formatUsdcForDisplay(totalAmount)} USDC) have been successfully withdrawn from the split wallet to your in-app wallet.`,
+                  '✅ Transfer Complete!', 
+                  `Your locked funds have been successfully transferred to your external card or wallet.`,
                   [
                     {
                       text: 'OK',
                       onPress: () => navigation.navigate('SplitsList')
                     }
                   ]
+                );
+              } else {
+                Alert.alert(
+                  '🎉 Winner Payout Complete!', 
+                  `Congratulations! You've received the full amount of ${formatUsdcForDisplay(totalAmount)} USDC from the degen split to your in-app wallet.`,
+                  [{ text: 'OK' }]
                 );
               }
             }
@@ -121,64 +125,60 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     }
   );
 
-  // CRITICAL FIX: Determine winner from wallet degenWinner (source of truth), fallback to selectedParticipant
-  // This ensures winner information is consistent even if navigation happened before save completed
-  const winnerUserId = currentSplitWallet?.degenWinner?.userId || 
-                       degenState.splitWallet?.degenWinner?.userId || 
-                       selectedParticipant?.userId || 
-                       selectedParticipant?.id;
+  // CRITICAL: Check if current user is the loser
+  // degenLoser is the selected participant (the LOSER)
+  // All other participants are winners
+  const loserUserId = currentSplitWallet?.degenLoser?.userId || 
+                      degenState.splitWallet?.degenLoser?.userId ||
+                      currentSplitWallet?.degenWinner?.userId || // Fallback for backward compatibility
+                      degenState.splitWallet?.degenWinner?.userId ||
+                      selectedParticipant?.userId || 
+                      selectedParticipant?.id;
   
-  const isWinner = currentUser && winnerUserId && 
-    winnerUserId === currentUser.id.toString();
-  const isLoser = !isWinner;
+  const isLoser = currentUser && loserUserId && 
+    loserUserId === currentUser.id.toString();
+  const isWinner = !isLoser && !!loserUserId; // If there's a loser and you're not it, you're a winner
   
-  // Use degenWinner from wallet as source of truth for selectedParticipant
-  const effectiveSelectedParticipant = currentSplitWallet?.degenWinner ? {
+  // Use degenLoser from wallet as source of truth for selectedParticipant
+  const effectiveSelectedParticipant = currentSplitWallet?.degenLoser ? {
+    id: currentSplitWallet.degenLoser.userId,
+    name: currentSplitWallet.degenLoser.name,
+    userId: currentSplitWallet.degenLoser.userId
+  } : (currentSplitWallet?.degenWinner ? {
     id: currentSplitWallet.degenWinner.userId,
     name: currentSplitWallet.degenWinner.name,
     userId: currentSplitWallet.degenWinner.userId
-  } : selectedParticipant;
+  } : selectedParticipant);
 
   // State to track current split wallet data
   // CRITICAL FIX: Initialize from route params, but reload if degenWinner is missing
   const [currentSplitWallet, setCurrentSplitWallet] = React.useState<SplitWallet | null>(splitWallet || null);
+  
+  // CRITICAL FIX: Track if we've already shown success alert to prevent duplicates
+  const hasShownSuccessAlertRef = React.useRef(false);
 
-  // CRITICAL FIX: Reload wallet on mount if degenWinner is missing or doesn't match selectedParticipant
+  // CRITICAL FIX: Reload wallet on mount to get latest status including degenLoser
   React.useEffect(() => {
     const initializeWallet = async () => {
       if (!splitWallet?.id) {return;}
 
-      // If wallet doesn't have degenWinner, reload it
-      if (!splitWallet.degenWinner) {
-        try {
-          const { SplitWalletService } = await import('../../services/split');
-          const result = await SplitWalletService.getSplitWallet(splitWallet.id);
-          if (result.success && result.wallet) {
-            console.log('🔍 DegenResultScreen: Reloaded wallet on mount (degenWinner missing):', {
-              hasDegenWinner: !!result.wallet.degenWinner,
-              degenWinner: result.wallet.degenWinner
-            });
-            setCurrentSplitWallet(result.wallet);
-            degenState.setSplitWallet(result.wallet);
-          }
-        } catch (error) {
-          console.error('🔍 DegenResultScreen: Error reloading wallet:', error);
-        }
-      } else {
-        // Verify selectedParticipant matches degenWinner
-        const winnerUserId = splitWallet.degenWinner.userId;
-        const selectedUserId = selectedParticipant?.userId || selectedParticipant?.id;
-        
-        if (winnerUserId !== selectedUserId) {
-          console.warn('🔍 DegenResultScreen: selectedParticipant mismatch, using degenWinner:', {
-            winnerUserId,
-            selectedUserId,
-            degenWinner: splitWallet.degenWinner
+      // Reload wallet to get latest participant status and loser information
+      try {
+        const { SplitWalletService } = await import('../../services/split');
+        const result = await SplitWalletService.getSplitWallet(splitWallet.id);
+        if (result.success && result.wallet) {
+          console.log('🔍 DegenResultScreen: Reloaded wallet on mount:', {
+            status: result.wallet.status,
+            participantsCount: result.wallet.participants.length,
+            hasDegenLoser: !!result.wallet.degenLoser,
+            degenLoser: result.wallet.degenLoser,
+            hasDegenWinner: !!result.wallet.degenWinner
           });
-          // Use degenWinner from wallet as source of truth
+          setCurrentSplitWallet(result.wallet);
+          degenState.setSplitWallet(result.wallet);
         }
-        
-        setCurrentSplitWallet(splitWallet);
+      } catch (error) {
+        console.error('🔍 DegenResultScreen: Error reloading wallet:', error);
       }
     };
 
@@ -269,9 +269,11 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             ]
           );
         } else {
+          // Get the actual amount transferred (loser's locked amount, not total)
+          const transferredAmount = result.amount || currentUserParticipant?.amountPaid || totalAmount;
           Alert.alert(
-            '✅ Payment Confirmed!', 
-            `Your locked funds (${formatUsdcForDisplay(totalAmount)} USDC) have been successfully withdrawn from the split wallet to your KAST card.`,
+            '✅ Transfer Complete!', 
+            `Your locked funds (${formatUsdcForDisplay(transferredAmount)} USDC) have been successfully transferred to your external card or wallet.`,
             [
               {
                 text: 'OK',
@@ -281,7 +283,25 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           );
         }
       } else {
-        Alert.alert('KAST Payment Failed', result.error || 'Failed to complete KAST payment. Please try again.');
+        // Check if error is about missing external destination
+        if (result.error?.includes('No external') || result.error?.includes('link a') || result.error?.includes('linked')) {
+          Alert.alert(
+            'External Card/Wallet Required', 
+            result.error || 'Please link a KAST card or external wallet in Settings to transfer your funds.',
+            [
+              {
+                text: 'Go to Settings',
+                onPress: () => navigation.navigate('LinkedCards')
+              },
+              {
+                text: 'Cancel',
+                style: 'cancel'
+              }
+            ]
+          );
+        } else {
+          Alert.alert('Transfer Failed', result.error || 'Failed to transfer to external card/wallet. Please try again.');
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to process KAST payment. Please try again.');
@@ -299,12 +319,9 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       // Simulate signature process
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Process the payment based on selected method
-      if (degenState.selectedPaymentMethod === 'personal-wallet') {
-        await handleInAppPayment();
-      } else {
-        await handleExternalPayment();
-      }
+      // CRITICAL: Only external card transfers are allowed
+      // Process the payment to external card
+      await handleExternalPayment();
       
       // Close modals
       degenState.setShowSignatureStep(false);
@@ -319,84 +336,30 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   };
 
   const handleInAppPayment = async () => {
-    degenState.setIsProcessing(true);
-    try {
-      // OPTIMIZED: Use centralized validation
-      if (!canUserClaimFunds()) {
-        Alert.alert(
-          'Already Processed', 
-          'Your payment has already been processed for this split.',
-          [{ text: 'OK' }]
-        );
-        degenState.setIsProcessing(false);
-        return;
-      }
-      
-      // NEW Degen Logic: Loser receives funds from split wallet to their in-app wallet
-      const { SplitWalletService } = await import('../../services/split');
-      const result = await SplitWalletService.processDegenLoserPayment(
-        splitWallet.id,
-        currentUser!.id.toString(),
-        'in-app', // Payment method
-        totalAmount, // Loser receives their locked funds back
-        'Degen Split Loser Payment (In-App Wallet)'
-      );
-      
-      if (result.success) {
-        // Check if this is a withdrawal request (for non-creators)
-        if (result.transactionSignature?.startsWith('WITHDRAWAL_REQUEST_')) {
-          Alert.alert(
-            '📋 Withdrawal Request Submitted', 
-            result.message || 'Your withdrawal request has been submitted. The split creator will process your request.',
-            [
-              {
-                text: 'OK',
-                onPress: () => navigation.navigate('SplitsList')
-              }
-            ]
-          );
-        } else {
-          Alert.alert(
-            '✅ Payment Confirmed!', 
-            `Your locked funds (${formatUsdcForDisplay(totalAmount)} USDC) have been successfully withdrawn from the split wallet to your in-app wallet.`,
-            [
-              {
-                text: 'OK',
-                onPress: () => navigation.navigate('SplitsList')
-              }
-            ]
-          );
-        }
-      } else {
-        // OPTIMIZED: Simplified error handling - real-time updates will handle success detection
-        if (result.signature && result.error?.includes('confirmation timed out')) {
-          // Transaction was sent but confirmation timed out
-          console.log('🔍 Loser payment sent but confirmation timed out, real-time updates will handle success detection', {
-            signature: result.signature,
-            splitWalletId: splitWallet.id
-          });
-          
-          Alert.alert(
-            '⏳ Payment Processing', 
-            'Your payment has been sent to the blockchain. Real-time updates will notify you when it completes.',
-            [{ text: 'OK' }]
-          );
-        } else {
-          Alert.alert('Payment Failed', result.error || 'Failed to complete payment. Please try again.');
-        }
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to complete payment. Please try again.');
-    } finally {
-      degenState.setIsProcessing(false);
-    }
+    // CRITICAL: In-app wallet transfers are not allowed - must use external card
+    Alert.alert(
+      'External Card Required',
+      'Funds must be transferred to your external linked card, not to your in-app wallet. Please use the "Transfer to External Card" option.',
+      [{ text: 'OK' }]
+    );
+    return;
   };
 
   const handleClaimFunds = async () => {
-    const success = await degenLogic.handleClaimFunds(currentUser, splitWallet, totalAmount);
+    // CRITICAL FIX: Mark that we'll show success alert to prevent duplicates
+    const success = await degenLogic.handleClaimFunds(
+      currentUser, 
+      splitWallet, 
+      totalAmount,
+      () => {
+        // Callback to mark that success alert was shown
+        hasShownSuccessAlertRef.current = true;
+      }
+    );
     if (success) {
       // Refresh split wallet data to show updated status
       try {
+        const { SplitWalletService } = await import('../../services/split');
         const result = await SplitWalletService.getSplitWallet(splitWallet.id);
         if (result.success && result.wallet) {
           setCurrentSplitWallet(result.wallet);
@@ -404,26 +367,6 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       } catch (error) {
         console.error('Error refreshing split wallet data:', error);
       }
-
-      // Show success message and let user decide what to do next
-      Alert.alert(
-        '🎉 Funds Claimed Successfully!',
-        'Your winnings have been transferred to your wallet. You can now close this screen or continue to view the split details.',
-        [
-          {
-            text: 'Stay Here',
-            style: 'cancel'
-          },
-          {
-            text: 'Go to Dashboard',
-            onPress: () => navigation.navigate('Dashboard', { refreshBalance: true })
-          },
-          {
-            text: 'Go to Splits List',
-            onPress: () => navigation.navigate('SplitsList', { refreshBalance: true })
-          }
-        ]
-      );
     }
   };
 
@@ -509,7 +452,10 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           isWinner ? styles.winnerAmountContainer : styles.loserAmountContainer
         ]}>
           <Text style={styles.amountValue}>
-            {isWinner ? '+' : '-'} {formatUsdcForDisplay(totalAmount)} USDC
+            {isWinner 
+              ? `+ ${formatUsdcForDisplay(totalAmount)} USDC` // Winner gets total from all participants
+              : `${formatUsdcForDisplay(currentUserParticipant?.amountPaid || currentUserParticipant?.amountOwed || totalAmount)} USDC` // Loser gets their locked amount
+            }
           </Text>
         </View>
 
@@ -517,8 +463,8 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         <View style={styles.messageContainer}>
           <Text style={styles.messageText}>
             {isWinner 
-              ? `You're safe @${effectiveSelectedParticipant?.name || selectedParticipant?.name || 'the winner'} is paying for you`
-              : `You covered the total bill: ${formatUsdcForDisplay(totalAmount)} USDC.`
+              ? `You're safe! ${effectiveSelectedParticipant?.name || 'The loser'} is paying for you. You'll receive ${formatUsdcForDisplay(totalAmount)} USDC to your in-app wallet.`
+              : `You covered the bill: ${formatUsdcForDisplay(currentUserParticipant?.amountPaid || currentUserParticipant?.amountOwed || totalAmount)} USDC. Transfer your locked funds to your external card or wallet to use them.`
             }
           </Text>
           {!isWinner && (
@@ -549,12 +495,13 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             onPress={handleShowPrivateKey}
             variant="secondary"
             style={styles.splitWalletButton}
+            disabled={hasAlreadyClaimed} // Disable after withdrawal (single withdrawal rule)
           />
           
           {isWinner ? (
             // Winner - Claim button
             <Button
-              title={degenState.isProcessing ? `${getSplitStatusDisplayText('spinning')}...` : 'Claim'}
+              title={degenState.isProcessing ? 'Claiming...' : 'Claim'}
               onPress={() => degenState.setShowClaimModal(true)}
               variant="primary"
               disabled={degenState.isProcessing}
@@ -562,12 +509,12 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
               style={{flex: 1}}
             />
           ) : (
-            // Loser - Claim button (replacing Pay with KAST)
+            // Loser - Transfer to external card button
             <Button
-              title={degenState.isProcessing ? `${getSplitStatusDisplayText('spinning')}...` : 'Claim'}
+              title={degenState.isProcessing ? 'Transferring...' : 'Transfer to External Card'}
               onPress={() => degenState.setShowPaymentOptionsModal(true)}
               variant="primary"
-              disabled={degenState.isProcessing}
+              disabled={degenState.isProcessing || hasAlreadyClaimed}
               loading={degenState.isProcessing}
               style={styles.claimButtonNew}
             />
@@ -575,7 +522,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         </View>
       </View>
 
-      {/* Claim CustomModal */}
+      {/* Claim Modal - For Winners */}
       <Modal
         visible={degenState.showClaimModal}
         onClose={() => degenState.setShowClaimModal(false)}
@@ -629,37 +576,19 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       <Modal
         visible={degenState.showPaymentOptionsModal}
         onClose={() => degenState.setShowPaymentOptionsModal(false)}
-        title={!degenState.showSignatureStep ? 'Choose Payment Method' : 'Withdraw Your Locked Funds'}
+        title={!degenState.showSignatureStep ? 'Transfer to External Card' : 'Transfer Your Locked Funds'}
         description={!degenState.showSignatureStep 
-          ? `You need to pay the full ${formatUsdcForDisplay(totalAmount)} USDC bill. How would you like to pay?`
-          : 'Your locked funds will be sent from the split wallet to your chosen destination.'
+          ? `Transfer your locked funds (${formatUsdcForDisplay(totalAmount)} USDC) to your external linked card to use them.`
+          : 'Your locked funds will be sent from the split wallet to your external card.'
         }
         showHandle={true}
         closeOnBackdrop={true}
       >
         {!degenState.showSignatureStep ? (
-          // Payment Method Selection Step
+          // Payment Method Selection Step - Only External Card
           <>
             <View style={styles.paymentOptionsModalContainer}>
-              <TouchableOpacity 
-                style={styles.paymentOptionButton}
-                onPress={() => {
-                  degenState.setSelectedPaymentMethod('personal-wallet');
-                  degenState.setShowSignatureStep(true);
-                }}
-              >
-                <View style={styles.paymentOptionIcon}>
-                  <Text style={styles.paymentOptionIconText}>💳</Text>
-                </View>
-                <View style={styles.paymentOptionContent}>
-                  <Text style={styles.paymentOptionTitle}>In-App Wallet</Text>
-                  <Text style={styles.paymentOptionDescription}>
-                    Withdraw to In-App Wallet
-                  </Text>
-                </View>
-                <Text style={styles.paymentOptionArrow}>→</Text>
-              </TouchableOpacity>
-
+              {/* CRITICAL: Only show external card option - no in-app wallet */}
               <TouchableOpacity 
                 style={styles.paymentOptionButton}
                 onPress={() => {
@@ -671,13 +600,19 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
                   <Text style={styles.paymentOptionIconText}>🏦</Text>
                 </View>
                 <View style={styles.paymentOptionContent}>
-                  <Text style={styles.paymentOptionTitle}>KAST Card</Text>
+                  <Text style={styles.paymentOptionTitle}>External Card (KAST)</Text>
                   <Text style={styles.paymentOptionDescription}>
-                    Withdraw to KAST Card
+                    Transfer to your linked external card
                   </Text>
                 </View>
                 <Text style={styles.paymentOptionArrow}>→</Text>
               </TouchableOpacity>
+            </View>
+            
+            <View style={styles.paymentInfoContainer}>
+              <Text style={styles.paymentInfoText}>
+                💡 All participants must transfer funds to external cards. No in-app wallet transfers allowed.
+              </Text>
             </View>
 
             <TouchableOpacity 

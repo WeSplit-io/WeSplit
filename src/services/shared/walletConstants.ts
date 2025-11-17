@@ -15,12 +15,52 @@ export const RPC_CONFIG = {
   isProduction: getConfig().blockchain.isProduction,
 };
 
-// USDC Configuration
-export const USDC_CONFIG = {
-  mintAddress: getConfig().blockchain.usdcMintAddress,
+// USDC Configuration - Lazy getter to avoid module load issues
+let _USDC_CONFIG: { mintAddress: string; decimals: number; symbol: string } | null = null;
+
+export const getUSDC_CONFIG = () => {
+  if (!_USDC_CONFIG) {
+    try {
+      const config = getConfig();
+      const mintAddress = config?.blockchain?.usdcMintAddress;
+      
+      // Validate mint address
+      if (!mintAddress || typeof mintAddress !== 'string' || mintAddress.length < 32) {
+        // Fallback to devnet USDC
+        const fallbackMint = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+        console.warn('[walletConstants] Invalid USDC mint address, using devnet fallback', { mintAddress });
+        _USDC_CONFIG = {
+          mintAddress: fallbackMint,
+          decimals: 6,
+          symbol: 'USDC',
+        };
+      } else {
+        _USDC_CONFIG = {
+          mintAddress,
+          decimals: 6,
+          symbol: 'USDC',
+        };
+      }
+    } catch (error) {
+      // Ultimate fallback
+      console.error('[walletConstants] Failed to get USDC config, using devnet fallback', error);
+      _USDC_CONFIG = {
+        mintAddress: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
   decimals: 6,
   symbol: 'USDC',
 };
+    }
+  }
+  return _USDC_CONFIG;
+};
+
+// Legacy export for backward compatibility
+export const USDC_CONFIG = new Proxy({} as { mintAddress: string; decimals: number; symbol: string }, {
+  get(target, prop) {
+    const config = getUSDC_CONFIG();
+    return (config as any)[prop];
+  },
+});
 
 // Phantom Deep Link Schemes
 export const PHANTOM_SCHEMES = [

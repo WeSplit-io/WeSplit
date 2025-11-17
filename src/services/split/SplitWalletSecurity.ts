@@ -567,6 +567,76 @@ export class SplitWalletSecurity {
   }
 
   /**
+   * Keep shared private key participant list in sync (Degen Split)
+   * Ensures newly invited participants can access the shared private key document
+   */
+  static async syncSharedPrivateKeyParticipants(
+    splitWalletId: string,
+    participants: { userId: string; name?: string }[]
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (!splitWalletId) {
+        return {
+          success: false,
+          error: 'splitWalletId is required',
+        };
+      }
+
+      if (!participants || participants.length === 0) {
+        return {
+          success: false,
+          error: 'No participants provided to sync',
+        };
+      }
+
+      const { db } = await import('../../config/firebase/firebase');
+      const { doc, getDoc, setDoc } = await import('firebase/firestore');
+
+      const privateKeyDocRef = doc(db, 'splitWalletPrivateKeys', splitWalletId);
+      const privateKeyDoc = await getDoc(privateKeyDocRef);
+
+      if (!privateKeyDoc.exists()) {
+        logger.warn('Shared private key document not found while syncing participants', {
+          splitWalletId,
+          participantsCount: participants.length
+        }, 'SplitWalletSecurity');
+        return {
+          success: false,
+          error: 'Shared private key record not found for this split wallet',
+        };
+      }
+
+      const sanitizedParticipants = participants.map(participant => ({
+        userId: participant.userId?.toString(),
+        name: participant.name || 'Unknown Participant',
+      }));
+
+      await setDoc(
+        privateKeyDocRef,
+        {
+          participants: sanitizedParticipants,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      logger.info('Shared private key participants synchronized', {
+        splitWalletId,
+        participantsCount: sanitizedParticipants.length
+      }, 'SplitWalletSecurity');
+
+      return { success: true };
+    } catch (error) {
+      console.error('🔍 SplitWalletSecurity: Error syncing shared private key participants:', error);
+      logger.error('Failed to sync shared private key participants', error, 'SplitWalletSecurity');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Delete split wallet private key for all participants (Degen Split)
    * Used when a Degen Split is completed or cancelled
    */
@@ -596,6 +666,24 @@ export class SplitWalletSecurity {
       });
 
       await Promise.all(deletePromises);
+
+      // Remove shared private key record from Firebase to avoid lingering secrets
+      try {
+        const { db } = await import('../../config/firebase/firebase');
+        const { doc, deleteDoc } = await import('firebase/firestore');
+
+        await deleteDoc(doc(db, 'splitWalletPrivateKeys', splitWalletId));
+
+        logger.info('Shared private key record deleted from Firebase', {
+          splitWalletId,
+          participantsCount: participants.length
+        }, 'SplitWalletSecurity');
+      } catch (firebaseError) {
+        logger.warn('Failed to delete shared private key record from Firebase', {
+          splitWalletId,
+          error: firebaseError instanceof Error ? firebaseError.message : String(firebaseError)
+        }, 'SplitWalletSecurity');
+      }
 
       logger.info('Split wallet private key deleted for all participants', {
         splitWalletId,

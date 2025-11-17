@@ -3,7 +3,7 @@
  * Centralized transaction settings for Solana operations with iOS-specific optimizations
  */
 
-import { getNetworkConfig } from '../network/networkConfig';
+import { getNetworkConfig as getIOSNetworkConfig } from '../network/networkConfig';
 
 export interface TransactionConfig {
   retry: {
@@ -28,7 +28,7 @@ export interface TransactionConfig {
 }
 
 // Get platform-specific network configuration
-const networkConfig = getNetworkConfig();
+const networkConfig = getIOSNetworkConfig();
 
 export const TRANSACTION_CONFIG: TransactionConfig = {
   retry: {

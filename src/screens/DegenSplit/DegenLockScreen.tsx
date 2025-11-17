@@ -126,6 +126,28 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       onSplitWalletUpdate: (splitWallet) => {
         console.log('🔍 DegenLockScreen: Real-time wallet update:', splitWallet);
         degenState.setSplitWallet(splitWallet);
+        
+        // CRITICAL FIX: Check if current user has locked their funds when wallet is updated
+        if (splitWallet && currentUser) {
+          const userHasLocked = degenLogic.checkUserLockStatus(splitWallet, currentUser);
+          degenState.setIsLocked(userHasLocked);
+          
+          // Update locked participants list
+          if (userHasLocked) {
+            const userId = currentUser.id.toString();
+            if (!degenState.lockedParticipants.includes(userId)) {
+              degenState.setLockedParticipants([...degenState.lockedParticipants, userId]);
+            }
+          } else {
+            const userId = currentUser.id.toString();
+            degenState.setLockedParticipants(degenState.lockedParticipants.filter(id => id !== userId));
+          }
+          
+          logger.info('Lock status synced from real-time wallet update', {
+            userId: currentUser.id.toString(),
+            hasLocked: userHasLocked
+          }, 'DegenLockScreen');
+        }
       },
       onError: (error) => {
         console.error('🔍 DegenLockScreen: Real-time error:', error);
@@ -189,8 +211,38 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   useEffect(() => {
     updateCircleProgress();
   }, [degenState.splitWallet, updateCircleProgress]);
+
+  // CRITICAL FIX: Sync isLocked state whenever splitWallet changes
+  // This ensures that when user returns to the screen, isLocked reflects their actual lock status
+  useEffect(() => {
+    if (degenState.splitWallet && currentUser) {
+      const userHasLocked = degenLogic.checkUserLockStatus(degenState.splitWallet, currentUser);
+      
+      // Only update if the state is different to avoid unnecessary re-renders
+      if (degenState.isLocked !== userHasLocked) {
+        degenState.setIsLocked(userHasLocked);
+        
+        // Update locked participants list
+        const userId = currentUser.id.toString();
+        if (userHasLocked) {
+          if (!degenState.lockedParticipants.includes(userId)) {
+            degenState.setLockedParticipants([...degenState.lockedParticipants, userId]);
+          }
+        } else {
+          degenState.setLockedParticipants(degenState.lockedParticipants.filter(id => id !== userId));
+        }
+        
+        logger.info('Lock status synced from wallet change', {
+          userId: currentUser.id.toString(),
+          hasLocked: userHasLocked,
+          walletId: degenState.splitWallet?.id
+        }, 'DegenLockScreen');
+      }
+    }
+  }, [degenState.splitWallet, currentUser?.id, degenLogic]);
   
   const insets = useSafeAreaInsets();
+  const isResultReady = degenState.splitWallet?.status === 'spinning_completed' || degenState.splitWallet?.status === 'completed';
 
   // Early return if essential data is missing
   if (!splitData && !billData) {
@@ -315,16 +367,22 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
 
     // CRITICAL FIX: Reload wallet if participants change (e.g., after inviting users)
     // This ensures wallet is refreshed when new participants are added
-    const reloadWallet = async () => {
+        const reloadWallet = async () => {
       if (degenState.splitWallet && splitData && currentUser) {
         try {
           const { SplitWalletService } = await import('../../services/split');
           const walletResult = await SplitWalletService.getSplitWallet(degenState.splitWallet.id);
           if (walletResult.success && walletResult.wallet) {
             degenState.setSplitWallet(walletResult.wallet);
+            
+            // CRITICAL FIX: Check lock status when wallet is reloaded
+            const userHasLocked = degenLogic.checkUserLockStatus(walletResult.wallet, currentUser);
+            degenState.setIsLocked(userHasLocked);
+            
             console.log('🔍 DegenLockScreen: Wallet reloaded after participant change:', {
               walletId: walletResult.wallet.id,
-              participantsCount: walletResult.wallet.participants.length
+              participantsCount: walletResult.wallet.participants.length,
+              userHasLocked
             });
           }
         } catch (error) {
@@ -472,8 +530,23 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
-                style={styles.privateKeyButton}
+                style={[
+                  styles.privateKeyButton,
+                  // CRITICAL: Disable if user has already withdrawn (single withdrawal rule)
+                  (() => {
+                    const currentUserParticipant = degenState.splitWallet?.participants.find(
+                      p => p.userId === currentUser?.id.toString()
+                    );
+                    return currentUserParticipant?.status === 'paid' ? { opacity: 0.5 } : {};
+                  })()
+                ]}
                 onPress={handleShowPrivateKey}
+                disabled={(() => {
+                  const currentUserParticipant = degenState.splitWallet?.participants.find(
+                    p => p.userId === currentUser?.id.toString()
+                  );
+                  return currentUserParticipant?.status === 'paid';
+                })()}
               >
                 <Image
                   source={require('../../../assets/eye-icon.png')}
@@ -530,7 +603,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           />
         ) : degenLogic.isCurrentUserCreator(currentUser, splitData) ? (
           // Creator and locked - show waiting or start spinning
-          degenState.splitWallet?.status === 'spinning_completed' ? (
+          isResultReady ? (
             // Roulette completed - show view results button
             <Button
               title="View Results"
@@ -577,7 +650,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           )
         ) : (
           // Not creator but locked - show waiting message or view results
-          degenState.splitWallet?.status === 'spinning_completed' ? (
+          isResultReady ? (
             // Roulette completed - show view results button
             <Button
               title="🎯 View Results"
@@ -680,6 +753,13 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
               size="small"
               icon="Key"
               iconPosition="left"
+              disabled={(() => {
+                // CRITICAL: Disable if user has already withdrawn (single withdrawal rule)
+                const currentUserParticipant = degenState.splitWallet?.participants.find(
+                  p => p.userId === currentUser?.id.toString()
+                );
+                return currentUserParticipant?.status === 'paid';
+              })()}
             />
           </View>
         )}

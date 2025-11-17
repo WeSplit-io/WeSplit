@@ -453,6 +453,32 @@ export class SplitWalletManagement {
         // Don't fail the update if sync fails, but log the error
       }
 
+      // Keep shared private key access in sync for Degen splits
+      if (currentWallet.splitType === 'degen') {
+        try {
+          const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+          const syncResult = await SplitWalletSecurity.syncSharedPrivateKeyParticipants(
+            splitWalletId,
+            updatedParticipants.map(participant => ({
+              userId: participant.userId,
+              name: participant.name || 'Unknown Participant',
+            }))
+          );
+
+          if (!syncResult.success) {
+            logger.warn('Failed to sync shared private key participants for Degen split', {
+              splitWalletId,
+              error: syncResult.error
+            }, 'SplitWalletManagement');
+          }
+        } catch (securityError) {
+          logger.error('Error syncing shared private key participants', {
+            splitWalletId,
+            error: securityError instanceof Error ? securityError.message : String(securityError)
+          }, 'SplitWalletManagement');
+        }
+      }
+
       const updatedWallet: SplitWallet = {
         ...currentWallet,
         ...updatedWalletData,

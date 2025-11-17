@@ -138,6 +138,9 @@ module.exports = {
       EXPO_PUBLIC_TWITTER_CLIENT_ID: process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID,
       
       // Solana Configuration
+      // Primary network selection (recommended)
+      EXPO_PUBLIC_NETWORK: process.env.EXPO_PUBLIC_NETWORK,
+      // Legacy network configuration (backward compatibility)
       EXPO_PUBLIC_HELIUS_API_KEY: process.env.EXPO_PUBLIC_HELIUS_API_KEY,
       EXPO_PUBLIC_FORCE_MAINNET: process.env.EXPO_PUBLIC_FORCE_MAINNET || 'false',
       EXPO_PUBLIC_DEV_NETWORK: process.env.EXPO_PUBLIC_DEV_NETWORK || 'devnet',

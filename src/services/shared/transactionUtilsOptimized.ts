@@ -76,6 +76,11 @@ export class OptimizedTransactionUtils {
     const TRANSACTION_CONFIG = transactionConfigModule.TRANSACTION_CONFIG;
     const logger = loggerModule.logger;
 
+    // Use connection factory for network-aware connection management
+    const connectionFactoryModule = await import('../blockchain/connection');
+    this.connection = await connectionFactoryModule.getSolanaConnection();
+    
+    // Get RPC endpoints from config for rotation logic
     this.rpcEndpoints = getConfig().blockchain.rpcEndpoints || [getConfig().blockchain.rpcUrl];
     
     // Log RPC endpoint configuration for debugging
@@ -89,55 +94,25 @@ export class OptimizedTransactionUtils {
                  .replace(/api-key=[^&]+/, 'api-key=***');
       }),
       network: getConfig().blockchain.network,
-      note: 'Using optimized RPC endpoints with rotation and rate limit handling'
+      note: 'Using connection factory with optimized RPC endpoints and rotation'
     }, 'OptimizedTransactionUtils');
-    
-    this.connection = await this.createConnection();
     this.initialized = true;
   }
 
+  /**
+   * Create connection using connection factory
+   * Uses network-aware connection factory with custom transaction timeout options
+   */
   private async createConnection(): Promise<Connection> {
-    const solanaWeb3 = await loadModule('solana-web3');
-    const configModule = await loadModule('config');
+    // Use connection factory for network-aware connections
+    const connectionFactoryModule = await import('../blockchain/connection');
     const transactionConfigModule = await loadModule('transactionConfig');
-    
-    const { Connection } = solanaWeb3;
-    const getConfig = configModule.getConfig;
     const TRANSACTION_CONFIG = transactionConfigModule.TRANSACTION_CONFIG;
-
-    const currentEndpoint = this.rpcEndpoints[this.currentEndpointIndex];
     
-    const connectionOptions: any = {
-      commitment: getConfig().blockchain.commitment,
+    // Get connection with custom options for transaction timeouts
+    return connectionFactoryModule.createSolanaConnection({
       confirmTransactionInitialTimeout: TRANSACTION_CONFIG.timeout.transaction,
-      disableRetryOnRateLimit: false,
-      httpHeaders: {
-        'User-Agent': 'WeSplit/1.0',
-        'Connection': 'keep-alive',
-      },
-      fetch: (url: string, options: any) => {
-        const controller = new AbortController();
-        const timeoutDuration = url.includes('getLatestBlockhash') ? 30000 : TRANSACTION_CONFIG.timeout.connection;
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-        }, timeoutDuration);
-        
-        return fetch(url, {
-          ...options,
-          signal: controller.signal,
-        }).finally(() => {
-          clearTimeout(timeoutId);
-        });
-      },
-    };
-
-    // Only add wsEndpoint if it's configured and valid to avoid WebSocket errors
-    const wsUrl = getConfig().blockchain.wsUrl;
-    if (wsUrl && wsUrl.trim() !== '') {
-      connectionOptions.wsEndpoint = wsUrl;
-    }
-
-    return new Connection(currentEndpoint, connectionOptions);
+    });
   }
 
   /**
@@ -540,7 +515,14 @@ export class OptimizedTransactionUtils {
   public async getConnection(): Promise<Connection> {
     await this.initialize();
     if (!this.connection) {
-      this.connection = await this.createConnection();
+      // Use connection factory for network-aware connection
+      const connectionFactoryModule = await import('../blockchain/connection');
+      const transactionConfigModule = await loadModule('transactionConfig');
+      const TRANSACTION_CONFIG = transactionConfigModule.TRANSACTION_CONFIG;
+      
+      this.connection = await connectionFactoryModule.createSolanaConnection({
+        confirmTransactionInitialTimeout: TRANSACTION_CONFIG.timeout.transaction,
+      });
     }
     return this.connection;
   }

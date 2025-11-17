@@ -6,14 +6,80 @@ import { getConfig } from '../unified';
 export const USDC_DECIMALS = 6;
 export const SOL_DECIMALS = 9;
 
+// Known valid USDC mint addresses
+const DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'; // Valid devnet USDC
+const MAINNET_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // Valid mainnet USDC
+
 // USDC Mint Address as PublicKey - Network-aware
 export const getUSDC_MINT = (): PublicKey => {
+  try {
   const config = getConfig();
-  return new PublicKey(config.blockchain.usdcMintAddress);
+    const mintAddress = config?.blockchain?.usdcMintAddress;
+    
+    // Validate mint address format
+    if (!mintAddress || typeof mintAddress !== 'string' || mintAddress.length < 32) {
+      // Fallback to devnet USDC if config not ready or invalid
+      console.warn('[tokens] Network config not ready or invalid, using devnet USDC fallback', {
+        mintAddress,
+        hasConfig: !!config,
+        hasBlockchain: !!config?.blockchain,
+      });
+      return new PublicKey(DEVNET_USDC_MINT);
+    }
+    
+    try {
+      return new PublicKey(mintAddress);
+    } catch (pubkeyError) {
+      // Invalid public key format - try to determine network and use appropriate fallback
+      const network = config?.blockchain?.network || 'devnet';
+      const fallbackMint = network === 'mainnet' ? MAINNET_USDC_MINT : DEVNET_USDC_MINT;
+      console.warn('[tokens] Invalid USDC mint address format, using fallback', {
+        mintAddress,
+        network,
+        fallbackMint,
+        error: pubkeyError,
+      });
+      return new PublicKey(fallbackMint);
+    }
+  } catch (error) {
+    // Fallback to devnet USDC if config fails
+    console.warn('[tokens] Failed to get network config, using devnet USDC fallback', error);
+    return new PublicKey(DEVNET_USDC_MINT);
+  }
 };
 
 // Legacy export for backward compatibility - use getUSDC_MINT() instead
-export const USDC_MINT = getUSDC_MINT();
+// Lazy initialization to avoid module load issues
+let _USDC_MINT: PublicKey | null = null;
+const getUSDC_MINT_Lazy = (): PublicKey => {
+  if (!_USDC_MINT) {
+    try {
+      _USDC_MINT = getUSDC_MINT();
+    } catch (error) {
+      // Ultimate fallback if everything fails
+      console.error('[tokens] Critical: Failed to initialize USDC_MINT, using hardcoded devnet fallback', error);
+      _USDC_MINT = new PublicKey(DEVNET_USDC_MINT);
+    }
+  }
+  return _USDC_MINT;
+};
+
+// Export as getter object to maintain backward compatibility
+export const USDC_MINT = new Proxy({} as PublicKey, {
+  get(target, prop) {
+    const mint = getUSDC_MINT_Lazy();
+    const value = (mint as any)[prop];
+    return typeof value === 'function' ? value.bind(mint) : value;
+  },
+  getOwnPropertyDescriptor() {
+    const mint = getUSDC_MINT_Lazy();
+    return { enumerable: true, configurable: true, value: mint };
+  },
+  ownKeys() {
+    const mint = getUSDC_MINT_Lazy();
+    return Object.keys(mint);
+  },
+}) as PublicKey;
 export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112'); // Wrapped SOL
 
 export const getTOKEN_CONFIG = () => {

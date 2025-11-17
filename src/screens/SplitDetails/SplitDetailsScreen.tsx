@@ -769,35 +769,33 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       if (!currentSplitData || !currentSplitData.splitType) {return;}
 
       // Only redirect if the split is already active/locked and we're not from a notification
-      if (currentSplitData.status === 'active' || currentSplitData.status === 'locked') {
-        // Split is already active/locked, redirecting to appropriate screen
+      const splitStatus = currentSplitData.status;
+      const shouldRedirectFair = currentSplitData.splitType === 'fair' && (splitStatus === 'active' || splitStatus === 'locked');
+      const degenStatuses = ['pending', 'active', 'locked', 'spinning', 'spinning_completed', 'completed'];
+      const shouldRedirectDegen = currentSplitData.splitType === 'degen' && degenStatuses.includes(splitStatus as string);
 
-        // Small delay to ensure UI is ready
+      if (shouldRedirectFair || shouldRedirectDegen) {
+        // Split is already active in a downstream flow, redirect accordingly
         setTimeout(() => {
-          if (currentSplitData.splitType === 'fair') {
+          if (shouldRedirectFair) {
             navigation.navigate('FairSplit', {
               splitData: currentSplitData,
-              billData: billData,
+              billData,
               processedBillData: currentProcessedBillData,
-              splitWallet: splitWallet,
-              isFromNotification: isFromNotification,
-              notificationId: notificationId
+              splitWallet,
+              isFromNotification,
+              notificationId
             });
-          } else if (currentSplitData.splitType === 'degen') {
-            // Degen Split is disabled - redirect to FairSplit instead
-            logger.warn('Degen Split is disabled, redirecting to FairSplit', null, 'SplitDetailsScreen');
-            Alert.alert(
-              'Degen Split Disabled',
-              'Degen Split is currently disabled. Redirecting to Fair Split.',
-              [{ text: 'OK' }]
-            );
-            navigation.navigate('FairSplit', {
+          } else if (shouldRedirectDegen) {
+            navigation.navigate('DegenLock', {
               splitData: currentSplitData,
-              billData: billData,
+              billData,
               processedBillData: currentProcessedBillData,
-              splitWallet: splitWallet,
-              isFromNotification: isFromNotification,
-              notificationId: notificationId
+              splitWallet,
+              participants: currentSplitData.participants,
+              totalAmount: currentSplitData.totalAmount || parseFloat(totalAmount),
+              isFromNotification,
+              notificationId
             });
           }
         }, 100);
@@ -805,7 +803,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     };
 
     checkSplitStateAndRedirect();
-  }, [currentSplitData, navigation, billData, currentProcessedBillData, splitWallet, isFromNotification, notificationId, isActuallyNewBill, isActuallyManualCreation]);
+  }, [currentSplitData, navigation, billData, currentProcessedBillData, splitWallet, isFromNotification, notificationId, isActuallyNewBill, isActuallyManualCreation, totalAmount]);
 
   // Track if loadSplitData is currently running to prevent duplicate calls
   const isLoadingSplitDataRef = useRef(false);
@@ -1555,10 +1553,6 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Private key modal functions moved to FairSplit/DegenLock screens
 
   const handleSplitTypeSelection = async (type: 'fair' | 'degen') => {
-    // Degen split is disabled - do nothing when clicked
-    if (type === 'degen') {
-      return;
-    }
     setSelectedSplitType(type);
   };
 
@@ -1628,9 +1622,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               // NO splitWallet passed - will be created in FairSplit
             });
           } else if (selectedSplitType === 'degen') {
-            // Degen Split is disabled
-            Alert.alert('Degen Split Disabled', 'Degen Split is currently disabled. Please use Fair Split instead.');
-            return;
+            navigation.navigate('DegenLock', {
+              splitData: updateResult.split,
+              billData,
+              processedBillData: currentProcessedBillData,
+              participants: updateResult.split?.participants,
+              totalAmount: updateResult.split?.totalAmount || parseFloat(totalAmount),
+              splitWallet,
+            });
           }
         } else {
           logger.error('Failed to update split', { error: updateResult.error }, 'SplitDetailsScreen');
@@ -1734,9 +1733,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               // NO splitWallet passed - will be created in FairSplit
             });
           } else if (selectedSplitType === 'degen') {
-            // Degen Split is disabled
-            Alert.alert('Degen Split Disabled', 'Degen Split is currently disabled. Please use Fair Split instead.');
-            return;
+            navigation.navigate('DegenLock', {
+              splitData: createResult.split,
+              billData,
+              processedBillData: currentProcessedBillData,
+              participants: createResult.split?.participants,
+              totalAmount: createResult.split?.totalAmount || parseFloat(totalAmount),
+            });
           }
         } else {
           logger.error('Failed to create split', { error: createResult.error }, 'SplitDetailsScreen');
@@ -2184,29 +2187,23 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             <Text style={styles.splitOptionDescription}>Split the bill equally among all participants</Text>
           </TouchableOpacity>
 
-          {/* Degen Split Option - DISABLED (Visible but locked) */}
+          {/* Degen Split Option */}
           <TouchableOpacity
             style={[
               styles.splitOption,
-              styles.splitOptionDisabled,
               selectedSplitType === 'degen' && styles.splitOptionSelected
             ]}
             onPress={() => handleSplitTypeSelection('degen')}
-            disabled={true}
-            activeOpacity={1}
           >
             <Image
               source={require('../../../assets/degen-split-icon.png')}
-              style={[styles.splitOptionIconImage, { opacity: 0.5 }]}
+              style={styles.splitOptionIconImage}
             />
-            <Text style={[styles.splitOptionTitle, { opacity: 0.5 }]}>Degen Split</Text>
-            <Text style={[styles.splitOptionDescription, { opacity: 0.5 }]}>Winner takes all - high risk, high reward</Text>
-            <View style={[styles.riskyModeLabel, { opacity: 0.5 }]}>
+            <Text style={styles.splitOptionTitle}>Degen Split</Text>
+            <Text style={styles.splitOptionDescription}>Winner takes all – high risk, high reward. Shared private key for every participant.</Text>
+            <View style={styles.riskyModeLabel}>
               <Text style={styles.riskyModeIcon}>🔥</Text>
               <Text style={styles.riskyModeText}>Risky</Text>
-            </View>
-            <View style={[styles.riskyModeLabel, { top: 'auto', bottom: 5, backgroundColor: colors.textSecondary }]}>
-              <Text style={[styles.riskyModeText, { color: colors.white }]}>Coming Soon</Text>
             </View>
           </TouchableOpacity>
         </View>

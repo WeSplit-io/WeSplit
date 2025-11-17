@@ -531,11 +531,19 @@ class ConsolidatedBillAnalysisService {
       dataKeys: Object.keys(aiData)
     }, 'BillAnalysis');
 
-    // Optimized item processing
-    const items = (aiData.items || []).map((item: any, index: number) => ({
-      name: item.name || `Item ${index + 1}`,
-      price: item.price || 0
-    }));
+    // Optimized item processing - handle both Firebase function format and legacy format
+    const items = (aiData.items || []).map((item: any, index: number) => {
+      // Firebase function returns: { description, quantity, unit_price, total_price, tax_rate }
+      // Legacy format: { name, price }
+      const itemName = item.description || item.name || `Item ${index + 1}`;
+      // Use total_price if available, otherwise unit_price, otherwise price
+      const itemPrice = item.total_price || item.unit_price || item.price || 0;
+      
+      return {
+        name: itemName,
+        price: itemPrice
+      };
+    });
 
     // Optimized total calculation with multiple fallbacks
     const subtotal = aiData.totals?.subtotal || aiData.subtotal || 0;
@@ -561,10 +569,16 @@ class ConsolidatedBillAnalysisService {
       }, 'BillAnalysis');
     }
 
+    // Extract currency from transaction or top level (Firebase function format)
+    const currency = aiData.transaction?.currency || aiData.currency || "USD";
+    
+    // Extract country from transaction or top level
+    const country = aiData.transaction?.country || aiData.country || "USA";
+    
     return {
       category: aiData.category || "Food & Drinks",
-      country: aiData.country || "USA",
-      currency: aiData.currency || "USD",
+      country: country,
+      currency: currency,
       store: {
         name: aiData.merchant?.name || aiData.merchant || "Unknown Store",
         location: {
@@ -579,7 +593,7 @@ class ConsolidatedBillAnalysisService {
       transaction: {
         date: aiData.transaction?.date || new Date().toISOString().split('T')[0],
         time: aiData.transaction?.time || new Date().toTimeString().split(' ')[0],
-        order_id: aiData.transaction?.order_id || this.generateBillId(),
+        order_id: aiData.transaction?.receipt_number || aiData.transaction?.order_id || this.generateBillId(),
         employee: aiData.transaction?.employee || "Unknown",
         items,
         sub_total: subtotal,

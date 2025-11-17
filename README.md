@@ -32,6 +32,37 @@ need with the speed and affordability of Solana.
 - **Request 1:1** - Request money to a friend in one click
 - **Instant Settlement** – No intermediaries, no delays, no friction
 - **Cross-chain Ready** – Built on Solana today, designed for multi-chain tomorrow
+
+## Network Configuration
+
+WeSplit supports both Solana devnet (for development) and mainnet (for production).
+
+### Quick Start
+
+**Local Development (Devnet):**
+```bash
+# Default - uses devnet automatically
+npm start
+
+# Or explicitly
+EXPO_PUBLIC_NETWORK=devnet npm start
+```
+
+**Production Build (Mainnet):**
+```bash
+# Production builds default to mainnet
+eas build --profile production
+```
+
+### Environment Variables
+
+**Client App:**
+- `EXPO_PUBLIC_NETWORK` - Set to `devnet` or `mainnet` (defaults: devnet in dev, mainnet in production)
+
+**Backend (Firebase Functions):**
+- `SOLANA_NETWORK` - Must match client network (`devnet` or `mainnet`)
+
+See [NETWORK_CONFIGURATION.md](./NETWORK_CONFIGURATION.md) for complete documentation.
 ## Team
 
 WeSplit is built by a team of five founders, including four

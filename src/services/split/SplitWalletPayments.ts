@@ -18,6 +18,7 @@ import { USDC_CONFIG } from '../shared/walletConstants';
 import { processUsdcTransfer } from '../blockchain/transaction/transactionSigningService';
 import { VersionedTransaction } from '@solana/web3.js';
 import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS } from '../shared/blockhashUtils';
+import { NetworkValidator } from '../blockchain/network/networkValidator';
 
 // Helper function to verify transaction on blockchain
 async function verifyTransactionOnBlockchain(transactionSignature: string): Promise<boolean> {
@@ -915,6 +916,9 @@ async function executeFastTransaction(
     const config = getConfig();
     const isMainnet = config.blockchain.network === 'mainnet';
     
+    // Validate network for payment operations
+    NetworkValidator.validateNetworkForOperation('Split wallet payment', isMainnet);
+    
     let confirmed = false;
     let attempts = 0;
     // Mainnet needs more time - transactions can take 30+ seconds
@@ -1529,6 +1533,9 @@ async function executeDegenSplitTransaction(
     const { getConfig: getConfigForDegen } = await import('../../config/unified');
     const degenConfig = getConfigForDegen();
     const isMainnetDegen = degenConfig.blockchain.network === 'mainnet';
+    
+        // Validate network for degen split operations
+        NetworkValidator.validateNetworkForOperation('Degen split payment', isMainnetDegen);
     
     const maxAttempts = isMainnetDegen ? 40 : 30; // 40 attempts for mainnet (40 seconds), 30 for devnet (30 seconds)
     const waitTime = isMainnetDegen ? 2000 : 1000; // 2 seconds for mainnet, 1 second for devnet
@@ -2598,6 +2605,67 @@ export class SplitWalletPayments {
 
       const wallet = walletResult.wallet;
 
+      // CRITICAL: Validate that degenLoser exists (the selected participant is the LOSER)
+      // Winners are all participants EXCEPT the degenLoser
+      // Check degenLoser first, fallback to degenWinner for backward compatibility
+      const loserInfo = wallet.degenLoser || wallet.degenWinner;
+      
+      if (!loserInfo) {
+        return {
+          success: false,
+          error: 'No loser has been selected for this degen split yet. Please wait for the roulette to complete.',
+        };
+      }
+
+      // CRITICAL: If the user is the loser, they cannot claim winner payout
+      if (loserInfo.userId === winnerUserId) {
+        logger.warn('Attempted winner payout by loser participant', {
+          splitWalletId,
+          attemptedWinnerUserId: winnerUserId,
+          loserUserId: loserInfo.userId,
+          loserName: loserInfo.name
+        }, 'SplitWalletPayments');
+        
+        return {
+          success: false,
+          error: `You are the loser of this degen split. Please use the "Transfer to External Card" option to transfer your funds.`,
+        };
+      }
+
+      // CRITICAL: Validate that the user is actually a participant
+      const userParticipant = wallet.participants.find(p => p.userId === winnerUserId);
+      if (!userParticipant) {
+        return {
+          success: false,
+          error: 'You are not a participant in this degen split.',
+        };
+      }
+
+      // CRITICAL FIX: Check if any participant is already marked as paid (winner)
+      // This prevents multiple winners from being processed
+      const existingPaidParticipants = wallet.participants.filter(p => p.status === 'paid');
+      if (existingPaidParticipants.length > 0) {
+        const paidParticipant = existingPaidParticipants[0];
+        if (!paidParticipant) {
+          // This shouldn't happen, but handle it gracefully
+          logger.warn('Found paid participants array but first element is undefined', {
+            splitWalletId,
+            existingPaidParticipantsLength: existingPaidParticipants.length
+          }, 'SplitWalletPayments');
+        } else if (paidParticipant.userId !== winnerUserId) {
+          return {
+            success: false,
+            error: `Another participant (${paidParticipant.name}) has already been marked as the winner.`,
+          };
+        } else {
+          // If it's the same user, they've already claimed
+          return {
+            success: false,
+            error: 'Winner has already claimed their funds',
+          };
+        }
+      }
+
       // Reconcile any pending funding transactions before payout to ensure balance is current
       try {
         await this.reconcilePendingTransactions(splitWalletId);
@@ -2613,8 +2681,8 @@ export class SplitWalletPayments {
       }
 
       if (winnerParticipant.status === 'paid') {
-            return {
-              success: false,
+        return {
+          success: false,
           error: 'Winner has already claimed their funds',
         };
       }
@@ -2633,9 +2701,13 @@ export class SplitWalletPayments {
         if (splitResult.success && splitResult.split) {
           const split = splitResult.split;
           
-          // Award rewards for all participants (winner and losers)
+          // Award rewards for all participants (winner and loser)
+          // CRITICAL: Get the actual loser ID from degenLoser (or degenWinner for backward compatibility)
+          const actualLoserId = wallet.degenLoser?.userId || wallet.degenWinner?.userId;
+          
           for (const participant of wallet.participants) {
-            const isWinner = participant.userId === winnerUserId;
+            // CRITICAL: isWinner = true if participant is NOT the loser
+            const isWinner = actualLoserId ? participant.userId !== actualLoserId : participant.userId === winnerUserId;
             await splitRewardsService.awardDegenSplitParticipation({
               userId: participant.userId,
               splitId: split.id,
@@ -2735,18 +2807,29 @@ export class SplitWalletPayments {
         // Don't fail the transaction if database save fails
       }
 
-      // Update winner participant status to 'paid' and mark wallet as completed
-      const updatedParticipants = wallet.participants.map(p => 
-        p.userId === winnerUserId 
-          ? { 
-              ...p,
-              status: 'paid' as const,
-              amountPaid: actualTotalAmount, // Winner gets the total amount from all participants
-              transactionSignature: transactionResult.signature,
-              paidAt: new Date().toISOString()
-            }
-          : p
-      );
+      // CRITICAL FIX: Update winner participant status to 'paid' and ensure all others remain as 'locked' (losers)
+      // This ensures there is always exactly 1 winner and all others are losers
+      const updatedParticipants = wallet.participants.map(p => {
+        if (p.userId === winnerUserId) {
+          // Winner gets paid status
+          return { 
+            ...p,
+            status: 'paid' as const,
+            amountPaid: actualTotalAmount, // Winner gets the total amount from all participants
+            transactionSignature: transactionResult.signature,
+            paidAt: new Date().toISOString()
+          };
+        } else {
+          // CRITICAL: All non-winners must remain as 'locked' (losers)
+          // They will need to claim their refund separately via processDegenLoserPayment
+          // Ensure their status is 'locked' and not 'paid'
+          return {
+            ...p,
+            status: p.status === 'paid' ? 'locked' as const : p.status, // Force non-winners to be 'locked'
+            // Don't change amountPaid for losers - they keep their locked amount
+          };
+        }
+      });
 
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
       await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
@@ -2756,6 +2839,8 @@ export class SplitWalletPayments {
         lastUpdated: new Date().toISOString(),
         finalTransactionSignature: transactionResult.signature
       });
+
+      await this.cleanupSharedPrivateKeyIfAllSettled(splitWalletId, updatedParticipants);
 
       logger.info('✅ Degen winner payout completed successfully', {
           splitWalletId,
@@ -2781,21 +2866,25 @@ export class SplitWalletPayments {
   }
 
   /**
-   * Process degen loser payment (refund) - Fast Mode
+   * Process degen loser payment - Sends funds directly to external linked card or wallet
+   * CRITICAL: Losers withdraw to external cards/wallets (not in-app wallet)
+   * Winners withdraw to in-app wallet
    */
   static async processDegenLoserPayment(
     splitWalletId: string,
     loserUserId: string,
     totalAmount: number,
     description?: string,
+    cardId?: string, // Optional: KAST card ID to send funds to
     fastMode: boolean = true
   ): Promise<PaymentResult> {
     try {
-      logger.info('🚀 Processing degen loser payment', {
+      logger.info('🚀 Processing degen loser payment to external card/wallet', {
         splitWalletId,
         loserUserId,
         totalAmount,
-        description
+        description,
+        cardId
       }, 'SplitWalletPayments');
 
       // Get split wallet
@@ -2809,60 +2898,171 @@ export class SplitWalletPayments {
 
       const wallet = walletResult.wallet;
 
+      // CRITICAL: Validate that degenLoser exists and matches the loserUserId
+      // This ensures only the actual loser can transfer to external card
+      const loserInfo = wallet.degenLoser || wallet.degenWinner; // Fallback for backward compatibility
+      
+      if (!loserInfo) {
+        return {
+          success: false,
+          error: 'No loser has been selected for this degen split yet. Please wait for the roulette to complete.',
+        };
+      }
+
+      // CRITICAL: Validate that the requesting user is actually the loser
+      if (loserInfo.userId !== loserUserId) {
+        logger.warn('Attempted loser payment by non-loser participant', {
+          splitWalletId,
+          attemptedLoserUserId: loserUserId,
+          actualLoserUserId: loserInfo.userId,
+          loserName: loserInfo.name
+        }, 'SplitWalletPayments');
+        
+        return {
+          success: false,
+          error: `You are not the loser of this degen split. The loser is ${loserInfo.name}. Winners should use the "Claim" option to withdraw funds to their in-app wallet.`,
+        };
+      }
+
       // Find loser participant
       const loserParticipant = wallet.participants.find(p => p.userId === loserUserId);
       if (!loserParticipant) {
         return {
           success: false,
-          error: 'Loser not found in split wallet participants',
+          error: 'Participant not found in split wallet',
         };
       }
 
       if (loserParticipant.status === 'paid') {
         return {
           success: false,
-          error: 'Loser has already received their refund',
+          error: 'You have already transferred your funds to your external card or wallet',
         };
       }
 
-      // Get user wallet
-        const { walletService } = await import('../blockchain/wallet');
-        const userWallet = await walletService.getWalletInfo(loserUserId);
-        if (!userWallet) {
+      // CRITICAL: Loser gets back their own locked amount, not the total bill amount
+      // The loser only receives what they originally locked (their contribution)
+      const loserLockedAmount = loserParticipant.amountPaid || loserParticipant.amountOwed || totalAmount;
+      
+      logger.info('Loser payment amount calculation', {
+        splitWalletId,
+        loserUserId,
+        passedTotalAmount: totalAmount,
+        loserLockedAmount,
+        participantAmountPaid: loserParticipant.amountPaid,
+        participantAmountOwed: loserParticipant.amountOwed
+      }, 'SplitWalletPayments');
+
+      // CRITICAL: Get user's linked external destination (KAST card or external wallet)
+      // Funds must go to external card/wallet, not in-app wallet
+      let destinationAddress: string;
+      
+      if (cardId) {
+        // Use provided card ID
+        const { ExternalCardService } = await import('../integrations/external/ExternalCardService');
+        const cardInfo = await ExternalCardService.getCardInfo(cardId);
+        
+        if (!cardInfo.success || !cardInfo.card) {
           return {
             success: false,
-          error: 'User wallet not found. Please ensure you have a wallet set up.',
-        };
+            error: 'External card not found. Please link a KAST card first.',
+          };
+        }
+        
+        destinationAddress = cardInfo.card.identifier; // KAST card wallet address
+      } else {
+        // CRITICAL: Get user's linked external destinations (KAST cards OR external wallets)
+        // Losers can withdraw to either external cards or external wallets
+        const { LinkedWalletService } = await import('../blockchain/wallet/LinkedWalletService');
+        const linkedDestinations = await LinkedWalletService.getLinkedDestinations(loserUserId);
+        
+        // Prefer KAST cards, but fallback to external wallets if no cards available
+        let selectedDestination: { address: string; id: string; type: string; name?: string } | null = null;
+        
+        if (linkedDestinations.kastCards.length > 0) {
+          // Use first KAST card if available
+          const firstCard = linkedDestinations.kastCards[0];
+          if (firstCard) {
+            const cardAddress = firstCard.address || firstCard.identifier;
+            if (cardAddress) {
+              selectedDestination = {
+                address: cardAddress,
+                id: firstCard.id,
+                type: 'kast',
+                name: firstCard.label || 'KAST Card'
+              };
+              logger.info('Using first linked KAST card for loser payment', {
+                cardId: firstCard.id,
+                cardAddress: cardAddress
+              }, 'SplitWalletPayments');
+            }
+          }
+        } else if (linkedDestinations.externalWallets.length > 0) {
+          // Fallback to external wallet if no KAST cards
+          const firstWallet = linkedDestinations.externalWallets[0];
+          if (firstWallet) {
+            const walletAddress = firstWallet.address || firstWallet.identifier;
+            if (walletAddress) {
+              selectedDestination = {
+                address: walletAddress,
+                id: firstWallet.id,
+                type: 'external',
+                name: firstWallet.label || 'External Wallet'
+              };
+              logger.info('Using first linked external wallet for loser payment', {
+                walletId: firstWallet.id,
+                walletAddress: walletAddress
+              }, 'SplitWalletPayments');
+            }
+          }
+        }
+        
+        if (!selectedDestination) {
+          return {
+            success: false,
+            error: 'No external card or wallet linked. Please link a KAST card or external wallet in Settings to transfer your funds.',
+          };
+        }
+        
+        destinationAddress = selectedDestination.address;
+        
+        logger.info('Selected destination for loser payment', {
+          destinationType: selectedDestination.type,
+          destinationId: selectedDestination.id,
+          destinationName: selectedDestination.name,
+          destinationAddress: destinationAddress
+        }, 'SplitWalletPayments');
       }
 
       // Get the private key using degen split specific logic
       const privateKeyResult = await this.getSplitWalletPrivateKeyPrivate(splitWalletId, loserUserId);
       
-        if (!privateKeyResult.success || !privateKeyResult.privateKey) {
-          return {
-            success: false,
+      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        return {
+          success: false,
           error: privateKeyResult.error || 'Failed to retrieve private key for degen split withdrawal',
         };
       }
 
-      // Execute transaction using fast or standard method based on fastMode
+      // CRITICAL: Execute transaction to external card/wallet address (not in-app wallet)
+      // Loser gets their own locked amount, not the total
       const transactionResult = fastMode 
         ? await executeFastTransaction(
             wallet.walletAddress,
             privateKeyResult.privateKey,
-            userWallet.address,
-            totalAmount,
+            destinationAddress, // Send to external card/wallet, not in-app wallet
+            loserLockedAmount, // Loser gets their own locked amount
             wallet.currency,
-            description || `Degen Split loser refund for ${loserUserId}`,
+            description || `Degen Split loser transfer to external card/wallet for ${loserUserId}`,
             'withdrawal'
           )
         : await executeDegenSplitTransaction(
             wallet.walletAddress,
             privateKeyResult.privateKey,
-            userWallet.address,
-            totalAmount,
+            destinationAddress, // Send to external card/wallet, not in-app wallet
+            loserLockedAmount, // Loser gets their own locked amount
             wallet.currency,
-            description || `Degen Split loser refund for ${loserUserId}`,
+            description || `Degen Split loser transfer to external card/wallet for ${loserUserId}`,
             'withdrawal'
           );
       
@@ -2886,13 +3086,13 @@ export class SplitWalletPayments {
         
         await saveTransactionAndAwardPoints({
           userId: loserUserId,
-          toAddress: userWallet.address,
-          amount: totalAmount,
+          toAddress: destinationAddress, // External card/wallet address, not in-app wallet
+          amount: loserLockedAmount, // Loser gets their own locked amount
           signature: transactionResult.signature!,
-          transactionType: 'split_wallet_withdrawal',
-          companyFee: 0, // No fee for withdrawals
-          netAmount: totalAmount,
-          memo: description || `Degen Split loser refund for ${loserUserId}`,
+          transactionType: 'external_payment', // Use external_payment type for external transfers
+          companyFee: 0, // Fee handled by external transfer service
+          netAmount: loserLockedAmount, // Loser gets their own locked amount
+          memo: description || `Degen Split loser transfer to external card/wallet for ${loserUserId}`,
           currency: wallet.currency as 'USDC' | 'SOL'
         });
         
@@ -2900,7 +3100,7 @@ export class SplitWalletPayments {
           signature: transactionResult.signature,
           loserUserId,
           splitWalletId,
-          amount: totalAmount
+          amount: loserLockedAmount
         }, 'SplitWalletPayments');
       } catch (saveError) {
         logger.error('❌ Failed to save degen loser refund transaction', saveError, 'SplitWalletPayments');
@@ -2908,14 +3108,16 @@ export class SplitWalletPayments {
       }
 
       // Update loser participant status to 'paid'
+      // CRITICAL: Keep amountPaid as their original locked amount (don't change it)
       const updatedParticipants = wallet.participants.map(p => 
         p.userId === loserUserId 
           ? { 
             ...p,
             status: 'paid' as const,
-              amountPaid: totalAmount,
-              transactionSignature: transactionResult.signature,
-              paidAt: new Date().toISOString()
+            // Keep amountPaid as their original locked amount (loserLockedAmount)
+            // Don't change amountPaid - it represents what they locked
+            transactionSignature: transactionResult.signature,
+            paidAt: new Date().toISOString()
             }
           : p
       );
@@ -2928,17 +3130,19 @@ export class SplitWalletPayments {
         finalTransactionSignature: transactionResult.signature
       });
 
+      await this.cleanupSharedPrivateKeyIfAllSettled(splitWalletId, updatedParticipants);
+
       logger.info('✅ Degen loser payment completed successfully', {
         splitWalletId,
         loserUserId,
-        amount: totalAmount,
+        amount: loserLockedAmount, // Loser gets their own locked amount
         transactionSignature: transactionResult.signature
       }, 'SplitWalletPayments');
 
       return {
         success: true,
         transactionSignature: transactionResult.signature,
-        amount: totalAmount
+        amount: loserLockedAmount // Return the actual amount transferred (loser's locked amount)
       };
 
     } catch (error) {
@@ -3217,6 +3421,40 @@ export class SplitWalletPayments {
 
   static async getFairSplitPrivateKey(splitWalletId: string, creatorId: string): Promise<{ success: boolean; privateKey?: string; error?: string }> {
     return this.getFairSplitPrivateKeyPrivate(splitWalletId, creatorId);
+  }
+
+  private static async cleanupSharedPrivateKeyIfAllSettled(
+    splitWalletId: string,
+    participants: SplitWalletParticipant[]
+  ): Promise<void> {
+    const allParticipantsSettled = participants.length > 0 && participants.every(
+      participant => participant.status === 'paid'
+    );
+
+    if (!allParticipantsSettled) {
+      return;
+    }
+
+    try {
+      const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+      await SplitWalletSecurity.deleteSplitWalletPrivateKeyForAllParticipants(
+        splitWalletId,
+        participants.map(participant => ({
+          userId: participant.userId,
+          name: participant.name || 'Participant'
+        }))
+      );
+
+      logger.info('Shared private key cleaned up after settlement', {
+        splitWalletId,
+        participantsCount: participants.length
+      }, 'SplitWalletPayments');
+    } catch (error) {
+      logger.warn('Failed to cleanup shared private key after settlement', {
+        splitWalletId,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SplitWalletPayments');
+    }
   }
 
   static async getSplitWalletPrivateKey(splitWalletId: string, requesterId: string): Promise<{ success: boolean; privateKey?: string; error?: string }> {

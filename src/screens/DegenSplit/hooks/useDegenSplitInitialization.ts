@@ -109,6 +109,18 @@ export const useDegenSplitInitialization = (
       } else if (wallet) {
         // Wallet exists, check participant lock status
         await logic.checkAllParticipantsLocked(wallet, participants);
+        
+        // CRITICAL FIX: Also check if current user has locked their funds
+        if (currentUser) {
+          const userHasLocked = logic.checkUserLockStatus(wallet, currentUser);
+          setState({ isLocked: userHasLocked });
+          
+          logger.info('Lock status checked during initialization', {
+            userId: currentUser.id.toString(),
+            hasLocked: userHasLocked,
+            walletId: wallet.id
+          }, 'DegenSplitInitialization');
+        }
       }
       
       logger.info('Degen split initialization completed', {

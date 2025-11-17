@@ -19,7 +19,12 @@ export interface SplitWallet {
   updatedAt: string;
   completedAt?: string; // When the split was completed
   firebaseDocId?: string; // Firebase document ID for direct access
-  degenWinner?: { // For degen splits - stores the winner information
+  degenWinner?: { // For degen splits - stores the winner information (legacy)
+    userId: string;
+    name: string;
+    selectedAt: string;
+  };
+  degenLoser?: { // For degen splits - stores the loser information (selected participant is the LOSER)
     userId: string;
     name: string;
     selectedAt: string;

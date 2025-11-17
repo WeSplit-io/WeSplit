@@ -1,0 +1,353 @@
+/**
+ * Solana Network Configuration Module
+ * 
+ * Centralized network selection for devnet/mainnet switching.
+ * Production builds default to mainnet; dev builds default to devnet.
+ * 
+ * This module provides a single source of truth for Solana network configuration,
+ * with production-safe defaults and backward compatibility with legacy env vars.
+ */
+
+import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../../services/analytics/loggingService';
+
+export type SolanaNetwork = 'devnet' | 'mainnet' | 'testnet';
+
+export interface NetworkConfig {
+  network: SolanaNetwork;
+  rpcUrl: string;
+  rpcEndpoints: string[];
+  usdcMintAddress: string;
+  commitment: 'processed' | 'confirmed' | 'finalized';
+  timeout: number;
+  retries: number;
+  wsUrl?: string;
+}
+
+// Network-specific constants
+const NETWORK_CONFIGS: Record<SolanaNetwork, Omit<NetworkConfig, 'network'>> = {
+  mainnet: {
+    rpcUrl: 'https://api.mainnet-beta.solana.com',
+    rpcEndpoints: [
+      'https://rpc.ankr.com/solana',
+      'https://api.mainnet-beta.solana.com',
+    ],
+    usdcMintAddress: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    commitment: 'confirmed',
+    timeout: 25000,
+    retries: 4,
+    wsUrl: 'wss://api.mainnet-beta.solana.com',
+  },
+  devnet: {
+    rpcUrl: 'https://api.devnet.solana.com',
+    rpcEndpoints: [
+      'https://api.devnet.solana.com',
+      'https://devnet.helius-rpc.com',
+    ],
+    usdcMintAddress: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', // Devnet USDC
+    commitment: 'confirmed',
+    timeout: 20000,
+    retries: 2,
+    wsUrl: 'wss://api.devnet.solana.com',
+  },
+  testnet: {
+    rpcUrl: 'https://api.testnet.solana.com',
+    rpcEndpoints: [
+      'https://api.testnet.solana.com',
+    ],
+    usdcMintAddress: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', // Testnet USDC (same as devnet)
+    commitment: 'confirmed',
+    timeout: 20000,
+    retries: 2,
+    wsUrl: 'wss://api.testnet.solana.com',
+  },
+};
+
+// Cache for network config
+let cachedConfig: NetworkConfig | null = null;
+let configInitialized = false;
+
+/**
+ * Get environment variable with fallback chain
+ * Checks Constants.expoConfig.extra first, then process.env
+ */
+function getEnvVar(key: string): string | undefined {
+  // Check Constants.expoConfig.extra first (Expo's way)
+  if (Constants.expoConfig?.extra?.[key]) {
+    return Constants.expoConfig.extra[key] as string;
+  }
+  // Fallback to process.env
+  return process.env[key];
+}
+
+/**
+ * Determine if this is a production build
+ */
+function isProductionBuild(): boolean {
+  // Check EAS build profile
+  const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
+  if (buildProfile === 'production') {
+    return true;
+  }
+  
+  // Check APP_ENV
+  const appEnv = getEnvVar('APP_ENV');
+  if (appEnv === 'production') {
+    return true;
+  }
+  
+  // Check if __DEV__ is false (production bundle)
+  return !__DEV__;
+}
+
+/**
+ * Get network from environment variables
+ * Supports both new (EXPO_PUBLIC_NETWORK) and legacy (DEV_NETWORK, FORCE_MAINNET) env vars
+ */
+function getNetworkFromEnv(): SolanaNetwork | null {
+  // Primary: EXPO_PUBLIC_NETWORK (recommended)
+  const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK');
+  if (networkEnv) {
+    const normalized = networkEnv.toLowerCase().trim();
+    if (normalized === 'mainnet' || normalized === 'mainnet-beta') {
+      return 'mainnet';
+    }
+    if (normalized === 'devnet') {
+      return 'devnet';
+    }
+    if (normalized === 'testnet') {
+      return 'testnet';
+    }
+  }
+  
+  // Legacy: EXPO_PUBLIC_DEV_NETWORK (backward compatibility)
+  const devNetwork = getEnvVar('EXPO_PUBLIC_DEV_NETWORK');
+  if (devNetwork) {
+    const normalized = devNetwork.toLowerCase().trim();
+    if (normalized === 'mainnet' || normalized === 'mainnet-beta') {
+      return 'mainnet';
+    }
+    if (normalized === 'devnet') {
+      return 'devnet';
+    }
+  }
+  
+  // Legacy: DEV_NETWORK (backward compatibility)
+  const devNetworkLegacy = getEnvVar('DEV_NETWORK');
+  if (devNetworkLegacy) {
+    const normalized = devNetworkLegacy.toLowerCase().trim();
+    if (normalized === 'mainnet' || normalized === 'mainnet-beta') {
+      return 'mainnet';
+    }
+    if (normalized === 'devnet') {
+      return 'devnet';
+    }
+    }
+  
+  // Legacy: EXPO_PUBLIC_FORCE_MAINNET (backward compatibility)
+  const forceMainnet = getEnvVar('EXPO_PUBLIC_FORCE_MAINNET');
+  if (forceMainnet === 'true') {
+    return 'mainnet';
+  }
+  
+  // Legacy: FORCE_MAINNET (backward compatibility)
+  const forceMainnetLegacy = getEnvVar('FORCE_MAINNET');
+  if (forceMainnetLegacy === 'true') {
+    return 'mainnet';
+  }
+  
+  return null;
+}
+
+/**
+ * Get network with production-safe defaults
+ */
+async function determineNetwork(): Promise<SolanaNetwork> {
+  const isProduction = isProductionBuild();
+  
+  // 1. Check environment variable
+  const envNetwork = getNetworkFromEnv();
+  if (envNetwork) {
+    // Validate production builds don't use devnet
+    if (isProduction && envNetwork === 'devnet') {
+      logger.warn(
+        'Production build attempted to use devnet. Defaulting to mainnet.',
+        { envNetwork },
+        'solanaNetworkConfig'
+      );
+      return 'mainnet';
+    }
+    return envNetwork;
+  }
+  
+  // 2. Check runtime override (dev only)
+  if (!isProduction && __DEV__) {
+    try {
+      const override = await AsyncStorage.getItem('NETWORK_OVERRIDE');
+      if (override && ['devnet', 'mainnet', 'testnet'].includes(override)) {
+        logger.info(`Using runtime network override: ${override}`, null, 'solanaNetworkConfig');
+        return override as SolanaNetwork;
+      }
+    } catch (error) {
+      logger.warn('Failed to read network override', { error }, 'solanaNetworkConfig');
+    }
+  }
+  
+  // 3. Default based on build type
+  if (isProduction) {
+    logger.info('Production build defaulting to mainnet', null, 'solanaNetworkConfig');
+    return 'mainnet';
+  }
+  
+  logger.info('Development build defaulting to devnet', null, 'solanaNetworkConfig');
+  return 'devnet';
+}
+
+/**
+ * Enhance RPC endpoints with API keys if available
+ */
+function enhanceRpcEndpoints(
+  network: SolanaNetwork,
+  baseEndpoints: string[]
+): string[] {
+  const endpoints = [...baseEndpoints];
+  
+  if (network === 'mainnet') {
+    // Add Helius if API key available
+    const heliusKey = getEnvVar('EXPO_PUBLIC_HELIUS_API_KEY');
+    if (heliusKey && heliusKey !== 'YOUR_HELIUS_API_KEY_HERE') {
+      endpoints.unshift(`https://mainnet.helius-rpc.com/?api-key=${heliusKey}`);
+    }
+    
+    // Add Alchemy if API key available
+    const alchemyKey = getEnvVar('EXPO_PUBLIC_ALCHEMY_API_KEY');
+    if (alchemyKey && alchemyKey !== 'YOUR_ALCHEMY_API_KEY_HERE') {
+      endpoints.unshift(`https://solana-mainnet.g.alchemy.com/v2/${alchemyKey}`);
+    }
+    
+    // Add GetBlock if API key available
+    const getBlockKey = getEnvVar('EXPO_PUBLIC_GETBLOCK_API_KEY');
+    if (getBlockKey && getBlockKey !== 'YOUR_GETBLOCK_API_KEY_HERE') {
+      endpoints.unshift(`https://sol.getblock.io/mainnet/?api_key=${getBlockKey}`);
+    }
+    
+    // Add QuickNode if endpoint available
+    const quickNodeEndpoint = getEnvVar('EXPO_PUBLIC_QUICKNODE_ENDPOINT');
+    if (quickNodeEndpoint && quickNodeEndpoint !== 'YOUR_QUICKNODE_ENDPOINT_HERE') {
+      endpoints.unshift(quickNodeEndpoint);
+    }
+    
+    // Add Chainstack if endpoint available
+    const chainstackEndpoint = getEnvVar('EXPO_PUBLIC_CHAINSTACK_ENDPOINT');
+    if (chainstackEndpoint && chainstackEndpoint !== 'YOUR_CHAINSTACK_ENDPOINT_HERE') {
+      endpoints.unshift(chainstackEndpoint);
+    }
+  }
+  
+  return endpoints;
+}
+
+/**
+ * Get network configuration
+ * 
+ * This is the main entry point for network configuration.
+ * Returns a cached config for performance.
+ */
+export async function getNetworkConfig(): Promise<NetworkConfig> {
+  // Return cached config if available
+  if (cachedConfig && configInitialized) {
+    return cachedConfig;
+  }
+  
+  const network = await determineNetwork();
+  const baseConfig = NETWORK_CONFIGS[network];
+  
+  // Enhance RPC endpoints with API keys
+  const rpcEndpoints = enhanceRpcEndpoints(network, baseConfig.rpcEndpoints);
+  
+  const config: NetworkConfig = {
+    network,
+    ...baseConfig,
+    rpcUrl: rpcEndpoints[0] || baseConfig.rpcUrl,
+    rpcEndpoints,
+  };
+  
+  // Cache the config
+  cachedConfig = config;
+  configInitialized = true;
+  
+  logger.info('Network configuration loaded', {
+    network: config.network,
+    rpcUrl: config.rpcUrl.replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***'),
+    endpointCount: config.rpcEndpoints.length,
+    isProduction: isProductionBuild(),
+  }, 'solanaNetworkConfig');
+  
+  return config;
+}
+
+/**
+ * Get network configuration synchronously (uses cached value)
+ * 
+ * WARNING: Only use this after getNetworkConfig() has been called at least once.
+ * For first-time access, use the async version.
+ */
+export function getNetworkConfigSync(): NetworkConfig {
+  if (!cachedConfig) {
+    throw new Error(
+      'Network config not initialized. Call getNetworkConfig() first.'
+    );
+  }
+  return cachedConfig;
+}
+
+/**
+ * Clear network config cache (useful for testing or runtime changes)
+ */
+export function clearNetworkConfigCache(): void {
+  cachedConfig = null;
+  configInitialized = false;
+  logger.info('Network config cache cleared', null, 'solanaNetworkConfig');
+}
+
+/**
+ * Set runtime network override (dev only)
+ * 
+ * WARNING: This requires app restart to take effect.
+ */
+export async function setNetworkOverride(network: SolanaNetwork): Promise<void> {
+  if (isProductionBuild()) {
+    throw new Error('Network override not allowed in production builds');
+  }
+  
+  if (!['devnet', 'mainnet', 'testnet'].includes(network)) {
+    throw new Error(`Invalid network: ${network}`);
+  }
+  
+  await AsyncStorage.setItem('NETWORK_OVERRIDE', network);
+  clearNetworkConfigCache();
+  
+  logger.info(`Network override set to: ${network}`, null, 'solanaNetworkConfig');
+}
+
+/**
+ * Get current network (synchronous, uses cache)
+ */
+export function getCurrentNetwork(): SolanaNetwork {
+  return getNetworkConfigSync().network;
+}
+
+/**
+ * Check if currently on mainnet
+ */
+export function isMainnet(): boolean {
+  return getCurrentNetwork() === 'mainnet';
+}
+
+/**
+ * Check if currently on devnet
+ */
+export function isDevnet(): boolean {
+  return getCurrentNetwork() === 'devnet';
+}

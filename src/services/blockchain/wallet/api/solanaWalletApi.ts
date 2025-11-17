@@ -23,12 +23,19 @@ export interface WalletCreationResult {
 }
 
 class SolanaWalletService {
-  private connection: Connection;
+  private connection: Connection | null = null;
   private keypair: Keypair | null = null;
 
   constructor() {
-    const config = getConfig();
-    this.connection = new Connection(config.blockchain.rpcUrl, config.blockchain.commitment);
+    // Connection will be initialized lazily using connection factory
+  }
+
+  private async getConnection(): Promise<Connection> {
+    if (!this.connection) {
+      const { getSolanaConnection } = await import('../../connection');
+      this.connection = await getSolanaConnection();
+    }
+    return this.connection;
   }
 
   /**
@@ -152,7 +159,8 @@ class SolanaWalletService {
       }
 
       const publicKey = this.keypair.publicKey;
-      const solBalance = await this.connection.getBalance(publicKey);
+      const connection = await this.getConnection();
+      const solBalance = await connection.getBalance(publicKey);
       
       // USDC balance would need to be implemented with SPL token support
       const usdcBalance = 0; // Placeholder

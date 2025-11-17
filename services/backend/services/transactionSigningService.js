@@ -44,8 +44,54 @@ class TransactionSigningService {
         throw new Error('Company wallet public key mismatch');
       }
 
-      // Create connection - use network from environment, default to devnet for development
-      const network = process.env.DEV_NETWORK || process.env.EXPO_PUBLIC_DEV_NETWORK || 'devnet';
+      // Create connection - use network from environment, match Firebase Functions logic
+      // Primary: SOLANA_NETWORK (matches client EXPO_PUBLIC_NETWORK)
+      // Secondary: EXPO_PUBLIC_NETWORK (matches client)
+      // Fallback: Legacy env vars for backward compatibility
+      let network = 'devnet'; // Default to devnet for safety
+      
+      if (process.env.SOLANA_NETWORK) {
+        const solanaNetwork = (process.env.SOLANA_NETWORK || '').trim().toLowerCase();
+        if (solanaNetwork === 'mainnet' || solanaNetwork === 'mainnet-beta') {
+          network = 'mainnet';
+        } else if (solanaNetwork === 'devnet') {
+          network = 'devnet';
+        } else if (solanaNetwork === 'testnet') {
+          network = 'testnet';
+        } else {
+          network = solanaNetwork;
+        }
+      } else if (process.env.EXPO_PUBLIC_NETWORK) {
+        const expoNetwork = (process.env.EXPO_PUBLIC_NETWORK || '').trim().toLowerCase();
+        if (expoNetwork === 'mainnet' || expoNetwork === 'mainnet-beta') {
+          network = 'mainnet';
+        } else if (expoNetwork === 'devnet') {
+          network = 'devnet';
+        } else if (expoNetwork === 'testnet') {
+          network = 'testnet';
+        } else {
+          network = expoNetwork;
+        }
+      } else if (process.env.DEV_NETWORK) {
+        const devNetwork = (process.env.DEV_NETWORK || '').trim().toLowerCase();
+        if (devNetwork === 'mainnet') {
+          network = 'mainnet';
+        } else if (devNetwork === 'devnet') {
+          network = 'devnet';
+        } else {
+          network = devNetwork;
+        }
+      } else if (process.env.EXPO_PUBLIC_DEV_NETWORK) {
+        const frontendNetwork = (process.env.EXPO_PUBLIC_DEV_NETWORK || '').trim().toLowerCase();
+        if (frontendNetwork === 'mainnet' || frontendNetwork === 'mainnet-beta') {
+          network = 'mainnet';
+        } else if (frontendNetwork === 'devnet') {
+          network = 'devnet';
+        } else {
+          network = frontendNetwork;
+        }
+      }
+      
       let rpcUrl = process.env.HELIUS_RPC_URL;
       
       if (!rpcUrl) {
