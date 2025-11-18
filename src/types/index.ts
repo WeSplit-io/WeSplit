@@ -28,6 +28,11 @@ export interface User {
   migration_completed?: string; // Timestamp when migration was completed
   migration_version?: string; // Migration version
   
+  // Phone authentication fields
+  phone?: string; // Phone number in E.164 format
+  phoneVerified?: boolean; // Phone verification status
+  primary_phone?: string; // Primary phone for identification (similar to primary_email)
+  
   // Reward system fields
   points?: number; // Total points accumulated
   total_points_earned?: number; // Lifetime points (for stats)
@@ -130,7 +135,7 @@ export interface AppState {
   // User state
   currentUser: User | null;
   isAuthenticated: boolean;
-  authMethod: 'wallet' | 'email' | 'guest' | 'social' | null;
+  authMethod: 'wallet' | 'email' | 'phone' | 'guest' | 'social' | null;
   
   // UI state
   isLoading: boolean;
@@ -147,7 +152,7 @@ export interface AppState {
 // App action types
 export type AppAction =
   | { type: 'SET_CURRENT_USER'; payload: User }
-  | { type: 'AUTHENTICATE_USER'; payload: { user: User; method: 'wallet' | 'email' | 'guest' | 'social' } }
+  | { type: 'AUTHENTICATE_USER'; payload: { user: User; method: 'wallet' | 'email' | 'phone' | 'guest' | 'social' } }
   | { type: 'LOGOUT_USER' }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }

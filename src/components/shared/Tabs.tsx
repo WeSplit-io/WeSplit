@@ -134,11 +134,12 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.white70,
+    color: colors.white70, // 70% white opacity - readable on dark background
   },
   tabTextActive: {
-    color: colors.black,
-    fontWeight: typography.fontWeight.medium,
+    color: colors.textDark, // Dark text for better contrast on bright gradient
+    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.sm,
   },
 });
 

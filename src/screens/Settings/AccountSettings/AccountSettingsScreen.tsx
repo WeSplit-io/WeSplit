@@ -23,6 +23,10 @@ import { logger } from '../../../services/analytics/loggingService';
 import styles from './styles';
 import { Container, Button, Input, PhosphorIcon } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
+import { authService } from '../../../services/auth/AuthService';
+import { normalizePhoneNumber, isValidPhoneNumber } from '../../../utils/validation/phone';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import PhoneInputModal from '../../../components/auth/PhoneInputModal';
 
 
 interface AccountSettingsScreenProps {
@@ -38,9 +42,12 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
   // Form states
   const [pseudo, setPseudo] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
+  const [phoneNumber, setPhoneNumber] = useState(currentUser?.phone || '');
   const [avatar, setAvatar] = useState<string | null>(currentUser?.avatar || null);
   const [pseudoError, setPseudoError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [isAddingPhone, setIsAddingPhone] = useState(false);
+  const [showPhoneInputModal, setShowPhoneInputModal] = useState(false);
   
   // Account deletion states
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -53,6 +60,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
   useEffect(() => {
     setPseudo(currentUser?.name || '');
     setEmail(currentUser?.email || '');
+    setPhoneNumber(currentUser?.phone || '');
     setAvatar(currentUser?.avatar || null);
   }, [currentUser]);
 
@@ -242,6 +250,17 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
         } catch (syncError) {
           logger.error('❌ Error syncing profile image quest', syncError, 'AccountSettingsScreen');
           // Don't fail the profile update if sync fails
+        }
+      }
+      
+      // Clear phone reminder badge if phone was added
+      if (phoneNumber && currentUser?.id) {
+        try {
+          const promptShownKey = `phone_prompt_shown_${currentUser.id}`;
+          await AsyncStorage.removeItem(promptShownKey);
+          logger.info('Phone reminder badge cleared', { userId: currentUser.id }, 'AccountSettingsScreen');
+        } catch (error) {
+          logger.warn('Failed to clear phone reminder badge', error, 'AccountSettingsScreen');
         }
       }
       
@@ -472,6 +491,39 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
             editable={false}
           />
 
+          {/* Phone Number Field */}
+          {phoneNumber ? (
+            <Input
+              label="Phone Number"
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              placeholder="+1234567890"
+              keyboardType="phone-pad"
+              editable={false}
+            />
+          ) : (
+            <View>
+              <Text style={{
+                color: colors.textLight,
+                fontSize: 14,
+                fontWeight: '500',
+                marginBottom: spacing.sm,
+                marginTop: spacing.md,
+              }}>
+                Phone Number
+              </Text>
+              <Button
+                title="Add Phone Number"
+                onPress={() => {
+                  setShowPhoneInputModal(true);
+                }}
+                variant="secondary"
+                size="medium"
+                style={{ marginBottom: spacing.md }}
+              />
+            </View>
+          )}
+
           {/* Delete Account Button */}
           <TouchableOpacity 
             style={[styles.deleteAccountButton, isDeletingAccount && { opacity: 0.6 }]} 
@@ -550,6 +602,36 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           style={styles.gradientButton}
         />
       </View>
+
+      {/* Phone Input Modal */}
+      <PhoneInputModal
+        visible={showPhoneInputModal}
+        onDismiss={() => setShowPhoneInputModal(false)}
+        onSendCode={async (phone) => {
+          try {
+            setIsAddingPhone(true);
+            
+            // Send verification code (pass userId and email to help with auth state)
+            const result = await authService.linkPhoneNumberToUser(phone, undefined, currentUser?.id, currentUser?.email);
+            
+            if (result.success && result.verificationId) {
+              setShowPhoneInputModal(false);
+              // Navigate to verification screen with linking context
+              navigation.navigate('Verification', {
+                phoneNumber: phone,
+                verificationId: result.verificationId,
+                isLinking: true // Flag to indicate this is linking, not new signup
+              });
+            } else {
+              Alert.alert('Error', result.error || 'Failed to send verification code');
+            }
+          } catch (error) {
+            Alert.alert('Error', 'Failed to send verification code');
+          } finally {
+            setIsAddingPhone(false);
+          }
+        }}
+      />
     </Container>
   );
 };

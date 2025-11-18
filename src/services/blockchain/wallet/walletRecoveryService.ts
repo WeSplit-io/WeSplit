@@ -63,6 +63,26 @@ export class WalletRecoveryService {
   }
 
   /**
+   * Hash phone number for use as storage identifier (fallback when userId changes)
+   * Uses SHA-256 to create consistent identifier from phone number
+   */
+  private static async hashPhone(phone: string): Promise<string> {
+    try {
+      // Normalize phone to E.164 format (remove spaces, ensure + prefix)
+      const normalizedPhone = phone.trim().replace(/\s/g, '');
+      const hash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        normalizedPhone
+      );
+      return hash.substring(0, 16); // Use first 16 chars as identifier
+    } catch (error) {
+      logger.error('Failed to hash phone', error, 'WalletRecoveryService');
+      // Fallback: use base64 encoded phone (less secure but works)
+      return Buffer.from(phone.trim().replace(/\s/g, '')).toString('base64').substring(0, 16);
+    }
+  }
+
+  /**
    * Store a wallet securely on the device
    * Also stores by email hash as backup identifier (for recovery when userId changes)
    */
@@ -70,7 +90,7 @@ export class WalletRecoveryService {
     address: string;
     publicKey: string;
     privateKey: string;
-  }, userEmail?: string): Promise<boolean> {
+  }, userEmail?: string, userPhone?: string): Promise<boolean> {
     try {
       // Primary: store private key via secure vault (Keychain+MMKV) using userId
       const pkStored = await secureVault.store(userId, 'privateKey', wallet.privateKey);
@@ -110,6 +130,28 @@ export class WalletRecoveryService {
         } catch (emailError) {
           // Non-critical - email-based storage is backup only
           logger.warn('Email-based wallet storage failed (non-critical)', emailError, 'WalletRecoveryService');
+        }
+      }
+
+      // ✅ CRITICAL: Also store by phone hash as backup identifier
+      // This allows recovery even if userId changes after app update
+      if (userPhone) {
+        try {
+          const phoneHash = await this.hashPhone(userPhone);
+          const phoneStored = await secureVault.store(phoneHash, 'privateKey', wallet.privateKey);
+          if (phoneStored) {
+            logger.info('Wallet also stored by phone hash (backup identifier)', { 
+              phoneHash: phoneHash.substring(0, 8) + '...',
+              address: wallet.address 
+            }, 'WalletRecoveryService');
+          } else {
+            logger.warn('Failed to store wallet by phone hash (non-critical)', { 
+              phoneHash: phoneHash.substring(0, 8) + '...' 
+            }, 'WalletRecoveryService');
+          }
+        } catch (phoneError) {
+          // Non-critical - phone-based storage is backup only
+          logger.warn('Phone-based wallet storage failed (non-critical)', phoneError, 'WalletRecoveryService');
         }
       }
       

@@ -71,6 +71,9 @@ export const firebaseDataTransformers = {
     firebase_uid: doc.data().firebase_uid || '',
     primary_email: doc.data().primary_email || '',
     email_verified: doc.data().email_verified || false,
+    phone: doc.data().phone || undefined,
+    phoneVerified: doc.data().phoneVerified || doc.data().phone_verified || undefined,
+    primary_phone: doc.data().primary_phone || undefined,
     migration_completed: doc.data().migration_completed ? firebaseDataTransformers.timestampToISO(doc.data().migration_completed) : undefined,
     migration_version: doc.data().migration_version || '',
     points: doc.data().points || 0,
@@ -110,6 +113,9 @@ export const firebaseDataTransformers = {
     if (user.firebase_uid !== undefined) {data.firebase_uid = user.firebase_uid;}
     if (user.primary_email !== undefined) {data.primary_email = user.primary_email;}
     if (user.email_verified !== undefined) {data.email_verified = user.email_verified;}
+    if (user.phone !== undefined) {data.phone = user.phone;}
+    if (user.phoneVerified !== undefined) {data.phoneVerified = user.phoneVerified;}
+    if (user.primary_phone !== undefined) {data.primary_phone = user.primary_phone;}
     if (user.migration_completed !== undefined) {data.migration_completed = user.migration_completed ? firebaseDataTransformers.isoToTimestamp(user.migration_completed) : null;}
     if (user.migration_version !== undefined) {data.migration_version = user.migration_version;}
     if (user.points !== undefined) {data.points = user.points;}
@@ -383,6 +389,23 @@ export const firebaseDataService = {
       }
     },
 
+    getUserByPhone: async (phone: string): Promise<User | null> => {
+      try {
+        const q = query(collection(db, 'users'), where('phone', '==', phone), limit(1));
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          return null;
+        }
+        
+        const userDoc = querySnapshot.docs[0];
+        return firebaseDataTransformers.firestoreToUser(userDoc);
+      } catch (error) {
+        logger.error('Failed to get user by phone', { phone, error }, 'FirebaseDataService');
+        throw error;
+      }
+    },
+
     createUserIfNotExists: async (userData: Omit<User, "id" | "created_at">): Promise<User> => {
       try {
         // Check if user already exists by email
@@ -416,13 +439,14 @@ export const firebaseDataService = {
         const usersSnapshot = await getDocs(usersQuery);
         const allUsers = usersSnapshot.docs.map(doc => firebaseDataTransformers.firestoreToUser(doc));
         
-        // Filter users by name, email, and wallet address (case-insensitive, partial match)
+        // Filter users by name, email, wallet address, and phone number (case-insensitive, partial match)
         const searchTermLower = searchTerm.toLowerCase();
         const filteredUsers = allUsers.filter(user => {
           const nameMatch = user.name?.toLowerCase().includes(searchTermLower);
           const emailMatch = user.email?.toLowerCase().includes(searchTermLower);
           const walletMatch = user.wallet_address?.toLowerCase().includes(searchTermLower);
-          return nameMatch || emailMatch || walletMatch;
+          const phoneMatch = user.phone?.toLowerCase().includes(searchTermLower);
+          return nameMatch || emailMatch || walletMatch || phoneMatch;
         });
         
         // Sort by relevance (exact matches first, then partial matches)
@@ -433,9 +457,11 @@ export const firebaseDataService = {
           const bEmailExact = b.email?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
           const aWalletExact = a.wallet_address?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
           const bWalletExact = b.wallet_address?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+          const aPhoneExact = a.phone?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+          const bPhoneExact = b.phone?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
           
-          const aScore = Math.min(aNameExact, aEmailExact, aWalletExact);
-          const bScore = Math.min(bNameExact, bEmailExact, bWalletExact);
+          const aScore = Math.min(aNameExact, aEmailExact, aWalletExact, aPhoneExact);
+          const bScore = Math.min(bNameExact, bEmailExact, bWalletExact, bPhoneExact);
           
           if (aScore !== bScore) {
             return aScore - bScore; // Exact matches first

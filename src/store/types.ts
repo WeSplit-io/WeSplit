@@ -12,7 +12,7 @@ import { User, Notification } from '../types';
 export interface UserState {
   currentUser: User | null;
   isAuthenticated: boolean;
-  authMethod: 'wallet' | 'email' | 'guest' | 'social' | null;
+  authMethod: 'wallet' | 'email' | 'phone' | 'guest' | 'social' | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -112,7 +112,7 @@ export interface AppStoreState {
 
 export interface UserActions {
   setCurrentUser: (user: User | null) => void;
-  authenticateUser: (user: User, method: 'wallet' | 'email' | 'guest' | 'social') => void;
+  authenticateUser: (user: User, method: 'wallet' | 'email' | 'phone' | 'guest' | 'social') => void;
   logoutUser: () => void;
   updateUser: (updates: Partial<User>) => void;
   setUserLoading: (loading: boolean) => void;

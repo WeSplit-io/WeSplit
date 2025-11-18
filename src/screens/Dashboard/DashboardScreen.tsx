@@ -49,6 +49,9 @@ import { secureVault, isVaultAuthenticated } from '../../services/security/secur
 import BadgeDisplay from '../../components/profile/BadgeDisplay';
 import ProfileAssetDisplay from '../../components/profile/ProfileAssetDisplay';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import PhonePromptModal from '../../components/auth/PhonePromptModal';
+import { authService } from '../../services/auth/AuthService';
+import { normalizePhoneNumber } from '../../utils/validation/phone';
 
 
 
@@ -66,6 +69,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [authenticationError, setAuthenticationError] = useState<string | null>(null);
   const hasAuthenticatedRef = useRef(false);
   const lastAuthenticatedUserIdRef = useRef<string | null>(null); // Track which user we authenticated for
+
+  // Phone prompt modal state
+  const [showPhonePrompt, setShowPhonePrompt] = useState(false);
+  const [needsPhoneReminder, setNeedsPhoneReminder] = useState(false);
 
   // Function to fetch user data from Firebase
   const fetchUserData = async (userId: string) => {
@@ -195,6 +202,84 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
     authenticate();
   }, [isAuthenticated, currentUser?.id]); // Only re-run when user changes, not on every focus
+
+  // Check phone prompt status
+  useEffect(() => {
+    const checkPhonePromptStatus = async () => {
+      if (!currentUser?.id || !isAuthenticated) {
+        return;
+      }
+
+      try {
+        // Check if user has email but no phone number
+        const hasEmail = !!currentUser.email;
+        const hasPhone = !!currentUser.phone;
+
+        if (hasEmail && !hasPhone) {
+          // Check if user has seen the prompt before
+          const promptShownKey = `phone_prompt_shown_${currentUser.id}`;
+          const promptShown = await AsyncStorage.getItem(promptShownKey);
+
+          if (!promptShown) {
+            // Show prompt on first login after integration
+            setShowPhonePrompt(true);
+          } else {
+            // User has seen prompt but skipped - show reminder badge
+            setNeedsPhoneReminder(true);
+          }
+        } else {
+          setShowPhonePrompt(false);
+          setNeedsPhoneReminder(false);
+        }
+      } catch (error) {
+        logger.error('Failed to check phone prompt status', error, 'DashboardScreen');
+      }
+    };
+
+    checkPhonePromptStatus();
+  }, [currentUser?.id, currentUser?.email, currentUser?.phone, isAuthenticated]);
+
+  // Handle phone prompt actions
+  const handleAddPhone = async (phone: string) => {
+    try {
+      setShowPhonePrompt(false);
+      
+      // Normalize phone number
+      const normalizedPhone = normalizePhoneNumber(phone);
+      
+      // Link phone to existing user account (not create new account)
+      // Pass userId and email to help with auth state verification
+      const result = await authService.linkPhoneNumberToUser(normalizedPhone, undefined, currentUser?.id, currentUser?.email);
+      
+      if (result.success && result.verificationId) {
+        // Navigate to verification screen with linking context
+        navigation.navigate('Verification', {
+          phoneNumber: normalizedPhone,
+          verificationId: result.verificationId,
+          isLinking: true // Flag to indicate this is linking, not new signup
+        });
+      } else {
+        throw new Error(result.error || 'Failed to send verification code');
+      }
+    } catch (error) {
+      logger.error('Failed to add phone number', error, 'DashboardScreen');
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to send verification code');
+      setShowPhonePrompt(true); // Show modal again on error
+    }
+  };
+
+  const handleSkipPhonePrompt = async () => {
+    try {
+      if (currentUser?.id) {
+        const promptShownKey = `phone_prompt_shown_${currentUser.id}`;
+        await AsyncStorage.setItem(promptShownKey, 'true');
+        setShowPhonePrompt(false);
+        setNeedsPhoneReminder(true); // Show reminder badge
+      }
+    } catch (error) {
+      logger.error('Failed to save phone prompt status', error, 'DashboardScreen');
+    }
+  };
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
@@ -939,6 +1024,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             style={styles.headerLeft}
             onPress={() => navigation.navigate('Profile')}
           >
+            <View style={{ position: 'relative' }}>
             <Avatar
               userId={currentUser?.id}
               userName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
@@ -946,6 +1032,25 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               style={styles.profileImage}
               size={50}
             />
+              {/* Red dot reminder badge */}
+              {needsPhoneReminder && (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Profile')}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    width: 12,
+                    height: 12,
+                    borderRadius: 6,
+                    backgroundColor: colors.error || '#FF3B30',
+                    borderWidth: 2,
+                    borderColor: colors.blackWhite5 || '#1A1A1A',
+                    zIndex: 10,
+                  }}
+                />
+              )}
+            </View>
             <View style={{ marginLeft: spacing.md }}>
               <Text style={styles.welcomeText}>Welcome back,</Text>
               <Text style={styles.userName}>
@@ -1334,6 +1439,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
 
       <NavBar currentRoute="Dashboard" navigation={navigation} />
+
+      {/* Phone Prompt Modal */}
+      <PhonePromptModal
+        visible={showPhonePrompt}
+        onDismiss={handleSkipPhonePrompt}
+        onAddPhone={handleAddPhone}
+      />
     </Container>
   );
 };

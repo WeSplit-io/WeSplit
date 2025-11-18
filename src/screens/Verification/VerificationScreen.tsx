@@ -9,6 +9,9 @@ import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
+import { authService } from '../../services/auth/AuthService';
+import { auth } from '../../config/firebase/firebase';
+import { EmailPersistenceService } from '../../services/core/emailPersistenceService';
 
 const CODE_LENGTH = 4; // 4-digit code
 const RESEND_SECONDS = 30;
@@ -16,7 +19,7 @@ const RESEND_SECONDS = 30;
 const VerificationScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
-  const { authenticateUser } = useApp();
+  const { authenticateUser, state } = useApp();
   const [code, setCode] = useState(Array(CODE_LENGTH).fill(''));
   const [error, setError] = useState('');
   const [timer, setTimer] = useState(RESEND_SECONDS);
@@ -65,12 +68,175 @@ const VerificationScreen: React.FC = () => {
 
     try {
       const email = route.params?.email;
-      if (!email) {
-        throw new Error('Email not found');
-      }
+      const phoneNumber = route.params?.phoneNumber;
+      const verificationId = route.params?.verificationId;
+      const isLinking = route.params?.isLinking; // Flag for linking phone to existing account
 
       const codeString = code.join('');
-      if (__DEV__) { logger.info('Verifying code', { codeString, email }, 'VerificationScreen'); }
+
+      // Handle phone verification
+      if (phoneNumber && verificationId) {
+        // Check if this is linking phone to existing account or new signup
+        if (isLinking) {
+          // Linking phone to existing user account
+          if (__DEV__) { logger.info('Linking phone to existing account', { codeString, phoneNumber: phoneNumber.substring(0, 5) + '...' }, 'VerificationScreen'); }
+          
+          // Get userId from app context
+          const userId = state.currentUser?.id;
+          const linkResult = await authService.verifyAndLinkPhoneCode(verificationId, codeString, phoneNumber, userId);
+          
+          if (!linkResult.success) {
+            throw new Error(linkResult.error || 'Failed to link phone number');
+          }
+
+          // Phone linked successfully - update local user state
+          if (__DEV__) { logger.info('Phone linked successfully', { phoneNumber: phoneNumber.substring(0, 5) + '...' }, 'VerificationScreen'); }
+          
+          // Refresh user data to get updated phone number
+          try {
+            const { firestoreService } = await import('../../config/firebase/firebase');
+            const currentUser = authService.getCurrentUser();
+            if (currentUser) {
+              const updatedUserData = await firestoreService.getUserDocument(currentUser.uid);
+              
+              if (updatedUserData) {
+                const transformedUser = {
+                  id: updatedUserData.id,
+                  name: updatedUserData.name,
+                  email: updatedUserData.email || '',
+                  phone: updatedUserData.phone || phoneNumber,
+                  wallet_address: updatedUserData.wallet_address || '',
+                  wallet_public_key: updatedUserData.wallet_public_key || updatedUserData.wallet_address || '',
+                  created_at: updatedUserData.created_at || new Date().toISOString(),
+                  avatar: updatedUserData.avatar || '',
+                  hasCompletedOnboarding: updatedUserData.hasCompletedOnboarding || false
+                };
+
+                // CRITICAL: Preserve email in SecureStore after phone linking
+                // This ensures the user can still log in with email after linking phone
+                if (transformedUser.email) {
+                  try {
+                    await EmailPersistenceService.saveEmail(transformedUser.email);
+                    if (__DEV__) { logger.info('Email preserved in SecureStore after phone linking', { email: transformedUser.email }, 'VerificationScreen'); }
+                  } catch (emailSaveError) {
+                    logger.warn('Failed to preserve email after phone linking (non-critical)', emailSaveError, 'VerificationScreen');
+                    // Non-critical, continue with authentication
+                  }
+                }
+                
+                // Update the global app context with the updated user
+                authenticateUser(transformedUser, state.authMethod || 'email');
+                
+                // Clear phone reminder badge
+                if (currentUser.uid) {
+                  try {
+                    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+                    const promptShownKey = `phone_prompt_shown_${currentUser.uid}`;
+                    await AsyncStorage.removeItem(promptShownKey);
+                  } catch (error) {
+                    // Non-critical
+                  }
+                }
+                
+                // Navigate back to profile
+                Alert.alert('Success', 'Phone number linked successfully!');
+                navigation.goBack();
+                return;
+              }
+            }
+          } catch (error) {
+            logger.error('Failed to refresh user data after phone linking', error, 'VerificationScreen');
+            
+            // CRITICAL: Even if refresh fails, preserve the email from current user context
+            // This ensures email persistence is maintained
+            if (state.currentUser?.email) {
+              try {
+                await EmailPersistenceService.saveEmail(state.currentUser.email);
+                if (__DEV__) { logger.info('Email preserved in SecureStore after phone linking (fallback)', { email: state.currentUser.email }, 'VerificationScreen'); }
+              } catch (emailSaveError) {
+                logger.warn('Failed to preserve email after phone linking (fallback, non-critical)', emailSaveError, 'VerificationScreen');
+              }
+            }
+            
+            // Still show success and navigate back
+            Alert.alert('Success', 'Phone number linked successfully!');
+            navigation.goBack();
+            return;
+          }
+        } else {
+          // New user signup with phone
+          if (__DEV__) { logger.info('Verifying phone code', { codeString, phoneNumber: phoneNumber.substring(0, 5) + '...' }, 'VerificationScreen'); }
+          
+          const authResponse = await authService.verifyPhoneCode(verificationId, codeString);
+
+          if (!authResponse.success || !authResponse.user) {
+            throw new Error(authResponse.error || 'Phone verification failed');
+          }
+
+          // Code verified successfully and user is now authenticated
+          if (__DEV__) { logger.info('Phone authentication successful', { user: authResponse.user.uid }, 'VerificationScreen'); }
+          
+          // Get user data from Firestore
+          try {
+            const { firestoreService } = await import('../../config/firebase/firebase');
+            const existingUserData = await firestoreService.getUserDocument(authResponse.user.uid);
+            
+            if (existingUserData) {
+              const transformedUser = {
+                id: existingUserData.id,
+                name: existingUserData.name,
+                email: existingUserData.email || '',
+                phone: existingUserData.phone || phoneNumber,
+                wallet_address: existingUserData.wallet_address || '',
+                wallet_public_key: existingUserData.wallet_public_key || existingUserData.wallet_address || '',
+                created_at: existingUserData.created_at || new Date().toISOString(),
+                avatar: existingUserData.avatar || '',
+                hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false
+              };
+
+              // CRITICAL: If user has email, save it to SecureStore for future logins
+              // This ensures users can log in with either email or phone after phone signup
+              if (transformedUser.email) {
+                try {
+                  await EmailPersistenceService.saveEmail(transformedUser.email);
+                  if (__DEV__) { logger.info('Email saved to SecureStore after phone signup', { email: transformedUser.email }, 'VerificationScreen'); }
+                } catch (emailSaveError) {
+                  logger.warn('Failed to save email after phone signup (non-critical)', emailSaveError, 'VerificationScreen');
+                  // Non-critical, continue with authentication
+                }
+              }
+              
+              // Update the global app context with the authenticated user
+              authenticateUser(transformedUser, 'phone');
+              
+              // Check if user needs to create a profile
+              const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+              
+              if (needsProfile) {
+                logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'VerificationScreen');
+                (navigation as any).reset({
+                  index: 0,
+                  routes: [{ name: 'CreateProfile', params: { email: transformedUser.email, phoneNumber: transformedUser.phone } }],
+                });
+              } else {
+                logger.info('User already has name, navigating to Dashboard', { name: transformedUser.name }, 'VerificationScreen');
+                (navigation as any).reset({
+                  index: 0,
+                  routes: [{ name: 'Dashboard' }],
+                });
+              }
+            } else {
+              throw new Error('User data not found');
+            }
+          } catch (firestoreError) {
+            logger.error('Failed to get user data from Firestore', firestoreError, 'VerificationScreen');
+            throw new Error('Failed to load user data');
+          }
+        }
+      } 
+      // Handle email verification (existing flow)
+      else if (email) {
+        if (__DEV__) { logger.info('Verifying email code', { codeString, email }, 'VerificationScreen'); }
       
       const authResponse = await verifyCode(email, codeString);
 
@@ -80,6 +246,22 @@ const VerificationScreen: React.FC = () => {
 
       // Code verified successfully and user is now authenticated
       if (__DEV__) { logger.info('Authentication successful', { user: authResponse.user }, 'VerificationScreen'); }
+      
+      // CRITICAL: Sign user into Firebase Auth using custom token if available
+      // This ensures auth.currentUser is set, which is required for phone linking
+      if (authResponse.customToken) {
+        try {
+          const { signInWithCustomToken } = await import('firebase/auth');
+          const { auth } = await import('../../config/firebase/firebase');
+          await signInWithCustomToken(auth, authResponse.customToken);
+          if (__DEV__) { logger.info('✅ Signed in to Firebase Auth with custom token', null, 'VerificationScreen'); }
+        } catch (tokenError) {
+          logger.warn('Failed to sign in with custom token (non-critical)', tokenError, 'VerificationScreen');
+          // Continue anyway - user is still authenticated in app context
+        }
+      } else {
+        logger.warn('No custom token returned from verification - user may not be signed into Firebase Auth', null, 'VerificationScreen');
+      }
       
       // Transform API response to match User type (snake_case)
       // Keep Firebase user ID as string to match Firestore format
@@ -124,17 +306,15 @@ const VerificationScreen: React.FC = () => {
       if (__DEV__) {
         logger.debug('Raw API Response', { authResponse }, 'VerificationScreen');
         logger.debug('Transformed User', { transformedUser }, 'VerificationScreen');
-        logger.debug('User Data Analysis', {
-          id: transformedUser.id,
-          name: transformedUser.name,
-          nameType: typeof transformedUser.name,
-          nameLength: transformedUser.name?.length,
-          trimmedName: transformedUser.name?.trim(),
-          trimmedNameLength: transformedUser.name?.trim()?.length,
-          hasCompletedOnboarding: transformedUser.hasCompletedOnboarding,
-          walletAddress: transformedUser.wallet_address,
-          walletPublicKey: transformedUser.wallet_public_key
-        });
+      }
+      
+      // Save email to persistence for future logins
+      try {
+        await EmailPersistenceService.saveEmail(transformedUser.email);
+        if (__DEV__) { logger.info('Email saved to persistence after successful verification', { email: transformedUser.email }, 'VerificationScreen'); }
+      } catch (emailSaveError) {
+        logger.warn('Failed to save email to persistence (non-critical)', emailSaveError, 'VerificationScreen');
+        // Non-critical, continue with authentication
       }
       
       // Update the global app context with the authenticated user
@@ -143,18 +323,6 @@ const VerificationScreen: React.FC = () => {
       
       // Check if user needs to create a profile (has no name/pseudo)
       const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-      
-      if (__DEV__) {
-        logger.debug('Profile Creation Check', {
-          name: transformedUser.name,
-          nameLength: transformedUser.name?.length,
-          trimmedName: transformedUser.name?.trim(),
-          trimmedNameLength: transformedUser.name?.trim()?.length,
-          needsProfile,
-          hasCompletedOnboarding: transformedUser.hasCompletedOnboarding,
-          willNavigateTo: needsProfile ? 'CreateProfile' : 'Dashboard'
-        });
-      }
       
       if (needsProfile) {
         logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'VerificationScreen');
@@ -169,6 +337,9 @@ const VerificationScreen: React.FC = () => {
           index: 0,
           routes: [{ name: 'Dashboard' }],
         });
+        }
+      } else {
+        throw new Error('Email or phone number not found');
       }
       
     } catch (error) {
@@ -186,18 +357,38 @@ const VerificationScreen: React.FC = () => {
       
       try {
         const email = route.params?.email;
-        if (!email) {
-          throw new Error('Email not found');
-        }
+        const phoneNumber = route.params?.phoneNumber;
 
+        // Handle phone resend
+        if (phoneNumber) {
+          const isLinking = route.params?.isLinking;
+          
+          // Use appropriate method based on context
+          const result = isLinking 
+            ? await authService.linkPhoneNumberToUser(phoneNumber)
+            : await authService.signInWithPhoneNumber(phoneNumber);
+          
+          if (result.success) {
+            setTimer(RESEND_SECONDS);
+            Alert.alert('Success', 'New verification code sent to your phone');
+            // Update route params with new verification ID
+            route.params = { ...route.params, verificationId: result.verificationId };
+          } else {
+            throw new Error(result.error || 'Failed to resend code');
+        }
+        }
+        // Handle email resend
+        else if (email) {
         const result = await sendVerificationCode(email);
         
         if (result.success) {
           setTimer(RESEND_SECONDS);
-        // Show success message
         Alert.alert('Success', 'New verification code sent to your email');
         } else {
           throw new Error(result.error || 'Failed to resend code');
+          }
+        } else {
+          throw new Error('Email or phone number not found');
         }
         
       } catch (error) {
@@ -235,11 +426,25 @@ const VerificationScreen: React.FC = () => {
           >
             <View style={styles.centerContent}>
         <View style={styles.mailIconBox}>
-          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmail.png?alt=media&token=5e3ac6e7-79b1-47e7-8087-f7e4c070d222' }} style={styles.mailIcon} />
+          <Image 
+            source={{ 
+              uri: route.params?.phoneNumber 
+                ? 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fphone.png?alt=media' 
+                : 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmail.png?alt=media&token=5e3ac6e7-79b1-47e7-8087-f7e4c070d222' 
+            }} 
+            style={styles.mailIcon} 
+          />
         </View>
-        <Text style={styles.title}>Check your Email</Text>
+        <Text style={styles.title}>
+          {route.params?.phoneNumber ? 'Check your Phone' : 'Check your Email'}
+        </Text>
         <Text style={styles.subtitle}>
-          We sent a code to <Text style={styles.emailHighlight}>{route.params?.email || 'yourname@gmail.com'}</Text>
+          We sent a code to{' '}
+          <Text style={styles.emailHighlight}>
+            {route.params?.phoneNumber 
+              ? route.params.phoneNumber.substring(0, 5) + '...' 
+              : route.params?.email || 'yourname@gmail.com'}
+          </Text>
         </Text>
         
         <View style={styles.codeRow}>

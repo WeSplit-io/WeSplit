@@ -333,8 +333,26 @@ const CreateProfileScreen: React.FC = () => {
     try {
       setIsLoading(true);
 
-      // Get email from route/context or authenticated user
-      const email = (route?.params as any)?.email || state.currentUser?.email || 'user@example.com';
+      // Get email from route/params, authenticated user, or stored email
+      // IMPORTANT: Don't use fallback 'user@example.com' - if no email, we should handle it properly
+      let email = (route?.params as any)?.email || state.currentUser?.email;
+      
+      // If still no email, try loading from SecureStore
+      if (!email) {
+        try {
+          const { EmailPersistenceService } = await import('../../services/core/emailPersistenceService');
+          email = await EmailPersistenceService.loadEmail();
+        } catch (error) {
+          logger.warn('Failed to load email from SecureStore', error, 'CreateProfileScreen');
+        }
+      }
+      
+      // If still no email, this is an error condition - user should have an email
+      if (!email) {
+        logger.error('No email available for profile creation', null, 'CreateProfileScreen');
+        Alert.alert('Error', 'Email address is required. Please log in again.');
+        return;
+      }
 
       // Check if user already exists and has a username
       try {

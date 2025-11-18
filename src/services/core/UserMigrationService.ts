@@ -71,6 +71,93 @@ export class UserMigrationService {
   }
   
   /**
+   * Ensure consistent user identification for phone-authenticated users
+   * Uses phone as primary identifier, then email, then Firebase UID
+   */
+  static async ensureUserConsistencyWithPhone(firebaseUser: any, phoneNumber: string): Promise<User> {
+    try {
+      const firebaseUid = firebaseUser.uid;
+      const email = firebaseUser.email;
+      
+      logger.info('Ensuring user consistency (phone)', { 
+        phone: phoneNumber.substring(0, 5) + '...', 
+        firebaseUid: firebaseUid.substring(0, 8) + '...',
+        hasEmail: !!email
+      }, 'UserMigrationService');
+      
+      // 1. First search by phone (primary identifier for phone auth)
+      const userDataByPhone = await this.findUserByPhone(phoneNumber);
+      
+      if (userDataByPhone) {
+        logger.info('Found existing user by phone', { 
+          phone: phoneNumber.substring(0, 5) + '...',
+          existingUserId: userDataByPhone.id.substring(0, 8) + '...',
+          newFirebaseUid: firebaseUid.substring(0, 8) + '...'
+        }, 'UserMigrationService');
+        
+        // User exists - update Firebase UID if different
+        if (userDataByPhone.id !== firebaseUid) {
+          await this.updateUserFirebaseUid(userDataByPhone.id, firebaseUid);
+          userDataByPhone.id = firebaseUid; // Update local reference
+        }
+        
+        // Update user profile data if needed
+        await this.updateUserProfileData(userDataByPhone.id, firebaseUser);
+        
+        return userDataByPhone;
+      }
+      
+      // 2. If email exists, try to find by email (for users who added phone later)
+      if (email) {
+        const userDataByEmail = await this.findUserByEmail(email);
+        
+        if (userDataByEmail) {
+          logger.info('Found existing user by email, adding phone', { 
+            email: email.substring(0, 5) + '...',
+            existingUserId: userDataByEmail.id.substring(0, 8) + '...'
+          }, 'UserMigrationService');
+          
+          // Update Firebase UID if different
+          if (userDataByEmail.id !== firebaseUid) {
+            await this.updateUserFirebaseUid(userDataByEmail.id, firebaseUid);
+            userDataByEmail.id = firebaseUid;
+          }
+          
+          // Add phone number to existing user
+          const userRef = doc(db, 'users', userDataByEmail.id);
+          await updateDoc(userRef, {
+            phone: phoneNumber,
+            phoneVerified: true,
+            primary_phone: phoneNumber
+          });
+          
+          // Update local reference
+          userDataByEmail.phone = phoneNumber;
+          userDataByEmail.phoneVerified = true;
+          userDataByEmail.primary_phone = phoneNumber;
+          
+          // Update user profile data
+          await this.updateUserProfileData(userDataByEmail.id, firebaseUser);
+          
+          return userDataByEmail;
+        }
+      }
+      
+      // 3. User doesn't exist - create new user with phone as primary identifier
+      logger.info('Creating new user (phone)', { 
+        phone: phoneNumber.substring(0, 5) + '...',
+        firebaseUid: firebaseUid.substring(0, 8) + '...'
+      }, 'UserMigrationService');
+      
+      return await this.createNewUserWithPhone(firebaseUser, phoneNumber);
+      
+    } catch (error) {
+      logger.error('Failed to ensure user consistency (phone)', error, 'UserMigrationService');
+      throw error;
+    }
+  }
+  
+  /**
    * Find user by email (primary identifier)
    */
   private static async findUserByEmail(email: string): Promise<User | null> {
@@ -92,6 +179,32 @@ export class UserMigrationService {
       return null;
     } catch (error) {
       logger.error('Failed to find user by email', error, 'UserMigrationService');
+      return null;
+    }
+  }
+
+  /**
+   * Find user by phone number
+   */
+  static async findUserByPhone(phone: string): Promise<User | null> {
+    try {
+      const usersRef = collection(db, 'users');
+      const userQuery = query(usersRef, where('phone', '==', phone));
+      const userDocs = await getDocs(userQuery);
+      
+      if (!userDocs.empty) {
+        const userDoc = userDocs.docs[0];
+        const userData = firebaseDataTransformers.firestoreToUser(userDoc);
+        logger.info('Found user by phone', { 
+          phone: phone.substring(0, 5) + '...',
+          userId: userData.id.substring(0, 8) + '...'
+        }, 'UserMigrationService');
+        return userData;
+      }
+      
+      return null;
+    } catch (error) {
+      logger.error('Failed to find user by phone', error, 'UserMigrationService');
       return null;
     }
   }
@@ -195,6 +308,51 @@ export class UserMigrationService {
       return newUser;
     } catch (error) {
       logger.error('Failed to create new user', error, 'UserMigrationService');
+      throw error;
+    }
+  }
+
+  /**
+   * Create new user with phone number (for phone-authenticated users)
+   */
+  private static async createNewUserWithPhone(firebaseUser: any, phoneNumber: string): Promise<User> {
+    try {
+      const userData = {
+        id: firebaseUser.uid,
+        firebase_uid: firebaseUser.uid,
+        name: firebaseUser.displayName || phoneNumber.substring(0, 5) + '...' || 'User',
+        email: firebaseUser.email || '', // Email may be empty for phone-only users
+        phone: phoneNumber,
+        phoneVerified: true,
+        primary_phone: phoneNumber,
+        wallet_address: '',
+        wallet_public_key: '',
+        created_at: new Date().toISOString(),
+        avatar: firebaseUser.photoURL || '',
+        hasCompletedOnboarding: false,
+        email_verified: firebaseUser.emailVerified || false,
+        wallet_status: 'no_wallet',
+        wallet_type: 'app-generated',
+        wallet_migration_status: 'none',
+        // Initialize points balance
+        points: 0,
+        total_points_earned: 0
+      };
+      
+      const userRef = await addDoc(collection(db, 'users'), userData);
+      const newUser = {
+        ...userData,
+        id: userRef.id
+      } as User;
+      
+      logger.info('Created new user (phone)', { 
+        userId: newUser.id.substring(0, 8) + '...',
+        phone: newUser.phone?.substring(0, 5) + '...'
+      }, 'UserMigrationService');
+      
+      return newUser;
+    } catch (error) {
+      logger.error('Failed to create new user (phone)', error, 'UserMigrationService');
       throw error;
     }
   }

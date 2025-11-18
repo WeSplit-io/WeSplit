@@ -49,6 +49,12 @@ const emailFunctions = require('./emailFunctions');
 exports.sendVerificationEmail = emailFunctions.sendVerificationEmail;
 exports.verifyCode = emailFunctions.verifyCode;
 
+// Import and export phone functions
+const phoneFunctions = require('./phoneFunctions');
+exports.getCustomTokenForUser = phoneFunctions.getCustomTokenForUser;
+exports.sendPhoneVerificationCode = phoneFunctions.sendPhoneVerificationCode;
+exports.verifyPhoneForLinking = phoneFunctions.verifyPhoneForLinking;
+
 // Import and export MoonPay functions
 const moonpayFunctions = require('./moonpay.js');
 exports.createMoonPayURL = moonpayFunctions.createMoonPayURL;

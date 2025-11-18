@@ -112,43 +112,134 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
         if (firebaseUser && firebaseUser.emailVerified) {
           // User is authenticated and email is verified
-          logger.info('User authenticated, checking profile and onboarding status', null, 'SplashScreen');
+          logger.info('User authenticated via Firebase, fetching fresh user data from Firestore', { uid: firebaseUser.uid }, 'SplashScreen');
 
-          // Check if user needs to create a profile (has no name/pseudo)
-          const needsProfile = !currentUser?.name || currentUser.name.trim() === '';
+          // CRITICAL: Fetch fresh user data from Firestore instead of relying on stale app context
+          try {
+            const userData = await firestoreService.getUserDocument(firebaseUser.uid);
+            
+            if (userData) {
+              // Check if existing user should skip onboarding
+              const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
 
-          if (needsProfile) {
-            logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'SplashScreen');
+              // Transform to app user format
+              const transformedUser = {
+                id: userData.id || firebaseUser.uid,
+                name: userData.name || '',
+                email: userData.email || firebaseUser.email || '',
+                wallet_address: userData.wallet_address || '',
+                wallet_public_key: userData.wallet_public_key || userData.wallet_address || '',
+                created_at: userData.created_at || new Date().toISOString(),
+                avatar: userData.avatar || '',
+                hasCompletedOnboarding: shouldSkipOnboarding
+              };
+
+              // Update app context with fresh data
+              authenticateUser(transformedUser, 'email');
+
+              // Check if user needs to create a profile (has no name/pseudo)
+              const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+
+              if (needsProfile) {
+                logger.info('User needs to create profile (no name), navigating to CreateProfile', { email: transformedUser.email }, 'SplashScreen');
+                setHasNavigated(true);
+                navigation.replace('CreateProfile', { email: transformedUser.email });
+              } else if (transformedUser.hasCompletedOnboarding) {
+                logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+                setHasNavigated(true);
+                navigation.replace('Dashboard');
+              } else {
+                logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+                setHasNavigated(true);
+                navigation.replace('Onboarding');
+              }
+            } else {
+              // User document doesn't exist in Firestore - this shouldn't happen but handle gracefully
+              logger.warn('Firebase user exists but Firestore document not found', { uid: firebaseUser.uid }, 'SplashScreen');
+              const userEmail = firebaseUser.email || '';
+              setHasNavigated(true);
+              navigation.replace('CreateProfile', { email: userEmail });
+            }
+          } catch (error) {
+            logger.error('Failed to fetch user data from Firestore', error, 'SplashScreen');
+            // Fallback: navigate to CreateProfile with email from Firebase user
+            const userEmail = firebaseUser.email || '';
             setHasNavigated(true);
-            navigation.replace('CreateProfile', { email: currentUser?.email || '' });
-          } else if (currentUser?.hasCompletedOnboarding) {
-            logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
-            setHasNavigated(true);
-            navigation.replace('Dashboard');
-          } else {
-            logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
-            setHasNavigated(true);
-            navigation.replace('Onboarding');
+            navigation.replace('CreateProfile', { email: userEmail });
           }
-        } else if (isAuthenticated && currentUser) {
-          // User is authenticated in app context
-          logger.info('User authenticated in app context, checking profile and onboarding status', null, 'SplashScreen');
+        } else if (isAuthenticated && currentUser && currentUser.id) {
+          // User is authenticated in app context (but not in Firebase Auth)
+          // This can happen if user was authenticated via Firestore-only flow
+          logger.info('User authenticated in app context, verifying user data from Firestore', { userId: currentUser.id }, 'SplashScreen');
 
-          // Check if user needs to create a profile (has no name/pseudo)
-          const needsProfile = !currentUser.name || currentUser.name.trim() === '';
+          // CRITICAL: Fetch fresh user data from Firestore to ensure we have latest info
+          try {
+            const userData = await firestoreService.getUserDocument(currentUser.id);
+            
+            if (userData) {
+              // Check if existing user should skip onboarding
+              const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
 
-          if (needsProfile) {
-            logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'SplashScreen');
-            setHasNavigated(true);
-            navigation.replace('CreateProfile', { email: currentUser.email });
-          } else if (currentUser.hasCompletedOnboarding) {
-            logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
-            setHasNavigated(true);
-            navigation.replace('Dashboard');
-          } else {
-            logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
-            setHasNavigated(true);
-            navigation.replace('Onboarding');
+              // Transform to app user format
+              const transformedUser = {
+                id: userData.id || currentUser.id,
+                name: userData.name || '',
+                email: userData.email || currentUser.email || '',
+                wallet_address: userData.wallet_address || currentUser.wallet_address || '',
+                wallet_public_key: userData.wallet_public_key || userData.wallet_address || currentUser.wallet_public_key || '',
+                created_at: userData.created_at || currentUser.created_at || new Date().toISOString(),
+                avatar: userData.avatar || currentUser.avatar || '',
+                hasCompletedOnboarding: shouldSkipOnboarding
+              };
+
+              // Update app context with fresh data
+              authenticateUser(transformedUser, state.authMethod || 'email');
+
+              // Check if user needs to create a profile (has no name/pseudo)
+              const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+
+              if (needsProfile) {
+                logger.info('User needs to create profile (no name), navigating to CreateProfile', { email: transformedUser.email }, 'SplashScreen');
+                setHasNavigated(true);
+                navigation.replace('CreateProfile', { email: transformedUser.email });
+              } else if (transformedUser.hasCompletedOnboarding) {
+                logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+                setHasNavigated(true);
+                navigation.replace('Dashboard');
+              } else {
+                logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+                setHasNavigated(true);
+                navigation.replace('Onboarding');
+              }
+            } else {
+              // User document not found - use app context data
+              logger.warn('User document not found in Firestore, using app context data', { userId: currentUser.id }, 'SplashScreen');
+              const needsProfile = !currentUser.name || currentUser.name.trim() === '';
+              if (needsProfile) {
+                setHasNavigated(true);
+                navigation.replace('CreateProfile', { email: currentUser.email || '' });
+              } else if (currentUser.hasCompletedOnboarding) {
+                setHasNavigated(true);
+                navigation.replace('Dashboard');
+              } else {
+                setHasNavigated(true);
+                navigation.replace('Onboarding');
+              }
+            }
+          } catch (error) {
+            logger.error('Failed to fetch user data from Firestore, using app context', error, 'SplashScreen');
+            // Fallback to app context data
+            const needsProfile = !currentUser.name || currentUser.name.trim() === '';
+            if (needsProfile) {
+              setHasNavigated(true);
+              navigation.replace('CreateProfile', { email: currentUser.email || '' });
+            } else if (currentUser.hasCompletedOnboarding) {
+              setHasNavigated(true);
+              navigation.replace('Dashboard');
+            } else {
+              setHasNavigated(true);
+              navigation.replace('Onboarding');
+            }
           }
         } else {
           // User is not authenticated, check for stored email

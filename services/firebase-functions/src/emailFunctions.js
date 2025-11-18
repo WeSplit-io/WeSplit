@@ -270,13 +270,16 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
       }
     }
 
-    // Try to create custom token, but handle permission errors gracefully
+    // CRITICAL: Always create custom token for email verification
+    // This ensures users are signed into Firebase Auth, which is required for phone linking
     let customToken = null;
     try {
       customToken = await admin.auth().createCustomToken(firebaseUser.uid);
+      console.log('✅ Created custom token for user', { uid: firebaseUser.uid });
     } catch (tokenError) {
-      console.warn('Could not create custom token due to permissions:', tokenError.message);
-      // Continue without custom token - the frontend will handle authentication
+      console.error('❌ Could not create custom token due to permissions:', tokenError.message);
+      // This is critical - throw error if we can't create token
+      throw new functions.https.HttpsError('internal', 'Failed to create authentication token');
     }
 
     // Only mark code as used after all operations succeed

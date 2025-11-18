@@ -71,7 +71,8 @@ function isValidEmail(email: string): boolean {
 }
 
 /**
- * Validate phone number format
+ * Validate phone number format (legacy - use phone.ts for E.164 validation)
+ * @deprecated Use isValidPhoneNumber from './phone' for E.164 format validation
  */
 function isValidPhoneNumber(phone: string): boolean {
   if (!phone || typeof phone !== 'string') {

@@ -14,6 +14,7 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
 import { colors } from '../../theme';
 import { Container, Header, Button, Input, LoadingScreen } from '../../components/shared';
+import Tabs from '../../components/shared/Tabs';
 import { useApp } from '../../context/AppContext';
 import { firebaseAuth, firestoreService, auth } from '../../config/firebase/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -22,14 +23,17 @@ import { walletService } from '../../services/blockchain/wallet';
 import { sendVerificationCode } from '../../services/data';
 import { logger } from '../../services/analytics/loggingService';
 import { EmailPersistenceService } from '../../services/core/emailPersistenceService';
+import { PhonePersistenceService } from '../../services/core/phonePersistenceService';
 import { useWallet } from '../../context/WalletContext';
+import { authService } from '../../services/auth/AuthService';
+import { isValidPhoneNumber, normalizePhoneNumber } from '../../utils/validation/phone';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
 
 type RootStackParamList = {
   Dashboard: undefined;
-  Verification: { email: string };
+  Verification: { email?: string; phoneNumber?: string; verificationId?: string; isLinking?: boolean };
   AuthMethods: undefined;
   Auth: undefined;
   Splash: undefined;
@@ -44,7 +48,9 @@ const AuthMethodsScreen: React.FC = () => {
   const { hydrateAppWalletSecrets } = useWallet();
 
   // State management
+  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [hasHandledAuthState, setHasHandledAuthState] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -209,6 +215,15 @@ const AuthMethodsScreen: React.FC = () => {
         updateUser(appUser);
       }
 
+      // Save email to persistence for future logins
+      try {
+        await saveEmailToStorage(appUser.email);
+        logger.info('Email saved to persistence after successful authentication', { email: appUser.email }, 'AuthMethodsScreen');
+      } catch (emailSaveError) {
+        logger.warn('Failed to save email to persistence (non-critical)', emailSaveError, 'AuthMethodsScreen');
+        // Non-critical, continue with authentication
+      }
+
       // Authenticate user with updated data (including wallet if created)
       authenticateUser(appUser, 'email');
 
@@ -324,6 +339,15 @@ const AuthMethodsScreen: React.FC = () => {
                 hasCompletedOnboarding: shouldSkipOnboarding
               };
 
+              // Save email to persistence for future logins
+              try {
+                await saveEmailToStorage(transformedUser.email);
+                logger.info('Email saved to persistence after successful login', { email: transformedUser.email }, 'AuthMethodsScreen');
+              } catch (emailSaveError) {
+                logger.warn('Failed to save email to persistence (non-critical)', emailSaveError, 'AuthMethodsScreen');
+                // Non-critical, continue with authentication
+              }
+
               // Update the global app context with the authenticated user
               authenticateUser(transformedUser, 'email');
 
@@ -364,6 +388,15 @@ const AuthMethodsScreen: React.FC = () => {
               avatar: userData.avatar || '',
               hasCompletedOnboarding: shouldSkipOnboarding
             };
+
+            // Save email to persistence for future logins
+            try {
+              await saveEmailToStorage(transformedUser.email);
+              logger.info('Email saved to persistence after successful login', { email: transformedUser.email }, 'AuthMethodsScreen');
+            } catch (emailSaveError) {
+              logger.warn('Failed to save email to persistence (non-critical)', emailSaveError, 'AuthMethodsScreen');
+              // Non-critical, continue with authentication
+            }
 
             // Update the global app context with the authenticated user
             authenticateUser(transformedUser, 'email');
@@ -478,6 +511,63 @@ const AuthMethodsScreen: React.FC = () => {
       }
     } finally {
       logger.info('Email authentication process finished, setting loading to false', null, 'AuthMethodsScreen');
+      setLoading(false);
+    }
+  };
+
+  // Handle phone authentication
+  const handlePhoneAuth = async () => {
+    logger.info('handlePhoneAuth called', { phoneNumber }, 'AuthMethodsScreen');
+    
+    // Normalize phone number to E.164 format
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    
+    if (!normalizedPhone || !isValidPhoneNumber(normalizedPhone)) {
+      logger.warn('Invalid phone number', null, 'AuthMethodsScreen');
+      Alert.alert('Error', 'Please enter a valid phone number in international format (e.g., +1234567890)');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      logger.info('Starting phone authentication process', null, 'AuthMethodsScreen');
+      
+      // Call Firebase Phone Auth to send SMS
+      const result = await authService.signInWithPhoneNumber(normalizedPhone);
+      
+      if (!result.success || !result.verificationId) {
+        throw new Error(result.error || 'Failed to send verification code');
+      }
+
+      // Save phone to storage for future use
+      await PhonePersistenceService.savePhone(normalizedPhone);
+
+      logger.info('SMS code sent successfully', null, 'AuthMethodsScreen');
+      
+      // Navigate to verification screen with phone number and verification ID
+      navigation.navigate('Verification', { 
+        phoneNumber: normalizedPhone,
+        verificationId: result.verificationId
+      });
+    } catch (error: any) {
+      logger.error('Error in phone authentication', { error: error.message, code: error.code }, 'AuthMethodsScreen');
+      
+      if (error.code === 'auth/too-many-requests') {
+        Alert.alert(
+          'Too Many Requests',
+          'Too many attempts. Please wait a few minutes before trying again.'
+        );
+      } else if (error.code === 'auth/invalid-phone-number') {
+        Alert.alert('Invalid Phone Number', 'Please enter a valid phone number in international format.');
+      } else {
+        Alert.alert(
+          'Authentication Error',
+          error.message || 'Failed to send verification code. Please try again.'
+        );
+      }
+    } finally {
+      logger.info('Phone authentication process finished, setting loading to false', null, 'AuthMethodsScreen');
       setLoading(false);
     }
   };
@@ -761,7 +851,19 @@ const AuthMethodsScreen: React.FC = () => {
 
           <View style={styles.contentContainer}>
 
+          {/* Auth Method Tabs */}
+          <Tabs
+            tabs={[
+              { label: 'Email', value: 'email' },
+              { label: 'Phone', value: 'phone' }
+            ]}
+            activeTab={authMethod}
+            onTabChange={(tab) => setAuthMethod(tab as 'email' | 'phone')}
+            enableAnimation={false}
+          />
+
           {/* Email Input */}
+          {authMethod === 'email' && (
           <Input
             label="Email"
             placeholder="Enter your email"
@@ -787,17 +889,46 @@ const AuthMethodsScreen: React.FC = () => {
             textContentType="emailAddress"
             autoComplete="email"
           />
+          )}
+
+          {/* Phone Input */}
+          {authMethod === 'phone' && (
+            <Input
+              label="Phone Number"
+              placeholder="+1234567890"
+              value={phoneNumber}
+              onChangeText={(text) => {
+                logger.debug('Phone input changed', { text }, 'AuthMethodsScreen');
+                setPhoneNumber(text);
+              }}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="telephoneNumber"
+              autoComplete="tel"
+            />
+          )}
+
           {/* Next Button */}
           <Button
             title="Next"
             onPress={() => {
-              logger.info('Next button pressed', { email, loading }, 'AuthMethodsScreen');
+              if (authMethod === 'email') {
+                logger.info('Next button pressed (email)', { email, loading }, 'AuthMethodsScreen');
               handleEmailAuth();
+              } else {
+                logger.info('Next button pressed (phone)', { phoneNumber, loading }, 'AuthMethodsScreen');
+                handlePhoneAuth();
+              }
             }}
             variant="primary"
             size="large"
             fullWidth={true}
-            disabled={!email || !isValidEmail(email) || loading}
+            disabled={
+              authMethod === 'email' 
+                ? (!email || !isValidEmail(email) || loading)
+                : (!phoneNumber || !isValidPhoneNumber(normalizePhoneNumber(phoneNumber)) || loading)
+            }
             loading={loading}
           />
 
