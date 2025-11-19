@@ -28,7 +28,6 @@ import { normalizePhoneNumber, isValidPhoneNumber } from '../../../utils/validat
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PhoneInputModal from '../../../components/auth/PhoneInputModal';
 
-
 interface AccountSettingsScreenProps {
   navigation: any;
 }

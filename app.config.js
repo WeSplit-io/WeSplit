@@ -31,11 +31,9 @@ module.exports = {
         NSPhotoLibraryUsageDescription: "This app accesses the photo library to let you select profile pictures.",
         ITSAppUsesNonExemptEncryption: false
       },
-      ...(process.env.EAS_BUILD_PROFILE === 'development' ? {
-        entitlements: {
-          // Remove push notifications capability for development builds
-        }
-      } : {})
+      entitlements: {
+        'com.apple.developer.devicecheck': true
+      }
     },
     scheme: "wesplit",
     android: {
