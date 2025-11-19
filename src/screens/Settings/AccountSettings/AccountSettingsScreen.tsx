@@ -43,6 +43,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
   const [email, setEmail] = useState(currentUser?.email || '');
   const [phoneNumber, setPhoneNumber] = useState(currentUser?.phone || '');
   const [avatar, setAvatar] = useState<string | null>(currentUser?.avatar || null);
+  const [showBadgesOnProfile, setShowBadgesOnProfile] = useState(currentUser?.show_badges_on_profile !== false);
   const [pseudoError, setPseudoError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [isAddingPhone, setIsAddingPhone] = useState(false);
@@ -61,19 +62,22 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
     setEmail(currentUser?.email || '');
     setPhoneNumber(currentUser?.phone || '');
     setAvatar(currentUser?.avatar || null);
+    setShowBadgesOnProfile(currentUser?.show_badges_on_profile !== false);
   }, [currentUser]);
 
   // Track changes
   useEffect(() => {
     const originalPseudo = currentUser?.name || '';
     const originalAvatar = currentUser?.avatar || null;
+    const originalShowBadges = currentUser?.show_badges_on_profile !== false;
     
     const hasModifications = 
       pseudo !== originalPseudo || 
-      avatar !== originalAvatar;
+      avatar !== originalAvatar ||
+      showBadgesOnProfile !== originalShowBadges;
     
     setHasChanges(hasModifications);
-  }, [pseudo, avatar, currentUser]);
+  }, [pseudo, avatar, showBadgesOnProfile, currentUser]);
 
   const handlePickImage = () => {
     const options = avatar 
@@ -238,7 +242,8 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
       await updateUser({ 
         ...currentUser, 
         name: pseudo.trim(),
-        avatar: finalAvatarUrl
+        avatar: finalAvatarUrl,
+        show_badges_on_profile: showBadgesOnProfile
       });
       
       // Sync profile image quest completion if avatar was added
@@ -522,6 +527,54 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
               />
             </View>
           )}
+
+          {/* Settings Section */}
+          <View style={{ marginTop: spacing.md }}>
+            <Text style={{
+              color: colors.textLight,
+              fontSize: 14,
+              fontWeight: '500',
+              marginBottom: spacing.sm,
+            }}>
+              Settings
+            </Text>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: colors.white5,
+              borderRadius: spacing.md,
+              padding: spacing.md,
+              borderWidth: 1,
+              borderColor: colors.white10,
+            }}>
+              <Text style={{
+                color: colors.textLight,
+                fontSize: 14,
+              }}>
+                Show badges on my profile
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowBadgesOnProfile(!showBadgesOnProfile)}
+                style={{
+                  width: 50,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: showBadgesOnProfile ? colors.green : colors.white10,
+                  justifyContent: 'center',
+                  paddingHorizontal: 2,
+                }}
+              >
+                <View style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: colors.white,
+                  alignSelf: showBadgesOnProfile ? 'flex-end' : 'flex-start',
+                }} />
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {/* Delete Account Button */}
           <TouchableOpacity 

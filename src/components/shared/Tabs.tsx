@@ -109,11 +109,12 @@ const Tabs: React.FC<TabsProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    padding: 5,
+    padding: 4,
     backgroundColor: colors.white5,
     borderRadius: 16,
     marginBottom: spacing.md,
     width: '100%',
+    gap: 4,
   },
   tab: {
     flex: 1,
@@ -122,22 +123,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    minHeight: 36,
   },
   tabGradient: {
-    paddingHorizontal: spacing.screenPaddingHorizontal,
+    paddingHorizontal: spacing.xs,
     paddingVertical: spacing.sm,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    minHeight: 36,
   },
   tabText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.white70, // 70% white opacity - readable on dark background
+    color: colors.white70,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.sm,
   },
   tabTextActive: {
-    color: colors.textDark, // Dark text for better contrast on bright gradient
+    color: colors.textDark,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.sm,
   },

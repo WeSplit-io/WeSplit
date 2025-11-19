@@ -15,6 +15,7 @@ import './src/config/firebase/firebase';
 // Import all new screens
 import DashboardScreen from './src/screens/Dashboard/DashboardScreen';
 import ProfileScreen from './src/screens/Settings/Profile/ProfileScreen';
+import UserProfileScreen from './src/screens/UserProfile/UserProfileScreen';
 import SplashScreen from './src/screens/Splash/SplashScreen';
 import GetStartedScreen from './src/screens/GetStarted/GetStartedScreen';
 import AuthMethodsScreen from './src/screens/AuthMethods/AuthMethodsScreen';
@@ -161,6 +162,7 @@ export default function App() {
                     <Stack.Screen name="Premium" component={PremiumScreen} />
                     <Stack.Screen name="Notifications" component={NotificationsScreen} />
                     <Stack.Screen name="Language" component={LanguageScreen} />
+                    <Stack.Screen name="UserProfile" component={UserProfileScreen} />
                     <Stack.Screen name="Contacts" component={ContactsScreen} />
                     <Stack.Screen name="ContactAction" component={ContactActionScreen} />
                     <Stack.Screen name="Send" component={SendScreen} />

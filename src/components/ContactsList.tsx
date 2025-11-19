@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert, Linking, Animated, RefreshControl } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 import Icon from './Icon';
 import { Input, PhosphorIcon, Tabs, Tab, ModernLoader } from './shared';
 import { useApp } from '../context/AppContext';
@@ -10,12 +11,14 @@ import { deepLinkHandler } from '../services/core';
 import { UserSearchService, UserSearchResult } from '../services/contacts';
 import { isSolanaPayUri, parseUri, extractRecipientAddress, isValidSolanaAddress } from '../services/core';
 import { UserContact, User } from '../types';
-import { colors } from '../theme';
+import { colors, spacing } from '../theme';
 import { styles } from './ContactsList.styles';
 import { logger } from '../services/core';
 import Avatar from './shared/Avatar';
 import { getWalletAddressStatus } from '../utils/crypto/wallet';
 import { useRealtimeUserSearch } from '../hooks/useRealtimeUserSearch';
+import CommunityBadge from './profile/CommunityBadge';
+import { badgeService } from '../services/rewards/badgeService';
 
 interface ContactsListProps {
   onContactSelect: (contact: UserContact) => void;
@@ -54,6 +57,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
   multiSelect = false,
   groupId: _groupId,
 }) => {
+  const navigation = useNavigation();
   const { state } = useApp();
   const { currentUser } = state;
 
@@ -672,83 +676,153 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
     const isSelected = multiSelect && selectedContacts.some(c => c.id === item.id);
 
+    const handleContactPress = () => {
+      // If in multi-select mode, use onContactSelect
+      if (multiSelect) {
+        onContactSelect(item);
+      } else {
+        // Otherwise, navigate to user profile
+        navigation.navigate('UserProfile', {
+          userId: item.id,
+          contact: item
+        });
+      }
+    };
+
+    const handleAvatarPress = () => {
+      navigation.navigate('UserProfile', {
+        userId: item.id,
+        contact: item
+      });
+    };
+
+    return (
+      <ContactRowWithBadges
+        key={`${section}-${item.id}`}
+        contact={item}
+        isSelected={isSelected}
+        onPress={handleContactPress}
+        onAvatarPress={handleAvatarPress}
+        formatWalletAddress={formatWalletAddress}
+        multiSelect={multiSelect}
+        onContactSelect={onContactSelect}
+        toggleFavorite={toggleFavorite}
+      />
+    );
+  };
+
+  // Contact Row Component with Badges
+  const ContactRowWithBadges: React.FC<{
+    contact: UserContact;
+    isSelected: boolean;
+    onPress: () => void;
+    onAvatarPress: () => void;
+    formatWalletAddress: (address: string) => string;
+    multiSelect: boolean;
+    onContactSelect: (contact: UserContact) => void;
+    toggleFavorite: (contactId: string) => void;
+  }> = ({ contact, isSelected, onPress, onAvatarPress, formatWalletAddress, multiSelect, onContactSelect, toggleFavorite }) => {
+    const [communityBadges, setCommunityBadges] = useState<any[]>([]);
+
+    useEffect(() => {
+      const loadBadges = async () => {
+        try {
+          const badges = await badgeService.getUserCommunityBadges(contact.id);
+          setCommunityBadges(badges);
+        } catch (error) {
+          // Silently fail - badges are optional
+        }
+      };
+
+      if (contact.id) {
+        loadBadges();
+      }
+    }, [contact.id]);
+
     return (
       <TouchableOpacity
-        key={`${section}-${item.id}`}
         style={[styles.contactRow, isSelected && styles.contactRowSelected]}
-        onPress={() => onContactSelect(item)}
+        onPress={onPress}
       >
-        <Avatar
-          userId={item.id.toString()}
-          userName={item.name}
-          size={50}
-          avatarUrl={item.avatar}
-          style={styles.avatar}
-        />
-      <View style={styles.contactInfo}>
-        <Text style={styles.contactName}>
-          {item.name || formatWalletAddress(item.wallet_address)}
-        </Text>
-        <View>
-          <Text style={styles.contactEmail}>
-            {item.wallet_address ? formatWalletAddress(item.wallet_address) : (item.email || '')}
-            {('mutual_groups_count' in item && typeof (item as { mutual_groups_count?: number }).mutual_groups_count === 'number' && (item as { mutual_groups_count: number }).mutual_groups_count > 0) && (
-              <Text style={styles.mutualGroupsText}> • {(item as { mutual_groups_count: number }).mutual_groups_count} splits</Text>
-            )}
-          </Text>
-          {(() => {
-            const walletStatus = getWalletAddressStatus(item.wallet_address);
-            if (walletStatus.status !== 'valid') {
-              return (
-                <Text style={[styles.contactEmail, { color: walletStatus.color, fontSize: 11, marginTop: 2 }]}>
-                  ⚠️ {walletStatus.displayText}
-                </Text>
-              );
-            }
-            return null;
-          })()}
-          {/*{item.email && item.wallet_address && (
-            <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
-              {item.email}
-            </Text>
-          )}*/}
-        </View>
-      </View>
-      {multiSelect ? (
-        <View style={styles.selectIndicator}>
-          {isSelected ? (
-            <LinearGradient
-              colors={[colors.green, colors.greenBlue || colors.green]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.addButton}
-            >
-              <PhosphorIcon 
-                name="Check" 
-                size={16} 
-                color={colors.black} 
-                weight="bold"
-              />
-            </LinearGradient>
-          ) : (
-            <View style={styles.addButton}>
-              <Text style={styles.addButtonText}>Add</Text>
-            </View>
-          )}
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.favoriteButton}
-          onPress={() => toggleFavorite(item.id)}
-        >
-          <Icon
-            name="star"
-            size={16}
-            color={item.isFavorite ? colors.brandGreen : colors.textSecondary}
+        <TouchableOpacity onPress={onAvatarPress}>
+          <Avatar
+            userId={contact.id.toString()}
+            userName={contact.name}
+            size={50}
+            avatarUrl={contact.avatar}
+            style={styles.avatar}
           />
         </TouchableOpacity>
-      )}
-    </TouchableOpacity>
+        <View style={styles.contactInfo}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' }}>
+            <Text style={styles.contactName}>
+              {contact.name || formatWalletAddress(contact.wallet_address)}
+            </Text>
+            {communityBadges.map((badge) => (
+              <CommunityBadge
+                key={badge.badgeId}
+                icon={badge.icon}
+                iconUrl={badge.imageUrl}
+                title={badge.title}
+                size={16}
+              />
+            ))}
+          </View>
+          <View>
+            <Text style={styles.contactEmail}>
+              {contact.wallet_address ? formatWalletAddress(contact.wallet_address) : (contact.email || '')}
+              {('mutual_groups_count' in contact && typeof (contact as { mutual_groups_count?: number }).mutual_groups_count === 'number' && (contact as { mutual_groups_count: number }).mutual_groups_count > 0) && (
+                <Text style={styles.mutualGroupsText}> • {(contact as { mutual_groups_count: number }).mutual_groups_count} splits</Text>
+              )}
+            </Text>
+            {(() => {
+              const walletStatus = getWalletAddressStatus(contact.wallet_address);
+              if (walletStatus.status !== 'valid') {
+                return (
+                  <Text style={[styles.contactEmail, { color: walletStatus.color, fontSize: 11, marginTop: 2 }]}>
+                    ⚠️ {walletStatus.displayText}
+                  </Text>
+                );
+              }
+              return null;
+            })()}
+          </View>
+        </View>
+        {multiSelect ? (
+          <View style={styles.selectIndicator}>
+            {isSelected ? (
+              <LinearGradient
+                colors={[colors.green, colors.greenBlue || colors.green]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.addButton}
+              >
+                <PhosphorIcon 
+                  name="Check" 
+                  size={16} 
+                  color={colors.black} 
+                  weight="bold"
+                />
+              </LinearGradient>
+            ) : (
+              <View style={styles.addButton}>
+                <Text style={styles.addButtonText}>Add</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.favoriteButton}
+            onPress={() => toggleFavorite(contact.id)}
+          >
+            <Icon
+              name="star"
+              size={16}
+              color={contact.isFavorite ? colors.brandGreen : colors.textSecondary}
+            />
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
     );
   };
 

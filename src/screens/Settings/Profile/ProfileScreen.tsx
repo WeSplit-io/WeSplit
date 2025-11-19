@@ -204,7 +204,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Header Card */}
-        <TouchableOpacity style={styles.profileCard} onPress={handleAccountInfo}>
+        <TouchableOpacity 
+          style={styles.profileCard} 
+          onPress={handleAccountInfo}
+        >
           <View style={styles.profileAvatar}>
             <AvatarComponent
               avatar={currentUser?.avatar}

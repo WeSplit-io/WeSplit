@@ -10,13 +10,16 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
-import { Container, Header, LoadingScreen } from '../../components/shared';
+import { Container, Header, LoadingScreen, Input, Button } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import Tabs from '../../components/shared/Tabs';
+import BadgeCard from '../../components/rewards/BadgeCard';
 import { useApp } from '../../context/AppContext';
 import { questService, QUEST_DEFINITIONS } from '../../services/rewards/questService';
 import { Quest } from '../../types/rewards';
@@ -24,6 +27,8 @@ import { logger } from '../../services/analytics/loggingService';
 import { getSeasonReward, calculateRewardPoints, SeasonReward } from '../../services/rewards/seasonRewardsConfig';
 import { seasonService, Season } from '../../services/rewards/seasonService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
+import { badgeService, BadgeProgress } from '../../services/rewards/badgeService';
+import { BADGE_DEFINITIONS } from '../../services/rewards/badgeConfig';
 
 const HowToEarnPointsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
@@ -34,6 +39,12 @@ const HowToEarnPointsScreen: React.FC = () => {
   const [userQuests, setUserQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentSeason, setCurrentSeason] = useState<Season>(1);
+  const [activeSection, setActiveSection] = useState<'quest' | 'badges'>('quest');
+  const [badgeProgress, setBadgeProgress] = useState<BadgeProgress[]>([]);
+  const [badgeTab, setBadgeTab] = useState<'all' | 'claimed' | 'redeem'>('all');
+  const [claimingBadge, setClaimingBadge] = useState<string | null>(null);
+  const [redeemCode, setRedeemCode] = useState('');
+  const [redeemingBadge, setRedeemingBadge] = useState(false);
 
   useEffect(() => {
     setCurrentSeason(seasonService.getCurrentSeason());
@@ -58,6 +69,25 @@ const HowToEarnPointsScreen: React.FC = () => {
   useEffect(() => {
     loadQuests();
   }, [loadQuests]);
+
+  const loadBadges = useCallback(async () => {
+    if (!currentUser?.id) {
+      return;
+    }
+
+    try {
+      const progress = await badgeService.getUserBadgeProgress(currentUser.id);
+      setBadgeProgress(progress);
+    } catch (error) {
+      logger.error('Failed to load badges', { error }, 'HowToEarnPointsScreen');
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (activeSection === 'badges') {
+      loadBadges();
+    }
+  }, [activeSection, loadBadges]);
 
   // Memoized icon map to prevent recreation
   const questIconMap = useMemo<Record<string, React.ComponentProps<typeof PhosphorIcon>['name']>>(() => ({
@@ -237,6 +267,80 @@ const HowToEarnPointsScreen: React.FC = () => {
     </View>
   );
 
+  const handleClaimBadge = useCallback(async (badgeId: string) => {
+    if (!currentUser?.id || claimingBadge) return;
+
+    setClaimingBadge(badgeId);
+    try {
+      const result = await badgeService.claimBadge(currentUser.id, badgeId);
+      if (result.success) {
+        Alert.alert('Success', 'Badge claimed successfully!');
+        await loadBadges();
+      } else {
+        Alert.alert('Error', result.error || 'Failed to claim badge');
+      }
+    } catch (error) {
+      logger.error('Failed to claim badge', { error, badgeId }, 'HowToEarnPointsScreen');
+      Alert.alert('Error', 'Failed to claim badge. Please try again.');
+    } finally {
+      setClaimingBadge(null);
+    }
+  }, [currentUser?.id, loadBadges]);
+
+  const handleRedeemCode = useCallback(async () => {
+    if (!currentUser?.id || !redeemCode.trim() || redeemingBadge) return;
+
+    setRedeemingBadge(true);
+    try {
+      const result = await badgeService.claimEventBadge(currentUser.id, redeemCode.trim());
+      if (result.success) {
+        Alert.alert('Success', 'Badge redeemed successfully!');
+        setRedeemCode('');
+        await loadBadges();
+      } else {
+        Alert.alert('Error', result.error || 'Invalid redeem code');
+      }
+    } catch (error) {
+      logger.error('Failed to redeem badge', { error, redeemCode }, 'HowToEarnPointsScreen');
+      Alert.alert('Error', 'Failed to redeem badge. Please try again.');
+    } finally {
+      setRedeemingBadge(false);
+    }
+  }, [currentUser?.id, redeemCode, redeemingBadge, loadBadges]);
+
+  // Filter badges based on active tab
+  const filteredBadges = useMemo(() => {
+    if (badgeTab === 'claimed') {
+      // Show all claimed badges (both achievement and event)
+      return badgeProgress.filter(p => p.claimed);
+    }
+    if (badgeTab === 'redeem') {
+      // Show only event badges that can be redeemed
+      return badgeProgress.filter(p => p.isEventBadge && !p.claimed);
+    }
+    // "All" tab shows all badges (both achievement and event)
+    return badgeProgress;
+  }, [badgeProgress, badgeTab]);
+
+  const renderBadgeCard = (progress: BadgeProgress) => {
+    const badgeInfo = BADGE_DEFINITIONS[progress.badgeId];
+    if (!badgeInfo) return null;
+
+    const isClaiming = claimingBadge === progress.badgeId;
+    const canClaim = progress.current >= progress.target && !progress.claimed;
+
+    return (
+      <BadgeCard
+        key={progress.badgeId}
+        progress={progress}
+        badgeInfo={badgeInfo}
+        onPress={() => canClaim && !isClaiming && handleClaimBadge(progress.badgeId)}
+        disabled={!canClaim || isClaiming}
+        isClaiming={isClaiming}
+      />
+    );
+  };
+
   if (loading) {
     return (
       <Container>
@@ -299,14 +403,95 @@ const HowToEarnPointsScreen: React.FC = () => {
         }
       />
 
+      {/* Primary Navigation: Quest / Badges */}
+      <View style={styles.primaryNavWrapper}>
+        <Tabs
+          tabs={[
+            { label: 'Quest', value: 'quest' },
+            { label: 'Badges', value: 'badges' },
+          ]}
+          activeTab={activeSection}
+          onTabChange={(tab) => setActiveSection(tab as 'quest' | 'badges')}
+          enableAnimation={false}
+        />
+      </View>
+
+      {/* Secondary Navigation: All / Claimed / Redeem Code (only for badges) */}
+      {activeSection === 'badges' && (
+        <View style={styles.secondaryNavWrapper}>
+          <Tabs
+            tabs={[
+              { label: 'All', value: 'all' },
+              { label: 'Claimed', value: 'claimed' },
+              { label: 'Redeem Code', value: 'redeem' },
+            ]}
+            activeTab={badgeTab}
+            onTabChange={(tab) => setBadgeTab(tab as 'all' | 'claimed' | 'redeem')}
+            enableAnimation={false}
+          />
+        </View>
+      )}
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.cardsContainer}>
+          {activeSection === 'quest' ? (
+            <>
           {orderedQuests.map(renderQuestCard)}
           {infoCards.map(renderInfoCard)}
+            </>
+          ) : (
+            <>
+              {badgeTab === 'redeem' ? (
+                <View style={styles.redeemContainer}>
+                  <Text style={styles.redeemTitle}>Claim your special badge:</Text>
+                  <Input
+                    placeholder="Enter code"
+                    value={redeemCode}
+                    onChangeText={setRedeemCode}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    variant="default"
+                    containerStyle={styles.redeemInputContainer}
+                  />
+                  <Button
+                    title="Redeem your badge"
+                    onPress={handleRedeemCode}
+                    disabled={!redeemCode.trim() || redeemingBadge}
+                    loading={redeemingBadge}
+                    variant="primary"
+                    fullWidth={true}
+                    style={styles.redeemButton}
+                  />
+                  {filteredBadges.length > 0 && (
+                    <View style={styles.availableBadgesContainer}>
+                      <Text style={styles.availableBadgesTitle}>Available Event Badges:</Text>
+                      <View style={styles.badgesGrid}>
+                        {filteredBadges.map(renderBadgeCard)}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.badgesGrid}>
+                  {filteredBadges.length > 0 ? (
+                    filteredBadges.map(renderBadgeCard)
+                  ) : (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyStateText}>
+                        {badgeTab === 'claimed' 
+                          ? 'No badges claimed yet' 
+                          : 'No badges available'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          )}
         </View>
       </ScrollView>
     </Container>
@@ -346,6 +531,7 @@ const styles = StyleSheet.create({
     color: colors.black,
   },
   cardsContainer: {
+    paddingHorizontal: spacing.screenPaddingHorizontal,
     gap: spacing.md,
   },
   questCard: {
@@ -446,6 +632,60 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.textLightSecondary,
     lineHeight: 20,
+  },
+  // Primary Navigation Styles
+  primaryNavWrapper: {
+    marginHorizontal: spacing.screenPaddingHorizontal,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  secondaryNavWrapper: {
+    marginHorizontal: spacing.screenPaddingHorizontal,
+    marginBottom: spacing.sm,
+  },
+  // Badge Styles
+  badgesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: '100%',
+    justifyContent: 'space-between',
+  },
+  emptyState: {
+    width: '100%',
+    paddingVertical: spacing.xxxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    fontSize: typography.fontSize.md,
+    color: colors.white70,
+    textAlign: 'center',
+  },
+  // Redeem Code Styles
+  redeemContainer: {
+    width: '100%',
+  },
+  redeemTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textLight,
+    marginBottom: spacing.md,
+  },
+  redeemInputContainer: {
+    marginBottom: spacing.md,
+  },
+  redeemButton: {
+    marginTop: 0,
+  },
+  availableBadgesContainer: {
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  availableBadgesTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+    marginBottom: spacing.xs,
   },
 });
 

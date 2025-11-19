@@ -22,6 +22,12 @@ export interface BadgeInfo {
   iconUrl?: string; // Optional image URL for badge icon
   category?: string;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
+  points?: number; // Points awarded when badge is claimed
+  target?: number; // Target value for progress-based badges
+  isEventBadge?: boolean; // True if badge is claimable via redeem code/event
+  redeemCode?: string; // Optional redeem code for event badges
+  isCommunityBadge?: boolean; // True if this is a community badge (displayed next to name)
+  showNextToName?: boolean; // True if badge should be displayed next to user name/profile picture
 }
 
 /**
@@ -86,15 +92,82 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     category: 'christmas',
     rarity: 'rare'
   },
-  // Add more badges here as they are created
+  // Achievement Badges - Splits Withdrawn
+  'splits_withdrawn_50': {
+    badgeId: 'splits_withdrawn_50',
+    title: '50 Total Splits',
+    description: 'Split with your friend',
+    icon: '50',
+    iconUrl: undefined, // Will be set from database
+    category: 'achievement',
+    rarity: 'common',
+    points: 50,
+    target: 50
+  },
+  'splits_withdrawn_100': {
+    badgeId: 'splits_withdrawn_100',
+    title: '100 Total Splits',
+    description: 'Split with your friend',
+    icon: '100',
+    iconUrl: undefined,
+    category: 'achievement',
+    rarity: 'rare',
+    points: 100,
+    target: 100
+  },
+  'splits_withdrawn_250': {
+    badgeId: 'splits_withdrawn_250',
+    title: '250 Total Splits',
+    description: 'Split with your friend',
+    icon: '250',
+    iconUrl: undefined,
+    category: 'achievement',
+    rarity: 'epic',
+    points: 250,
+    target: 250
+  },
+  'splits_withdrawn_500': {
+    badgeId: 'splits_withdrawn_500',
+    title: '500 Total Splits',
+    description: 'Split with your friend',
+    icon: '500',
+    iconUrl: undefined,
+    category: 'achievement',
+    rarity: 'legendary',
+    points: 500,
+    target: 500
+  },
+  // Event Badges - Can be claimed via redeem codes
+  // Add event badges here as needed
   // Example:
-  // 'first_transaction': {
-  //   badgeId: 'first_transaction',
-  //   title: 'First Transaction',
-  //   description: 'Completed your first transaction',
-  //   icon: '💸',
-  //   category: 'achievement',
-  //   rarity: 'common'
+  // 'event_summer_2024': {
+  //   badgeId: 'event_summer_2024',
+  //   title: 'Summer Event 2024',
+  //   description: 'Participated in Summer Event',
+  //   icon: '☀️',
+  //   category: 'event',
+  //   rarity: 'rare',
+  //   points: 200,
+  //   isEventBadge: true,
+  //   redeemCode: 'SUMMER2024'
+  // },
+  
+  // Community Badges - Represent communities, displayed next to user name
+  // These badges can only be claimed via redeem codes
+  // Example community badges:
+  // 'community_solana_breakpoint_2025': {
+  //   badgeId: 'community_solana_breakpoint_2025',
+  //   title: 'Solana Breakpoint 2025',
+  //   description: 'Solana Breakpoint 2025 Abu Dhabi',
+  //   icon: '🕌',
+  //   iconUrl: 'https://example.com/breakpoint-badge.png',
+  //   category: 'community',
+  //   rarity: 'rare',
+  //   points: 0, // Community badges typically don't award points
+  //   isEventBadge: true,
+  //   isCommunityBadge: true,
+  //   showNextToName: true, // Display next to user name
+  //   redeemCode: 'BREAKPOINT2025'
   // },
 };
 

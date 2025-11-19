@@ -48,6 +48,7 @@ export interface User {
   active_profile_asset?: string; // Currently active profile asset ID
   wallet_backgrounds?: string[]; // Array of wallet background asset IDs owned
   active_wallet_background?: string; // Currently active wallet background asset ID
+  show_badges_on_profile?: boolean; // Whether to show badges on profile (default: true)
 }
 
 // User contact includes relationship metadata
