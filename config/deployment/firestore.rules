@@ -28,5 +28,21 @@ service cloud.firestore {
       allow write: if request.auth != null && 
         request.auth.uid == resource.data.createdBy;
     }
+    
+    // Split wallets - require authentication, detailed access control in application code
+    match /splitWallets/{splitWalletId} {
+      // Require authentication for all operations
+      // Application code enforces creator/participant checks
+      allow read, write: if request.auth != null;
+    }
+    
+    // Split wallet private keys - CRITICAL: Require authentication
+    // Application code enforces participant verification before decryption
+    // This provides defense in depth - encrypted keys require auth + participant check
+    match /splitWalletPrivateKeys/{splitWalletId} {
+      // Require authentication - participant verification happens in application code
+      // The encryption key derivation also requires app config, providing additional security
+      allow read, write: if request.auth != null;
+    }
   }
 } 

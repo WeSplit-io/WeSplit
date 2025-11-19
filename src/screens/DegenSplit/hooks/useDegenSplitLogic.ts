@@ -1077,8 +1077,34 @@ export const useDegenSplitLogic = (
     splitWallet: SplitWallet,
     currentUser: any
   ): Promise<void> => {
-    if (splitWallet?.id && currentUser?.id) {
-      try {
+    if (!splitWallet?.id || !currentUser?.id) {
+      Alert.alert('Error', 'Missing required data to retrieve private key');
+      return;
+    }
+
+    // If a request is already in progress, avoid duplicate calls
+    if (state.isFetchingPrivateKey) {
+      logger.warn('Private key retrieval already in progress - ignoring duplicate tap', {
+        splitWalletId: splitWallet.id,
+        userId: currentUser.id.toString()
+      }, 'DegenSplitLogic');
+      return;
+    }
+
+    // If we previously cached a key for a different wallet, clear it
+    if (state.privateKey && state.privateKeyWalletId && state.privateKeyWalletId !== splitWallet.id) {
+      setState({ privateKey: null, privateKeyWalletId: null });
+    }
+
+    // If we already have a cached private key for this wallet, just show the modal
+    if (state.privateKey && state.privateKeyWalletId === splitWallet.id) {
+      setState({ showPrivateKeyModal: true });
+      return;
+    }
+
+    try {
+      setState({ isFetchingPrivateKey: true, error: null });
+
         // CRITICAL: Check if user has already withdrawn (single withdrawal rule)
         // Once a user withdraws, they cannot access the private key anymore
         const currentUserParticipant = splitWallet.participants.find(
@@ -1100,6 +1126,7 @@ export const useDegenSplitLogic = (
         if (result.success && result.privateKey) {
           setState({ 
             privateKey: result.privateKey,
+          privateKeyWalletId: splitWallet.id,
             showPrivateKeyModal: true 
           });
         } else {
@@ -1107,11 +1134,16 @@ export const useDegenSplitLogic = (
         }
       } catch (error) {
         handleError(error, 'get private key');
-      }
-    } else {
-      Alert.alert('Error', 'Missing required data to retrieve private key');
+    } finally {
+      setState({ isFetchingPrivateKey: false });
     }
-  }, [setState]);
+  }, [
+    state.isFetchingPrivateKey,
+    state.privateKey,
+    state.privateKeyWalletId,
+    setState,
+    handleError
+  ]);
 
   const handleCopyPrivateKey = useCallback((privateKey: string) => {
     if (privateKey) {

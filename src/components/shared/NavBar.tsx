@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, StyleProp, Dimensions } from 'react-native';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,6 +6,7 @@ import { HouseLine, PiggyBank, ArrowsSplit, Medal, Users } from 'phosphor-react-
 import { colors, spacing, typography } from '../../theme';
 import platformUtils from '../../utils/core/platformUtils';
 import { logger } from '../../services/core';
+import CreateChoiceModal from './CreateChoiceModal';
 
 const styles = StyleSheet.create({
 
@@ -127,6 +128,7 @@ interface NavBarProps {
 
 const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }) => {
   const { width: screenWidth } = Dimensions.get('window');
+  const [showCreateModal, setShowCreateModal] = useState(false);
   
   const containerPadding = 32;
   const scrollContentPadding = 16;
@@ -134,6 +136,7 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
   const itemWidth = availableWidth / navItems.length;
   
   const isCompactMode = itemWidth < 60;
+  
   const handleNavigation = (route: string) => {
     if (!route) {
       console.warn('NavBar: No route provided for navigation');
@@ -153,13 +156,32 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
       } else if (route === 'SplitsList') {
         navigation.navigate('SplitsList' as never, {} as never);
       } else if (route === 'BillCamera') {
-        // Navigate to camera screen for OCR-based split creation
-        navigation.navigate('BillCamera' as never, {} as never);
+        // Open modal to choose between Split and Shared Wallet
+        setShowCreateModal(true);
       } else {
         navigation.navigate(route as never);
       }
     } catch (error) {
       logger.error(`NavBar: Error navigating to ${String(route)}`, { error: error as Record<string, unknown> }, 'NavBar');
+    }
+  };
+  
+  const handleCreateSplit = () => {
+    if (!navigation) return;
+    try {
+      navigation.navigate('BillCamera' as never, {} as never);
+    } catch (error) {
+      logger.error('NavBar: Error navigating to BillCamera', { error: error as Record<string, unknown> }, 'NavBar');
+    }
+  };
+  
+  const handleCreateSharedWallet = () => {
+    if (!navigation) return;
+    try {
+      // Navigate to CreateSharedWallet screen (to be created)
+      navigation.navigate('CreateSharedWallet' as never, {} as never);
+    } catch (error) {
+      logger.error('NavBar: Error navigating to CreateSharedWallet', { error: error as Record<string, unknown> }, 'NavBar');
     }
   };
 
@@ -221,6 +243,7 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
   };
 
   return (
+    <>
     <View style={[styles.container, customStyle]}>
       <View style={[styles.scrollContent, isCompactMode && styles.scrollContentCompact]}>
         {navItems.map((item, index) => {
@@ -278,6 +301,15 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
         })}
       </View>
     </View>
+      
+      {/* Create Choice Modal */}
+      <CreateChoiceModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreateSplit={handleCreateSplit}
+        onCreateSharedWallet={handleCreateSharedWallet}
+      />
+    </>
   );
 };
 

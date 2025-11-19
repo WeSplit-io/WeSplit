@@ -45,6 +45,10 @@ export interface DegenSplitState {
   setShowPrivateKeyModal: (show: boolean) => void;
   privateKey: string | null;
   setPrivateKey: (key: string | null) => void;
+  privateKeyWalletId: string | null;
+  setPrivateKeyWalletId: (id: string | null) => void;
+  isFetchingPrivateKey: boolean;
+  setIsFetchingPrivateKey: (loading: boolean) => void;
   
   // Result screen states
   isProcessing: boolean;
@@ -99,6 +103,8 @@ export const useDegenSplitState = (existingSplitWallet?: SplitWallet): DegenSpli
   const [showWalletRecapModal, setShowWalletRecapModal] = useState(false);
   const [showPrivateKeyModal, setShowPrivateKeyModal] = useState(false);
   const [privateKey, setPrivateKey] = useState<string | null>(null);
+  const [privateKeyWalletId, setPrivateKeyWalletId] = useState<string | null>(null);
+  const [isFetchingPrivateKey, setIsFetchingPrivateKey] = useState(false);
   
   // Result screen states
   const [isProcessing, setIsProcessing] = useState(false);
@@ -158,6 +164,10 @@ export const useDegenSplitState = (existingSplitWallet?: SplitWallet): DegenSpli
     setShowPrivateKeyModal,
     privateKey,
     setPrivateKey,
+    privateKeyWalletId,
+    setPrivateKeyWalletId,
+    isFetchingPrivateKey,
+    setIsFetchingPrivateKey,
     
     // Result screen states
     isProcessing,

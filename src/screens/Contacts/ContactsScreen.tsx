@@ -24,7 +24,7 @@ interface ContactsScreenProps {
 }
 
 const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) => {
-  const { action, onContactSelect, splitId, splitName, returnRoute, currentSplitData, groupId } = route.params || {};
+  const { action, onContactSelect, splitId, splitName, returnRoute, currentSplitData, groupId, sharedWalletId, walletMembers } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
   const { address } = useWallet();
@@ -49,8 +49,17 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
         contact: contact,
         groupId,
       });
-    } else if (action === 'split') {
-      // If we're in split mode, toggle contact selection for multiple selection
+    } else if (action === 'split' || action === 'sharedWallet') {
+      // If we're in split or sharedWallet mode, toggle contact selection for multiple selection
+      // For sharedWallet, also check if contact is already a member
+      if (action === 'sharedWallet' && walletMembers) {
+        const isAlreadyMember = walletMembers.some((m: any) => m.userId === contact.id.toString());
+        if (isAlreadyMember) {
+          // Don't allow selection of existing members
+          return;
+        }
+      }
+      
       setSelectedContacts(prev => {
         const isAlreadySelected = prev.some(c => c.id === contact.id);
         if (isAlreadySelected) {
@@ -70,13 +79,22 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
 
     // Navigate back with all selected contacts
     if (returnRoute) {
-      navigation.navigate(returnRoute, {
+      const returnParams: any = {
         selectedContacts: selectedContacts,
-        splitId: splitId,
-        splitName: splitName,
-        // Pass back the current split data to preserve state
-        currentSplitData: currentSplitData
-      });
+      };
+
+      // Add action-specific params
+      if (action === 'split') {
+        returnParams.splitId = splitId;
+        returnParams.splitName = splitName;
+        returnParams.currentSplitData = currentSplitData;
+      } else if (action === 'sharedWallet') {
+        // Pass back walletId and wallet data for reloading if needed
+        returnParams.walletId = sharedWalletId;
+        returnParams.selectedContacts = selectedContacts;
+      }
+
+      navigation.navigate(returnRoute, returnParams);
     } else {
       navigation.goBack();
     }
@@ -117,12 +135,16 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
       return 'Request Money';
     } else if (action === 'split') {
       return 'Add to Split';
+    } else if (action === 'sharedWallet') {
+      return 'Add Participants';
     }
     return 'Contacts';
   };
 
   const isSplitMode = action === 'split';
+  const isSharedWalletMode = action === 'sharedWallet';
   const isRequestMode = action === 'request';
+  const isMultiSelectMode = isSplitMode || isSharedWalletMode;
 
   return (
     <Container>
@@ -130,7 +152,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
       <Header 
         title={getHeaderTitle()}
         onBackPress={() => navigation.goBack()}
-        showBackButton={isSplitMode || isRequestMode}
+        showBackButton={isSplitMode || isRequestMode || isSharedWalletMode}
       />
 
       {/* Request Mode Tabs */}
@@ -176,13 +198,13 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
             onSearchQueryChange={setSearchQuery}
             placeholder="Search contacts"
             hideToggleBar={true}
-            selectedContacts={isSplitMode ? selectedContacts : undefined}
-            multiSelect={isSplitMode}
+            selectedContacts={isMultiSelectMode ? selectedContacts : undefined}
+            multiSelect={isMultiSelectMode}
           />
         )}
       </View>
 
-      {isSplitMode && (
+      {isMultiSelectMode && (
         <View style={styles.inviteButtonContainer}>
           <Button
             title={selectedContacts.length === 0 
@@ -199,7 +221,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
         </View>
       )}
       
-      {!isSplitMode && <NavBar currentRoute="Contacts" navigation={navigation} />}
+      {!isMultiSelectMode && <NavBar currentRoute="Contacts" navigation={navigation} />}
     </Container>
   );
 };

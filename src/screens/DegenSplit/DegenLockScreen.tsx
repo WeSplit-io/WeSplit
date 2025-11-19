@@ -13,6 +13,7 @@ import {
   ScrollView,
   Image,
   Animated,
+  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,8 +89,17 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   const { state } = useApp();
   const { currentUser } = state;
   
-  // Initialize our custom hooks
+  // Initialize our custom hooks FIRST - before any code that uses degenState
   const degenState = useDegenSplitState(existingSplitWallet);
+  
+  const currentUserParticipant = useMemo(() => {
+    if (!degenState.splitWallet || !currentUser?.id) {return null;}
+    return degenState.splitWallet.participants.find(
+      participant => participant.userId === currentUser.id.toString()
+    ) || null;
+  }, [degenState.splitWallet, currentUser?.id]);
+  const hasCurrentUserWithdrawn = currentUserParticipant?.status === 'paid';
+  const isPrivateKeyActionDisabled = hasCurrentUserWithdrawn || degenState.isFetchingPrivateKey;
   const degenLogic = useDegenSplitLogic(degenState, (updates) => {
     // Update state function
     Object.keys(updates).forEach(key => {
@@ -334,9 +344,8 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   };
 
   const handleShowPrivateKey = async () => {
-    if (degenState.splitWallet) {
+    if (!degenState.splitWallet || degenState.isFetchingPrivateKey) {return;}
       await degenLogic.handleShowPrivateKey(degenState.splitWallet, currentUser);
-    }
   };
 
   const handleCopyWalletAddress = (address: string) => {
@@ -409,6 +418,17 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       }
     }
   }, [splitData?.id, currentUser?.id, totalAmount, participants?.length]); // CRITICAL FIX: Add participants.length dependency
+
+  // Pre-fetch private key payload when wallet loads to speed up "View Private Key" action
+  useEffect(() => {
+    if (degenState.splitWallet?.id && currentUser?.id) {
+      const { SplitWalletService } = require('../../services/split');
+      // Pre-fetch in background - don't await, let it happen asynchronously
+      SplitWalletService.preFetchPrivateKeyPayload(degenState.splitWallet.id).catch(() => {
+        // Silently fail - pre-fetch is optional optimization
+      });
+    }
+  }, [degenState.splitWallet?.id, currentUser?.id]);
 
   // Start periodic checks
   useEffect(() => {
@@ -532,27 +552,25 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
               <TouchableOpacity
                 style={[
                   styles.privateKeyButton,
-                  // CRITICAL: Disable if user has already withdrawn (single withdrawal rule)
-                  (() => {
-                    const currentUserParticipant = degenState.splitWallet?.participants.find(
-                      p => p.userId === currentUser?.id.toString()
-                    );
-                    return currentUserParticipant?.status === 'paid' ? { opacity: 0.5 } : {};
-                  })()
+                  isPrivateKeyActionDisabled ? { opacity: 0.5 } : {}
                 ]}
                 onPress={handleShowPrivateKey}
-                disabled={(() => {
-                  const currentUserParticipant = degenState.splitWallet?.participants.find(
-                    p => p.userId === currentUser?.id.toString()
-                  );
-                  return currentUserParticipant?.status === 'paid';
-                })()}
+                disabled={isPrivateKeyActionDisabled}
               >
+                {degenState.isFetchingPrivateKey ? (
+                  <>
+                    <ActivityIndicator color={colors.white} style={{ marginRight: spacing.xs }} />
+                    <Text style={styles.privateKeyButtonText}>Retrieving...</Text>
+                  </>
+                ) : (
+                  <>
                 <Image
                   source={require('../../../assets/eye-icon.png')}
                   style={styles.privateKeyButtonIcon}
                 />
                 <Text style={styles.privateKeyButtonText}>View Private Key</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -753,13 +771,8 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
               size="small"
               icon="Key"
               iconPosition="left"
-              disabled={(() => {
-                // CRITICAL: Disable if user has already withdrawn (single withdrawal rule)
-                const currentUserParticipant = degenState.splitWallet?.participants.find(
-                  p => p.userId === currentUser?.id.toString()
-                );
-                return currentUserParticipant?.status === 'paid';
-              })()}
+              disabled={hasCurrentUserWithdrawn}
+              loading={degenState.isFetchingPrivateKey}
             />
           </View>
         )}

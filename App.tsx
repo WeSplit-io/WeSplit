@@ -67,6 +67,9 @@ import TransactionHistoryScreen from './src/screens/TransactionHistory/Transacti
 import ExternalWalletConnectionScreen from './src/screens/ExternalWalletConnection/ExternalWalletConnectionScreen';
 import ManualSignatureInputScreen from './src/screens/ExternalWalletConnection/ManualSignatureInputScreen';
 import ManualBillCreationScreen from './src/screens/Billing/ManualBillCreation/ManualBillCreationScreen';
+import CreateSharedWalletScreen from './src/screens/SharedWallet/CreateSharedWalletScreen';
+import SharedWalletDetailsScreen from './src/screens/SharedWallet/SharedWalletDetailsScreen';
+import SharedWalletSettingsScreen from './src/screens/SharedWallet/SharedWalletSettingsScreen';
 // import AuthDebugScreen from './src/screens/Debug/AuthDebugScreen';
 
 // Development-only test screen
@@ -196,6 +199,9 @@ export default function App() {
                     <Stack.Screen name="ExternalWalletConnection" component={ExternalWalletConnectionScreen} />
                     <Stack.Screen name="ManualSignatureInput" component={ManualSignatureInputScreen} />
                     <Stack.Screen name="ManualBillCreation" component={ManualBillCreationScreen} />
+                    <Stack.Screen name="CreateSharedWallet" component={CreateSharedWalletScreen} />
+                    <Stack.Screen name="SharedWalletDetails" component={SharedWalletDetailsScreen} />
+                    <Stack.Screen name="SharedWalletSettings" component={SharedWalletSettingsScreen} />
                     {/* <Stack.Screen name="AuthDebug" component={AuthDebugScreen} /> */}
                     {__DEV__ && WalletPersistenceTestScreen && (
                       <Stack.Screen name="WalletPersistenceTest" component={WalletPersistenceTestScreen} />

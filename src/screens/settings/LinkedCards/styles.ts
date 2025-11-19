@@ -205,4 +205,15 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     textAlign: 'center',
   },
+  selectableCard: {
+    borderWidth: 1,
+    borderColor: colors.white10,
+    borderRadius: spacing.lg,
+  },
+  selectionHint: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.md,
+    fontStyle: 'italic',
+  },
 });

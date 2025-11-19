@@ -371,6 +371,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   };
 
   const handleShowPrivateKey = async () => {
+    if (degenState.isFetchingPrivateKey) {return;}
     await degenLogic.handleShowPrivateKey(splitWallet, currentUser);
   };
 
@@ -495,7 +496,8 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             onPress={handleShowPrivateKey}
             variant="secondary"
             style={styles.splitWalletButton}
-            disabled={hasAlreadyClaimed} // Disable after withdrawal (single withdrawal rule)
+            disabled={hasAlreadyClaimed || degenState.isFetchingPrivateKey} // Disable after withdrawal (single withdrawal rule)
+            loading={degenState.isFetchingPrivateKey}
           />
           
           {isWinner ? (

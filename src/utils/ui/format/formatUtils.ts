@@ -69,6 +69,33 @@ export function formatCurrency(amount: number, currency: string = 'USD', decimal
 }
 
 /**
+ * Format balance for display (handles USDC specially)
+ * This is the unified function for formatting balances across the app
+ * @param amount Amount to format
+ * @param currency Currency code (default: 'USDC')
+ * @param decimals Number of decimal places (default: 2 for display, 6 for USDC)
+ * @returns Formatted string with currency
+ */
+export function formatBalance(amount: number, currency: string = 'USDC', decimals?: number): string {
+  if (currency === 'USDC') {
+    const displayDecimals = decimals ?? 6;
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: displayDecimals,
+    }).format(amount) + ' USDC';
+  }
+  
+  // For other currencies, use standard currency formatting
+  const displayDecimals = decimals ?? 2;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: displayDecimals,
+  }).format(amount);
+}
+
+/**
  * Round USDC amount to proper precision (6 decimal places)
  * Uses proper rounding to avoid floating point precision issues
  * @param amount Amount to round
@@ -203,6 +230,7 @@ export const formatUtils = {
   amount: formatAmount,
   number: formatNumber,
   currency: formatCurrency,
+  balance: formatBalance,
   roundUsdc: roundUsdcAmount,
   usdcDisplay: formatUsdcForDisplay,
   walletAddress: formatWalletAddress,

@@ -28,8 +28,11 @@ import Avatar from '../../../components/shared/Avatar';
 import GroupIcon from '../../../components/GroupIcon';
 import Icon from '../../../components/Icon';
 import { Container, Button, ModernLoader } from '../../../components/shared';
+import Tabs from '../../../components/shared/Tabs';
+import SharedWalletCard from '../../../components/SharedWalletCard';
 import { BillSplitSummary } from '../../../types/billSplitting';
 import { splitStorageService, Split, SplitStorageService } from '../../../services/splits';
+import { SharedWalletService, SharedWallet } from '../../../services/sharedWallet';
 import { logger } from '../../../services/analytics/loggingService';
 import { MockupDataService } from '../../../services/data/mockupData';
 import { priceManagementService } from '../../../services/core';
@@ -66,10 +69,10 @@ const AvatarComponent = ({ avatar, displayName, style, userId }: { avatar?: stri
   );
 };
 
-const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
+const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }) => {
   const { state } = useApp();
   const { currentUser } = state;
-
+  
   const [splits, setSplits] = useState<Split[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,11 +83,16 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
   const [totalSplits, setTotalSplits] = useState(0); // Track total splits for page calculation
   const [lastDoc, setLastDoc] = useState<any>(null); // Store last document for pagination
   const [pageHistory, setPageHistory] = useState<Array<{ page: number; lastDoc: any }>>([]); // Track page history for navigation
+  const [activeTab, setActiveTab] = useState<'splits' | 'sharedWallets'>('splits'); // NEW: Top-level tab state
+  const [sharedWallets, setSharedWallets] = useState<SharedWallet[]>([]);
+  const [isLoadingSharedWallets, setIsLoadingSharedWallets] = useState(false);
   const SPLITS_PER_PAGE = 20;
   
   // Refs to prevent infinite loops
   const hasLoadedOnFocusRef = useRef(false);
   const lastUserIdRef = useRef<string | null>(null);
+  const lastRouteParamsRef = useRef<string>(''); // Track last route params to detect changes
+  const userHasManuallyChangedTabRef = useRef(false); // Track if user manually changed tab
   
   // Calculate total pages
   const totalPages = Math.ceil(totalSplits / SPLITS_PER_PAGE) || 1;
@@ -154,6 +162,69 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     // loadSplits is stable and doesn't need to be in deps
   }, [currentUser?.id]);
 
+  // Load shared wallets
+  const loadSharedWallets = useCallback(async () => {
+    if (!currentUser?.id) {
+      return;
+    }
+
+    setIsLoadingSharedWallets(true);
+    try {
+      const result = await SharedWalletService.getUserSharedWallets(currentUser.id.toString());
+      if (result.success && result.wallets) {
+        setSharedWallets(result.wallets);
+        if (__DEV__) {
+          logger.debug('Shared wallets loaded successfully', { 
+            count: result.wallets.length,
+            walletIds: result.wallets.map(w => w.id)
+          }, 'SplitsListScreen');
+        }
+      } else {
+        logger.error('Failed to load shared wallets', { error: result.error }, 'SplitsListScreen');
+        // Don't clear wallets on error - keep existing ones to prevent flickering
+        // Only clear if we have no wallets yet
+        setSharedWallets(prev => prev.length === 0 ? [] : prev);
+      }
+    } catch (error) {
+      logger.error('Error loading shared wallets', error, 'SplitsListScreen');
+      // Don't clear wallets on error - keep existing ones to prevent flickering
+      // Only clear if we have no wallets yet
+      setSharedWallets(prev => prev.length === 0 ? [] : prev);
+    } finally {
+      setIsLoadingSharedWallets(false);
+    }
+  }, [currentUser?.id]);
+
+  // Handle route params to set active tab (e.g., when navigating from CreateSharedWallet or SharedWalletDetails)
+  // Only apply if user hasn't manually changed the tab and route params have changed
+  useEffect(() => {
+    const currentRouteParams = route?.params || {};
+    const routeParamsKey = JSON.stringify(currentRouteParams);
+    const newInitialTab = currentRouteParams.activeTab as 'splits' | 'sharedWallets' | undefined;
+    
+    // Only apply route params if:
+    // 1. There's a new tab in route params
+    // 2. The route params have actually changed (not just re-render)
+    // 3. User hasn't manually changed the tab
+    // 4. The new tab is different from current tab
+    if (
+      newInitialTab &&
+      routeParamsKey !== lastRouteParamsRef.current &&
+      !userHasManuallyChangedTabRef.current &&
+      newInitialTab !== activeTab
+    ) {
+      setActiveTab(newInitialTab);
+      lastRouteParamsRef.current = routeParamsKey;
+      // Clear route params after applying to prevent re-applying
+      if (navigation.setParams) {
+        navigation.setParams({ activeTab: undefined });
+      }
+    } else if (routeParamsKey !== lastRouteParamsRef.current) {
+      // Update ref even if we don't apply, to track changes
+      lastRouteParamsRef.current = routeParamsKey;
+    }
+  }, [route?.params, activeTab, navigation]);
+
   // Refresh splits when screen comes into focus (e.g., after joining a split or creating a new one)
   useFocusEffect(
     useCallback(() => {
@@ -170,20 +241,39 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         setCurrentPage(1);
         setPageHistory([]);
         setLastDoc(null);
+        // Reset manual tab change flag when user changes
+        userHasManuallyChangedTabRef.current = false;
+        lastRouteParamsRef.current = '';
       }
       
-      // Always reload on focus to ensure we have the latest splits
-      // This is important when user creates a new split and navigates back
-        if (__DEV__) {
-          logger.debug('Screen focused, loading splits for user', { userId: currentUser.id }, 'SplitsListScreen');
-        }
+      // Always reload on focus to ensure we have the latest data
+      // This is important when user creates a new split/wallet and navigates back
+      if (__DEV__) {
+        logger.debug('Screen focused, loading data for user', { userId: currentUser.id }, 'SplitsListScreen');
+      }
+      
+      // Load splits if on splits tab
+      if (activeTab === 'splits') {
         // Clear avatar cache to force reload
         setParticipantAvatars({});
         // Load page 1 on focus (user might have created a new split)
         loadSplits(1, undefined);
         hasLoadedOnFocusRef.current = true;
-    }, [currentUser?.id])
+      } else if (activeTab === 'sharedWallets') {
+        // Load shared wallets if on shared wallets tab
+        loadSharedWallets();
+      }
+    }, [currentUser?.id, activeTab, loadSharedWallets])
   );
+
+
+  // Load shared wallets when tab changes to sharedWallets
+  // Only load if we don't already have wallets to prevent unnecessary reloads
+  useEffect(() => {
+    if (activeTab === 'sharedWallets' && currentUser?.id && sharedWallets.length === 0 && !isLoadingSharedWallets) {
+      loadSharedWallets();
+    }
+  }, [activeTab, currentUser?.id, loadSharedWallets, sharedWallets.length, isLoadingSharedWallets]);
 
   // Load participant avatars when splits change
   useEffect(() => {
@@ -402,13 +492,17 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    if (activeTab === 'splits') {
     // Reset to page 1 on refresh
     setCurrentPage(1);
     setPageHistory([]);
     setLastDoc(null);
     await loadSplits(1, undefined);
+    } else if (activeTab === 'sharedWallets') {
+      await loadSharedWallets();
+    }
     setRefreshing(false);
-  }, []);
+  }, [activeTab, loadSharedWallets]);
 
 
   const handleCreateSplit = useCallback(() => {
@@ -418,6 +512,32 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     } catch (err) {
       console.error('❌ SplitsListScreen: Error navigating to camera:', err);
       Alert.alert('Navigation Error', 'Failed to open camera');
+    }
+  }, [navigation]);
+
+  const handleCreateSharedWallet = useCallback(() => {
+    try {
+      navigation.navigate('CreateSharedWallet');
+    } catch (err) {
+      console.error('❌ SplitsListScreen: Error navigating to create shared wallet:', err);
+      Alert.alert('Navigation Error', 'Failed to open create shared wallet screen');
+    }
+  }, [navigation]);
+
+  const handleSharedWalletPress = useCallback((wallet: SharedWallet) => {
+    try {
+      logger.debug('Opening shared wallet', {
+        walletId: wallet.id,
+        name: wallet.name
+      }, 'SplitsListScreen');
+      
+      navigation.navigate('SharedWalletDetails', {
+        walletId: wallet.id,
+        wallet: wallet,
+      });
+    } catch (err) {
+      console.error('❌ SplitsListScreen: Error opening shared wallet:', err);
+      Alert.alert('Error', 'Failed to open shared wallet');
     }
   }, [navigation]);
 
@@ -678,7 +798,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           <Text style={styles.headerTitle}>Pools</Text>
           <TouchableOpacity
             style={styles.newPoolButton}
-            onPress={handleCreateSplit}
+            onPress={activeTab === 'splits' ? handleCreateSplit : handleCreateSharedWallet}
             activeOpacity={0.8}
           >
             <LinearGradient
@@ -688,12 +808,35 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
               style={styles.newPoolButton}
             >
               <Icon name="plus" size={16} color={colors.black} />
-              <Text style={styles.newPoolButtonText}>New Pool</Text>
+              <Text style={styles.newPoolButtonText}>
+                {activeTab === 'splits' ? 'New Pool' : 'New Wallet'}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        {/* Filter Tabs */}
+        {/* Top-Level Tabs: Splits | Shared Wallets */}
+        <Tabs
+          tabs={[
+            { label: 'Splits', value: 'splits' },
+            { label: 'Shared Wallets', value: 'sharedWallets' },
+          ]}
+          activeTab={activeTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab as 'splits' | 'sharedWallets');
+            // Mark that user has manually changed the tab
+            // This prevents route params from overriding user's choice
+            userHasManuallyChangedTabRef.current = true;
+            // Clear route params to prevent them from interfering
+            if (navigation.setParams) {
+              navigation.setParams({ activeTab: undefined });
+            }
+          }}
+          enableAnimation={true}
+        />
+
+        {/* Filter Tabs - Only show when "Splits" tab is active */}
+        {activeTab === 'splits' && (
         <View style={styles.filtersContainer}>
           <TouchableOpacity
             style={{ flex: 1 }}
@@ -770,9 +913,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             )}
           </TouchableOpacity>
         </View>
+        )}
 
         {/* Page Indicator - Below filter tabs */}
-        {(hasMore || currentPage > 1) && displaySplits.length > 0 && (
+        {activeTab === 'splits' && (hasMore || currentPage > 1) && displaySplits.length > 0 && (
           <View style={styles.pageIndicatorContainer}>
             <Text style={styles.pageIndicatorText}>
               Page {currentPage} of {totalPages}
@@ -780,8 +924,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           </View>
         )}
 
-        {/* Splits List */}
-        {isLoading ? (
+        {/* Content based on active tab */}
+        {activeTab === 'splits' ? (
+          /* Splits List */
+          isLoading ? (
           <View style={styles.loadingContainer}>
             <ModernLoader size="large" text="Loading splits..." />
           </View>
@@ -815,6 +961,45 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           <View>
             {displaySplits.map(renderSplitCard)}
           </View>
+          )
+        ) : (
+          /* Shared Wallets List */
+          isLoadingSharedWallets ? (
+            <View style={styles.loadingContainer}>
+              <ModernLoader size="large" text="Loading shared wallets..." />
+            </View>
+          ) : sharedWallets.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Image
+                source={require('../../../../assets/pool-empty-icon.png')}
+                style={styles.emptyStateIcon}
+              />
+              <View style={styles.emptyStateContent}>
+                <Text style={styles.emptyStateTitle}>No Shared Wallets</Text>
+                <Text style={styles.emptyStateSubtitle}>
+                  Create a shared wallet to manage ongoing expenses with friends and family.
+                </Text>
+              </View>
+              <Button
+                title="Create Shared Wallet"
+                onPress={handleCreateSharedWallet}
+                variant="primary"
+                size="large"
+                style={styles.createFirstButtonWrapper}
+              />
+            </View>
+          ) : (
+            <View>
+              {sharedWallets.map((wallet) => (
+                <SharedWalletCard
+                  key={wallet.id}
+                  wallet={wallet}
+                  currentUserId={currentUser?.id?.toString()}
+                  onPress={handleSharedWalletPress}
+                />
+              ))}
+            </View>
+          )
         )}
         </ScrollView>
       </View>

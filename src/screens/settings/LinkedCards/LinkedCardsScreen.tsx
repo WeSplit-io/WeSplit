@@ -11,11 +11,15 @@ import { Container } from '../../../components/shared';
 import PhosphorIcon from '../../../components/shared/PhosphorIcon';
 import Button from '../../../components/shared/Button';
 import { colors, typography } from '@/theme';
+import { SharedWalletService } from '../../../services/sharedWallet';
 import ModernLoader from '@/components/shared/ModernLoader';
 
-const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
+const LinkedCardsScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
   const { currentUser } = state;
+  
+  // Get return route params if navigating from SharedWalletDetails
+  const { returnRoute, returnParams } = route?.params || {};
   
   const [externalWallets, setExternalWallets] = useState<LinkedWallet[]>([]);
   const [kastCards, setKastCards] = useState<LinkedWallet[]>([]);
@@ -159,6 +163,17 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
             status: newCard.status,
             balance: newCard.balance 
           }, 'LinkedCardsScreen');
+          
+          // If navigating from SharedWalletDetails, return with the new card
+          if (returnRoute === 'SharedWalletDetails' && returnParams) {
+            // Navigate back with the new card info for auto-linking
+            navigation.navigate(returnRoute, {
+              ...returnParams,
+              newlyAddedCard: newCard,
+            });
+            return;
+          }
+          
           Alert.alert('Success', `Solana card "${newCard.label}" has been linked successfully!`);
         } else {
           logger.error('Failed to add Solana card', { error: result.error }, 'LinkedCardsScreen');
@@ -336,16 +351,59 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
     );
   };
 
+  // Handle card selection when coming from SharedWalletDetails
+  const handleSelectCard = (card: LinkedWallet) => {
+    logger.info('Card selected for linking', { 
+      cardId: card.id, 
+      cardLabel: card.label,
+      returnRoute,
+      hasReturnParams: !!returnParams
+    }, 'LinkedCardsScreen');
+    
+    if (returnRoute === 'SharedWalletDetails' && returnParams) {
+      // Navigate back with the selected card for linking
+      logger.info('Navigating back to SharedWalletDetails with selected card', {
+        walletId: returnParams.walletId,
+        cardId: card.id
+      }, 'LinkedCardsScreen');
+      
+      navigation.navigate(returnRoute, {
+        ...returnParams,
+        selectedCard: card,
+      });
+    } else {
+      logger.warn('Cannot navigate: missing returnRoute or returnParams', {
+        returnRoute,
+        hasReturnParams: !!returnParams
+      }, 'LinkedCardsScreen');
+    }
+  };
+
   const renderKastCards = () => {
+    const isSelectionMode = returnRoute === 'SharedWalletDetails';
+    
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Solana Cards</Text>
+        {isSelectionMode && (
+          <Text style={styles.selectionHint}>Tap a card to link it to the shared wallet</Text>
+        )}
         {kastCards.length === 0 ? (
           <Text style={styles.emptyCategoryText}>No Solana cards yet</Text>
         ) : (
           kastCards.map((card) => (
-            <View key={card.id} style={styles.destinationItemContainer}>
-              <TouchableOpacity style={styles.destinationItem}>
+            <View
+              key={card.id}
+              style={[
+                styles.destinationItemContainer,
+                isSelectionMode && styles.selectableCard
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.destinationItem}
+                onPress={isSelectionMode ? () => handleSelectCard(card) : undefined}
+                activeOpacity={isSelectionMode ? 0.7 : 1}
+              >
               <View style={styles.destinationIcon}>
                 <PhosphorIcon 
                   name="CreditCard" 
@@ -360,6 +418,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
                     {formatWalletAddress(card.address || '')}
                   </Text>
                 </View>
+                {!isSelectionMode && (
                 <View style={styles.destinationActions}>
                   <TouchableOpacity 
                     style={styles.actionButton}
@@ -371,8 +430,17 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
                     <Text style={styles.actionButtonText}>•••</Text>
                   </TouchableOpacity>
                 </View>
+                )}
+                {isSelectionMode && (
+                  <PhosphorIcon 
+                    name="CaretRight" 
+                    size={20} 
+                    color={colors.green} 
+                    weight="regular"
+                  />
+                )}
               </TouchableOpacity>
-              {expandedItemId === card.id && (
+              {!isSelectionMode && expandedItemId === card.id && (
                 <View style={styles.dropdownMenu}>
                   <TouchableOpacity 
                     style={styles.dropdownItem}

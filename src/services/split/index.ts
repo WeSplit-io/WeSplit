@@ -215,6 +215,11 @@ export class SplitWalletService {
     return SplitWalletSecurity.getSplitWalletPrivateKey(splitWalletId, requesterId);
   }
 
+  static async preFetchPrivateKeyPayload(splitWalletId: string) {
+    await loadModules();
+    return SplitWalletSecurity.preFetchPrivateKeyPayload(splitWalletId);
+  }
+
   static async deleteSplitWalletPrivateKey(splitWalletId: string, creatorId: string) {
     await loadModules();
     return SplitWalletSecurity.deleteSplitWalletPrivateKey(splitWalletId, creatorId);

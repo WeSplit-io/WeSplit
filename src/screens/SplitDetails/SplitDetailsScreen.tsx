@@ -746,16 +746,83 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Handle selected contacts from Contacts screen
   useEffect(() => {
-    if (route?.params?.selectedContacts && Array.isArray(route.params.selectedContacts)) {
-      // Add all selected contacts to invited users
-      route.params.selectedContacts.forEach((contact: any) => {
-        inviteContact(contact);
-      });
+    const handleSelectedContacts = async () => {
+      if (!route?.params?.selectedContacts || !Array.isArray(route.params.selectedContacts) || route.params.selectedContacts.length === 0) {
+        return;
+      }
 
+      if (!currentUser) {
+        logger.warn('Cannot process selected contacts: missing current user', null, 'SplitDetailsScreen');
+        return;
+      }
+
+      const splitIdToUse = createdSplitId || currentSplitData?.id || splitId || effectiveSplitId;
+      if (!splitIdToUse) {
+        logger.warn('Cannot process selected contacts: missing split ID', null, 'SplitDetailsScreen');
+        return;
+      }
+
+      setIsInvitingUsers(true);
+      try {
+        const { SplitParticipantInvitationService } = await import('../../services/splits/SplitParticipantInvitationService');
+        
+        // Filter out existing participants
+        const newContacts = SplitParticipantInvitationService.filterExistingParticipants(
+          route.params.selectedContacts,
+          participants
+        );
+
+        if (newContacts.length === 0) {
+          Alert.alert('Info', 'All selected contacts are already participants in this split.');
+          navigation.setParams({ selectedContacts: undefined });
+          setIsInvitingUsers(false);
+          return;
+        }
+
+        const result = await SplitParticipantInvitationService.inviteParticipants({
+          splitId: splitIdToUse,
+          inviterId: currentUser.id.toString(),
+          inviterName: currentUser.name || 'User',
+          contacts: newContacts,
+          billName: billName,
+          totalAmount: parseFloat(totalAmount) || 0,
+          existingParticipants: participants,
+          splitWalletId: currentSplitData?.walletId,
+        });
+
+        if (result.success) {
+          // Reload split data to show the newly added participants
+          if (effectiveSplitId) {
+            await loadSplitData();
+          } else {
+            // For new bills, just reload from the database
+            if (splitIdToUse) {
+              const reloadResult = await SplitStorageService.getSplit(splitIdToUse);
+              if (reloadResult.success && reloadResult.split) {
+                setCurrentSplitData(reloadResult.split);
+              }
+            }
+          }
+
+          Alert.alert(
+            'Success',
+            result.message || `Successfully invited ${result.invitedCount} participant(s) to the split.`
+          );
+        } else {
+          Alert.alert('Error', result.error || 'Failed to invite participants');
+        }
+      } catch (error) {
+        logger.error('Error processing selected contacts', error as Record<string, unknown>, 'SplitDetailsScreen');
+        Alert.alert('Error', 'Failed to invite participants. Please try again.');
+      } finally {
+        setIsInvitingUsers(false);
       // Clear the selected contacts from route params to avoid re-processing
       navigation.setParams({ selectedContacts: undefined });
     }
-  }, [route?.params?.selectedContacts]);
+    };
+
+    handleSelectedContacts();
+  }, [route?.params?.selectedContacts, currentUser, participants, billName, totalAmount, effectiveSplitId, createdSplitId, currentSplitData, splitId, navigation]);
 
   useEffect(() => {
     // Check if split is already active/locked and redirect accordingly
@@ -1279,37 +1346,22 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         return;
       }
 
-      // Fetch the latest user data to get current wallet address
-      let latestWalletAddress = contact.walletAddress || contact.wallet_address || '';
-      try {
-        const { firebaseDataService } = await import('../../services/data');
-        const latestUserData = await firebaseDataService.user.getCurrentUser(contact.id || contact.userId);
-        if (latestUserData?.wallet_address) {
-          latestWalletAddress = latestUserData.wallet_address;
-        }
-      } catch (error) {
-        logger.warn('Could not fetch latest user data, using contact data', error as Record<string, unknown>, 'SplitDetailsScreen');
-      }
+      // Use the reusable service for consistency
+      const { SplitParticipantInvitationService } = await import('../../services/splits/SplitParticipantInvitationService');
+      
+      const result = await SplitParticipantInvitationService.inviteParticipants({
+        splitId: splitIdToUse,
+        inviterId: currentUser.id.toString(),
+        inviterName: currentUser.name || 'User',
+        contacts: [contact],
+        billName: billName,
+        totalAmount: parseFloat(totalAmount) || 0,
+        existingParticipants: participants,
+        splitWalletId: currentSplitData?.walletId,
+      });
 
-      // No longer managing local invited users state - participants are managed through the database
-
-      // Add participant to the split in the database
-      const participantData = {
-        userId: contact.id || contact.userId,
-        name: contact.name,
-        email: contact.email || '',
-        walletAddress: latestWalletAddress,
-        amountOwed: 0, // Will be calculated when split is finalized
-        amountPaid: 0,
-        status: 'invited' as const,
-        avatar: contact.avatar
-      };
-
-      const addParticipantResult = await SplitStorageService.addParticipant(splitIdToUse, participantData);
-
-      if (!addParticipantResult.success) {
-        logger.error('Failed to add participant to split', { error: addParticipantResult.error }, 'SplitDetailsScreen');
-        Alert.alert('Error', 'Failed to add participant to split. Please try again.');
+      if (!result.success) {
+        Alert.alert('Error', result.error || 'Failed to invite contact. Please try again.');
         return;
       }
 
@@ -1327,81 +1379,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         }
       }
 
-      // Update split wallet participants if we have a split wallet
-      if (currentSplitData?.walletId) {
-        try {
-          const { SplitWalletManagement } = await import('../../services/split/SplitWalletManagement');
-
-          // Get current split data to get all participants
-          const updatedSplitResult = await SplitStorageService.getSplit(splitIdToUse);
-          if (updatedSplitResult.success && updatedSplitResult.split) {
-            const allParticipants = updatedSplitResult.split.participants.map(p => ({
-              userId: p.userId,
-              name: p.name,
-              walletAddress: p.walletAddress,
-              amountOwed: p.amountOwed
-            }));
-
-            await SplitWalletManagement.updateSplitWalletParticipants(
-              currentSplitData.walletId,
-              allParticipants
-            );
-          }
-        } catch (walletError) {
-          logger.warn('Failed to update split wallet participants', { error: walletError }, 'SplitDetailsScreen');
-          // Don't fail the entire operation if wallet update fails
-        }
-      }
-
-      // Send notification to the invited user
-      logger.info('Sending split invitation notification', {
-        toUserId: contact.id || contact.userId,
-        fromUserId: currentUser.id.toString(),
-        splitId: splitIdToUse,
-        billName: billName
-      }, 'SplitDetailsScreen');
-
-      const notificationResult = await notificationService.instance.sendNotification(
-        contact.id || contact.userId,
-        'Split Invitation',
-        `${currentUser.name} has invited you to split "${billName}"`,
-        'split_invite',
-        {
-          splitId: splitIdToUse,
-          billName: billName,
-          totalAmount: parseFloat(totalAmount),
-          currency: 'USDC',
-          invitedBy: currentUser.id.toString(),
-          invitedByName: currentUser.name,
-          participantName: contact.name,
-          status: 'pending'
-        }
-      );
-
-      if (notificationResult) {
-        logger.info('Split invitation sent successfully', {
-          splitId: splitIdToUse,
-          invitedUserId: contact.id || contact.userId,
-          invitedUserName: contact.name,
-          billName
-        }, 'SplitDetailsScreen');
-
+      // Show success message
         Alert.alert(
           'Invitation Sent!',
           `${contact.name} has been invited to the split and will receive a notification.`
         );
-      } else {
-        logger.warn('Failed to send notification, but participant was added', {
-          splitId: splitIdToUse,
-          invitedUserId: contact.id || contact.userId,
-          invitedUserName: contact.name
-        }, 'SplitDetailsScreen');
-
-        Alert.alert(
-          'Participant Added',
-          `${contact.name} has been added to the split, but the notification may not have been sent.`
-        );
-      }
 
     } catch (error) {
       logger.error('Error inviting contact', error as Record<string, unknown>, 'SplitDetailsScreen');
