@@ -7,12 +7,13 @@ import {
 } from 'react-native';
 import { Transaction } from '../../types';
 import { colors, spacing, typography } from '../../theme';
-import { 
-  PaperPlaneTilt, 
-  HandCoins, 
-  ArrowLineDown, 
-  Bank 
-} from 'phosphor-react-native';
+import { PhosphorIcon } from '../shared';
+import { formatBalance } from '../../utils/ui/format/formatUtils';
+import {
+  getTransactionIconName,
+  formatTransactionTitle,
+  formatTransactionSource,
+} from '../../utils/transactionDisplayUtils';
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -30,61 +31,36 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
   senderName,
 }) => {
   const getTransactionIcon = () => {
-    const iconProps = {
-      size: 20,
-      color: colors.white,
-    };
-
-    switch (transaction.type) {
-      case 'send':
-        return <PaperPlaneTilt {...iconProps} />;
-      case 'receive':
-        return <HandCoins {...iconProps} />;
-      case 'deposit':
-        return <ArrowLineDown {...iconProps} />;
-      case 'withdraw':
-        return <Bank {...iconProps} />;
-      default:
-        return <PaperPlaneTilt {...iconProps} />;
-    }
+    const iconName = getTransactionIconName(transaction.type);
+    return (
+      <PhosphorIcon
+        name={iconName as any}
+        size={20}
+        color={colors.white}
+        weight="regular"
+      />
+    );
   };
 
   const getTransactionTitle = () => {
-    switch (transaction.type) {
-      case 'send':
-        return `Send to ${recipientName || transaction.recipient_name || transaction.to_user || 'Unknown'}`;
-      case 'receive':
-        return `Received from ${senderName || transaction.sender_name || transaction.from_user || 'Unknown'}`;
-      case 'deposit':
-        return 'Deposit';
-      case 'withdraw':
-        return 'Withdraw';
-      default:
-        return 'Transaction';
-    }
+    return formatTransactionTitle(transaction, recipientName, senderName);
   };
 
   const getTransactionSource = () => {
-    switch (transaction.type) {
-      case 'send':
-        return transaction.note || 'Payment';
-      case 'receive':
-        return transaction.note || 'Payment received';
-      case 'deposit':
-        return 'MoonPay';
-      case 'withdraw':
-        return 'Wallet';
-      default:
-        return '';
-    }
+    return formatTransactionSource(transaction);
   };
 
   const getTransactionAmount = () => {
     const amount = transaction.amount || 0;
     const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
+    const currency = transaction.currency || 'USDC';
     
+    // Use shared formatBalance utility for consistency
+    const formattedAmount = formatBalance(amount, currency, 2);
+    
+    // formatBalance already includes currency, so we just add the sign
     return {
-      amount: `${isIncome ? '+' : '-'}${amount.toFixed(2)} USDC`,
+      amount: `${isIncome ? '+' : '-'}${formattedAmount}`,
       color: isIncome ? colors.primaryGreen : colors.text
     };
   };

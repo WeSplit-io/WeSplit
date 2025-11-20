@@ -10,6 +10,12 @@ import { PhosphorIcon } from '../shared';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import {
+  getTransactionIconName,
+  getTransactionTypeLabel,
+  isIncomeTransaction,
+  isExpenseTransaction,
+} from '../../utils/transactionDisplayUtils';
 
 // Unified transaction interface that supports both shared wallet and split transactions
 export interface UnifiedTransaction {
@@ -25,6 +31,16 @@ export interface UnifiedTransaction {
   recipientName?: string; // For splits
   from_user?: string; // For splits
   to_user?: string; // For splits
+  // Wallet addresses for identifying split wallets and external destinations
+  from_wallet?: string;
+  to_wallet?: string;
+  // Split information
+  splitId?: string;
+  splitName?: string;
+  splitWalletId?: string;
+  // External destination flags
+  isExternalCard?: boolean;
+  isExternalWallet?: boolean;
   // Additional fields
   memo?: string;
   note?: string; // Alternative to memo
@@ -75,6 +91,62 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
     return transaction.userName || 'Unknown';
   }, [transaction, variant]);
 
+  // Get the display subtitle (destination/source info)
+  const getDisplaySubtitle = useMemo(() => {
+    // For withdrawals, show destination type or split name if withdrawing from split
+    if (transaction.type === 'withdrawal') {
+      // If withdrawing FROM a split wallet, show split name
+      if (transaction.splitName) {
+        return transaction.splitName;
+      }
+      // Otherwise show destination type
+      if (transaction.isExternalCard) {
+        return 'External Card';
+      } else if (transaction.isExternalWallet) {
+        return 'External Wallet';
+      }
+      return 'Wallet';
+    }
+    
+    // For sends/payments, show destination or source
+    if (transaction.type === 'send' || transaction.type === 'payment') {
+      // If sending TO a split wallet (funding), show split name
+      if (transaction.splitName && transaction.to_wallet) {
+        // Check if the split wallet is the destination
+        const isFundingSplit = transaction.to_wallet && transaction.splitWalletId;
+        if (isFundingSplit) {
+          return transaction.splitName;
+        }
+      }
+      // If withdrawing FROM a split wallet, show split name
+      if (transaction.splitName && transaction.from_wallet) {
+        const isWithdrawingFromSplit = transaction.from_wallet && transaction.splitWalletId;
+        if (isWithdrawingFromSplit) {
+          return transaction.splitName;
+        }
+      }
+      // If we have external destination info, show it
+      if (transaction.isExternalCard) {
+        return 'External Card';
+      } else if (transaction.isExternalWallet) {
+        return 'External Wallet';
+      }
+      // Fallback to recipient name or "Unknown User"
+      return transaction.recipientName || 'Unknown User';
+    }
+    
+    // For receives/deposits, show source (receiving FROM split wallet)
+    if (transaction.type === 'receive' || transaction.type === 'deposit') {
+      if (transaction.splitName) {
+        return transaction.splitName;
+      }
+      return transaction.senderName || 'Unknown User';
+    }
+    
+    // Default: show memo/note if available
+    return transaction.memo || transaction.note || '';
+  }, [transaction]);
+
   // Get the memo/note text
   const getMemoText = useMemo(() => {
     return transaction.memo || transaction.note;
@@ -86,60 +158,30 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
   }, [transaction.createdAt, transaction.created_at]);
 
   const getIconName = () => {
-    switch (transaction.type) {
-      case 'funding':
-      case 'deposit':
-      case 'receive':
-        return 'ArrowDown';
-      case 'withdrawal':
-      case 'send':
-      case 'payment':
-        return 'ArrowUp';
-      case 'refund':
-        return 'ArrowCounterClockwise';
-      default:
-        return 'ArrowsClockwise';
-    }
+    // Map to Phosphor icon names used in this component
+    const iconMap: Record<string, string> = {
+      funding: 'ArrowDown',
+      deposit: 'ArrowDown',
+      receive: 'ArrowDown',
+      withdrawal: 'ArrowUp',
+      send: 'ArrowUp',
+      payment: 'ArrowUp',
+      refund: 'ArrowCounterClockwise',
+    };
+    return iconMap[transaction.type] || 'ArrowsClockwise';
   };
 
   const getIconColor = () => {
-    switch (transaction.type) {
-      case 'funding':
-      case 'deposit':
-      case 'receive':
-        return colors.green;
-      case 'withdrawal':
-      case 'send':
-      case 'payment':
-        return colors.error;
-      case 'refund':
-        return colors.green;
-      default:
-        return colors.white70;
+    if (isIncomeTransaction(transaction.type)) {
+      return colors.green;
+    } else if (isExpenseTransaction(transaction.type)) {
+      return colors.error;
     }
+    return colors.white70;
   };
 
   const getTypeLabel = () => {
-    switch (transaction.type) {
-      case 'funding':
-        return 'Top Up';
-      case 'withdrawal':
-        return 'Withdrawal';
-      case 'send':
-        return 'Sent';
-      case 'receive':
-        return 'Received';
-      case 'deposit':
-        return 'Deposit';
-      case 'payment':
-        return 'Payment';
-      case 'refund':
-        return 'Refund';
-      case 'fee':
-        return 'Fee';
-      default:
-        return 'Transfer';
-    }
+    return getTransactionTypeLabel(transaction.type);
   };
 
   const getStatusStyle = () => {
@@ -165,24 +207,18 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
   };
 
   const amountColor = useMemo(() => {
-    const incomeTypes = ['funding', 'deposit', 'receive', 'refund'];
-    const expenseTypes = ['withdrawal', 'send', 'payment'];
-    
-    if (incomeTypes.includes(transaction.type)) {
+    if (isIncomeTransaction(transaction.type)) {
       return colors.green;
-    } else if (expenseTypes.includes(transaction.type)) {
+    } else if (isExpenseTransaction(transaction.type)) {
       return colors.error;
     }
     return colors.white;
   }, [transaction.type]);
 
   const amountPrefix = useMemo(() => {
-    const incomeTypes = ['funding', 'deposit', 'receive', 'refund'];
-    const expenseTypes = ['withdrawal', 'send', 'payment'];
-    
-    if (incomeTypes.includes(transaction.type)) {
+    if (isIncomeTransaction(transaction.type)) {
       return '+';
-    } else if (expenseTypes.includes(transaction.type)) {
+    } else if (isExpenseTransaction(transaction.type)) {
       return '-';
     }
     return '';
@@ -206,8 +242,8 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
       </View>
       <View style={styles.transactionInfo}>
         <Text style={styles.transactionType}>{getTypeLabel()}</Text>
-        <Text style={styles.transactionUser}>{getUserDisplayName}</Text>
-        {getMemoText && (
+        <Text style={styles.transactionUser}>{getDisplaySubtitle}</Text>
+        {getMemoText && getDisplaySubtitle !== getMemoText && (
           <Text style={styles.transactionMemo} numberOfLines={1}>
             {getMemoText}
           </Text>

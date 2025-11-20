@@ -210,6 +210,9 @@ const SharedWalletDetailsScreen: React.FC = () => {
           status: tx.status,
           createdAt: tx.createdAt,
           transactionSignature: tx.transactionSignature,
+          // Include destination for withdrawals to enable external card/wallet detection
+          to_wallet: tx.destination || tx.to_wallet,
+          from_wallet: tx.from_wallet,
         }));
         setTransactions(unifiedTransactions);
       }

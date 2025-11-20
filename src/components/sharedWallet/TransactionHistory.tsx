@@ -3,13 +3,16 @@
  * Displays transaction history for shared wallets and splits
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { ModernLoader } from '../shared';
 import TransactionHistoryItem, { UnifiedTransaction } from './TransactionHistoryItem';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { enrichTransactions } from '../../utils/transactionEnrichment';
+import { deduplicateTransactions } from '../../utils/transactionDisplayUtils';
+import { useApp } from '../../context/AppContext';
 
 interface TransactionHistoryProps {
   transactions: UnifiedTransaction[];
@@ -34,6 +37,30 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   emptyMessage = 'No transactions yet',
   emptySubtext,
 }) => {
+  const { state } = useApp();
+  const { currentUser } = state;
+  const [enrichedTransactions, setEnrichedTransactions] = useState<UnifiedTransaction[]>(transactions);
+
+  // Enrich transactions with split names and external destination info
+  // Also deduplicate transactions by tx_hash to ensure uniqueness
+  useEffect(() => {
+    // Deduplicate transactions first (using shared utility)
+    const uniqueTransactions = deduplicateTransactions(transactions);
+    
+    if (uniqueTransactions.length > 0 && currentUser?.id) {
+      // Enrich with split names and external destination info
+      enrichTransactions(uniqueTransactions, currentUser.id.toString())
+        .then(setEnrichedTransactions)
+        .catch((error) => {
+          console.error('Error enriching transactions:', error);
+          setEnrichedTransactions(uniqueTransactions);
+        });
+    } else {
+      // If no user ID, just use deduplicated transactions
+      setEnrichedTransactions(uniqueTransactions);
+    }
+  }, [transactions, currentUser?.id]);
+
   const defaultEmptySubtext = variant === 'sharedWallet'
     ? 'Transactions will appear here when you top up or withdraw funds'
     : 'Transactions will appear here when payments are made';
@@ -60,7 +87,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
         )}
       </View>
       
-      {transactions.length === 0 ? (
+      {enrichedTransactions.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>{emptyMessage}</Text>
           {(emptySubtext || defaultEmptySubtext) && (
@@ -71,7 +98,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
         </View>
       ) : (
         <View style={styles.transactionsList}>
-          {transactions.map((tx) => (
+          {enrichedTransactions.map((tx) => (
             <TransactionHistoryItem
               key={tx.id || tx.firebaseDocId}
               transaction={tx}

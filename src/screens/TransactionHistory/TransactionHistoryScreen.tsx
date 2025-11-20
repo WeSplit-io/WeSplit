@@ -16,6 +16,9 @@ import { firebaseDataService } from '../../services/data';
 import { Transaction } from '../../types';
 import { TransactionModal, TransactionItem } from '../../components/transactions';
 import { getUserDisplayName, preloadUserData } from '../../services/shared/dataUtils';
+import { convertTransactionsToUnified } from '../../utils/transactionConversion';
+import { enrichTransactions } from '../../utils/transactionEnrichment';
+import { deduplicateTransactions, getTransactionKey } from '../../utils/transactionDisplayUtils';
 import styles from './styles';
 import { colors } from '../../theme/colors';
 import { logger } from '../../services/analytics/loggingService';
@@ -30,6 +33,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
   const { currentUser } = state;
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [enrichedTransactions, setEnrichedTransactions] = useState<Transaction[]>([]);
   const [userNames, setUserNames] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,9 +90,84 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
       }
       
       setTransactions(userTransactions);
+      
+      // Convert and enrich transactions for better display
+      try {
+        const unifiedTransactions = convertTransactionsToUnified(userTransactions);
+        
+        // Deduplicate by tx_hash first (using shared utility)
+        const uniqueTransactions = deduplicateTransactions(unifiedTransactions);
+        
+        // Enrich with split names and external destination info
+        const enriched = await enrichTransactions(uniqueTransactions, currentUser.id.toString());
+        
+        // Convert back to Transaction format with enriched data
+        const enrichedAsTransactions: Transaction[] = enriched.map(tx => {
+          const originalTx = userTransactions.find(t => t.id === tx.id || t.tx_hash === tx.tx_hash) || userTransactions[0];
+          
+          // Clean up note - remove wallet IDs and generic text
+          let cleanedNote = originalTx.note || tx.note || '';
+          
+          // Check if this is a split transaction
+          const isSplitTransaction = cleanedNote && (
+            cleanedNote.toLowerCase().includes('split') || 
+            cleanedNote.toLowerCase().includes('degen') ||
+            cleanedNote.match(/degen_split_wallet|split_wallet/i)
+          );
+          
+          if (tx.splitName || isSplitTransaction) {
+            // Remove wallet ID patterns from note
+            cleanedNote = cleanedNote
+              .replace(/degen_split_wallet_[a-zA-Z0-9_\s]+/gi, '') // Remove wallet IDs and trailing spaces/numbers
+              .replace(/split_wallet_[a-zA-Z0-9_\s]+/gi, '')
+              .replace(/\d{6,}[_\w]*/g, '') // Remove long number sequences (wallet ID parts)
+              .replace(/fund\s+locking/gi, '') // Remove "fund locking" text
+              .replace(/\s{2,}/g, ' ')
+              .replace(/-\s*-/g, '-')
+              .replace(/^\s*-\s*/, '') // Remove leading dash
+              .replace(/\s*-\s*$/, '') // Remove trailing dash
+              .trim();
+            
+            // If note is just generic split text, use empty string (will show "Split funding" in subtitle)
+            if (cleanedNote.match(/^(Degen Split|Fair Split|Split)\s*(fund locking|payment)?$/i) || 
+                cleanedNote.length < 5) {
+              cleanedNote = '';
+            }
+          }
+          
+          // Only set recipient_name to split name if it's a valid split name (not generic text)
+          let finalRecipientName = originalTx.recipient_name || tx.recipientName;
+          if (tx.splitName && tx.to_wallet) {
+            // Validate that splitName is not generic text like "fund locking"
+            const isValidSplitName = tx.splitName.length > 3 && 
+              !tx.splitName.toLowerCase().includes('fund locking') &&
+              !tx.splitName.toLowerCase().includes('locking') &&
+              !tx.splitName.match(/^(degen_split_wallet_|split_wallet_)/i);
+            
+            if (isValidSplitName) {
+              finalRecipientName = tx.splitName;
+            }
+          }
+          
+          return {
+            ...originalTx,
+            // Clean note without wallet IDs
+            note: cleanedNote,
+            // Only set recipient_name if we have a valid split name
+            recipient_name: finalRecipientName,
+          };
+        });
+        
+        setEnrichedTransactions(enrichedAsTransactions);
+      } catch (enrichError) {
+        logger.error('Error enriching transactions', enrichError, 'TransactionHistoryScreen');
+        // Fallback to original transactions if enrichment fails
+        setEnrichedTransactions(userTransactions);
+      }
     } catch (error) {
       console.error('❌ Error loading transactions:', error);
       Alert.alert('Error', 'Failed to load transactions');
+      setEnrichedTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -318,16 +397,39 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         ) : getFilteredTransactions().length > 0 ? (
           <View style={styles.transactionsList}>
-            {getFilteredTransactions().map(transaction => (
-              <TransactionItem
-                key={transaction.id}
-                transaction={transaction}
-                recipientName={userNames.get(transaction.to_user)}
-                senderName={userNames.get(transaction.from_user)}
-                onPress={handleTransactionPress}
-                showTime={true}
-              />
-            ))}
+            {(enrichedTransactions.length > 0 ? enrichedTransactions : transactions)
+              .filter(tx => {
+                // Apply same filtering logic
+                if (activeTab === 'income') {
+                  return tx.type === 'receive' || tx.type === 'deposit';
+                } else if (activeTab === 'expenses') {
+                  return tx.type === 'send' || tx.type === 'withdraw';
+                }
+                return true;
+              })
+              .map((transaction, index) => {
+                // For split transactions, prioritize split name from recipient_name
+                // Check if recipient_name looks like a split name (not a wallet ID)
+                const isSplitName = transaction.recipient_name && 
+                  transaction.recipient_name.length < 100 && 
+                  !transaction.recipient_name.match(/^(degen_split_wallet_|split_wallet_|wallet_)/i) &&
+                  !transaction.recipient_name.includes('Unknown');
+                
+                const finalRecipientName = isSplitName 
+                  ? transaction.recipient_name 
+                  : (userNames.get(transaction.to_user) || transaction.recipient_name);
+                
+                return (
+                  <TransactionItem
+                    key={getTransactionKey(transaction, index)}
+                    transaction={transaction}
+                    recipientName={finalRecipientName}
+                    senderName={userNames.get(transaction.from_user) || transaction.sender_name}
+                    onPress={handleTransactionPress}
+                    showTime={true}
+                  />
+                );
+              })}
           </View>
         ) : (
           renderEmptyState()
