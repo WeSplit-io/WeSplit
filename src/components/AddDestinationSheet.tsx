@@ -13,6 +13,7 @@ import { validateAddress, validateKastWalletAddress } from '../utils/network/sen
 import { spacing } from '../theme/spacing';
 import MWADetectionButton from './wallet/MWADetectionButton';
 import { ExternalCardService } from '../services/integrations/external/ExternalCardService';
+import { logger } from '../services/analytics/loggingService';
 
 // Destination type for wallet or card
 export interface Destination {
@@ -130,7 +131,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
             newErrors.address = addressValidation.error || `Please enter a valid address for ${chain}`;
           }
         } catch (error) {
-          console.error('Address validation error:', error);
+          logger.error('Address validation error', { error: error instanceof Error ? error.message : String(error) }, 'AddDestinationSheet');
           newErrors.address = 'Invalid address format';
         }
       }
@@ -144,7 +145,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
             newErrors.kastAddress = addressValidation.error || 'Please enter a valid Solana card wallet address';
           }
         } catch (error) {
-          console.error('KAST address validation error:', error);
+          logger.error('KAST address validation error', { error: error instanceof Error ? error.message : String(error) }, 'AddDestinationSheet');
           newErrors.kastAddress = 'Invalid Solana card wallet address format';
         }
       }
@@ -232,7 +233,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
           resetForm();
           return;
         } catch (error) {
-          console.error('Error validating Solana card:', error);
+          logger.error('Error validating Solana card', { error: error instanceof Error ? error.message : String(error) }, 'AddDestinationSheet');
           setErrors({ kastAddress: 'Failed to validate card. Please try again.' });
           return;
         }
@@ -250,7 +251,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
       // Reset form after successful save
       resetForm();
     } catch (error) {
-      console.error('Error in handleSave:', error);
+      logger.error('Error in handleSave', { error: error instanceof Error ? error.message : String(error) }, 'AddDestinationSheet');
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     }
   };

@@ -13,6 +13,7 @@ import { typography } from '../../theme/typography';
 import { enrichTransactions } from '../../utils/transactionEnrichment';
 import { deduplicateTransactions } from '../../utils/transactionDisplayUtils';
 import { useApp } from '../../context/AppContext';
+import { logger } from '../../services/analytics/loggingService';
 
 interface TransactionHistoryProps {
   transactions: UnifiedTransaction[];
@@ -52,7 +53,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
       enrichTransactions(uniqueTransactions, currentUser.id.toString())
         .then(setEnrichedTransactions)
         .catch((error) => {
-          console.error('Error enriching transactions:', error);
+          logger.error('Error enriching transactions', { error: error instanceof Error ? error.message : String(error) }, 'TransactionHistory');
           setEnrichedTransactions(uniqueTransactions);
         });
     } else {

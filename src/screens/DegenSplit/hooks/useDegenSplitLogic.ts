@@ -350,14 +350,12 @@ export const useDegenSplitLogic = (
     if (state.isLocked || state.isLocking || state.isLoadingWallet) {return false;}
     
     if (!currentUser?.id) {
-      // Log error but don't show popup
-      console.error('User not authenticated');
+      logger.warn('User not authenticated', null, 'DegenSplitLogic');
       return false;
     }
 
     if (!participants || !Array.isArray(participants) || participants.length === 0) {
-      // Log error but don't show popup
-      console.error('No participants found');
+      logger.warn('No participants found', null, 'DegenSplitLogic');
       return false;
     }
 
@@ -369,8 +367,7 @@ export const useDegenSplitLogic = (
       const userBalance = balanceResult?.usdcBalance || 0;
       
       if (userBalance < totalAmount) {
-        // Log error but don't show popup
-        console.error(`Insufficient funds: need ${totalAmount} USDC, have ${userBalance} USDC`);
+        logger.warn('Insufficient funds', { need: totalAmount, have: userBalance }, 'DegenSplitLogic');
         return false;
       }
       
@@ -379,8 +376,8 @@ export const useDegenSplitLogic = (
       return true;
       
     } catch (error) {
-      console.error('Error checking user balance:', error);
-      // Log error but don't show popup - continue anyway
+      logger.error('Error checking user balance', { error: error instanceof Error ? error.message : String(error) }, 'DegenSplitLogic');
+      // Continue anyway - show modal
       setState({ showLockModal: true });
       return true;
     }
@@ -431,8 +428,7 @@ export const useDegenSplitLogic = (
         );
         
         if (!syncResult.success) {
-          // Log error but don't show popup
-          console.error('Failed to sync participants:', syncResult.error);
+          logger.error('Failed to sync participants', { error: syncResult.error || 'Unknown error' }, 'DegenSplitLogic');
           setState({ isCreatingWallet: false });
           return false;
         }
@@ -754,8 +750,7 @@ export const useDegenSplitLogic = (
         return lockedCount === totalParticipants;
       }
     } catch (error) {
-      console.error('Error checking participant locks:', error);
-      logger.error('Error checking participant locks', error, 'DegenSplitLogic');
+      logger.error('Error checking participant locks', { error: error instanceof Error ? error.message : String(error) }, 'DegenSplitLogic');
     } finally {
       checkInProgressRef.current = false;
       setState({ isCheckingLocks: false });
@@ -885,8 +880,8 @@ export const useDegenSplitLogic = (
               }
             );
             createTimeoutWrapper(loserNotificationPromise, 5000, 'Send loser notification')
-              .then(() => console.log(`✅ Loser notification sent to ${loserName}`))
-              .catch(error => console.error(`❌ Failed to send loser notification to ${loserName}:`, error));
+              .then(() => logger.debug('Loser notification sent', { loserName }, 'DegenSplitLogic'))
+              .catch(error => logger.warn('Failed to send loser notification', { loserName, error: error instanceof Error ? error.message : String(error) }, 'DegenSplitLogic'));
 
               for (const winner of winnersFromResult) {
               try {
@@ -896,14 +891,14 @@ export const useDegenSplitLogic = (
                   billName
                 );
                 createTimeoutWrapper(winnerNotificationPromise, 5000, 'Send winner notification')
-                  .then(() => console.log(`✅ Winner notification sent to ${winner.name}`))
-                  .catch(error => console.error(`❌ Failed to send winner notification to ${winner.name}:`, error));
+                  .then(() => logger.debug('Winner notification sent', { winnerName: winner.name }, 'DegenSplitLogic'))
+                  .catch(error => logger.warn('Failed to send winner notification', { winnerName: winner.name, error: error instanceof Error ? error.message : String(error) }, 'DegenSplitLogic'));
               } catch (error) {
-                console.error('❌ Failed to send winner notification:', error);
+                logger.warn('Failed to send winner notification', { winnerName: winner.name, error: error instanceof Error ? error.message : String(error) }, 'DegenSplitLogic');
               }
             }
           } catch (error) {
-            console.error('❌ Failed to send roulette result notifications:', error);
+            logger.warn('Failed to send roulette result notifications', { error: error instanceof Error ? error.message : String(error) }, 'DegenSplitLogic');
           }
         })();
         }, 100);
@@ -986,10 +981,10 @@ export const useDegenSplitLogic = (
         // OPTIMIZED: Simplified error handling - real-time updates will handle success detection
         if (result.signature && result.error?.includes('confirmation timed out')) {
           // Transaction was sent but confirmation timed out
-          console.log('🔍 Transaction sent but confirmation timed out, real-time updates will handle success detection', {
+          logger.info('Transaction sent but confirmation timed out, real-time updates will handle success detection', {
             signature: result.signature,
             splitWalletId: splitWallet.id
-          });
+          }, 'DegenSplitLogic');
           
           Alert.alert(
             '⏳ Transaction Processing', 
@@ -1119,7 +1114,7 @@ export const useDegenSplitLogic = (
   // Error handling
   const handleError = useCallback((error: any, context: string) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    logger.error(`Error in ${context}`, error, 'DegenSplitLogic');
+    logger.error(`Error in ${context}`, { error: errorMessage }, 'DegenSplitLogic');
     setState({ error: errorMessage });
     Alert.alert('Error', `Failed to ${context}. Please try again.`);
   }, [setState]);

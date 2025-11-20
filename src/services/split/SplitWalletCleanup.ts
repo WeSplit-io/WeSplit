@@ -109,8 +109,7 @@ export class SplitWalletCleanup {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletCleanup: Error cancelling split wallet:', error);
-      logger.error('Failed to cancel split wallet', error, 'SplitWalletCleanup');
+      logger.error('Failed to cancel split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCleanup');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -229,8 +228,7 @@ export class SplitWalletCleanup {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletCleanup: Error completing split wallet:', error);
-      logger.error('Failed to complete split wallet', error, 'SplitWalletCleanup');
+      logger.error('Failed to complete split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCleanup');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -287,7 +285,7 @@ export class SplitWalletCleanup {
       // Delete the private key from local storage
       const deleteKeyResult = await this.deleteSplitWalletPrivateKey(splitWalletId, creatorId);
       if (!deleteKeyResult.success) {
-        console.warn('⚠️ SplitWalletCleanup: Failed to delete private key:', deleteKeyResult.error);
+        logger.warn('Failed to delete private key', { error: deleteKeyResult.error }, 'SplitWalletCleanup');
         // Don't fail the entire operation for this
       }
 
@@ -340,7 +338,7 @@ export class SplitWalletCleanup {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletCleanup: Error burning split wallet and cleanup:', error);
+      logger.error('Error burning split wallet and cleanup', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCleanup');
       logger.error('Failed to burn split wallet and cleanup', error, 'SplitWalletCleanup');
       return {
         success: false,
@@ -427,7 +425,7 @@ export class SplitWalletCleanup {
       return { success: true };
 
     } catch (error) {
-      console.error('🔍 SplitWalletCleanup: Error burning split wallet funds:', error);
+      logger.error('Error burning split wallet funds', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCleanup');
       logger.error('Failed to burn split wallet funds', error, 'SplitWalletCleanup');
       return {
         success: false,

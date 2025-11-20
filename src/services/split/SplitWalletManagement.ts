@@ -269,7 +269,7 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletManagement: Error updating split wallet amount:', error);
+      logger.error('Error updating split wallet amount', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
       logger.error('Failed to update split wallet amount', error, 'SplitWalletManagement');
       return {
         success: false,
@@ -374,7 +374,7 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletManagement: Error updating split wallet:', error);
+      logger.error('Error updating split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
       logger.error('Failed to update split wallet', error, 'SplitWalletManagement');
       return {
         success: false,
@@ -500,7 +500,7 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletManagement: Error updating split wallet participants:', error);
+      logger.error('Error updating split wallet participants', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
       logger.error('Failed to update split wallet participants', error, 'SplitWalletManagement');
       return {
         success: false,
@@ -566,7 +566,7 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletManagement: Error locking split wallet:', error);
+      logger.error('Error locking split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
       logger.error('Failed to lock split wallet', error, 'SplitWalletManagement');
       return {
         success: false,
@@ -600,7 +600,7 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletManagement: Error debugging USDC balance:', error);
+      logger.error('Error debugging USDC balance', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
       logger.error('Failed to debug USDC balance', error, 'SplitWalletManagement');
       return {
         success: false,
@@ -665,7 +665,7 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletManagement: Error repairing split wallet data:', error);
+      logger.error('Error repairing split wallet data', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
       logger.error('Failed to repair split wallet data', error, 'SplitWalletManagement');
       return {
         success: false,
@@ -694,7 +694,7 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletManagement: Error repairing split wallet synchronization:', error);
+      logger.error('Error repairing split wallet synchronization', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
       logger.error('Failed to repair split wallet synchronization', error, 'SplitWalletManagement');
       return {
         success: false,

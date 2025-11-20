@@ -24,6 +24,7 @@ import Header from '../../components/shared/Header';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { colors } from '../../theme/colors';
 import styles from './styles';
+import { logger } from '../../services/analytics/loggingService';
 
 // Import the unified NotificationData interface
 import { NotificationData } from '../../types/notifications';
@@ -918,22 +919,13 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     if (state.currentUser?.id) {
       try {
         firebasePaymentRequests = await getReceivedPaymentRequests(state.currentUser.id, 10);
-        console.log('🔥 Loaded Firebase payment requests:', firebasePaymentRequests.length, firebasePaymentRequests);
-        firebasePaymentRequests.forEach((req, index) => {
-          console.log(`🔥 Firebase request ${index}:`, {
-            id: req.id,
-            senderName: req.senderName,
-            amount: req.amount,
-            description: req.description,
-            hasDescription: !!req.description,
-            descriptionLength: req.description?.length || 0,
-            descriptionTrimmed: req.description?.trim() || '',
-            isEmpty: !req.description || req.description.trim() === '',
-            rawData: req
-          });
-        });
+        if (__DEV__) {
+          logger.debug('Loaded Firebase payment requests', {
+            count: firebasePaymentRequests.length
+          }, 'NotificationsScreen');
+        }
       } catch (error) {
-        console.error('Error loading Firebase payment requests:', error);
+        logger.error('Error loading Firebase payment requests', { error: error instanceof Error ? error.message : String(error) }, 'NotificationsScreen');
       }
     }
     

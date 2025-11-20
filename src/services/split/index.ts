@@ -17,6 +17,9 @@ export type {
 export { SplitWalletAtomicUpdates } from './SplitWalletAtomicUpdates';
 export type { AtomicUpdateResult } from './SplitWalletAtomicUpdates';
 
+// Import logger for error handling
+import { logger } from '../analytics/loggingService';
+
 // Import modules using dynamic imports to avoid circular dependencies
 let SplitWalletCreation: any;
 let SplitWalletManagement: any;
@@ -209,9 +212,9 @@ export class SplitWalletService {
       });
       return response.data;
     } catch (error) {
-      console.warn('⚠️ executeDegenRoulette remote call failed, falling back to local implementation', {
+      logger.warn('executeDegenRoulette remote call failed, falling back to local implementation', {
         error: error instanceof Error ? error.message : String(error),
-      });
+      }, 'SplitWalletService');
     }
 
     return SplitRouletteService.executeDegenRoulette(splitWalletId, requestedByUserId);

@@ -234,7 +234,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
       
       setSearchResults(results);
     } catch (error) {
-      console.error('❌ Error searching users:', error);
+      logger.error('Error searching users', { error: error instanceof Error ? error.message : String(error) }, 'ContactsList');
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -361,7 +361,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
         Alert.alert('Error', result.error || 'Failed to add contact');
       }
     } catch (error) {
-      console.error('❌ Error adding contact:', error);
+      logger.error('Error adding contact', { error: error instanceof Error ? error.message : String(error) }, 'ContactsList');
       const errorMessage = error instanceof Error ? error.message : 'Failed to add contact';
       Alert.alert('Error', errorMessage);
     } finally {
@@ -420,7 +420,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
         Alert.alert('Error', result.error || 'Failed to update favorite status');
       }
     } catch (error) {
-      console.error('❌ Error toggling favorite:', error);
+      logger.error('Error toggling favorite', { error: error instanceof Error ? error.message : String(error) }, 'ContactsList');
       const errorMessage = error instanceof Error ? error.message : 'Failed to update favorite status';
       Alert.alert('Error', errorMessage);
     } finally {
@@ -608,7 +608,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
       }
       
     } catch (error) {
-      console.error('Error processing QR code:', error);
+      logger.error('Error processing QR code', { error: error instanceof Error ? error.message : String(error) }, 'ContactsList');
       Alert.alert('Error', 'Failed to process QR code. Please try again.');
     } finally {
       setIsProcessingQR(false);

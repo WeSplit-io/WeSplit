@@ -68,12 +68,13 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   // Use route params if available, otherwise fallback to split data
   const totalAmount = routeTotalAmount || splitData?.totalAmount || 0;
   
-  // Debug logging for amount values
+  // Debug logging for amount values (development only)
   useEffect(() => {
+    if (__DEV__) {
     const testAmount = 0.11599999999999999;
     const testRounded = roundUsdcAmount(testAmount);
     
-    console.log('🔍 DegenLockScreen amount debugging:', {
+      logger.debug('Amount debugging', {
       routeTotalAmount,
       splitDataTotalAmount: splitData?.totalAmount,
       finalTotalAmount: totalAmount,
@@ -81,10 +82,9 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       isNumber: typeof totalAmount === 'number',
       isFinite: Number.isFinite(totalAmount),
       testAmount,
-      testRounded,
-      testAmountString: testAmount.toString(),
-      testRoundedString: testRounded.toString()
-    });
+        testRounded
+      }, 'DegenLockScreen');
+    }
   }, [totalAmount, routeTotalAmount, splitData?.totalAmount]);
   const { state } = useApp();
   const { currentUser } = state;
@@ -125,16 +125,16 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     degenState.splitWallet?.id,
     {
       onParticipantUpdate: (participants) => {
-        console.log('🔍 DegenLockScreen: Real-time participant update:', participants);
+        logger.debug('Real-time participant update', { participantsCount: participants.length }, 'DegenLockScreen');
         setParticipants(participants);
       },
       onLockStatusUpdate: (lockedParticipants, allLocked) => {
-        console.log('🔍 DegenLockScreen: Real-time lock status update:', { lockedParticipants, allLocked });
+        logger.debug('Real-time lock status update', { lockedCount: lockedParticipants.length, allLocked }, 'DegenLockScreen');
         degenState.setLockedParticipants(lockedParticipants);
         degenState.setAllParticipantsLocked(allLocked);
       },
       onSplitWalletUpdate: (splitWallet) => {
-        console.log('🔍 DegenLockScreen: Real-time wallet update:', splitWallet);
+        logger.debug('Real-time wallet update', { walletId: splitWallet?.id }, 'DegenLockScreen');
         degenState.setSplitWallet(splitWallet);
         
         // CRITICAL FIX: Check if current user has locked their funds when wallet is updated
@@ -160,7 +160,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         }
       },
       onError: (error) => {
-        console.error('🔍 DegenLockScreen: Real-time error:', error);
+        logger.error('Real-time error', { error: error.message }, 'DegenLockScreen');
         degenState.setError(error.message);
       }
     }
@@ -168,17 +168,17 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
 
   // Animation refs are initialized in the useDegenSplitState hook
 
-  // Debug logging for route params
+  // Debug logging for route params (development only)
   useEffect(() => {
-    console.log('🔍 DegenLockScreen route params:', {
+    if (__DEV__) {
+      logger.debug('Route params', {
       hasRoute: !!route,
       hasParams: !!route?.params,
-      routeParams: routeParams,
-      splitData: splitData,
-      participants: participants,
-      totalAmount: totalAmount
-    });
-  }, [route, routeParams, splitData, participants, totalAmount]);
+        participantsCount: participants?.length,
+        totalAmount
+      }, 'DegenLockScreen');
+    }
+  }, [route, participants, totalAmount]);
 
   // Calculate progress percentage and update animation
   const updateCircleProgress = useCallback(() => {
@@ -288,8 +288,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
 
   // Validate required data
   if (!participants || !Array.isArray(participants) || participants.length === 0) {
-    // Log error but don't show popup
-    console.error('Invalid participants data');
+    logger.error('Invalid participants data', new Error('Participants data is missing or invalid'), 'DegenLockScreen');
     navigation.navigate('SplitsList');
     return null;
   }
@@ -374,49 +373,13 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       await degenInit.initializeDegenSplit(splitData, currentUser, refreshedParticipants, totalAmount);
     };
 
-    // CRITICAL FIX: Reload wallet if participants change (e.g., after inviting users)
-    // This ensures wallet is refreshed when new participants are added
-        const reloadWallet = async () => {
-      if (degenState.splitWallet && splitData && currentUser) {
-        try {
-          const { SplitWalletService } = await import('../../services/split');
-          const walletResult = await SplitWalletService.getSplitWallet(degenState.splitWallet.id);
-          if (walletResult.success && walletResult.wallet) {
-            degenState.setSplitWallet(walletResult.wallet);
-            
-            // CRITICAL FIX: Check lock status when wallet is reloaded
-            const userHasLocked = degenLogic.checkUserLockStatus(walletResult.wallet, currentUser);
-            degenState.setIsLocked(userHasLocked);
-            
-            console.log('🔍 DegenLockScreen: Wallet reloaded after participant change:', {
-              walletId: walletResult.wallet.id,
-              participantsCount: walletResult.wallet.participants.length,
-              userHasLocked
-            });
-          }
-        } catch (error) {
-          console.error('🔍 DegenLockScreen: Error reloading wallet:', error);
-        }
-      }
-    };
-
+    // OPTIMIZED: Real-time updates will handle wallet refreshes automatically
     // Only initialize if we have the required data and haven't initialized yet
     if (splitData && currentUser && participants && totalAmount && !degenState.splitWallet) {
       initialize();
-    } else if (degenState.splitWallet && participants && participants.length > 0) {
-      // CRITICAL FIX: Reload wallet when participants change (e.g., after inviting users)
-      // Check if wallet participants count differs from current participants count
-      const walletParticipantsCount = degenState.splitWallet.participants?.length || 0;
-      const currentParticipantsCount = participants.length;
-      
-      if (currentParticipantsCount !== walletParticipantsCount) {
-        console.log('🔍 DegenLockScreen: Participant count changed, reloading wallet:', {
-          walletParticipantsCount,
-          currentParticipantsCount
-        });
-        reloadWallet();
-      }
     }
+    // Note: Real-time updates will automatically refresh wallet when participants change
+    // No need for manual reload - this prevents duplicate calls and conflicts
   }, [splitData?.id, currentUser?.id, totalAmount, participants?.length]); // CRITICAL FIX: Add participants.length dependency
 
   // Pre-fetch private key payload when wallet loads to speed up "View Private Key" action
@@ -467,20 +430,15 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       lockedCount = degenState.lockedParticipants.length;
     }
     
-    // Debug logging to understand the issue
-    console.log('🔍 DegenLockScreen lockedCount calculation:', {
+    // Debug logging to understand the issue (development only)
+    if (__DEV__) {
+      logger.debug('LockedCount calculation', {
       hasSplitWallet: !!degenState.splitWallet,
-      splitWalletParticipants: degenState.splitWallet?.participants?.map((p: any) => ({
-        userId: p.userId,
-        status: p.status,
-        amountPaid: p.amountPaid,
-        amountOwed: p.amountOwed,
-        hasTransactionSignature: !!p.transactionSignature
-      })),
       lockedParticipantsLength: degenState.lockedParticipants.length,
       finalLockedCount: lockedCount,
       totalParticipants: participants.length
-    });
+      }, 'DegenLockScreen');
+    }
 
   return (
     <Container>

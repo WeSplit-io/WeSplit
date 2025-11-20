@@ -23,6 +23,7 @@ import { SplitWallet, SplitWalletParticipant } from '../../services/split/types'
 import { useApp } from '../../context/AppContext';
 import { formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
 import { LinkedWalletService, LinkedDestinations } from '../../services/blockchain/wallet/LinkedWalletService';
+import { logger } from '../../services/analytics/loggingService';
 
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
@@ -83,7 +84,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         setLinkedDestinations(destinations);
         return destinations;
       } catch (error) {
-        console.error('Failed to load linked destinations', error);
+        logger.error('Failed to load linked destinations', { error: error instanceof Error ? error.message : String(error) }, 'DegenResultScreen');
         setLinkedDestinations(null);
         return null;
       } finally {
@@ -120,7 +121,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     degenState.splitWallet?.id,
     {
       onParticipantUpdate: (participants) => {
-        console.log('🔍 DegenResultScreen: Real-time participant update:', participants);
+        logger.debug('Real-time participant update', { participantsCount: participants.length }, 'DegenResultScreen');
         
         // Check if current user's status changed to 'paid' and exit loading state
         if (currentUser && degenState.isProcessing) {
@@ -129,7 +130,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           );
           
           if (currentUserParticipant?.status === 'paid') {
-            console.log('✅ Real-time update: User status changed to paid, exiting loading state');
+            logger.info('Real-time update: User status changed to paid, exiting loading state', null, 'DegenResultScreen');
             
             // CRITICAL FIX: Only show success message if we were actually processing AND haven't already shown an alert
             // This prevents duplicate alerts when the transaction succeeds immediately
@@ -164,12 +165,12 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         }
       },
       onSplitWalletUpdate: (splitWallet) => {
-        console.log('🔍 DegenResultScreen: Real-time wallet update:', splitWallet);
+        logger.debug('Real-time wallet update', { walletId: splitWallet?.id }, 'DegenResultScreen');
         degenState.setSplitWallet(splitWallet);
         setCurrentSplitWallet(splitWallet);
       },
       onError: (error) => {
-        console.error('🔍 DegenResultScreen: Real-time error:', error);
+        logger.error('Real-time error', { error: error.message }, 'DegenResultScreen');
         degenState.setError(error.message);
       }
     }
@@ -280,38 +281,43 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
   const hasReloadedInitialWalletRef = React.useRef(false);
 
-  // CRITICAL FIX: Reload wallet on mount only when initial data is incomplete
+  // OPTIMIZED: Reload wallet on mount only when initial data is incomplete
+  // Real-time updates will handle subsequent updates, so we only need initial load if data is missing
   React.useEffect(() => {
     const initializeWallet = async () => {
       if (!splitWallet?.id || hasReloadedInitialWalletRef.current) {return;}
 
       const needsReload = !splitWallet?.degenLoser || !splitWallet?.participants?.length;
-      if (!needsReload) {return;}
+      if (!needsReload) {
+        // Data is complete, just set it
+        setCurrentSplitWallet(splitWallet);
+        degenState.setSplitWallet(splitWallet);
+        return;
+      }
 
       hasReloadedInitialWalletRef.current = true;
 
-      // Reload wallet to get latest participant status and loser information
+      // Only reload if data is incomplete - real-time updates will handle subsequent changes
       try {
         const { SplitWalletService } = await import('../../services/split');
         const result = await SplitWalletService.getSplitWallet(splitWallet.id);
         if (result.success && result.wallet) {
-          console.log('🔍 DegenResultScreen: Reloaded wallet on mount:', {
+          logger.debug('Reloaded wallet on mount (incomplete initial data)', {
             status: result.wallet.status,
             participantsCount: result.wallet.participants.length,
             hasDegenLoser: !!result.wallet.degenLoser,
-            degenLoser: result.wallet.degenLoser,
             hasDegenWinner: !!result.wallet.degenWinner
-          });
+          }, 'DegenResultScreen');
           setCurrentSplitWallet(result.wallet);
           degenState.setSplitWallet(result.wallet);
         }
       } catch (error) {
-        console.error('🔍 DegenResultScreen: Error reloading wallet:', error);
+        logger.error('Error reloading wallet', { error: error instanceof Error ? error.message : String(error) }, 'DegenResultScreen');
       }
     };
 
     initializeWallet();
-  }, [splitWallet?.id, splitWallet?.degenLoser, splitWallet?.participants?.length]); // Only run when data incomplete
+  }, [splitWallet?.id]); // Only depend on wallet ID - real-time updates handle the rest
 
   // OPTIMIZED: Efficient state reset with proper dependency management
   React.useEffect(() => {
@@ -385,24 +391,17 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     navigation.navigate('LinkedCards');
   }, [degenState, navigation]);
   
-  // Debug logging
+  // Debug logging (only in development)
   React.useEffect(() => {
-    if (currentSplitWallet && currentUser) {
-      console.log('🔍 DegenResultScreen Debug:', {
+    if (currentSplitWallet && currentUser && __DEV__) {
+      logger.debug('DegenResultScreen state', {
         splitWalletId: currentSplitWallet.id,
         currentUserId: currentUser.id,
-        currentUserParticipant: currentUserParticipant,
         hasAlreadyClaimed,
-        allParticipants: currentSplitWallet.participants.map(p => ({
-          userId: p.userId,
-          name: p.name,
-          status: p.status,
-          amountPaid: p.amountPaid,
-          amountOwed: p.amountOwed
-        }))
-      });
+        participantsCount: currentSplitWallet.participants.length
+      }, 'DegenResultScreen');
     }
-  }, [currentSplitWallet, currentUser, currentUserParticipant, hasAlreadyClaimed]);
+  }, [currentSplitWallet, currentUser, hasAlreadyClaimed]);
 
   // OPTIMIZED: Real-time updates will handle data loading automatically
   // No need for manual data loading - this causes conflicts with real-time updates
@@ -510,7 +509,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       degenState.setShowPaymentOptionsModal(false);
       degenState.setSelectedPaymentMethod(null);
     } catch (error) {
-      console.error('Error during signature process:', error);
+      logger.error('Error during signature process', { error: error instanceof Error ? error.message : String(error) }, 'DegenResultScreen');
       Alert.alert('Error', 'Failed to complete signature. Please try again.');
     } finally {
       degenState.setIsSigning(false);
@@ -544,7 +543,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(message)}`;
     
     Linking.openURL(twitterUrl).catch(err => {
-      console.error('Failed to open Twitter:', err);
+      logger.error('Failed to open Twitter', { error: err instanceof Error ? err.message : String(err) }, 'DegenResultScreen');
       Alert.alert('Error', 'Failed to open Twitter. Please try again.');
     });
   };

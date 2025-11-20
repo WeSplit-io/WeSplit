@@ -86,8 +86,7 @@ export class SplitWalletQueries {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletQueries: Error getting split wallet:', error);
-      logger.error('Failed to get split wallet', error, 'SplitWalletQueries');
+      logger.error('Failed to get split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletQueries');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -144,8 +143,7 @@ export class SplitWalletQueries {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletQueries: Error getting split wallet by bill ID:', error);
-      logger.error('Failed to get split wallet by bill ID', error, 'SplitWalletQueries');
+      logger.error('Failed to get split wallet by bill ID', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletQueries');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -244,7 +242,7 @@ export class SplitWalletQueries {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletQueries: Error locking participant amount:', error);
+      logger.error('Error locking participant amount', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletQueries');
       logger.error('Failed to lock participant amount', error, 'SplitWalletQueries');
       return {
         success: false,
@@ -290,7 +288,7 @@ export class SplitWalletQueries {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletQueries: Error getting split wallets by creator:', error);
+      logger.error('Error getting split wallets by creator', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletQueries');
       logger.error('Failed to get split wallets by creator', error, 'SplitWalletQueries');
       return {
         success: false,
@@ -337,7 +335,7 @@ export class SplitWalletQueries {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletQueries: Error getting split wallets by status:', error);
+      logger.error('Error getting split wallets by status', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletQueries');
       logger.error('Failed to get split wallets by status', error, 'SplitWalletQueries');
       return {
         success: false,
@@ -362,7 +360,7 @@ export class SplitWalletQueries {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletQueries: Error checking if split wallet exists:', error);
+      logger.error('Error checking if split wallet exists', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletQueries');
       logger.error('Failed to check if split wallet exists', error, 'SplitWalletQueries');
       return {
         success: false,
@@ -595,7 +593,7 @@ export class SplitWalletQueries {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletQueries: Error getting split wallet completion:', error);
+      logger.error('Error getting split wallet completion', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletQueries');
       logger.error('Failed to get split wallet completion', error, 'SplitWalletQueries');
       return {
         success: false,

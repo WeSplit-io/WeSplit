@@ -6,6 +6,7 @@
 import { useCallback } from 'react';
 import { Participant } from '../../../services/core';
 import { FairSplitState } from './useFairSplitState';
+import { logger } from '../../../services/analytics/loggingService';
 
 export interface FairSplitLogic {
   // Helper functions
@@ -111,7 +112,7 @@ export const useFairSplitLogic = (
             );
             
             if (!updateResult.success) {
-              console.error('Failed to update participant amounts in database:', updateResult.error);
+              logger.error('Failed to update participant amounts in database', { error: updateResult.error }, 'FairSplitLogic');
               // Revert local changes if database update failed
               setParticipants(participants);
             } else {
@@ -120,7 +121,7 @@ export const useFairSplitLogic = (
             }
           }
         } catch (error) {
-          console.error('Error updating participant amounts:', error);
+          logger.error('Error updating participant amounts', { error: error instanceof Error ? error.message : String(error) }, 'FairSplitLogic');
           // Revert local changes if database update failed
           setParticipants(participants);
         }
@@ -165,7 +166,7 @@ export const useFairSplitLogic = (
       // For now, we'll just simulate the loading
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error) {
-      console.error('Failed to load wallets:', error);
+      logger.error('Failed to load wallets', { error: error instanceof Error ? error.message : String(error) }, 'FairSplitLogic');
     } finally {
       state.setIsLoadingWallets(false);
     }

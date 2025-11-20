@@ -134,14 +134,14 @@ export class SplitWalletCreation {
           walletId: result.wallet.id 
         };
       } else {
-        console.error('❌ SplitWalletCreation: Test wallet creation failed:', result.error);
+        logger.error('Test wallet creation failed', { error: result.error }, 'SplitWalletCreation');
         return { 
           success: false, 
           error: result.error || 'Test wallet creation failed' 
         };
       }
     } catch (error) {
-      console.error('❌ SplitWalletCreation: Test wallet creation error:', error);
+      logger.error('Test wallet creation error', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCreation');
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown test error' 
@@ -277,7 +277,7 @@ export class SplitWalletCreation {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletCreation: Error creating split wallet:', error);
+      logger.error('Error creating split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCreation');
       logger.error('Failed to create split wallet', error, 'SplitWalletCreation');
       return {
         success: false,
@@ -505,7 +505,7 @@ export class SplitWalletCreation {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletCreation: Error creating Degen Split wallet:', error);
+      logger.error('Error creating Degen Split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCreation');
       logger.error('Failed to create Degen Split wallet', error, 'SplitWalletCreation');
       return {
         success: false,
@@ -581,7 +581,7 @@ export class SplitWalletCreation {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletCreation: Error force resetting split wallet:', error);
+      logger.error('Error force resetting split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCreation');
       logger.error('Failed to force reset split wallet', error, 'SplitWalletCreation');
       return {
         success: false,

@@ -2088,8 +2088,7 @@ export class SplitWalletPayments {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletPayments: Error processing degen split fund locking:', error);
-      logger.error('Failed to process degen split fund locking', error, 'SplitWalletPayments');
+      logger.error('Failed to process degen split fund locking', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletPayments');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'

@@ -23,7 +23,7 @@ import { notificationService } from '../../services/notifications';
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenRoulette } from './components';
 import { Container, Button } from '../../components/shared';
-import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
+import { formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
 import { getSplitStatusDisplayText } from '../../utils/statusUtils';
 
 // Category images mapping for dynamic icons
@@ -80,19 +80,19 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
       onParticipantUpdate: (participants) => {
         // Only update if not spinning to avoid interference
         if (!degenState.isSpinning) {
-          console.log('🔍 DegenSpinScreen: Real-time participant update:', participants);
+          logger.debug('Real-time participant update', { participantsCount: participants.length }, 'DegenSpinScreen');
           // Update participants if needed
         }
       },
       onSplitWalletUpdate: (splitWallet) => {
         // Only update if not spinning to avoid interference
         if (!degenState.isSpinning) {
-          console.log('🔍 DegenSpinScreen: Real-time wallet update:', splitWallet);
+          logger.debug('Real-time wallet update', { walletId: splitWallet?.id }, 'DegenSpinScreen');
           degenState.setSplitWallet(splitWallet);
         }
       },
       onError: (error) => {
-        console.error('🔍 DegenSpinScreen: Real-time error:', error);
+        logger.error('Real-time error', { error: error.message }, 'DegenSpinScreen');
         degenState.setError(error.message);
       }
     }

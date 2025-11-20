@@ -10,6 +10,7 @@ import { spacing } from '../../../theme/spacing';
 import { styles } from './DegenRouletteStyles';
 import Avatar from '../../../components/shared/Avatar';
 import { getUserAvatar } from '../../../services/shared/dataUtils';
+import { logger } from '../../../services/analytics/loggingService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -56,7 +57,7 @@ const DegenRoulette: React.FC<DegenRouletteProps> = ({
             const avatar = await getUserAvatar(userId);
             return { userId, avatar };
           } catch (error) {
-            console.warn('Failed to fetch avatar for user:', userId);
+            logger.warn('Failed to fetch avatar for user', { userId, error: error instanceof Error ? error.message : String(error) }, 'DegenRoulette');
             return { userId, avatar: undefined };
           }
         }

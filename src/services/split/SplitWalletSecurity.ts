@@ -277,8 +277,7 @@ export class SplitWalletSecurity {
       return { success: true };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error storing Fair split wallet private key:', error);
-      logger.error('Failed to store Fair split wallet private key', error, 'SplitWalletSecurity');
+      logger.error('Failed to store Fair split wallet private key', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -323,8 +322,7 @@ export class SplitWalletSecurity {
       return { success: true };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error storing split wallet private key:', error);
-      logger.error('Failed to store split wallet private key', error, 'SplitWalletSecurity');
+      logger.error('Failed to store split wallet private key', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -428,7 +426,7 @@ export class SplitWalletSecurity {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error checking for local private key:', error);
+      logger.error('Error checking for local private key', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       logger.error('Failed to check for local private key', error, 'SplitWalletSecurity');
       return {
         success: false,
@@ -507,7 +505,7 @@ export class SplitWalletSecurity {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error retrieving Fair split private key:', error);
+      logger.error('Error retrieving Fair split private key', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       logger.error('Failed to retrieve Fair split private key', error, 'SplitWalletSecurity');
       return {
         success: false,
@@ -843,7 +841,7 @@ export class SplitWalletSecurity {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error retrieving split wallet private key:', error);
+      logger.error('Error retrieving split wallet private key', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       logger.error('Failed to retrieve split wallet private key', error, 'SplitWalletSecurity');
       return {
         success: false,
@@ -902,7 +900,7 @@ export class SplitWalletSecurity {
       return { success: true };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error storing split wallet private key for all participants:', error);
+      logger.error('Error storing split wallet private key for all participants', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       logger.error('Failed to store split wallet private key for all participants', error, 'SplitWalletSecurity');
       return {
         success: false,
@@ -972,7 +970,7 @@ export class SplitWalletSecurity {
 
       return { success: true };
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error syncing shared private key participants:', error);
+      logger.error('Error syncing shared private key participants', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       logger.error('Failed to sync shared private key participants', error, 'SplitWalletSecurity');
       return {
         success: false,
@@ -1038,7 +1036,7 @@ export class SplitWalletSecurity {
       return { success: true };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error deleting split wallet private key for all participants:', error);
+      logger.error('Error deleting split wallet private key for all participants', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       logger.error('Failed to delete split wallet private key for all participants', error, 'SplitWalletSecurity');
       return {
         success: false,
@@ -1071,7 +1069,7 @@ export class SplitWalletSecurity {
       return { success: true };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error deleting split wallet private key:', error);
+      logger.error('Error deleting split wallet private key', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       logger.error('Failed to delete split wallet private key', error, 'SplitWalletSecurity');
       return {
         success: false,
@@ -1097,7 +1095,7 @@ export class SplitWalletSecurity {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error listing stored private keys:', error);
+      logger.error('Error listing stored private keys', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletSecurity');
       logger.error('Failed to list stored private keys', error, 'SplitWalletSecurity');
       return {
         success: false,
