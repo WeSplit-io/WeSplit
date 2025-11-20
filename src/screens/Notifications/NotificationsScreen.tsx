@@ -16,7 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NotificationCard } from '../../components/notifications';
 import RequestCard from '../../components/requests/RequestCard';
 import { useApp } from '../../context/AppContext';
-import { doc, getDoc, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, updateDoc, deleteDoc, writeBatch, getDocs, query, where, collection } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { getReceivedPaymentRequests } from '../../services/payments/firebasePaymentRequestService';
 import { Container, LoadingScreen } from '../../components/shared';
@@ -359,6 +359,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   // Function to delete notification
   const deleteNotification = async (notificationId: string) => {
     try {
+      console.log('🗑️ Deleting notification:', notificationId);
+      
       // Add to deleted set to prevent it from reappearing
       setDeletedNotificationIds(prev => new Set(prev).add(notificationId));
       
@@ -369,11 +371,28 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       try {
         if (notificationId.startsWith('firebase_')) {
           const actualRequestId = notificationId.replace('firebase_', '');
-          // Delete from payment_requests collection
-          await deleteDoc(doc(db, 'payment_requests', actualRequestId));
+          console.log('🗑️ Deleting payment request:', actualRequestId);
+          
+          // Verify the document exists before deleting
+          const requestDoc = await getDoc(doc(db, 'payment_requests', actualRequestId));
+          if (requestDoc.exists()) {
+            await deleteDoc(doc(db, 'payment_requests', actualRequestId));
+            console.log('✅ Payment request deleted successfully:', actualRequestId);
+          } else {
+            console.warn('⚠️ Payment request not found:', actualRequestId);
+          }
         } else {
-          // Delete from notifications collection
-          await deleteDoc(doc(db, 'notifications', notificationId));
+          console.log('🗑️ Deleting notification from notifications collection:', notificationId);
+          
+          // Verify the document exists before deleting
+          const notificationDoc = await getDoc(doc(db, 'notifications', notificationId));
+          if (notificationDoc.exists()) {
+            await deleteDoc(doc(db, 'notifications', notificationId));
+            console.log('✅ Notification deleted successfully:', notificationId);
+          } else {
+            console.warn('⚠️ Notification not found:', notificationId);
+            // Still keep it in deleted set to prevent it from showing up
+          }
         }
         
         // Refresh notifications context in background
@@ -381,12 +400,13 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           refreshNotifications().catch(err => console.error('Error refreshing notifications:', err));
         }
       } catch (error) {
-        console.error('Error deleting notification from Firebase:', error);
+        console.error('❌ Error deleting notification from Firebase:', error);
         // Don't re-add to local state - keep it deleted
-        showToast('Failed to delete notification', 'error');
+        // The deletedNotificationIds set will prevent it from showing up again
+        showToast('Failed to delete notification from server', 'error');
       }
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      console.error('❌ Error deleting notification:', error);
       showToast('Failed to delete notification', 'error');
     }
   };
@@ -479,21 +499,129 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               setFilteredNotifications([]);
               setViewedNotificationIds(new Set());
 
-              // Delete all notifications from Firebase in background
+              // Delete all notifications from Firebase using batch operations for better performance
               // Don't wait for completion to keep UI responsive
-              Promise.all(notificationsToDelete.map(async (notification) => {
+              (async () => {
                 try {
-                  if (notification.id.startsWith('firebase_')) {
-                    const actualRequestId = notification.id.replace('firebase_', '');
-                    await deleteDoc(doc(db, 'payment_requests', actualRequestId));
-                  } else {
-                    await deleteDoc(doc(db, 'notifications', notification.id));
+                  console.log('🗑️ Starting batch deletion of', notificationsToDelete.length, 'notifications');
+                  
+                  // Separate payment requests and regular notifications
+                  const paymentRequestIds: string[] = [];
+                  const notificationIds: string[] = [];
+                  
+                  notificationsToDelete.forEach(notification => {
+                    if (notification.id.startsWith('firebase_')) {
+                      const actualRequestId = notification.id.replace('firebase_', '');
+                      paymentRequestIds.push(actualRequestId);
+                    } else {
+                      notificationIds.push(notification.id);
+                    }
+                  });
+                  
+                  // Delete payment requests (Firebase batch limit is 500 operations)
+                  if (paymentRequestIds.length > 0) {
+                    const BATCH_LIMIT = 500;
+                    const batches: string[][] = [];
+                    
+                    // Split into batches of 500
+                    for (let i = 0; i < paymentRequestIds.length; i += BATCH_LIMIT) {
+                      batches.push(paymentRequestIds.slice(i, i + BATCH_LIMIT));
+                    }
+                    
+                    let totalDeleted = 0;
+                    for (const batch of batches) {
+                      const paymentBatch = writeBatch(db);
+                      let batchCount = 0;
+                      
+                      for (const requestId of batch) {
+                        try {
+                          const requestDoc = await getDoc(doc(db, 'payment_requests', requestId));
+                          if (requestDoc.exists()) {
+                            paymentBatch.delete(doc(db, 'payment_requests', requestId));
+                            batchCount++;
+                          }
+                        } catch (error) {
+                          console.error(`Error checking payment request ${requestId}:`, error);
+                        }
+                      }
+                      
+                      if (batchCount > 0) {
+                        await paymentBatch.commit();
+                        totalDeleted += batchCount;
+                        console.log(`✅ Deleted batch of ${batchCount} payment requests`);
+                      }
+                    }
+                    
+                    if (totalDeleted > 0) {
+                      console.log(`✅ Total deleted ${totalDeleted} payment requests`);
+                    }
                   }
+                  
+                  // Delete regular notifications (Firebase batch limit is 500 operations)
+                  if (notificationIds.length > 0) {
+                    const BATCH_LIMIT = 500;
+                    const batches: string[][] = [];
+                    
+                    // Split into batches of 500
+                    for (let i = 0; i < notificationIds.length; i += BATCH_LIMIT) {
+                      batches.push(notificationIds.slice(i, i + BATCH_LIMIT));
+                    }
+                    
+                    let totalDeleted = 0;
+                    for (const batch of batches) {
+                      const notificationBatch = writeBatch(db);
+                      let batchCount = 0;
+                      
+                      for (const notifId of batch) {
+                        try {
+                          const notifDoc = await getDoc(doc(db, 'notifications', notifId));
+                          if (notifDoc.exists()) {
+                            notificationBatch.delete(doc(db, 'notifications', notifId));
+                            batchCount++;
+                          }
+                        } catch (error) {
+                          console.error(`Error checking notification ${notifId}:`, error);
+                        }
+                      }
+                      
+                      if (batchCount > 0) {
+                        await notificationBatch.commit();
+                        totalDeleted += batchCount;
+                        console.log(`✅ Deleted batch of ${batchCount} notifications`);
+                      }
+                    }
+                    
+                    if (totalDeleted > 0) {
+                      console.log(`✅ Total deleted ${totalDeleted} notifications`);
+                    }
+                  }
+                  
+                  console.log('✅ Batch deletion completed');
                 } catch (error) {
-                  console.error(`Error deleting notification ${notification.id}:`, error);
+                  console.error('❌ Error during batch deletion:', error);
+                  // Fallback: try individual deletions
+                  console.log('🔄 Falling back to individual deletions...');
+                  for (const notification of notificationsToDelete) {
+                    try {
+                      if (notification.id.startsWith('firebase_')) {
+                        const actualRequestId = notification.id.replace('firebase_', '');
+                        const requestDoc = await getDoc(doc(db, 'payment_requests', actualRequestId));
+                        if (requestDoc.exists()) {
+                          await deleteDoc(doc(db, 'payment_requests', actualRequestId));
+                        }
+                      } else {
+                        const notifDoc = await getDoc(doc(db, 'notifications', notification.id));
+                        if (notifDoc.exists()) {
+                          await deleteDoc(doc(db, 'notifications', notification.id));
+                        }
+                      }
+                    } catch (individualError) {
+                      console.error(`Error deleting notification ${notification.id}:`, individualError);
+                    }
+                  }
                 }
-              })).catch(err => {
-                console.error('Error during batch deletion:', err);
+              })().catch(err => {
+                console.error('❌ Error during batch deletion:', err);
               });
 
               // Refresh notifications context to sync with Firebase
