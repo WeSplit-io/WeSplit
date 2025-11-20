@@ -159,6 +159,7 @@ export const styles = StyleSheet.create({
   logoutText: {
     color: colors.white,
   },
+
   
   // Section Titles
   sectionTitle: {

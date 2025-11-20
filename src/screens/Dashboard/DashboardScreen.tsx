@@ -60,6 +60,11 @@ interface DashboardScreenProps {
   route?: any;
 }
 
+const vaultAuthSession = {
+  hasAuthenticated: false,
+  lastUserId: null as string | null,
+};
+
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) => {
   const { state, notifications, loadNotifications, refreshNotifications, updateUser } = useApp();
   const { currentUser, isAuthenticated } = state;
@@ -67,8 +72,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Biometric authentication state
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authenticationError, setAuthenticationError] = useState<string | null>(null);
-  const hasAuthenticatedRef = useRef(false);
-  const lastAuthenticatedUserIdRef = useRef<string | null>(null); // Track which user we authenticated for
 
   // Phone prompt modal state
   const [showPhonePrompt, setShowPhonePrompt] = useState(false);
@@ -141,15 +144,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     const authenticate = async () => {
       if (!isAuthenticated || !currentUser?.id) {
         setIsAuthenticating(false);
-        hasAuthenticatedRef.current = false;
-        lastAuthenticatedUserIdRef.current = null;
+        vaultAuthSession.hasAuthenticated = false;
+        vaultAuthSession.lastUserId = null;
         return;
       }
 
       // ✅ CRITICAL: Only authenticate once per user session
       // If we've already authenticated for this user and vault is still authenticated, skip
-      const isSameUser = lastAuthenticatedUserIdRef.current === currentUser.id;
-      if (isSameUser && hasAuthenticatedRef.current && isVaultAuthenticated()) {
+      const isSameUser = vaultAuthSession.lastUserId === currentUser.id;
+      if (isSameUser && vaultAuthSession.hasAuthenticated && isVaultAuthenticated()) {
         logger.debug('Dashboard: Already authenticated for this user session, skipping re-authentication', {
           userId: currentUser.id
         }, 'DashboardScreen');
@@ -159,10 +162,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
       // If user changed, reset authentication state
       if (!isSameUser) {
-        hasAuthenticatedRef.current = false;
-        lastAuthenticatedUserIdRef.current = currentUser.id;
+        const previousUserId = vaultAuthSession.lastUserId;
+        vaultAuthSession.hasAuthenticated = false;
+        vaultAuthSession.lastUserId = currentUser.id;
         logger.debug('Dashboard: User changed, resetting authentication state', {
-          previousUserId: lastAuthenticatedUserIdRef.current,
+          previousUserId,
           currentUserId: currentUser.id
         }, 'DashboardScreen');
       }
@@ -179,23 +183,23 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         
         if (authenticated) {
           logger.info('Authentication successful (biometrics or passcode)', { userId: currentUser.id }, 'DashboardScreen');
-          hasAuthenticatedRef.current = true;
-          lastAuthenticatedUserIdRef.current = currentUser.id;
+          vaultAuthSession.hasAuthenticated = true;
+          vaultAuthSession.lastUserId = currentUser.id;
           setIsAuthenticating(false);
         } else {
           // Keychain authentication failed (common in simulators or if user cancels)
           // This is okay - SecureStore fallback will work for vault access
           // Don't block the user, just log and continue
           logger.info('Keychain authentication not available (using SecureStore fallback)', { userId: currentUser.id }, 'DashboardScreen');
-          hasAuthenticatedRef.current = true; // Mark as done even if Keychain failed
-          lastAuthenticatedUserIdRef.current = currentUser.id;
+          vaultAuthSession.hasAuthenticated = true; // Mark as done even if Keychain failed
+          vaultAuthSession.lastUserId = currentUser.id;
           setIsAuthenticating(false);
           // No error - app will work with SecureStore fallback
         }
       } catch (error) {
         logger.error('Biometric authentication error', error, 'DashboardScreen');
         setAuthenticationError('Failed to authenticate. Please try again.');
-        hasAuthenticatedRef.current = false; // Allow retry on error
+        vaultAuthSession.hasAuthenticated = false; // Allow retry on error
         setIsAuthenticating(false);
       }
     };
@@ -979,12 +983,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         onRetry={async () => {
               setIsAuthenticating(true);
               setAuthenticationError(null);
-              hasAuthenticatedRef.current = false; // Reset to allow retry
+              vaultAuthSession.hasAuthenticated = false; // Reset to allow retry
               try {
                 // Force re-authentication on retry
                 const authenticated = await secureVault.preAuthenticate(true);
                 if (authenticated) {
-                  hasAuthenticatedRef.current = true;
+                  vaultAuthSession.hasAuthenticated = true;
                   setIsAuthenticating(false);
                 } else {
                   setAuthenticationError('Authentication failed. Please try again.');
@@ -992,7 +996,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 }
               } catch (error) {
                 setAuthenticationError('Failed to authenticate. Please try again.');
-                hasAuthenticatedRef.current = false;
+                vaultAuthSession.hasAuthenticated = false;
                 setIsAuthenticating(false);
               }
             }}
@@ -1368,12 +1372,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           ) : (
             <>
               {getCombinedActivities().slice(0, 5).map((activity) => {
+                const activityKey = `${activity.type}-${activity.id}-${activity.timestamp.getTime()}`;
                 if (activity.type === 'request') {
                   const request = activity.data;
                   const index = paymentRequests.findIndex(r => r.id === request.id);
                   return (
                     <RequestCard
-                      key={activity.id}
+                      key={activityKey}
                       request={request}
                       index={index}
                       onSendPress={handleSendPress}
@@ -1383,7 +1388,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                   const transaction = activity.data;
                   return (
                     <TransactionItem
-                      key={activity.id}
+                      key={activityKey}
                       transaction={transaction}
                       recipientName={userNames.get(transaction.to_user)}
                       senderName={userNames.get(transaction.from_user)}

@@ -26,9 +26,19 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
   disabled = false,
   isClaiming = false,
 }) => {
-  const isCompleted = progress.current >= progress.target;
-  const progressPercentage = Math.min((progress.current / progress.target) * 100, 100);
-  const canClaim = isCompleted && !progress.claimed;
+  const targetValue = typeof progress.target === 'number' && progress.target > 0 ? progress.target : 1;
+  const isCompleted = progress.current >= (progress.target || 0);
+  const progressPercentage = Math.min((progress.current / targetValue) * 100, 100);
+  const canClaim = progress.current >= (progress.target || Number.POSITIVE_INFINITY) && !progress.claimed;
+  const progressLabel = badgeInfo.progressLabel || 'TOTAL SPLITS';
+
+  const formatProgressValue = (value: number) => {
+    const safeValue = Number.isFinite(value) ? value : 0;
+    if (badgeInfo.progressMetric === 'transaction_volume') {
+      return `$${safeValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    }
+    return safeValue.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  };
 
   return (
     <TouchableOpacity
@@ -64,7 +74,7 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
           )}
         </View>
         <Text style={styles.badgeNumber}>{badgeInfo.icon}</Text>
-        <Text style={styles.badgeLabel}>TOTAL SPLITS</Text>
+        <Text style={styles.badgeLabel}>{progressLabel}</Text>
       </View>
 
       {/* Description */}
@@ -82,7 +92,7 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
           />
         </View>
         <Text style={styles.badgeProgressText}>
-          {progress.current}/{progress.target}
+          {formatProgressValue(progress.current)}/{formatProgressValue(progress.target || 0)}
         </Text>
       </View>
 

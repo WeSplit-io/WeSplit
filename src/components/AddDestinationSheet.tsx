@@ -12,6 +12,7 @@ import { validateAddress, validateKastWalletAddress } from '../utils/network/sen
 // Removed unused imports: colors, typography
 import { spacing } from '../theme/spacing';
 import MWADetectionButton from './wallet/MWADetectionButton';
+import { ExternalCardService } from '../services/integrations/external/ExternalCardService';
 
 // Destination type for wallet or card
 export interface Destination {
@@ -197,17 +198,6 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
       // For SOLANA cards, validate the wallet address and get card information
       if (destinationType === 'kast') {
         try {
-          // Dynamic import for ExternalCardService to handle module resolution
-          // eslint-disable-next-line import/no-unresolved
-          const ExternalCardServiceModule = await import('../../services/integrations/external/ExternalCardService');
-          // ExternalCardService is a class with static methods
-          const ExternalCardService = ExternalCardServiceModule.ExternalCardService || 
-            (ExternalCardServiceModule.default as typeof ExternalCardServiceModule.ExternalCardService);
-          
-          if (!ExternalCardService) {
-            throw new Error('ExternalCardService not found');
-          }
-          
           // Validate SOLANA card wallet address
           const validation = await ExternalCardService.validateKastCard(kastAddress.trim());
           if (!validation.isValid) {

@@ -313,6 +313,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         }
 
         // Fix existing splits where creator has 'pending' status and validate prices
+        // Also sync wallet status for degen splits
         const updatedSplits = await Promise.all(result.splits.map(async (split) => {
           // Get authoritative price from centralized price management
           const billId = split.billId || split.id;
@@ -331,6 +332,63 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
               ...split,
               totalAmount: authoritativePrice.amount
             };
+          }
+
+          // CRITICAL: For degen splits, check wallet status and sync if needed
+          if (updatedSplit.splitType === 'degen' && updatedSplit.walletId) {
+            try {
+              const { SplitWalletService } = await import('../../../services/split');
+              const walletResult = await SplitWalletService.getSplitWallet(updatedSplit.walletId);
+              
+              if (walletResult.success && walletResult.wallet) {
+                const wallet = walletResult.wallet;
+                
+                // If wallet status is 'closed' but split status is not synced, update it
+                if (wallet.status === 'closed' && updatedSplit.status !== 'completed') {
+                  logger.info('Syncing split status from closed wallet', {
+                    splitId: updatedSplit.id,
+                    walletId: wallet.id,
+                    walletStatus: wallet.status,
+                    splitStatus: updatedSplit.status
+                  }, 'SplitsListScreen');
+                  
+                  try {
+                    const { SplitDataSynchronizer } = await import('../../../services/split/SplitDataSynchronizer');
+                    await SplitDataSynchronizer.syncSplitStatusFromSplitWalletToSplitStorage(
+                      updatedSplit.billId,
+                      'closed',
+                      wallet.completedAt
+                    );
+                    
+                    // Update local split status for immediate display
+                    updatedSplit = {
+                      ...updatedSplit,
+                      status: 'completed' as const
+                    };
+                  } catch (syncError) {
+                    logger.error('Failed to sync split status from wallet', {
+                      splitId: updatedSplit.id,
+                      error: syncError instanceof Error ? syncError.message : String(syncError)
+                    }, 'SplitsListScreen');
+                    // Still update local status for display even if sync fails
+                    updatedSplit = {
+                      ...updatedSplit,
+                      status: 'completed' as const
+                    };
+                  }
+                } else if (wallet.status === 'spinning_completed' && updatedSplit.status === 'completed') {
+                  // Wallet is still spinning_completed, but split was marked completed
+                  // Keep the split status as is (it's already synced)
+                }
+              }
+            } catch (walletError) {
+              logger.debug('Could not check wallet status for split', {
+                splitId: updatedSplit.id,
+                walletId: updatedSplit.walletId,
+                error: walletError instanceof Error ? walletError.message : String(walletError)
+              }, 'SplitsListScreen');
+              // Continue with split as-is if wallet check fails
+            }
           }
 
           const creatorParticipant = updatedSplit.participants.find(p => p.userId === updatedSplit.creatorId);
@@ -580,7 +638,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
               splitWallet: wallet,
             };
 
-            if ((wallet.status === 'completed' || wallet.status === 'spinning_completed') && wallet.degenWinner) {
+            if ((wallet.status === 'completed' || wallet.status === 'spinning_completed' || wallet.status === 'closed') && wallet.degenWinner) {
               navigation.navigate('DegenResult', {
                 ...baseParams,
                 selectedParticipant: {
@@ -767,11 +825,18 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     }
     return splits.filter(split => {
       if (activeFilter === 'active') {
-        // Include active, pending, and draft splits in "active" filter
-        return split.status === 'active' || split.status === 'pending' || split.status === 'draft';
+        // Include active, pending, draft, locked, and spinning_completed splits in "active" filter
+        return split.status === 'active' || 
+               split.status === 'pending' || 
+               split.status === 'draft' ||
+               split.status === 'locked' ||
+               split.status === 'spinning_completed';
       }
       if (activeFilter === 'closed') {
-        return split.status === 'completed' || split.status === 'cancelled';
+        // Include completed, cancelled, and closed splits in "closed" filter
+        return split.status === 'completed' || 
+               split.status === 'cancelled' || 
+               split.status === 'closed';
       }
       return true;
     });

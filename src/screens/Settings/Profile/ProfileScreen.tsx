@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, Alert, Switch, ActivityIndicator, Linking } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, TouchableOpacity, ScrollView, Alert, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../../components/Icon';
 import NavBar from '../../../components/shared/NavBar';
@@ -14,6 +14,7 @@ import { Container } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 import BadgeDisplay from '../../../components/profile/BadgeDisplay';
 import ProfileAssetDisplay from '../../../components/profile/ProfileAssetDisplay';
+import { colors } from '../../../theme';
 
 // Helper function to safely load images with fallback
 const SafeImage = ({ source, style, fallbackSource }: any) => {
@@ -174,8 +175,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     Alert.alert('Verify Account', 'Account verification feature coming soon!');
   };
 
+  const handleRewardsNavigation = () => {
+    navigation.navigate('Rewards');
+  };
+
   const handleReferralFriend = () => {
-    Alert.alert('Referral', 'Refer a friend feature coming soon!');
+    navigation.navigate('Referral');
   };
 
   const handleHelpCenter = () => {
@@ -183,7 +188,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   };
 
   const handleFAQ = () => {
-    Alert.alert('FAQ', 'FAQ feature coming soon!');
+    Linking.openURL('https://wesplit.io').catch(() =>
+      Alert.alert('Error', 'Unable to open wesplit.io')
+    );
   };
 
   const handleFaceIdToggle = () => {
@@ -251,6 +258,19 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         {/* Account Details Section */}
         <Text style={styles.sectionTitle}>Account details</Text>
         <View style={styles.menuItemsContainer}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleRewardsNavigation}>
+            <SafeImage
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-history-icon.png?alt=media&token=95a8fbb7-1574-4f6b-8dc8-5bd02d0608e9' }}
+              style={styles.menuIcon}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
+            />
+            <Text style={styles.menuItemText}>Rewards & Badges</Text>
+            <SafeImage
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
+              style={styles.chevronIcon}
+              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={handleWalletManagement}>
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' }}

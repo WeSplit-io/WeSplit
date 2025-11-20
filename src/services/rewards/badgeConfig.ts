@@ -14,6 +14,8 @@
  * - rarity: Rarity level (e.g., 'common', 'rare', 'epic', 'legendary')
  */
 
+export type BadgeProgressMetric = 'split_withdrawals' | 'transaction_count' | 'transaction_volume';
+
 export interface BadgeInfo {
   badgeId: string;
   title: string;
@@ -28,6 +30,8 @@ export interface BadgeInfo {
   redeemCode?: string; // Optional redeem code for event badges
   isCommunityBadge?: boolean; // True if this is a community badge (displayed next to name)
   showNextToName?: boolean; // True if badge should be displayed next to user name/profile picture
+  progressMetric?: BadgeProgressMetric; // Metric used to compute progress
+  progressLabel?: string; // Optional label for progress visualization
 }
 
 /**
@@ -102,7 +106,9 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     category: 'achievement',
     rarity: 'common',
     points: 50,
-    target: 50
+    target: 50,
+    progressMetric: 'split_withdrawals',
+    progressLabel: 'TOTAL SPLITS'
   },
   'splits_withdrawn_100': {
     badgeId: 'splits_withdrawn_100',
@@ -113,7 +119,9 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     category: 'achievement',
     rarity: 'rare',
     points: 100,
-    target: 100
+    target: 100,
+    progressMetric: 'split_withdrawals',
+    progressLabel: 'TOTAL SPLITS'
   },
   'splits_withdrawn_250': {
     badgeId: 'splits_withdrawn_250',
@@ -124,7 +132,9 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     category: 'achievement',
     rarity: 'epic',
     points: 250,
-    target: 250
+    target: 250,
+    progressMetric: 'split_withdrawals',
+    progressLabel: 'TOTAL SPLITS'
   },
   'splits_withdrawn_500': {
     badgeId: 'splits_withdrawn_500',
@@ -135,8 +145,75 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     category: 'achievement',
     rarity: 'legendary',
     points: 500,
-    target: 500
+    target: 500,
+    progressMetric: 'split_withdrawals',
+    progressLabel: 'TOTAL SPLITS'
   },
+
+  // Transaction Count Badges
+  'transactions_completed_10': {
+    badgeId: 'transactions_completed_10',
+    title: 'On the Board',
+    description: 'Complete 10 transactions',
+    icon: '🔟',
+    category: 'achievement',
+    rarity: 'common',
+    points: 25,
+    target: 10,
+    progressMetric: 'transaction_count',
+    progressLabel: 'TOTAL TRANSACTIONS'
+  },
+  'transactions_completed_50': {
+    badgeId: 'transactions_completed_50',
+    title: 'Consistent Closer',
+    description: 'Complete 50 transactions',
+    icon: '🧮',
+    category: 'achievement',
+    rarity: 'rare',
+    points: 75,
+    target: 50,
+    progressMetric: 'transaction_count',
+    progressLabel: 'TOTAL TRANSACTIONS'
+  },
+  'transactions_completed_200': {
+    badgeId: 'transactions_completed_200',
+    title: 'Deal Machine',
+    description: 'Complete 200 transactions',
+    icon: '🤝',
+    category: 'achievement',
+    rarity: 'epic',
+    points: 200,
+    target: 200,
+    progressMetric: 'transaction_count',
+    progressLabel: 'TOTAL TRANSACTIONS'
+  },
+
+  // Transaction Volume Badges
+  'transaction_volume_1000': {
+    badgeId: 'transaction_volume_1000',
+    title: 'First Grand',
+    description: 'Move $1,000 through WeSplit',
+    icon: '💸',
+    category: 'achievement',
+    rarity: 'rare',
+    points: 100,
+    target: 1000,
+    progressMetric: 'transaction_volume',
+    progressLabel: 'TOTAL VOLUME ($)'
+  },
+  'transaction_volume_10000': {
+    badgeId: 'transaction_volume_10000',
+    title: 'High Roller',
+    description: 'Move $10,000 through WeSplit',
+    icon: '🏦',
+    category: 'achievement',
+    rarity: 'legendary',
+    points: 500,
+    target: 10000,
+    progressMetric: 'transaction_volume',
+    progressLabel: 'TOTAL VOLUME ($)'
+  },
+
   // Event Badges - Can be claimed via redeem codes
   // Add event badges here as needed
   // Example:

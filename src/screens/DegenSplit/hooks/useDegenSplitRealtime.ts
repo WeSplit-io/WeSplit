@@ -34,6 +34,46 @@ export const useDegenSplitRealtime = (
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
   const [hasReceivedRealtimeData, setHasReceivedRealtimeData] = useState(false);
   const realtimeCleanupRef = useRef<(() => void) | null>(null);
+  const walletFetchPromiseRef = useRef<Promise<void> | null>(null);
+  const walletFetchPendingRef = useRef(false);
+
+  const fetchLatestWallet = useCallback(async (reason: string) => {
+    if (!splitWalletId || !callbacks.onSplitWalletUpdate) {return;}
+
+    if (walletFetchPromiseRef.current) {
+      walletFetchPendingRef.current = true;
+      return;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
+        if (walletResult.success && walletResult.wallet) {
+          logger.debug('Fetching wallet due to update', {
+            reason,
+            participantsCount: walletResult.wallet.participants.length
+          }, 'useDegenSplitRealtime');
+          callbacks.onSplitWalletUpdate(walletResult.wallet);
+        }
+      } catch (error) {
+        logger.error('Error fetching wallet', {
+          reason,
+          error: error instanceof Error ? error.message : String(error)
+        }, 'useDegenSplitRealtime');
+      } finally {
+        if (walletFetchPromiseRef.current === fetchPromise) {
+          walletFetchPromiseRef.current = null;
+        }
+        if (walletFetchPendingRef.current) {
+          walletFetchPendingRef.current = false;
+          await fetchLatestWallet('queued');
+        }
+      }
+    })();
+
+    walletFetchPromiseRef.current = fetchPromise;
+    return fetchPromise;
+  }, [splitWalletId, callbacks]);
 
   // Start real-time updates
   const startRealtimeUpdates = useCallback(async () => {
@@ -102,20 +142,7 @@ export const useDegenSplitRealtime = (
               
               // Also check if we have a split wallet ID and the callback exists
               if (splitWalletId && callbacks.onSplitWalletUpdate && shouldFetchWallet) {
-                try {
-                  const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
-                  if (walletResult.success && walletResult.wallet) {
-                    logger.debug('Fetching wallet due to update', {
-                      hasMeaningfulStatusChanges,
-                      hasNewParticipants,
-                      hasChanges: update.hasChanges,
-                      participantsCount: update.participants.length
-                    }, 'useDegenSplitRealtime');
-                    callbacks.onSplitWalletUpdate(walletResult.wallet);
-                  }
-                } catch (error) {
-                  logger.error('Error fetching wallet', error as Record<string, unknown>, 'useDegenSplitRealtime');
-                }
+                await fetchLatestWallet('split-update');
               }
             }
           },
@@ -141,20 +168,12 @@ export const useDegenSplitRealtime = (
               callbacks.onLockStatusUpdate(lockedParticipants, allLocked);
             }
 
-            // CRITICAL FIX: Also fetch wallet when participants are updated
-            // This ensures wallet is refreshed when participants are added or updated
             if (splitWalletId && callbacks.onSplitWalletUpdate) {
-              try {
-                const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
-                if (walletResult.success && walletResult.wallet) {
-                  logger.debug('Fetching wallet due to participant update', {
-                    participantsCount: participants.length,
-                    walletParticipantsCount: walletResult.wallet.participants.length
-                  }, 'useDegenSplitRealtime');
-                  callbacks.onSplitWalletUpdate(walletResult.wallet);
-                }
-              } catch (error) {
-                logger.error('Error fetching wallet on participant update', error as Record<string, unknown>, 'useDegenSplitRealtime');
+              const hasActionableStatus = participants.some(p => 
+                p.status === 'locked' || p.status === 'accepted' || p.status === 'paid'
+              );
+              if (hasActionableStatus) {
+                await fetchLatestWallet('participant-update');
               }
             }
           },

@@ -927,16 +927,27 @@ export const firebaseDataService = {
 
     addLinkedWallet: async (userId: string, walletData: Record<string, unknown>): Promise<{ success: boolean; walletId?: string; error?: string }> => {
       try {
-        logger.info('Adding linked wallet', { userId, type: walletData.type }, 'FirebaseDataService');
+        // CRITICAL: Ensure type is explicitly set and not overridden
+        const type = walletData.type || 'external';
+        logger.info('Adding linked wallet', { userId, type, providedType: walletData.type }, 'FirebaseDataService');
         
-        const docRef = await addDoc(collection(db, 'linkedWallets'), {
+        // Ensure type is explicitly preserved in the document
+        const walletDocument = {
           ...walletData,
+          type, // Explicitly set type to prevent defaulting
           userId,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
-        });
+        };
         
-        logger.info('Linked wallet added successfully', { userId, walletId: docRef.id }, 'FirebaseDataService');
+        const docRef = await addDoc(collection(db, 'linkedWallets'), walletDocument);
+        
+        logger.info('Linked wallet added successfully', { 
+          userId, 
+          walletId: docRef.id,
+          type: walletDocument.type,
+          address: walletDocument.address || walletDocument.identifier
+        }, 'FirebaseDataService');
         return {
           success: true,
           walletId: docRef.id

@@ -56,10 +56,16 @@ export class LinkedWalletService {
       
       // Transform the data to ensure consistent structure
       const transformedWallets: LinkedWallet[] = linkedWallets.map(wallet => {
+        // CRITICAL: Preserve the original type from Firebase - don't default to 'external' for KAST cards
+        // Only default to 'external' if type is truly missing (undefined/null)
+        const walletType = wallet.type !== undefined && wallet.type !== null 
+          ? wallet.type 
+          : 'external';
+        
         const transformed = {
           id: wallet.id,
           userId: wallet.userId,
-          type: wallet.type || 'external',
+          type: walletType as 'external' | 'kast', // Explicitly preserve type
           label: wallet.label || 'Unknown',
           // For KAST cards, use identifier as address if address is not present
           address: wallet.address || wallet.identifier,
@@ -76,7 +82,11 @@ export class LinkedWalletService {
           updatedAt: wallet.updated_at || wallet.updatedAt || new Date().toISOString(),
           lastUsed: wallet.lastUsed
         };
-        console.log('LinkedWalletService: Transformed wallet:', transformed);
+        console.log('LinkedWalletService: Transformed wallet:', {
+          ...transformed,
+          originalType: wallet.type,
+          preservedType: transformed.type
+        });
         return transformed;
       });
 

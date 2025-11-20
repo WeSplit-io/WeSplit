@@ -4,9 +4,10 @@
  */
 
 import { db } from '../../config/firebase/firebase';
-import { doc, getDoc, setDoc, collection, getDocs, serverTimestamp, query, where, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, serverTimestamp, query, where, runTransaction, QueryDocumentSnapshot } from 'firebase/firestore';
 import { logger } from '../analytics/loggingService';
-import { BADGE_DEFINITIONS } from './badgeConfig';
+import priceManagementService from '../core/priceManagementService';
+import { BADGE_DEFINITIONS, BadgeInfo } from './badgeConfig';
 
 export interface BadgeProgress {
   badgeId: string;
@@ -37,7 +38,36 @@ interface BadgeClaimData {
   redeemCode?: string;
 }
 
+type UserClaimedBadge = {
+  badgeId: string;
+  title: string;
+  description: string;
+  icon: string;
+  imageUrl?: string;
+  claimedAt?: string;
+  isCommunityBadge?: boolean;
+  showNextToName?: boolean;
+};
+
+type CommunityBadge = {
+  badgeId: string;
+  title: string;
+  icon: string;
+  imageUrl?: string;
+};
+
+type BadgeMetrics = {
+  splitWithdrawals: number;
+  transactionCount: number;
+  transactionVolume: number;
+};
+
 class BadgeService {
+  private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  private badgeMetricsCache = new Map<string, { value: BadgeMetrics; expires: number }>();
+  private claimedBadgeIdsCache = new Map<string, { value: string[]; expires: number }>();
+  private userClaimedBadgesCache = new Map<string, { value: UserClaimedBadge[]; expires: number }>();
+  private communityBadgesCache = new Map<string, { value: CommunityBadge[]; expires: number }>();
   /**
    * Get user's badge progress for all badges
    */
@@ -53,11 +83,11 @@ class BadgeService {
         badge => badge.category === 'event' || badge.isEventBadge === true
       );
 
-      // Get user's split withdrawal count
-      const withdrawalCount = await this.getUserSplitWithdrawalCount(userId);
-
-      // Get claimed badges from database
-      const claimedBadges = await this.getClaimedBadges(userId);
+      // Load badge metrics and claimed badges concurrently
+      const [badgeMetrics, claimedBadges] = await Promise.all([
+        this.getUserBadgeMetrics(userId),
+        this.getClaimedBadges(userId)
+      ]);
 
       // Build progress array for achievement badges
       const achievementProgress: BadgeProgress[] = await Promise.all(
@@ -70,7 +100,7 @@ class BadgeService {
 
           return {
             badgeId: badge.badgeId,
-            current: withdrawalCount,
+            current: this.getProgressValueForBadge(badge, badgeMetrics),
             target: badge.target || 0,
             claimed,
             claimedAt: claimedBadgeData?.claimedAt,
@@ -114,45 +144,114 @@ class BadgeService {
   }
 
   /**
-   * Get user's split withdrawal count
-   * Counts transactions with transactionType 'split_wallet_withdrawal'
+   * Get aggregate metrics required for badge progress calculations
    */
-  private async getUserSplitWithdrawalCount(userId: string): Promise<number> {
+  private async getUserBadgeMetrics(userId: string): Promise<BadgeMetrics> {
+    const cached = this.getCachedValue(this.badgeMetricsCache, userId);
+    if (cached) {
+      return cached;
+    }
+
+    const serverMetrics = await this.getServerBadgeMetrics(userId);
+    if (serverMetrics) {
+      this.setCachedValue(this.badgeMetricsCache, userId, serverMetrics);
+      return serverMetrics;
+    }
+
+    const computedMetrics = await this.computeBadgeMetricsFromTransactions(userId);
+    this.setCachedValue(this.badgeMetricsCache, userId, computedMetrics);
+    await this.saveServerBadgeMetrics(userId, computedMetrics);
+    return computedMetrics;
+  }
+
+  /**
+   * Compute badge metrics by scanning user transactions and normalizing volumes
+   */
+  private async computeBadgeMetricsFromTransactions(userId: string): Promise<BadgeMetrics> {
     try {
-      // Query transactions collection for split withdrawals
-      // Split withdrawals are saved with transactionType: 'split_wallet_withdrawal'
-      const transactionsQuery = query(
-        collection(db, 'transactions'),
+      const transactionsRef = collection(db, 'transactions');
+      const sentQuery = query(
+        transactionsRef,
         where('from_user', '==', userId),
         where('status', '==', 'completed')
       );
-      
-      const snapshot = await getDocs(transactionsQuery);
-      
-      let withdrawalCount = 0;
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        
-        // Primary check: transactionType field
-        if (data.transactionType === 'split_wallet_withdrawal') {
-          withdrawalCount++;
-          return;
-        }
-        
-        // Fallback: Check note for split withdrawal indicators (for legacy transactions)
-        const note = (data.note || '').toLowerCase();
-        if (
-          note.includes('split') && 
-          (note.includes('withdrawal') || note.includes('withdraw') || note.includes('extract') || note.includes('extraction'))
-        ) {
-          withdrawalCount++;
-        }
-      });
+      const receivedQuery = query(
+        transactionsRef,
+        where('to_user', '==', userId),
+        where('status', '==', 'completed')
+      );
 
-      return withdrawalCount;
+      const [sentSnapshot, receivedSnapshot] = await Promise.all([
+        getDocs(sentQuery),
+        getDocs(receivedSnapshot)
+      ]);
+
+      const transactionDocs = new Map<string, QueryDocumentSnapshot>();
+      sentSnapshot.forEach((docSnap) => transactionDocs.set(docSnap.id, docSnap));
+      receivedSnapshot.forEach((docSnap) => transactionDocs.set(docSnap.id, docSnap));
+
+      const metrics: BadgeMetrics = {
+        splitWithdrawals: 0,
+        transactionCount: 0,
+        transactionVolume: 0
+      };
+
+      for (const docSnap of transactionDocs.values()) {
+        const data = docSnap.data() as Record<string, unknown>;
+        metrics.transactionCount += 1;
+        metrics.transactionVolume += await this.getUsdAmountForTransaction(data);
+
+        if (this.isSplitWithdrawal(data, userId)) {
+          metrics.splitWithdrawals += 1;
+        }
+      }
+
+      return metrics;
     } catch (error) {
-      logger.error('Failed to get split withdrawal count', { error }, 'BadgeService');
-      return 0;
+      logger.error('Failed to compute badge metrics from transactions', { error, userId }, 'BadgeService');
+      return { splitWithdrawals: 0, transactionCount: 0, transactionVolume: 0 };
+    }
+  }
+
+  private getBadgeMetricsDocRef(userId: string) {
+    return doc(db, 'users', userId, 'metadata', 'badge_metrics');
+  }
+
+  private async getServerBadgeMetrics(userId: string): Promise<BadgeMetrics | null> {
+    try {
+      const metricsDoc = await getDoc(this.getBadgeMetricsDocRef(userId));
+      if (!metricsDoc.exists()) {
+        return null;
+      }
+
+      const data = metricsDoc.data() as Record<string, unknown>;
+      const splitWithdrawals = this.normalizeTransactionAmount(data.splitWithdrawals);
+      const transactionCount = this.normalizeTransactionAmount(data.transactionCount);
+      const transactionVolume = this.normalizeTransactionAmount(data.transactionVolume);
+
+      return {
+        splitWithdrawals,
+        transactionCount,
+        transactionVolume
+      };
+    } catch (error) {
+      logger.error('Failed to load server badge metrics', { userId, error }, 'BadgeService');
+      return null;
+    }
+  }
+
+  private async saveServerBadgeMetrics(userId: string, metrics: BadgeMetrics): Promise<void> {
+    try {
+      await setDoc(
+        this.getBadgeMetricsDocRef(userId),
+        {
+          ...metrics,
+          updatedAt: serverTimestamp()
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      logger.error('Failed to persist badge metrics', { userId, error }, 'BadgeService');
     }
   }
 
@@ -160,6 +259,11 @@ class BadgeService {
    * Get list of claimed badge IDs for a user
    */
   private async getClaimedBadges(userId: string): Promise<string[]> {
+    const cached = this.getCachedValue(this.claimedBadgeIdsCache, userId);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const badgesRef = collection(db, 'users', userId, 'badges');
       const snapshot = await getDocs(badgesRef);
@@ -172,6 +276,7 @@ class BadgeService {
         }
       });
 
+      this.setCachedValue(this.claimedBadgeIdsCache, userId, claimedBadgeIds);
       return claimedBadgeIds;
     } catch (error) {
       logger.error('Failed to get claimed badges', { error }, 'BadgeService');
@@ -249,6 +354,8 @@ class BadgeService {
         badges: [...badges, badgeData.badgeId]
       });
     });
+
+    this.invalidateUserBadgeCaches(userId);
   }
 
   /**
@@ -382,16 +489,12 @@ class BadgeService {
    * Get user's claimed badges only (for profile display)
    * Returns badges with their image URLs and metadata
    */
-  async getUserClaimedBadges(userId: string): Promise<Array<{
-    badgeId: string;
-    title: string;
-    description: string;
-    icon: string;
-    imageUrl?: string;
-    claimedAt?: string;
-    isCommunityBadge?: boolean;
-    showNextToName?: boolean;
-  }>> {
+  async getUserClaimedBadges(userId: string): Promise<UserClaimedBadge[]> {
+    const cached = this.getCachedValue(this.userClaimedBadgesCache, userId);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const claimedBadgeIds = await this.getClaimedBadges(userId);
       
@@ -416,7 +519,9 @@ class BadgeService {
         })
       );
 
-      return claimedBadges.filter((badge): badge is NonNullable<typeof badge> => badge !== null);
+      const filteredBadges = claimedBadges.filter((badge): badge is NonNullable<typeof badge> => badge !== null);
+      this.setCachedValue(this.userClaimedBadgesCache, userId, filteredBadges);
+      return filteredBadges;
     } catch (error) {
       logger.error('Failed to get user claimed badges', { error }, 'BadgeService');
       return [];
@@ -426,15 +531,15 @@ class BadgeService {
   /**
    * Get user's community badges (badges that should be displayed next to name)
    */
-  async getUserCommunityBadges(userId: string): Promise<Array<{
-    badgeId: string;
-    title: string;
-    icon: string;
-    imageUrl?: string;
-  }>> {
+  async getUserCommunityBadges(userId: string): Promise<CommunityBadge[]> {
+    const cached = this.getCachedValue(this.communityBadgesCache, userId);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const claimedBadges = await this.getUserClaimedBadges(userId);
-      return claimedBadges
+      const communityBadges = claimedBadges
         .filter(badge => badge.isCommunityBadge && badge.showNextToName)
         .map(badge => ({
           badgeId: badge.badgeId,
@@ -442,6 +547,9 @@ class BadgeService {
           icon: badge.icon,
           imageUrl: badge.imageUrl
         }));
+
+      this.setCachedValue(this.communityBadgesCache, userId, communityBadges);
+      return communityBadges;
     } catch (error) {
       logger.error('Failed to get user community badges', { error }, 'BadgeService');
       return [];
@@ -509,6 +617,114 @@ class BadgeService {
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
+  }
+
+  /**
+   * Resolve progress value based on badge configuration
+   */
+  private getProgressValueForBadge(badge: BadgeInfo, metrics: {
+    splitWithdrawals: number;
+    transactionCount: number;
+    transactionVolume: number;
+  }): number {
+    switch (badge.progressMetric) {
+      case 'transaction_count':
+        return metrics.transactionCount;
+      case 'transaction_volume':
+        return metrics.transactionVolume;
+      case 'split_withdrawals':
+      default:
+        return metrics.splitWithdrawals;
+    }
+  }
+
+  /**
+   * Normalize transaction amount to a positive numeric value
+   */
+  private normalizeTransactionAmount(amount: unknown): number {
+    let numericAmount: number;
+    if (typeof amount === 'number') {
+      numericAmount = amount;
+    } else if (typeof amount === 'string') {
+      numericAmount = parseFloat(amount);
+    } else {
+      numericAmount = 0;
+    }
+
+    if (!Number.isFinite(numericAmount)) {
+      return 0;
+    }
+
+    return Math.abs(numericAmount);
+  }
+
+  /**
+   * Convert transaction amount to USD-equivalent for consistent comparisons
+   */
+  private async getUsdAmountForTransaction(data: Record<string, unknown>): Promise<number> {
+    const amount = this.normalizeTransactionAmount(data.amount);
+    if (amount === 0) {
+      return 0;
+    }
+
+    const currencyRaw = typeof data.currency === 'string' ? data.currency.toUpperCase() : 'USD';
+    if (currencyRaw === 'USD' || currencyRaw === 'USDC') {
+      return amount;
+    }
+
+    try {
+      const conversion = await priceManagementService.convertCurrency(currencyRaw, 'USD', amount);
+      if (conversion?.toAmount) {
+        return conversion.toAmount;
+      }
+    } catch (error) {
+      logger.warn('Currency conversion failed for badge metrics', { currency: currencyRaw, amount, error }, 'BadgeService');
+    }
+
+    return amount;
+  }
+
+  /**
+   * Determine if a transaction is a split withdrawal (supports legacy data)
+   */
+  private isSplitWithdrawal(data: Record<string, unknown>, userId: string): boolean {
+    const senderId = typeof data.from_user === 'string' ? data.from_user : undefined;
+    if (senderId !== userId) {
+      return false;
+    }
+
+    if ((data.transactionType as string | undefined) === 'split_wallet_withdrawal') {
+      return true;
+    }
+
+    const note = (data.note as string | undefined)?.toLowerCase() || '';
+    return (
+      note.includes('split') &&
+      (note.includes('withdrawal') ||
+        note.includes('withdraw') ||
+        note.includes('extract') ||
+        note.includes('extraction'))
+    );
+  }
+
+  private getCachedValue<T>(cache: Map<string, { value: T; expires: number }>, userId: string): T | null {
+    const cached = cache.get(userId);
+    if (cached && cached.expires > Date.now()) {
+      return cached.value;
+    }
+    cache.delete(userId);
+    return null;
+  }
+
+  private setCachedValue<T>(cache: Map<string, { value: T; expires: number }>, userId: string, value: T): void {
+    cache.set(userId, { value, expires: Date.now() + BadgeService.CACHE_TTL_MS });
+  }
+
+  private invalidateUserBadgeCaches(userId: string): void {
+    this.badgeMetricsCache.delete(userId);
+    this.claimedBadgeIdsCache.delete(userId);
+    this.userClaimedBadgesCache.delete(userId);
+    this.communityBadgesCache.delete(userId);
   }
 }
 

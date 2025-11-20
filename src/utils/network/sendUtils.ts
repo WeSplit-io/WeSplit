@@ -215,7 +215,7 @@ export const validateKastWalletAddress = (address: string): {
   isValid: boolean;
   error?: string;
 } => {
-  if (!address || address.trim() === '') {
+  if (!address || typeof address !== 'string') {
     return {
       isValid: false,
       error: 'KAST card wallet address is required'
@@ -223,8 +223,16 @@ export const validateKastWalletAddress = (address: string): {
   }
 
   const trimmed = address.trim();
+  
+  if (!trimmed) {
+    return {
+      isValid: false,
+      error: 'KAST card wallet address cannot be empty'
+    };
+  }
 
   // Use the same validation as external wallets - proper Solana address validation
+  // The validation function now handles trimming internally, but we do it here too for clarity
   const addressValidation = validateSolanaAddress(trimmed);
   if (!addressValidation.isValid) {
     return {

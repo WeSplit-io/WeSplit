@@ -327,6 +327,9 @@ export class SplitWalletManagement {
         if (updates.totalAmount) {splitUpdates.totalAmount = updates.totalAmount;}
         if (updates.currency) {splitUpdates.currency = updates.currency;}
         if (updates.updatedAt) {splitUpdates.updatedAt = updates.updatedAt;}
+        if (updates.degenLoser) {splitUpdates.degenLoser = updates.degenLoser as any;}
+        if (updates.degenWinner) {splitUpdates.degenWinner = updates.degenWinner as any;}
+        if (updates.rouletteAudit) {splitUpdates.rouletteAudit = updates.rouletteAudit as any;}
         
         if (Object.keys(splitUpdates).length > 0) {
           const splitUpdateResult = await SplitStorageService.updateSplitByBillId(currentWallet.billId, splitUpdates);

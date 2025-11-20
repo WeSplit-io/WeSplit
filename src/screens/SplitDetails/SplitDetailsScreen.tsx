@@ -1546,8 +1546,15 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       hideSplitModal();
 
       // Create or update the split with the selected type
-      // CRITICAL: For draft splits, use the splitId from route params
-      const splitIdToUse = createdSplitId || currentSplitData?.id || splitId;
+      // CRITICAL: For draft splits, prioritize splitId from route params and effectiveSplitId
+      // This ensures we update existing drafts instead of creating duplicates
+      const splitIdToUse = createdSplitId || currentSplitData?.id || splitId || effectiveSplitId;
+      
+      // CRITICAL: Check if this is a draft split that should be updated
+      const isDraftToUpdate = (currentSplitData?.status === 'draft' || splitData?.status === 'draft') && 
+                               splitIdToUse && 
+                               !isActuallyNewBill && 
+                               !isActuallyManualCreation;
       
       if (__DEV__) {
         logger.debug('handleContinue called', {
@@ -1556,24 +1563,43 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           createdSplitId,
           currentSplitDataId: currentSplitData?.id,
           splitId,
+          effectiveSplitId,
           isActuallyNewBill,
           isActuallyManualCreation,
           isDraftSplit,
+          isDraftToUpdate,
+          currentSplitDataStatus: currentSplitData?.status,
+          splitDataStatus: splitData?.status,
           hasProcessedBillData: !!currentProcessedBillData
         }, 'SplitDetailsScreen');
       }
 
-      if (splitIdToUse) {
+      // CRITICAL: Always update if we have a splitIdToUse and it's not a new bill
+      // This prevents creating duplicates for draft splits
+      // If we have splitIdToUse and it's not a new bill, we should update, not create
+      const shouldUpdateExisting = splitIdToUse && !isActuallyNewBill && !isActuallyManualCreation;
+      
+      if (shouldUpdateExisting) {
         // Update existing draft split with split type
         // Get the latest split data (might be the draft we just created or loaded)
-        let splitToUpdate = currentSplitData;
+        let splitToUpdate = currentSplitData || splitData;
         
-        // If we don't have currentSplitData but have splitId, load it
+        // If we don't have split data but have splitId, load it
         if (!splitToUpdate && splitIdToUse) {
+          if (__DEV__) {
+            logger.debug('Loading split data for update', { splitIdToUse }, 'SplitDetailsScreen');
+          }
           const loadResult = await SplitStorageService.getSplit(splitIdToUse);
           if (loadResult.success && loadResult.split) {
             splitToUpdate = loadResult.split;
             setCurrentSplitData(splitToUpdate);
+          } else {
+            logger.error('Failed to load split for update', { 
+              splitIdToUse, 
+              error: loadResult.error 
+            }, 'SplitDetailsScreen');
+            Alert.alert('Error', 'Failed to load split. Please try again.');
+            return;
           }
         }
         
@@ -1583,11 +1609,22 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           return;
         }
 
+        // CRITICAL: Only update splitType and status, preserve all other data
         const updatedSplitData = {
           ...splitToUpdate,
           splitType: selectedSplitType,
           status: 'pending' as const // Change from 'draft' to 'pending' when type is selected
         };
+
+        if (__DEV__) {
+          logger.debug('Updating existing split with split type', {
+            splitId: splitIdToUse,
+            originalStatus: splitToUpdate.status,
+            newStatus: updatedSplitData.status,
+            splitType: selectedSplitType,
+            title: splitToUpdate.title
+          }, 'SplitDetailsScreen');
+        }
 
         const updateResult = await SplitStorageService.updateSplit(splitIdToUse, updatedSplitData);
 
@@ -1619,6 +1656,22 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         }
       } else {
         // Create new split
+        // CRITICAL: Double-check we're not accidentally creating a duplicate
+        // If we have any splitId, we should have updated instead
+        if (splitIdToUse && !isActuallyNewBill && !isActuallyManualCreation) {
+          logger.error('CRITICAL: Attempted to create new split when splitId exists', {
+            splitIdToUse,
+            splitId,
+            effectiveSplitId,
+            currentSplitDataId: currentSplitData?.id,
+            createdSplitId,
+            isActuallyNewBill,
+            isActuallyManualCreation
+          }, 'SplitDetailsScreen');
+          Alert.alert('Error', 'Cannot create new split. Please try again or contact support.');
+          return;
+        }
+        
         if (__DEV__) {
           logger.debug('Creating new split', {
             splitIdToUse,

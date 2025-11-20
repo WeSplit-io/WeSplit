@@ -25,21 +25,42 @@ export class ValidationUtils {
         };
       }
 
-      if (address.length < 32 || address.length > 44) {
+      // Trim whitespace from address
+      const trimmed = address.trim();
+      
+      if (!trimmed) {
         return {
           isValid: false,
-          error: 'Invalid address length'
+          error: 'Address cannot be empty'
         };
       }
 
-      // Try to create a PublicKey to validate the address
-      new PublicKey(address);
+      // Solana addresses are base58 encoded and typically 32-44 characters
+      // But base58 encoding can vary, so we use a more lenient range
+      if (trimmed.length < 32 || trimmed.length > 44) {
+        return {
+          isValid: false,
+          error: `Invalid address length (${trimmed.length}). Solana addresses are typically 32-44 characters.`
+        };
+      }
+
+      // Try to create a PublicKey to validate the address format
+      // This will throw if the address is not a valid base58-encoded public key
+      new PublicKey(trimmed);
       
       return { isValid: true };
     } catch (error) {
+      // Provide more helpful error messages
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Invalid public key')) {
+        return {
+          isValid: false,
+          error: 'Invalid Solana address format. Please check the address and try again.'
+        };
+      }
       return {
         isValid: false,
-        error: `Invalid Solana address: ${error instanceof Error ? error.message : String(error)}`
+        error: `Invalid Solana address: ${errorMessage}`
       };
     }
   }

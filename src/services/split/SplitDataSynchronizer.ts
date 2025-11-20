@@ -203,6 +203,9 @@ export class SplitDataSynchronizer {
         case 'spinning_completed':
           splitStorageStatus = 'completed'; // Spinning completed means the split is done
           break;
+        case 'closed':
+          splitStorageStatus = 'completed'; // Closed wallet means the split is fully completed
+          break;
         default:
           splitStorageStatus = 'active';
       }

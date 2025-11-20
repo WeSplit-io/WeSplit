@@ -18,6 +18,10 @@ jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn(),
 }));
 
+jest.mock('expo-crypto', () => ({
+  getRandomBytes: jest.fn(() => new Uint8Array([1, 2, 3, 4])),
+}));
+
 jest.mock('expo-sharing', () => ({
   isAvailableAsync: jest.fn(),
   shareAsync: jest.fn(),

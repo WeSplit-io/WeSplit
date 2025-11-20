@@ -15,17 +15,24 @@ interface UserNameWithBadgesProps {
   userName: string;
   style?: any;
   textStyle?: any;
+  showBadges?: boolean;
 }
 
 const UserNameWithBadges: React.FC<UserNameWithBadgesProps> = ({
   userId,
   userName,
   style,
-  textStyle
+  textStyle,
+  showBadges = true
 }) => {
   const [communityBadges, setCommunityBadges] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!userId || showBadges === false) {
+      setCommunityBadges([]);
+      return;
+    }
+
     const loadBadges = async () => {
       try {
         const badges = await badgeService.getUserCommunityBadges(userId);
@@ -35,10 +42,8 @@ const UserNameWithBadges: React.FC<UserNameWithBadgesProps> = ({
       }
     };
 
-    if (userId) {
-      loadBadges();
-    }
-  }, [userId]);
+    loadBadges();
+  }, [userId, showBadges]);
 
   return (
     <View style={[styles.container, style]}>

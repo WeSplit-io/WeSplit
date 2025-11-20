@@ -725,6 +725,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
     const [communityBadges, setCommunityBadges] = useState<any[]>([]);
 
     useEffect(() => {
+      if (!contact.id || contact.show_badges_on_profile === false) {
+        setCommunityBadges([]);
+        return;
+      }
+
       const loadBadges = async () => {
         try {
           const badges = await badgeService.getUserCommunityBadges(contact.id);
@@ -734,10 +739,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
         }
       };
 
-      if (contact.id) {
-        loadBadges();
-      }
-    }, [contact.id]);
+      loadBadges();
+    }, [contact.id, contact.show_badges_on_profile]);
 
     return (
       <TouchableOpacity

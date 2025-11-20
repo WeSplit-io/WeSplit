@@ -456,7 +456,11 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
 
       {/* Main Content */}
       <View style={styles.mainContent}>
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxxl * 2 }}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Profile Picture */}
           <View style={styles.profilePictureContainer}>
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
@@ -564,6 +568,8 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                   justifyContent: 'center',
                   paddingHorizontal: 2,
                 }}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: showBadgesOnProfile }}
               >
                 <View style={{
                   width: 26,

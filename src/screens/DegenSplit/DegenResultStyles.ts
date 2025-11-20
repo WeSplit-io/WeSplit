@@ -32,8 +32,10 @@ export const styles = StyleSheet.create({
   headerSpacer: {
     width: 40,
   },
-  content: {
+  contentScroll: {
     flex: 1,
+  },
+  content: {
     paddingTop: 50,
     alignItems: 'center',
     paddingBottom: spacing.xl,
@@ -196,14 +198,105 @@ export const styles = StyleSheet.create({
   },
   // Action buttons container
   actionButtonsContainer: {
-    flexDirection: 'row',
-    gap: spacing.md,
     width: '100%',
     paddingHorizontal: spacing.md,
+    gap: spacing.md,
   },
   // New design action buttons
   splitWalletButton: {
-    flex: 1,
+    width: '100%',
+  },
+  primaryActionButton: {
+    width: '100%',
+  },
+  paymentOptionButtonDisabled: {
+    opacity: 0.5,
+  },
+  paymentOptionWarning: {
+    marginTop: spacing.xs,
+    color: colors.red,
+    fontSize: typography.fontSize.sm,
+  },
+  transferInfoBanner: {
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.white10,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  transferInfoText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  paymentInfoContainer: {
+    width: '100%',
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  paymentInfoText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  missingDestinationBanner: {
+    width: '100%',
+    borderRadius: 12,
+    padding: spacing.lg,
+    backgroundColor: colors.white10,
+    borderWidth: 1,
+    borderColor: colors.red,
+    marginTop: spacing.lg,
+  },
+  missingDestinationTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  missingDestinationText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  linkCardButton: {
+    marginTop: spacing.md,
+  },
+  selectedCardContainer: {
+    width: '100%',
+    borderRadius: 12,
+    padding: spacing.lg,
+    backgroundColor: colors.white10,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  selectedCardLabel: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  selectedCardName: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+  },
+  selectedCardMeta: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+  },
+  manageCardsButton: {
+    marginTop: spacing.sm,
   },
   claimButtonNew: {
     flex: 1,

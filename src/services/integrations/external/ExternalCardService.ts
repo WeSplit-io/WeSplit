@@ -59,10 +59,24 @@ export class ExternalCardService {
    */
   static async validateKastCard(walletAddress: string): Promise<CardValidationResult> {
     try {
-      logger.info('Validating KAST card wallet address', { walletAddress }, 'ExternalCardService');
+      // Trim the address before validation
+      const trimmedAddress = walletAddress?.trim();
+      
+      if (!trimmedAddress) {
+        return {
+          isValid: false,
+          error: 'KAST card wallet address is required'
+        };
+      }
 
-      // Validate as proper Solana wallet address
-      const addressValidation = validateSolanaAddress(walletAddress);
+      logger.info('Validating KAST card wallet address', { 
+        originalLength: walletAddress?.length,
+        trimmedLength: trimmedAddress.length,
+        address: trimmedAddress.substring(0, 8) + '...' 
+      }, 'ExternalCardService');
+
+      // Validate as proper Solana wallet address (validation function handles trimming internally too)
+      const addressValidation = validateSolanaAddress(trimmedAddress);
       if (!addressValidation.isValid) {
         return {
           isValid: false,
@@ -73,7 +87,7 @@ export class ExternalCardService {
       // Simulate API call to validate card
       // In production, this would call the actual KAST card API
       const mockCardInfo: CardInfo = {
-        identifier: walletAddress, // Use wallet address as identifier
+        identifier: trimmedAddress, // Use trimmed wallet address as identifier
         cardType: 'debit',
         status: 'active',
         balance: 1000.00, // Mock balance
@@ -82,7 +96,10 @@ export class ExternalCardService {
         cardholderName: 'Card Holder'
       };
 
-      logger.info('KAST card validation successful', { walletAddress }, 'ExternalCardService');
+      logger.info('KAST card validation successful', { 
+        walletAddress: trimmedAddress,
+        identifier: mockCardInfo.identifier
+      }, 'ExternalCardService');
 
       return {
         isValid: true,

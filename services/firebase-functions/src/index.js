@@ -82,3 +82,7 @@ exports.getCompanyWalletBalance = transactionFunctions.getCompanyWalletBalance;
 const externalPaymentIntegration = require('./externalPaymentIntegration');
 exports.createSplitFromPayment = externalPaymentIntegration.createSplitFromPayment;
 exports.testCreateSplitFromPayment = externalPaymentIntegration.testCreateSplitFromPayment;
+
+// Import and export degen roulette functions
+const degenRouletteFunctions = require('./degenRouletteFunctions');
+exports.executeDegenRoulette = degenRouletteFunctions.executeDegenRoulette;

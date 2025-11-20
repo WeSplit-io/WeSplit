@@ -70,6 +70,32 @@ export interface Split {
   // Wallet information
   walletId?: string;
   walletAddress?: string;
+  degenWinner?: {
+    userId: string;
+    name: string;
+    selectedAt: string;
+    requestedByUserId?: string;
+    entropySource?: string;
+    seed?: string;
+  };
+  degenLoser?: {
+    userId: string;
+    name: string;
+    selectedAt: string;
+    requestedByUserId?: string;
+    entropySource?: string;
+    seed?: string;
+  };
+  rouletteAudit?: {
+    selectedAt: string;
+    requestedByUserId?: string;
+    entropySource?: string;
+    seed?: string;
+    participantIds: string[];
+    lockedParticipantIds: string[];
+    loserUserId: string;
+    totalParticipants: number;
+  }[];
 }
 
 export interface SplitParticipant {

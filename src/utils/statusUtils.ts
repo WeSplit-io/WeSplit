@@ -27,6 +27,8 @@ export const getSplitStatusDisplayText = (status: string): string => {
       return 'Spinning Complete';
     case 'spinning':
       return 'Spinning';
+    case 'closed':
+      return 'Closed';
     default:
       return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
   }
@@ -82,6 +84,8 @@ export const getSplitStatusBadgeStyle = (status: string) => {
       return { backgroundColor: colors.success + '20' };
     case 'spinning':
       return { backgroundColor: colors.purple + '20' };
+    case 'closed':
+      return { backgroundColor: colors.textSecondary + '20' };
     default:
       return { backgroundColor: colors.surface };
   }
@@ -108,6 +112,8 @@ export const getSplitStatusTextStyle = (status: string) => {
       return { color: colors.success };
     case 'spinning':
       return { color: colors.purple };
+    case 'closed':
+      return { color: colors.textSecondary };
     default:
       return { color: colors.text };
   }
@@ -134,6 +140,8 @@ export const getSplitStatusDotStyle = (status: string) => {
       return { backgroundColor: colors.success };
     case 'spinning':
       return { backgroundColor: colors.purple };
+    case 'closed':
+      return { backgroundColor: colors.textSecondary };
     default:
       return { backgroundColor: colors.text };
   }

@@ -9,7 +9,8 @@ export type {
   SplitWallet,
   SplitWalletParticipant,
   SplitWalletResult,
-  PaymentResult
+  PaymentResult,
+  DegenRouletteAuditEntry
 } from './types';
 
 // Export atomic updates service
@@ -23,6 +24,7 @@ let SplitWalletPayments: any;
 let SplitWalletSecurity: any;
 let SplitWalletQueries: any;
 let SplitWalletCleanup: any;
+let SplitRouletteService: any;
 
 // Lazy load modules
 const loadModules = async () => {
@@ -43,6 +45,9 @@ const loadModules = async () => {
   }
   if (!SplitWalletCleanup) {
     SplitWalletCleanup = (await import('./SplitWalletCleanup')).SplitWalletCleanup;
+  }
+  if (!SplitRouletteService) {
+    SplitRouletteService = (await import('./SplitRouletteService')).SplitRouletteService;
   }
 };
 
@@ -187,6 +192,29 @@ export class SplitWalletService {
   static async processDegenFundLocking(splitWalletId: string, participantId: string, amount: number, transactionSignature?: string) {
     await loadModules();
     return SplitWalletPayments.processDegenFundLocking(splitWalletId, participantId, amount, transactionSignature);
+  }
+
+  static async executeDegenRoulette(splitWalletId: string, requestedByUserId?: string) {
+    await loadModules();
+    try {
+      const { httpsCallable } = await import('firebase/functions');
+      const { getFirebaseFunctionsClient } = await import('../firebase/functionsClient');
+      const functions = getFirebaseFunctionsClient();
+      const callable = httpsCallable(functions, 'executeDegenRoulette', {
+        timeout: 30000,
+      });
+      const response = await callable({
+        splitWalletId,
+        requestedByUserId,
+      });
+      return response.data;
+    } catch (error) {
+      console.warn('⚠️ executeDegenRoulette remote call failed, falling back to local implementation', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return SplitRouletteService.executeDegenRoulette(splitWalletId, requestedByUserId);
   }
 
   static async verifySplitWalletBalance(splitWalletId: string) {

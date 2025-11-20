@@ -3,6 +3,17 @@
  * Prevents circular import dependencies
  */
 
+export interface DegenRouletteAuditEntry {
+  selectedAt: string;
+  requestedByUserId?: string;
+  entropySource?: string;
+  seed?: string;
+  participantIds: string[];
+  lockedParticipantIds: string[];
+  loserUserId: string;
+  totalParticipants: number;
+}
+
 export interface SplitWallet {
   id: string;
   billId: string;
@@ -13,7 +24,7 @@ export interface SplitWallet {
   // The creator stores the split wallet's private key locally on their device
   totalAmount: number;
   currency: string;
-  status: 'active' | 'locked' | 'completed' | 'cancelled' | 'spinning_completed';
+  status: 'active' | 'locked' | 'completed' | 'cancelled' | 'spinning_completed' | 'closed';
   participants: SplitWalletParticipant[];
   createdAt: string;
   updatedAt: string;
@@ -23,12 +34,19 @@ export interface SplitWallet {
     userId: string;
     name: string;
     selectedAt: string;
+    requestedByUserId?: string;
+    entropySource?: string;
+    seed?: string;
   };
   degenLoser?: { // For degen splits - stores the loser information (selected participant is the LOSER)
     userId: string;
     name: string;
     selectedAt: string;
+    requestedByUserId?: string;
+    entropySource?: string;
+    seed?: string;
   };
+  rouletteAudit?: DegenRouletteAuditEntry[];
 }
 
 export interface SplitWalletParticipant {

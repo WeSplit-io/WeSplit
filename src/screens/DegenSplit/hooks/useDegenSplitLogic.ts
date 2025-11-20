@@ -61,7 +61,8 @@ export interface DegenSplitLogic {
     splitWallet: SplitWallet,
     splitData: any,
     billData: any,
-    totalAmount: number
+    totalAmount: number,
+    currentUser?: any
   ) => Promise<void>;
   
   // Result operations
@@ -773,65 +774,58 @@ export const useDegenSplitLogic = (
   };
 
   // Roulette operations
-  const handleStartSpinning = useCallback((
+  const handleStartSpinning = useCallback(async (
     participants: any[],
     splitWallet: SplitWallet,
     splitData: any,
     billData: any,
-    totalAmount: number
-  ): void => {
+    totalAmount: number,
+    currentUser?: any
+  ): Promise<void> => {
     if (state.isSpinning || state.hasSpun) {return;}
 
-    setState({ isSpinning: true });
+    if (!splitWallet?.id) {
+      Alert.alert('Missing Split Wallet', 'We could not find the split wallet for this spin.');
+      return;
+    }
 
-    // CRITICAL FIX: Improved randomness calculation for fair winner selection
-    // Handle edge cases and ensure fair distribution
-    let finalIndex: number;
-    
-    if (participants.length === 0) {
-      logger.error('No participants to select winner from', null, 'DegenSplitLogic');
-      setState({ isSpinning: false });
+    if (!participants || participants.length === 0) {
+      Alert.alert('No Participants', 'A split needs at least one participant to run the roulette.');
       return;
     }
     
-    if (participants.length === 1) {
-      // CRITICAL: Single participant is always the loser
-      finalIndex = 0;
-      logger.info('Only one participant, automatically selected as loser', {
-        participantId: participants[0].userId || participants[0].id,
-        note: 'Single participant is the loser and must transfer to external card'
-      }, 'DegenSplitLogic');
-    } else {
-      // Multiple participants - use improved randomness for fair distribution
-      // Combine multiple random values and timestamp for better entropy
-      const random1 = Math.random();
-      const random2 = Math.random();
-      const timestamp = Date.now();
-      
-      // Create a more random seed by combining multiple sources
-      // Use the fractional part of timestamp to add entropy
-      const timestampFraction = (timestamp % 1000) / 1000;
-      const combinedRandom = (random1 + random2 + timestampFraction) / 3;
-      
-      // Ensure fair distribution across all participants
-      finalIndex = Math.floor(combinedRandom * participants.length);
-      
-      // Safety check to ensure index is within bounds
-      if (finalIndex >= participants.length) {
-        finalIndex = participants.length - 1;
+    setState({ isSpinning: true, error: null });
+
+    try {
+      const { SplitWalletService } = await import('../../../services/split');
+      const rouletteResult = await SplitWalletService.executeDegenRoulette(
+        splitWallet.id,
+        currentUser?.id?.toString()
+      );
+
+      if (!rouletteResult.success || !rouletteResult.loserUserId) {
+        throw new Error(rouletteResult.error || 'Failed to execute roulette.');
       }
-      
-      logger.info('Random loser selected using improved algorithm', {
-        participantsCount: participants.length,
-        selectedIndex: finalIndex,
-        selectedParticipantId: participants[finalIndex].userId || participants[finalIndex].id,
-        note: 'Selected participant is the LOSER, all others are winners',
-        random1,
-        random2,
-        timestampFraction,
-        combinedRandom
-      }, 'DegenSplitLogic');
-    }
+
+      if (rouletteResult.updatedWallet) {
+        setState({ splitWallet: rouletteResult.updatedWallet });
+      }
+
+      const loserIndexInUi = participants.findIndex(
+        (participant: any) => (participant.userId || participant.id) === rouletteResult.loserUserId
+      );
+      const finalIndex = loserIndexInUi >= 0 ? loserIndexInUi : 0;
+      const loserParticipant = participants[finalIndex];
+
+      const winnersFromResult = rouletteResult.winners?.map(winner => ({
+        userId: winner.userId,
+        name: winner.name,
+      })) || participants
+        .filter((participant: any) => (participant.userId || participant.id) !== rouletteResult.loserUserId)
+        .map((participant: any) => ({
+          userId: participant.userId || participant.id,
+          name: participant.name,
+        }));
 
     // Reset animation values
     if (state.spinAnimationRef.current) {
@@ -841,84 +835,40 @@ export const useDegenSplitLogic = (
       state.cardScaleRef.current.setValue(1);
     }
 
-    // Animate the spin sequence - NON-BLOCKING
+      const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
+      const loserId = rouletteResult.loserUserId;
+      const loserName = rouletteResult.loserName || loserParticipant?.name || 'Participant';
+
+      // Animate the spin sequence
     const { Animated } = require('react-native');
     Animated.sequence([
-      // Scale down during spin
       Animated.timing(state.cardScaleRef.current, {
         toValue: 0.8,
         duration: 200,
         useNativeDriver: true,
       }),
-      // Main spin animation - very fast for quick experience
       Animated.timing(state.spinAnimationRef.current, {
         toValue: 1,
-        duration: 1500, // Reduced from 3000ms to 1500ms (1.5 seconds)
+          duration: 1500,
         useNativeDriver: true,
       }),
-      // Scale back up
       Animated.timing(state.cardScaleRef.current, {
         toValue: 1,
         duration: 200,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // IMMEDIATELY update UI state - no blocking operations
       setState({ 
         selectedIndex: finalIndex,
         isSpinning: false,
-        hasSpun: true
+          hasSpun: true,
       });
 
-      // CRITICAL: Select exactly 1 loser (selected participant), rest are winners
-      // Execute post-animation operations in background - COMPLETELY NON-BLOCKING
-      // Use setTimeout to ensure UI is not blocked
       setTimeout(() => {
-        // Save the loser information to the split wallet - NON-BLOCKING
-        (async () => {
-          try {
-            const { SplitWalletService } = await import('../../../services/split');
-            const selectedParticipant = participants[finalIndex];
-            const loserId = selectedParticipant.userId || selectedParticipant.id;
-            const loserName = selectedParticipant.name;
-            
-            // Save degenLoser (the selected participant is the LOSER)
-            // All other participants are winners
-            const saveLoserPromise = SplitWalletService.updateSplitWallet(splitWallet.id, {
-              degenLoser: {
-                userId: loserId,
-                name: loserName,
-                selectedAt: new Date().toISOString()
-              },
-              // Also save as degenWinner for backward compatibility, but it's actually the loser
-              // The UI will check degenLoser first
-              degenWinner: {
-                userId: loserId,
-                name: loserName,
-                selectedAt: new Date().toISOString()
-              },
-              status: 'spinning_completed'
-            });
-            
-            // Use shorter timeout and don't await - fire and forget
-            createTimeoutWrapper(saveLoserPromise, 5000, 'Save loser to database')
-              .then(() => console.log('✅ Loser information saved successfully'))
-              .catch(error => console.error('❌ Failed to save loser information:', error));
-          } catch (error) {
-            console.error('❌ Failed to save loser information:', error);
-          }
-        })();
-
-        // Send notifications - loser gets loser notification, winners get winner notifications - NON-BLOCKING
         (async () => {
           try {
             const { notificationService } = await import('../../../services/notifications');
-            const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
-            const selectedParticipant = participants[finalIndex];
-            const loserId = selectedParticipant.userId || selectedParticipant.id;
-            const loserName = selectedParticipant.name;
 
-            // Send loser notification to the selected participant
             const loserNotificationPromise = notificationService.instance.sendNotification(
               loserId,
               'Degen Split Complete - You Lost',
@@ -931,19 +881,17 @@ export const useDegenSplitLogic = (
                 amount: totalAmount,
                 currency: 'USDC',
                 isLoser: true,
-                timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
               }
             );
             createTimeoutWrapper(loserNotificationPromise, 5000, 'Send loser notification')
               .then(() => console.log(`✅ Loser notification sent to ${loserName}`))
               .catch(error => console.error(`❌ Failed to send loser notification to ${loserName}:`, error));
 
-            // Send winner notifications to all other participants
-            const winners = participants.filter(p => (p.userId || p.id) !== loserId);
-            for (const winner of winners) {
+              for (const winner of winnersFromResult) {
               try {
                 const winnerNotificationPromise = notificationService.instance.sendWinnerNotification(
-                  winner.userId || winner.id,
+                    winner.userId,
                   splitWallet.id,
                   billName
                 );
@@ -958,8 +906,17 @@ export const useDegenSplitLogic = (
             console.error('❌ Failed to send roulette result notifications:', error);
           }
         })();
-      }, 100); // Small delay to ensure UI state is updated first
-    });
+        }, 100);
+      });
+    } catch (error) {
+      setState({ isSpinning: false });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start roulette spin.';
+      logger.error('Failed to execute secure roulette', {
+        error: errorMessage,
+        splitWalletId: splitWallet.id,
+      }, 'DegenSplitLogic');
+      Alert.alert('Unable to Spin', errorMessage);
+    }
   }, [state.isSpinning, state.hasSpun, state.spinAnimationRef, state.cardScaleRef, setState]);
 
   // OPTIMIZED: Centralized claim validation function

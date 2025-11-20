@@ -2832,13 +2832,53 @@ export class SplitWalletPayments {
       });
 
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
+      
+      // Check if wallet is empty after this withdrawal and close it if needed
+      const balanceResult = await this.verifySplitWalletBalance(splitWalletId);
+      const shouldCloseWallet = balanceResult.success && 
+        (balanceResult.balance === 0 || (balanceResult.balance && balanceResult.balance < 0.000001)) &&
+        wallet.status === 'spinning_completed';
+      
+      const updateData: any = {
         participants: updatedParticipants,
-        status: 'completed',
+        status: shouldCloseWallet ? 'closed' : 'completed',
         completedAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
         finalTransactionSignature: transactionResult.signature
-      });
+      };
+      
+      if (shouldCloseWallet) {
+        logger.info('🔄 Closing degen split wallet - balance is empty after winner payout', {
+          splitWalletId,
+          balance: balanceResult.balance,
+          previousStatus: wallet.status
+        }, 'SplitWalletPayments');
+      }
+      
+      await updateDoc(doc(db, 'splitWallets', firebaseDocId), updateData);
+
+      // CRITICAL: Sync split storage status when wallet is closed
+      if (shouldCloseWallet) {
+        try {
+          const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
+          await SplitDataSynchronizer.syncSplitStatusFromSplitWalletToSplitStorage(
+            wallet.billId,
+            'closed',
+            updateData.completedAt
+          );
+          logger.info('✅ Split storage synchronized with closed wallet status', {
+            splitWalletId,
+            billId: wallet.billId
+          }, 'SplitWalletPayments');
+        } catch (syncError) {
+          logger.error('❌ Failed to sync split storage when closing wallet', {
+            splitWalletId,
+            billId: wallet.billId,
+            error: syncError instanceof Error ? syncError.message : String(syncError)
+          }, 'SplitWalletPayments');
+          // Don't fail the transaction if sync fails
+        }
+      }
 
       await this.cleanupSharedPrivateKeyIfAllSettled(splitWalletId, updatedParticipants);
 
@@ -2847,7 +2887,9 @@ export class SplitWalletPayments {
           winnerUserId,
         winnerAddress,
         amount: actualTotalAmount,
-          transactionSignature: transactionResult.signature
+          transactionSignature: transactionResult.signature,
+          walletClosed: shouldCloseWallet,
+          finalBalance: balanceResult.balance
         }, 'SplitWalletPayments');
 
         return {
@@ -3124,11 +3166,53 @@ export class SplitWalletPayments {
 
       // Update wallet in database using Firebase document ID
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
+      
+      // Check if wallet is empty after this withdrawal and close it if needed
+      const balanceResult = await this.verifySplitWalletBalance(splitWalletId);
+      const shouldCloseWallet = balanceResult.success && 
+        (balanceResult.balance === 0 || (balanceResult.balance && balanceResult.balance < 0.000001)) &&
+        wallet.status === 'spinning_completed';
+      
+      const updateData: any = {
         participants: updatedParticipants,
         lastUpdated: new Date().toISOString(),
         finalTransactionSignature: transactionResult.signature
-      });
+      };
+      
+      if (shouldCloseWallet) {
+        updateData.status = 'closed';
+        updateData.completedAt = new Date().toISOString();
+        logger.info('🔄 Closing degen split wallet - balance is empty after loser withdrawal', {
+          splitWalletId,
+          balance: balanceResult.balance,
+          previousStatus: wallet.status
+        }, 'SplitWalletPayments');
+      }
+      
+      await updateDoc(doc(db, 'splitWallets', firebaseDocId), updateData);
+
+      // CRITICAL: Sync split storage status when wallet is closed
+      if (shouldCloseWallet) {
+        try {
+          const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
+          await SplitDataSynchronizer.syncSplitStatusFromSplitWalletToSplitStorage(
+            wallet.billId,
+            'closed',
+            updateData.completedAt
+          );
+          logger.info('✅ Split storage synchronized with closed wallet status', {
+            splitWalletId,
+            billId: wallet.billId
+          }, 'SplitWalletPayments');
+        } catch (syncError) {
+          logger.error('❌ Failed to sync split storage when closing wallet', {
+            splitWalletId,
+            billId: wallet.billId,
+            error: syncError instanceof Error ? syncError.message : String(syncError)
+          }, 'SplitWalletPayments');
+          // Don't fail the transaction if sync fails
+        }
+      }
 
       await this.cleanupSharedPrivateKeyIfAllSettled(splitWalletId, updatedParticipants);
 
@@ -3136,7 +3220,9 @@ export class SplitWalletPayments {
         splitWalletId,
         loserUserId,
         amount: loserLockedAmount, // Loser gets their own locked amount
-        transactionSignature: transactionResult.signature
+        transactionSignature: transactionResult.signature,
+        walletClosed: shouldCloseWallet,
+        finalBalance: balanceResult.balance
       }, 'SplitWalletPayments');
 
       return {

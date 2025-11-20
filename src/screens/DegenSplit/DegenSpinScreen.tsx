@@ -232,7 +232,8 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
       splitWallet,
       splitData,
       billData,
-      totalAmount
+      totalAmount,
+      currentUser
     );
 
     // Navigate to result screen after delay - NON-BLOCKING

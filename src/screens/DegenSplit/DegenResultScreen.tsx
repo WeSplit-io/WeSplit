@@ -3,7 +3,7 @@
  * Uses modular hooks and components for better maintainability
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,21 +12,17 @@ import {
   Alert,
   Image,
   Linking,
-  Animated,
-  PanResponder,
   StyleSheet,
+  ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenResultStyles';
-import { SplitWalletService } from '../../services/split';
-import { SplitWallet } from '../../services/split/types';
-import { notificationService } from '../../services/notifications';
+import { useFocusEffect } from '@react-navigation/native';
+import { SplitWallet, SplitWalletParticipant } from '../../services/split/types';
 import { useApp } from '../../context/AppContext';
-import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
-import { getSplitStatusDisplayText, getParticipantStatusDisplayText } from '../../utils/statusUtils';
+import { formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
+import { LinkedWalletService, LinkedDestinations } from '../../services/blockchain/wallet/LinkedWalletService';
 
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
@@ -40,15 +36,8 @@ interface DegenResultScreenProps {
   route: any;
 }
 
-interface SelectedParticipant {
-  id: string;
-  name: string;
-  userId: string;
-}
-
-
 const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route }) => {
-  const { billData, participants, totalAmount, selectedParticipant, splitWallet, processedBillData, splitData } = route.params;
+  const { totalAmount, selectedParticipant, splitWallet, splitData } = route.params;
   const { state } = useApp();
   const { currentUser } = state;
   
@@ -63,6 +52,67 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       }
     });
   });
+  const [currentSplitWallet, setCurrentSplitWallet] = React.useState<SplitWallet | null>(splitWallet || null);
+  const [linkedDestinations, setLinkedDestinations] = React.useState<LinkedDestinations | null>(null);
+  const [isCheckingLinkedDestinations, setIsCheckingLinkedDestinations] = React.useState(false);
+  const linkedDestinationsRequestRef = React.useRef<Promise<LinkedDestinations | null> | null>(null);
+
+  const hasActiveKastCard = React.useCallback((destinations?: LinkedDestinations | null) => {
+    if (!destinations) {return false;}
+    return (destinations.kastCards || []).some(
+      (card) => card?.isActive !== false && card?.status === 'active'
+    );
+  }, []);
+
+  const refreshLinkedDestinations = React.useCallback(async (): Promise<LinkedDestinations | null> => {
+    if (!currentUser?.id) {
+      setLinkedDestinations(null);
+      linkedDestinationsRequestRef.current = null;
+      return null;
+    }
+
+    if (linkedDestinationsRequestRef.current) {
+      return linkedDestinationsRequestRef.current;
+    }
+
+    setIsCheckingLinkedDestinations(true);
+
+    const executeFetch = async () => {
+      try {
+        const destinations = await LinkedWalletService.getLinkedDestinations(currentUser.id.toString());
+        setLinkedDestinations(destinations);
+        return destinations;
+      } catch (error) {
+        console.error('Failed to load linked destinations', error);
+        setLinkedDestinations(null);
+        return null;
+      } finally {
+        setIsCheckingLinkedDestinations(false);
+      }
+    };
+
+    const fetchPromise = executeFetch();
+
+    linkedDestinationsRequestRef.current = fetchPromise;
+    fetchPromise.finally(() => {
+      if (linkedDestinationsRequestRef.current === fetchPromise) {
+        linkedDestinationsRequestRef.current = null;
+      }
+    });
+    return fetchPromise;
+  }, [currentUser?.id]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshLinkedDestinations();
+    }, [refreshLinkedDestinations])
+  );
+
+  React.useEffect(() => {
+    if (degenState.splitWallet && degenState.splitWallet.id !== currentSplitWallet?.id) {
+      setCurrentSplitWallet(degenState.splitWallet);
+    }
+  }, [degenState.splitWallet, currentSplitWallet?.id]);
 
   // Initialize real-time updates
   const realtimeState = useDegenSplitRealtime(
@@ -125,42 +175,120 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     }
   );
 
-  // CRITICAL: Check if current user is the loser
-  // degenLoser is the selected participant (the LOSER)
-  // All other participants are winners
-  const loserUserId = currentSplitWallet?.degenLoser?.userId || 
-                      degenState.splitWallet?.degenLoser?.userId ||
-                      currentSplitWallet?.degenWinner?.userId || // Fallback for backward compatibility
-                      degenState.splitWallet?.degenWinner?.userId ||
-                      selectedParticipant?.userId || 
-                      selectedParticipant?.id;
-  
-  const isLoser = currentUser && loserUserId && 
-    loserUserId === currentUser.id.toString();
-  const isWinner = !isLoser && !!loserUserId; // If there's a loser and you're not it, you're a winner
-  
-  // Use degenLoser from wallet as source of truth for selectedParticipant
-  const effectiveSelectedParticipant = currentSplitWallet?.degenLoser ? {
-    id: currentSplitWallet.degenLoser.userId,
-    name: currentSplitWallet.degenLoser.name,
-    userId: currentSplitWallet.degenLoser.userId
-  } : (currentSplitWallet?.degenWinner ? {
-    id: currentSplitWallet.degenWinner.userId,
-    name: currentSplitWallet.degenWinner.name,
-    userId: currentSplitWallet.degenWinner.userId
-  } : selectedParticipant);
+  const participants = React.useMemo<SplitWalletParticipant[]>(() => {
+    if (currentSplitWallet?.participants?.length) {return currentSplitWallet.participants;}
+    if (degenState.splitWallet?.participants?.length) {return degenState.splitWallet.participants;}
+    return splitWallet?.participants || [];
+  }, [currentSplitWallet?.participants, degenState.splitWallet?.participants, splitWallet?.participants]);
 
-  // State to track current split wallet data
-  // CRITICAL FIX: Initialize from route params, but reload if degenWinner is missing
-  const [currentSplitWallet, setCurrentSplitWallet] = React.useState<SplitWallet | null>(splitWallet || null);
+  const fallbackLoserFromParticipants = React.useMemo(() => {
+    if (!participants.length) {return null;}
+    const firstParticipant = participants[0];
+    if (!firstParticipant) {return null;}
+    if (participants.length === 1) {
+      return firstParticipant.userId;
+    }
+    const lockedParticipant = participants.find(
+      (participant: SplitWalletParticipant) => participant.status === 'locked'
+    );
+    const pendingParticipant = participants.find(
+      (participant: SplitWalletParticipant) => participant.status === 'pending'
+    );
+    return lockedParticipant?.userId || pendingParticipant?.userId || firstParticipant.userId;
+  }, [participants]);
+
+  const loserUserId = React.useMemo(() => (
+    currentSplitWallet?.degenLoser?.userId ||
+    degenState.splitWallet?.degenLoser?.userId ||
+    selectedParticipant?.userId ||
+    selectedParticipant?.id ||
+    fallbackLoserFromParticipants ||
+    null
+  ), [currentSplitWallet, degenState.splitWallet, selectedParticipant, fallbackLoserFromParticipants]);
+
+  const winnerUserId = React.useMemo(() => {
+    let candidate: string | null = null;
+    if (currentSplitWallet?.degenWinner?.userId) {
+      candidate = currentSplitWallet.degenWinner.userId;
+    } else if (degenState.splitWallet?.degenWinner?.userId) {
+      candidate = degenState.splitWallet.degenWinner.userId;
+    } else if (participants.length > 1 && loserUserId) {
+      const fallbackWinner = participants.find(
+        (participant: SplitWalletParticipant) => participant.userId !== loserUserId
+      );
+      candidate = fallbackWinner?.userId || null;
+    }
+
+    if (candidate && loserUserId && candidate === loserUserId) {
+      return null;
+    }
+
+    return candidate;
+  }, [currentSplitWallet, degenState.splitWallet, loserUserId, participants]);
+
+  const isLoser = React.useMemo(() => {
+    if (!currentUser?.id || !loserUserId) {return false;}
+    return loserUserId === currentUser.id.toString();
+  }, [currentUser?.id, loserUserId]);
+
+  const isWinner = React.useMemo(() => {
+    if (!currentUser?.id || isLoser) {return false;}
+    if (winnerUserId) {
+      return winnerUserId === currentUser.id.toString();
+    }
+    return false;
+  }, [currentUser?.id, winnerUserId, isLoser]);
+
+  const effectiveSelectedParticipant = React.useMemo(() => {
+    if (currentSplitWallet?.degenLoser) {
+      return {
+        id: currentSplitWallet.degenLoser.userId,
+        name: currentSplitWallet.degenLoser.name,
+        userId: currentSplitWallet.degenLoser.userId
+      };
+    }
+
+    if (degenState.splitWallet?.degenLoser) {
+      return {
+        id: degenState.splitWallet.degenLoser.userId,
+        name: degenState.splitWallet.degenLoser.name,
+        userId: degenState.splitWallet.degenLoser.userId
+      };
+    }
+
+    if (fallbackLoserFromParticipants) {
+      const participant = participants.find(p => p.userId === fallbackLoserFromParticipants);
+      if (participant) {
+        return {
+          id: participant.userId,
+          name: participant.name,
+          userId: participant.userId
+        };
+      }
+    }
+
+    return selectedParticipant;
+  }, [currentSplitWallet, degenState.splitWallet, selectedParticipant, fallbackLoserFromParticipants, participants]);
+
+  const combinedAvatarStyle = React.useMemo(
+    () => StyleSheet.flatten([styles.avatar, isWinner ? styles.winnerAvatar : styles.loserAvatar]),
+    [isWinner]
+  );
   
   // CRITICAL FIX: Track if we've already shown success alert to prevent duplicates
   const hasShownSuccessAlertRef = React.useRef(false);
 
-  // CRITICAL FIX: Reload wallet on mount to get latest status including degenLoser
+  const hasReloadedInitialWalletRef = React.useRef(false);
+
+  // CRITICAL FIX: Reload wallet on mount only when initial data is incomplete
   React.useEffect(() => {
     const initializeWallet = async () => {
-      if (!splitWallet?.id) {return;}
+      if (!splitWallet?.id || hasReloadedInitialWalletRef.current) {return;}
+
+      const needsReload = !splitWallet?.degenLoser || !splitWallet?.participants?.length;
+      if (!needsReload) {return;}
+
+      hasReloadedInitialWalletRef.current = true;
 
       // Reload wallet to get latest participant status and loser information
       try {
@@ -183,7 +311,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     };
 
     initializeWallet();
-  }, [splitWallet?.id]); // Only run once on mount
+  }, [splitWallet?.id, splitWallet?.degenLoser, splitWallet?.participants?.length]); // Only run when data incomplete
 
   // OPTIMIZED: Efficient state reset with proper dependency management
   React.useEffect(() => {
@@ -201,19 +329,61 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   }, [currentSplitWallet?.participants, currentUser?.id, degenState.isProcessing]);
 
   // OPTIMIZED: Centralized claim validation
-  const currentUserParticipant = currentSplitWallet?.participants.find((p: any) => p.userId === currentUser?.id.toString());
+  const currentUserParticipant = React.useMemo(() => {
+    if (!currentSplitWallet || !currentUser?.id) {return undefined;}
+    return currentSplitWallet.participants.find((p: any) => p.userId === currentUser.id.toString());
+  }, [currentSplitWallet, currentUser?.id]);
+
   const hasAlreadyClaimed = currentUserParticipant?.status === 'paid';
-  const hasValidTransaction = currentUserParticipant?.transactionSignature && 
-    !currentUserParticipant.transactionSignature.includes('timeout') &&
-    !currentUserParticipant.transactionSignature.includes('failed');
+  const transferButtonTitle = isCheckingLinkedDestinations
+    ? 'Checking...'
+    : (degenState.isProcessing ? 'Transferring...' : 'Transfer to External Card');
   
-  // Centralized function to check if user can claim funds
-  const canUserClaimFunds = useCallback(() => {
-    if (!currentUser || !currentSplitWallet) {return false;}
-    
-    const participant = currentSplitWallet.participants.find((p: any) => p.userId === currentUser.id.toString());
-    return participant && participant.status !== 'paid';
-  }, [currentUser, currentSplitWallet]);
+  const hasLinkedKastCard = React.useMemo(
+    () => hasActiveKastCard(linkedDestinations),
+    [linkedDestinations, hasActiveKastCard]
+  );
+  const selectedKastCard = React.useMemo(() => {
+    if (!linkedDestinations?.kastCards?.length) {return null;}
+    return linkedDestinations.kastCards.find(
+      (card) => card?.isActive !== false && card?.status === 'active'
+    ) || null;
+  }, [linkedDestinations?.kastCards]);
+
+  const ensureLinkedDestinationOrPrompt = useCallback(async () => {
+    const destinations = linkedDestinations ?? await refreshLinkedDestinations();
+    const hasDestination = hasActiveKastCard(destinations);
+
+    if (!hasDestination) {
+      return false;
+    }
+    return true;
+  }, [linkedDestinations, refreshLinkedDestinations, hasActiveKastCard]);
+
+  const handleTransferButtonPress = useCallback(async () => {
+    if (!isLoser) {
+      Alert.alert('Not Available', 'Only the selected payer can transfer funds to an external card.');
+      return;
+    }
+    if (degenState.isProcessing) {return;}
+
+    const hasDestination = await ensureLinkedDestinationOrPrompt();
+    degenState.setShowPaymentOptionsModal(true);
+    if (!hasDestination) {
+      degenState.setShowSignatureStep(false);
+      degenState.setSelectedPaymentMethod(null);
+    }
+  }, [degenState, ensureLinkedDestinationOrPrompt, isLoser]);
+
+  const handleManageLinkedCards = useCallback(() => {
+    degenState.setShowPaymentOptionsModal(false);
+    navigation.navigate('LinkedCards');
+  }, [degenState, navigation]);
+
+  const handleLinkExternalDestinations = useCallback(() => {
+    degenState.setShowPaymentOptionsModal(false);
+    navigation.navigate('LinkedCards');
+  }, [degenState, navigation]);
   
   // Debug logging
   React.useEffect(() => {
@@ -243,6 +413,10 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   };
 
   const handleExternalPayment = async () => {
+    if (!isLoser) {
+      Alert.alert('Not Available', 'Only the selected payer can transfer funds to an external card.');
+      return;
+    }
     degenState.setIsProcessing(true);
     try {
       // NEW Degen Logic: Loser receives funds from split wallet to their KAST card/external wallet
@@ -257,6 +431,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       
       if (result.success) {
         // Check if this is a withdrawal request (for non-creators)
+        hasShownSuccessAlertRef.current = true;
         if (result.transactionSignature?.startsWith('WITHDRAWAL_REQUEST_')) {
           Alert.alert(
             '📋 Withdrawal Request Submitted', 
@@ -314,6 +489,13 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   const handleSignatureStep = async () => {
     if (!degenState.selectedPaymentMethod) {return;}
     
+    const hasDestination = await ensureLinkedDestinationOrPrompt();
+    if (!hasDestination) {
+      degenState.setShowSignatureStep(false);
+      degenState.setSelectedPaymentMethod(null);
+      return;
+    }
+
     degenState.setIsSigning(true);
     try {
       // Simulate signature process
@@ -332,41 +514,6 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       Alert.alert('Error', 'Failed to complete signature. Please try again.');
     } finally {
       degenState.setIsSigning(false);
-    }
-  };
-
-  const handleInAppPayment = async () => {
-    // CRITICAL: In-app wallet transfers are not allowed - must use external card
-    Alert.alert(
-      'External Card Required',
-      'Funds must be transferred to your external linked card, not to your in-app wallet. Please use the "Transfer to External Card" option.',
-      [{ text: 'OK' }]
-    );
-    return;
-  };
-
-  const handleClaimFunds = async () => {
-    // CRITICAL FIX: Mark that we'll show success alert to prevent duplicates
-    const success = await degenLogic.handleClaimFunds(
-      currentUser, 
-      splitWallet, 
-      totalAmount,
-      () => {
-        // Callback to mark that success alert was shown
-        hasShownSuccessAlertRef.current = true;
-      }
-    );
-    if (success) {
-      // Refresh split wallet data to show updated status
-      try {
-        const { SplitWalletService } = await import('../../services/split');
-        const result = await SplitWalletService.getSplitWallet(splitWallet.id);
-        if (result.success && result.wallet) {
-          setCurrentSplitWallet(result.wallet);
-        }
-      } catch (error) {
-        console.error('Error refreshing split wallet data:', error);
-      }
     }
   };
 
@@ -414,7 +561,11 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       />
 
       {/* Main Content */}
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.contentScroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Avatar Container */}
         <View style={styles.avatarContainer}>
           <Avatar
@@ -422,10 +573,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             userName={currentUser?.name || currentUser?.email}
             size={120}
             avatarUrl={currentUser?.avatar}
-            style={[
-              styles.avatar,
-              isWinner ? styles.winnerAvatar : styles.loserAvatar
-            ]}
+            style={combinedAvatarStyle}
             showBorder={true}
             borderColor={isWinner ? colors.green : colors.red}
           />
@@ -486,7 +634,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
         </TouchableOpacity>
 
-      </View>
+      </ScrollView>
 
       {/* Action Buttons - Fixed at bottom */}
       <View style={styles.bottomActionButtonsContainer}>
@@ -495,84 +643,31 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             title="Split Wallet"
             onPress={handleShowPrivateKey}
             variant="secondary"
+            fullWidth
             style={styles.splitWalletButton}
-            disabled={hasAlreadyClaimed || degenState.isFetchingPrivateKey} // Disable after withdrawal (single withdrawal rule)
+            disabled={hasAlreadyClaimed || degenState.isFetchingPrivateKey}
             loading={degenState.isFetchingPrivateKey}
           />
-          
-          {isWinner ? (
-            // Winner - Claim button
-            <Button
-              title={degenState.isProcessing ? 'Claiming...' : 'Claim'}
-              onPress={() => degenState.setShowClaimModal(true)}
-              variant="primary"
-              disabled={degenState.isProcessing}
-              loading={degenState.isProcessing}
-              style={{flex: 1}}
-            />
+
+          {isLoser ? (
+          <Button
+            title={transferButtonTitle}
+            onPress={handleTransferButtonPress}
+            variant="primary"
+            fullWidth
+            disabled={degenState.isProcessing || hasAlreadyClaimed || isCheckingLinkedDestinations}
+            loading={degenState.isProcessing || isCheckingLinkedDestinations}
+            style={styles.primaryActionButton}
+          />
           ) : (
-            // Loser - Transfer to external card button
-            <Button
-              title={degenState.isProcessing ? 'Transferring...' : 'Transfer to External Card'}
-              onPress={() => degenState.setShowPaymentOptionsModal(true)}
-              variant="primary"
-              disabled={degenState.isProcessing || hasAlreadyClaimed}
-              loading={degenState.isProcessing}
-              style={styles.claimButtonNew}
-            />
+            <View style={styles.transferInfoBanner}>
+              <Text style={styles.transferInfoText}>
+                Winners have nothing to transfer. Sit tight while the loser sends the funds to their external card.
+              </Text>
+            </View>
           )}
         </View>
       </View>
-
-      {/* Claim Modal - For Winners */}
-      <Modal
-        visible={degenState.showClaimModal}
-        onClose={() => degenState.setShowClaimModal(false)}
-        title={hasAlreadyClaimed ? 'Funds Already Claimed' : 'Claim Your Winnings'}
-        description={hasAlreadyClaimed 
-          ? `You have already claimed your ${formatUsdcForDisplay(totalAmount)} USDC winnings.`
-          : `You won the degen split! Claim your ${formatUsdcForDisplay(totalAmount)} USDC winnings.`
-        }
-        showHandle={true}
-        closeOnBackdrop={true}
-      >
-        <View style={styles.modalIconContainer}>
-          <Text style={styles.modalIcon}>🎉</Text>
-        </View>
-        
-        {hasAlreadyClaimed ? (
-          <View style={styles.claimedStatusContainer}>
-            {hasValidTransaction ? (
-              <>
-                <Text style={styles.claimedStatusText}>✅ Funds Claimed {getSplitStatusDisplayText('completed')}</Text>
-                <Text style={styles.claimedStatusSubtext}>
-                  Transaction: {currentUserParticipant?.transactionSignature?.slice(0, 8)}...
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.claimedStatusText}>⚠️ Claim {getSplitStatusDisplayText('cancelled')} or Timed Out</Text>
-                <Text style={styles.claimedStatusSubtext}>
-                  Your previous claim attempt failed. You can try again.
-                </Text>
-                <AppleSlider
-                  onSlideComplete={handleClaimFunds}
-                  disabled={degenState.isProcessing}
-                  loading={degenState.isProcessing}
-                  text="Retry Claim"
-                />
-              </>
-            )}
-          </View>
-        ) : (
-          <AppleSlider
-            onSlideComplete={handleClaimFunds}
-            disabled={degenState.isProcessing}
-            loading={degenState.isProcessing}
-            text="Slide to Claim"
-          />
-        )}
-      </Modal>
 
       {/* Payment Options CustomModal */}
       <Modal
@@ -592,11 +687,16 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             <View style={styles.paymentOptionsModalContainer}>
               {/* CRITICAL: Only show external card option - no in-app wallet */}
               <TouchableOpacity 
-                style={styles.paymentOptionButton}
+                style={[
+                  styles.paymentOptionButton,
+                  (!hasLinkedKastCard || isCheckingLinkedDestinations) && styles.paymentOptionButtonDisabled
+                ]}
                 onPress={() => {
+                  if (!hasLinkedKastCard || isCheckingLinkedDestinations) {return;}
                   degenState.setSelectedPaymentMethod('kast-card');
                   degenState.setShowSignatureStep(true);
                 }}
+                disabled={!hasLinkedKastCard || isCheckingLinkedDestinations}
               >
                 <View style={styles.paymentOptionIcon}>
                   <Text style={styles.paymentOptionIconText}>🏦</Text>
@@ -606,16 +706,65 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
                   <Text style={styles.paymentOptionDescription}>
                     Transfer to your linked external card
                   </Text>
+                  {!hasLinkedKastCard && !isCheckingLinkedDestinations && (
+                    <Text style={styles.paymentOptionWarning}>
+                      No linked KAST cards found
+                    </Text>
+                  )}
                 </View>
                 <Text style={styles.paymentOptionArrow}>→</Text>
               </TouchableOpacity>
             </View>
             
-            <View style={styles.paymentInfoContainer}>
-              <Text style={styles.paymentInfoText}>
-                💡 All participants must transfer funds to external cards. No in-app wallet transfers allowed.
-              </Text>
-            </View>
+            {(!hasLinkedKastCard && !isCheckingLinkedDestinations) ? (
+              <>
+                <View style={styles.missingDestinationBanner}>
+                  <Text style={styles.missingDestinationTitle}>
+                    No KAST cards linked
+                  </Text>
+                  <Text style={styles.missingDestinationText}>
+                    Link a KAST card to withdraw your locked funds.
+                  </Text>
+                </View>
+                <Button
+                  title="Link KAST Card"
+                  onPress={handleLinkExternalDestinations}
+                  variant="primary"
+                  fullWidth
+                  style={styles.linkCardButton}
+                />
+              </>
+            ) : (
+              <>
+                <View style={styles.selectedCardContainer}>
+                  <Text style={styles.selectedCardLabel}>Selected card</Text>
+                  {selectedKastCard ? (
+                    <>
+                      <Text style={styles.selectedCardName}>{selectedKastCard.label}</Text>
+                      {selectedKastCard.address ? (
+                        <Text style={styles.selectedCardMeta}>
+                          {selectedKastCard.address.slice(0, 6)}...{selectedKastCard.address.slice(-4)}
+                        </Text>
+                      ) : null}
+                    </>
+                  ) : (
+                    <Text style={styles.selectedCardName}>Active KAST card</Text>
+                  )}
+                  <Button
+                    title="Manage linked cards"
+                    variant="secondary"
+                    fullWidth
+                    style={styles.manageCardsButton}
+                    onPress={handleManageLinkedCards}
+                  />
+                </View>
+                <View style={styles.paymentInfoContainer}>
+                  <Text style={styles.paymentInfoText}>
+                    💡 All participants must transfer funds to a linked KAST card. No in-app wallet transfers allowed.
+                  </Text>
+                </View>
+              </>
+            )}
 
             <TouchableOpacity 
               style={styles.modalCancelButton}
