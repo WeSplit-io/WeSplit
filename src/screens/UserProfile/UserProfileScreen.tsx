@@ -449,6 +449,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
               </View>
             ) : (
               <View style={styles.emptyState}>
+                <PhosphorIcon name="Trophy" size={32} color={colors.white70} />
                 <Text style={styles.emptyStateText}>No badges yet</Text>
               </View>
             )}
@@ -469,6 +470,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
               </View>
             ) : (
               <View style={styles.emptyState}>
+                <PhosphorIcon name="List" size={32} color={colors.white70} />
                 <Text style={styles.emptyStateText}>No activity yet</Text>
               </View>
             )}
@@ -683,6 +685,7 @@ const styles = StyleSheet.create({
   emptyState: {
     paddingVertical: spacing.xl,
     alignItems: 'center',
+    gap: spacing.sm,
   },
   emptyStateText: {
     fontSize: typography.fontSize.md,
