@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, Alert, Linking, Animated, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, Alert, Linking, RefreshControl } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import Icon from './Icon';
-import { Input, PhosphorIcon, Tabs, Tab, ModernLoader } from './shared';
+import { Input, PhosphorIcon, ModernLoader } from './shared';
 import { useApp } from '../context/AppContext';
 import { useContacts, useContactActions } from '../hooks';
 import { deepLinkHandler } from '../services/core';
@@ -19,15 +19,21 @@ import { getWalletAddressStatus } from '../utils/crypto/wallet';
 import { useRealtimeUserSearch } from '../hooks/useRealtimeUserSearch';
 import CommunityBadge from './profile/CommunityBadge';
 import { badgeService } from '../services/rewards/badgeService';
+import { TransactionHistoryService } from '../services/blockchain/transaction/transactionHistoryService';
+
+// Type for community badges
+type CommunityBadgeType = {
+  badgeId: string;
+  title: string;
+  icon: string;
+  imageUrl?: string;
+};
 
 interface ContactsListProps {
   onContactSelect: (contact: UserContact) => void;
   onAddContact?: (user: User) => void; // Callback for notification only, not for actual adding
   showAddButton?: boolean;
   showSearch?: boolean;
-  showTabs?: boolean;
-  activeTab?: 'All' | 'Favorite' | 'Search';
-  onTabChange?: (tab: 'All' | 'Favorite' | 'Search') => void;
   searchQuery?: string;
   onSearchQueryChange?: (query: string) => void;
   placeholder?: string;
@@ -44,9 +50,6 @@ const ContactsList: React.FC<ContactsListProps> = ({
   onAddContact,
   showAddButton = false,
   showSearch = true,
-  showTabs = true,
-  activeTab = 'All',
-  onTabChange,
   searchQuery = '',
   onSearchQueryChange,
   placeholder = "Search contacts",
@@ -67,6 +70,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [recentInteractions, setRecentInteractions] = useState<UserContact[]>([]);
+  const [loadingRecentInteractions, setLoadingRecentInteractions] = useState(false);
   
   // Real-time user search
   const { 
@@ -111,11 +116,6 @@ const ContactsList: React.FC<ContactsListProps> = ({
     }
   };
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Animation values
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const [isAnimating, setIsAnimating] = useState(false);
 
   // Add refresh functionality
   const handleRefresh = async () => {
@@ -131,43 +131,82 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
 
   // Use useMemo to prevent unnecessary filtering and state updates
-  const filteredContacts = useMemo(() => {
-    if (__DEV__) {
-      logger.debug('Filtering contacts', { 
-        contactsCount: contacts.length, 
-        activeTab, 
-        searchQuery: searchQuery.trim() 
-      }, 'ContactsList');
-    }
-    
-    let filtered = [...contacts];
+  // Get favorite contacts
+  const favoriteContacts = useMemo(() => {
+    return contacts.filter(contact => contact.isFavorite);
+  }, [contacts]);
 
-    if (activeTab === 'All') {
-      // Show all contacts in All tab
-      if (searchQuery.trim() !== '') {
-        const queryLower = searchQuery.toLowerCase();
-        filtered = filtered.filter(contact =>
-          (contact.wallet_address && contact.wallet_address.toLowerCase().includes(queryLower)) ||
-          (contact.name && contact.name.toLowerCase().includes(queryLower)) ||
-          (contact.email && contact.email.toLowerCase().includes(queryLower))
-        );
-      }
-    } else if (activeTab === 'Favorite') {
-      // Show only favorite contacts
-      filtered = filtered.filter(contact => contact.isFavorite);
-      // Apply search filter to favorites
-      if (searchQuery.trim() !== '') {
-        const queryLower = searchQuery.toLowerCase();
-        filtered = filtered.filter(contact =>
-          (contact.wallet_address && contact.wallet_address.toLowerCase().includes(queryLower)) ||
-          (contact.name && contact.name.toLowerCase().includes(queryLower)) ||
-          (contact.email && contact.email.toLowerCase().includes(queryLower))
-        );
-      }
-    }
+  // Get quick access contacts (first 4 favorites)
+  const quickAccessContacts = useMemo(() => {
+    return favoriteContacts.slice(0, 4);
+  }, [favoriteContacts]);
 
-    return filtered;
-  }, [searchQuery, contacts, activeTab]);
+  // Get regular contacts (non-favorites, excluding quick access)
+  const regularContacts = useMemo(() => {
+    const favoriteIds = new Set(favoriteContacts.map(c => String(c.id)));
+    return contacts.filter(contact => !favoriteIds.has(String(contact.id)));
+  }, [contacts, favoriteContacts]);
+
+  // Load recently interacted contacts
+  useEffect(() => {
+    const loadRecentInteractions = async () => {
+      if (!currentUser?.id || searchQuery.trim() !== '') {
+        return; // Don't load when searching
+      }
+
+      try {
+        setLoadingRecentInteractions(true);
+        const transactionHistoryService = new TransactionHistoryService();
+        const history = await transactionHistoryService.getUserTransactionHistory(
+          String(currentUser.id),
+          { limit: 100 }
+        );
+
+        if (history.success && history.transactions) {
+          // Map user IDs to their most recent interaction date and contact info
+          const userInteractionMap = new Map<string, { lastInteraction: Date; contact?: UserContact }>();
+
+          history.transactions.slice(0, 50).forEach(transaction => {
+            const otherUserId = transaction.from_user === String(currentUser.id) 
+              ? transaction.to_user 
+              : transaction.from_user;
+            
+            if (otherUserId && otherUserId !== String(currentUser.id)) {
+              const existing = userInteractionMap.get(otherUserId);
+              const transactionDate = new Date(transaction.created_at || transaction.createdAt || Date.now());
+              
+              if (!existing || transactionDate > existing.lastInteraction) {
+                const contact = contacts.find(c => String(c.id) === otherUserId);
+                userInteractionMap.set(otherUserId, {
+                  lastInteraction: transactionDate,
+                  contact
+                });
+              }
+            }
+          });
+
+          // Convert to array and sort by last interaction
+          const recentContacts = Array.from(userInteractionMap.values())
+            .filter(item => item.contact) // Only include contacts that exist
+            .map(item => item.contact!)
+            .sort((a, b) => {
+              const aDate = userInteractionMap.get(String(a.id))?.lastInteraction || new Date(0);
+              const bDate = userInteractionMap.get(String(b.id))?.lastInteraction || new Date(0);
+              return bDate.getTime() - aDate.getTime();
+            })
+            .slice(0, 10); // Limit to 10 most recent
+
+          setRecentInteractions(recentContacts);
+        }
+      } catch (error) {
+        logger.error('Failed to load recent interactions', { error }, 'ContactsList');
+      } finally {
+        setLoadingRecentInteractions(false);
+      }
+    };
+
+    loadRecentInteractions();
+  }, [currentUser?.id, contacts, searchQuery]);
 
   // Handle user search with enhanced functionality
   // Memoize handleUserSearch to prevent infinite loops
@@ -255,7 +294,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
     handleUserSearchRef.current = handleUserSearch;
   }, [subscribeRealtimeSearch, unsubscribeRealtimeSearch, clearRealtimeResults, handleUserSearch]);
 
-  // Debounced search with proper cleanup - only depend on searchQuery and activeTab
+  // Debounced search with proper cleanup - only depend on searchQuery
   useEffect(() => {
     const subscribeRef = subscribeRealtimeSearchRef.current;
     const unsubscribeRef = unsubscribeRealtimeSearchRef.current;
@@ -279,7 +318,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
       unsubscribeRef();
       clearRef();
     };
-  }, [searchQuery, activeTab]); // Only depend on searchQuery and activeTab
+  }, [searchQuery]); // Only depend on searchQuery
 
   // Cleanup on unmount - use refs to avoid dependency issues
   useEffect(() => {
@@ -621,48 +660,6 @@ const ContactsList: React.FC<ContactsListProps> = ({
     setIsProcessingQR(false);
   };
 
-  // Animation function for tab changes
-  const animateTabChange = (callback: () => void) => {
-    if (isAnimating) {return;}
-    
-    setIsAnimating(true);
-    
-    // Fade out and slide out current content
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: -20,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Execute the callback (tab change)
-      callback();
-      
-      // Reset slide position
-      slideAnim.setValue(20);
-      
-      // Fade in and slide in new content
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setIsAnimating(false);
-      });
-    });
-  };
 
   const renderContact = (item: UserContact, section: 'friends' | 'others' | 'all' | 'favorite') => {
     // Debug logging for contact avatar data
@@ -677,8 +674,12 @@ const ContactsList: React.FC<ContactsListProps> = ({
     const isSelected = multiSelect && selectedContacts.some(c => c.id === item.id);
 
     const handleContactPress = () => {
+      // If onContactSelect is provided (e.g., from Send screen), use it
+      // This takes precedence over default navigation
+      if (onContactSelect) {
+        onContactSelect(item);
+      } else if (multiSelect) {
       // If in multi-select mode, use onContactSelect
-      if (multiSelect) {
         onContactSelect(item);
       } else {
         // Otherwise, navigate to user profile
@@ -722,7 +723,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
     onContactSelect: (contact: UserContact) => void;
     toggleFavorite: (contactId: string) => void;
   }> = ({ contact, isSelected, onPress, onAvatarPress, formatWalletAddress, multiSelect, onContactSelect, toggleFavorite }) => {
-    const [communityBadges, setCommunityBadges] = useState<any[]>([]);
+    const [communityBadges, setCommunityBadges] = useState<CommunityBadgeType[]>([]);
 
     useEffect(() => {
       if (!contact.id || contact.show_badges_on_profile === false) {
@@ -757,7 +758,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
           />
         </TouchableOpacity>
         <View style={styles.contactInfo}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' }}>
+          <View style={styles.contactNameRow}>
             <Text style={styles.contactName}>
               {contact.name || formatWalletAddress(contact.wallet_address)}
             </Text>
@@ -859,43 +860,20 @@ const ContactsList: React.FC<ContactsListProps> = ({
       {/* Affichage selon le mode */}
       {(hideToggleBar || mode === 'list') ? (
         <>
-          {/* Tabs All/Favorite/Search */}
-          {showTabs && (
-            <Tabs
-              tabs={[
-                { label: 'All', value: 'All' },
-                { label: 'Favorite', value: 'Favorite' },
-                { label: 'Search', value: 'Search' }
-              ]}
-              activeTab={activeTab}
-              onTabChange={(tab) => animateTabChange(() => onTabChange?.(tab as 'All' | 'Favorite' | 'Search'))}
-              enableAnimation={true}
-            />
-          )}
           {/* Search Input */}
           {showSearch && (
             <View style={styles.searchContainer}>
               <Input
-                placeholder={activeTab === 'Search' ? "Search users by name or wallet address" : placeholder}
+                placeholder={placeholder}
                 value={searchQuery}
                 onChangeText={onSearchQueryChange}
                 leftIcon="MagnifyingGlass"
                 containerStyle={{ marginBottom: 0 }}
-                
-                autoFocus={activeTab === 'Search'}
               />
             </View>
           )}
           {/* Content */}
-          <Animated.View 
-            style={[
-              styles.animatedContentContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              }
-            ]}
-          >
+          <View style={styles.animatedContentContainer}>
             <ScrollView
               style={styles.contactsScrollView}
               contentContainerStyle={styles.scrollViewContent}
@@ -910,30 +888,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 />
               }
             >
-            {/* All Tab Content */}
-            {activeTab === 'All' && !searchQuery.trim() && (
-              <>
-                {/* Liste simple de tous les contacts filtrés */}
-                {filteredContacts.length > 0 && (
-                  <View style={styles.sectionContainer}>
-                    {filteredContacts.map(contact => renderContact(contact, 'all'))}
-                  </View>
-                )}
-              </>
-            )}
-            {/* Favorite Tab Content */}
-            {activeTab === 'Favorite' && !searchQuery.trim() && (
-              <>
-                {/* Liste simple des contacts favoris */}
-                {filteredContacts.length > 0 && (
-                  <View style={styles.sectionContainer}>
-                    {filteredContacts.map(contact => renderContact(contact, 'favorite'))}
-                  </View>
-                )}
-              </>
-            )}
-            {/* Search Results */}
-            {searchQuery.trim() && searchQuery.length >= 2 && (
+            {/* Search Results - Show when searching */}
+            {searchQuery.trim() && searchQuery.length >= 2 ? (
               <>
                 {isSearching && (
                   <View style={styles.loadingContainer}>
@@ -1098,22 +1054,79 @@ const ContactsList: React.FC<ContactsListProps> = ({
                   </View>
                 )}
               </>
-            )}
-            {/* Empty State */}
-            {filteredContacts.length === 0 && (activeTab === 'All' || activeTab === 'Favorite') && (
-              <View style={styles.emptyContainer}>
-                <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-empty-state.png?alt=media&token=9da88073-11df-4b69-bfd8-21ec369f51c4' }} style={styles.searchIconEmpty} />
-                <Text style={styles.emptyText}>
-                  {searchQuery.trim() !== ''
-                    ? 'No contacts found matching your search'
-                    : activeTab === 'Favorite'
-                      ? 'No favorite contacts yet'
-                      : 'No contacts available'}
-                </Text>
-              </View>
+            ) : (
+              <>
+                {/* Favorites Section - At the top */}
+                {favoriteContacts.length > 0 && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Favorites</Text>
+                    {favoriteContacts.map(contact => renderContact(contact, 'favorite'))}
+                  </View>
+                )}
+
+                {/* Quick Access Section - 4 contacts */}
+                {quickAccessContacts.length > 0 && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Quick Access</Text>
+                    <View style={styles.quickAccessGrid}>
+                      {quickAccessContacts.map(contact => (
+                        <TouchableOpacity
+                          key={`quick-${contact.id}`}
+                          style={styles.quickAccessItem}
+                          onPress={() => {
+                            if (onContactSelect) {
+                              onContactSelect(contact);
+                            } else {
+                              navigation.navigate('UserProfile', {
+                                userId: contact.id,
+                                contact: contact
+                              });
+                            }
+                          }}
+                        >
+                          <Avatar
+                            userId={contact.id.toString()}
+                            userName={contact.name}
+                            size={60}
+                            avatarUrl={contact.avatar}
+                            style={styles.quickAccessAvatar}
+                          />
+                          <Text style={styles.quickAccessName} numberOfLines={1}>
+                            {contact.name || formatWalletAddress(contact.wallet_address || '')}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Recently Interacted Section */}
+                {recentInteractions.length > 0 && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Recent Interactions</Text>
+                    {recentInteractions.map(contact => renderContact(contact, 'all'))}
+                  </View>
+                )}
+
+                {/* All Contacts Section */}
+                {regularContacts.length > 0 && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>All Contacts</Text>
+                    {regularContacts.map(contact => renderContact(contact, 'all'))}
+                  </View>
+                )}
+
+                {/* Empty State */}
+                {contacts.length === 0 && (
+                  <View style={styles.emptyContainer}>
+                    <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-empty-state.png?alt=media&token=9da88073-11df-4b69-bfd8-21ec369f51c4' }} style={styles.searchIconEmpty} />
+                    <Text style={styles.emptyText}>No contacts available</Text>
+                  </View>
+                )}
+              </>
             )}
             </ScrollView>
-          </Animated.View>
+          </View>
         </>
       ) : (
         <View style={styles.qrScannerContainer}>

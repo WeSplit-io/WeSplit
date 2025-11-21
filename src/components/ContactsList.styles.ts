@@ -75,6 +75,7 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.md,
+    marginTop: spacing.sm,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -104,6 +105,12 @@ export const styles = StyleSheet.create({
   contactInfo: {
     flex: 1,
     marginLeft: spacing.md,
+  },
+  contactNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flexWrap: 'wrap',
   },
   contactName: {
     color: colors.textLight,
@@ -208,6 +215,7 @@ export const styles = StyleSheet.create({
   },
   scrollViewContent: {
     paddingBottom: spacing.bottomNavSpace,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   searchContactRow: {
     flexDirection: 'row',
@@ -455,5 +463,30 @@ export const styles = StyleSheet.create({
   },
   statusContainer: {
     padding: spacing.xs,
+  },
+  // Quick Access Grid Styles
+  quickAccessGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  quickAccessItem: {
+    width: '22%',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  quickAccessAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: spacing.xs,
+  },
+  quickAccessName: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    textAlign: 'center',
+    maxWidth: 80,
   },
 }); 
