@@ -45,7 +45,6 @@ export const styles = StyleSheet.create({
 
   },
   tabGradient: {
-    paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingVertical: spacing.sm,
     borderRadius: 12,
     alignItems: 'center',
@@ -109,17 +108,17 @@ export const styles = StyleSheet.create({
   contactNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
     flexWrap: 'wrap',
   },
   contactName: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.xs / 2,
   },
   contactEmail: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   mutualGroupsText: {
@@ -215,7 +214,7 @@ export const styles = StyleSheet.create({
   },
   scrollViewContent: {
     paddingBottom: spacing.bottomNavSpace,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
+    paddingHorizontal: 0,
   },
   searchContactRow: {
     flexDirection: 'row',

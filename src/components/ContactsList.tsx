@@ -674,20 +674,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
     const isSelected = multiSelect && selectedContacts.some(c => c.id === item.id);
 
     const handleContactPress = () => {
-      // If onContactSelect is provided (e.g., from Send screen), use it
-      // This takes precedence over default navigation
-      if (onContactSelect) {
-        onContactSelect(item);
-      } else if (multiSelect) {
-      // If in multi-select mode, use onContactSelect
-        onContactSelect(item);
-      } else {
-        // Otherwise, navigate to user profile
-        navigation.navigate('UserProfile', {
-          userId: item.id,
-          contact: item
-        });
-      }
+      // Always navigate to user profile when clicking on a contact item
+      navigation.navigate('UserProfile', {
+        userId: item.id,
+        contact: item
+      });
     };
 
     const handleAvatarPress = () => {
@@ -768,7 +759,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 icon={badge.icon}
                 iconUrl={badge.imageUrl}
                 title={badge.title}
-                size={16}
+                size={20}
               />
             ))}
           </View>
