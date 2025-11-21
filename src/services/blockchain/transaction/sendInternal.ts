@@ -1401,16 +1401,24 @@ class InternalTransferService {
           
           // CRITICAL: On timeout, don't retry - transaction may have succeeded
           // Retrying could cause duplicate submission
+          // The deduplication service will prevent immediate retries within the time window
           if (isTimeout) {
             logger.warn('Transaction processing timed out - not retrying to prevent duplicate submission', {
               errorMessage,
               attempt: submissionAttempts + 1,
               maxAttempts: maxSubmissionAttempts,
-              note: 'Transaction may have succeeded. User should check transaction history. Retrying could cause duplicate submission.'
+              userId: params.userId,
+              to: params.to.substring(0, 8) + '...',
+              amount: params.amount,
+              note: 'Transaction may have succeeded. Deduplication service will prevent immediate retries. User should check transaction history.'
             }, 'InternalTransferService');
+            
+            // ✅ CRITICAL: The deduplication service will automatically prevent retries
+            // within the 30-second window, so we don't need to do anything special here
+            // Just return a clear error message
             return {
               success: false,
-              error: `Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again.`
+              error: `Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history before trying again. If you don't see the transaction, wait a moment and try again.`
             };
           }
           

@@ -72,6 +72,34 @@ class ExternalTransferService {
         userId: params.userId
       }, 'ExternalTransferService');
 
+      // ✅ CRITICAL: Check for duplicate in-flight transaction before proceeding
+      // External transfers bypass ConsolidatedTransactionService, so we need deduplication here too
+      const { transactionDeduplicationService } = await import('./TransactionDeduplicationService');
+      const existingPromise = transactionDeduplicationService.checkInFlight(
+        params.userId,
+        params.to,
+        params.amount
+      );
+      
+      if (existingPromise) {
+        logger.warn('⚠️ Duplicate external transfer detected - returning existing promise', {
+          userId: params.userId,
+          to: params.to.substring(0, 8) + '...',
+          amount: params.amount
+        }, 'ExternalTransferService');
+        
+        // Wait for existing transaction to complete
+        try {
+          const existingResult = await existingPromise;
+          return existingResult;
+        } catch (existingError) {
+          // If existing transaction failed, allow new attempt
+          logger.warn('Existing external transfer failed, allowing new attempt', {
+            error: existingError instanceof Error ? existingError.message : String(existingError)
+          }, 'ExternalTransferService');
+        }
+      }
+
       // Validate recipient address
       const recipientValidation = this.validateRecipientAddress(params.to);
       if (!recipientValidation.isValid) {
@@ -139,15 +167,46 @@ class ExternalTransferService {
         walletAddress: expectedWalletAddress 
       }, 'ExternalTransferService');
 
-      // Build and send transaction - WeSplit only supports USDC transfers
+      // ✅ CRITICAL: Wrap transaction in deduplication service
+      // Register transaction as in-flight and get cleanup function
+      const transactionPromise = (async () => {
+        // Build and send transaction - WeSplit only supports USDC transfers
+        if (params.currency === 'USDC') {
+          return await this.sendUsdcTransfer(params, recipientAmount, companyFee, expectedWalletAddress, walletResult.wallet.secretKey);
+        } else {
+          return {
+            success: false,
+            error: `Currency ${params.currency} is not supported. Only USDC transfers are supported.`,
+            signature: '',
+            txId: ''
+          };
+        }
+      })();
+      
+      const cleanup = transactionDeduplicationService.registerInFlight(
+        params.userId,
+        params.to,
+        params.amount,
+        transactionPromise
+      );
+
+      // Execute transaction with cleanup on completion
       let result: ExternalTransferResult;
-      if (params.currency === 'USDC') {
-        result = await this.sendUsdcTransfer(params, recipientAmount, companyFee, expectedWalletAddress, walletResult.wallet.secretKey);
-      } else {
-        result = {
-          success: false,
-          error: 'WeSplit only supports USDC transfers. SOL transfers are not supported within the app.'
-        };
+      try {
+        result = await transactionPromise;
+        
+        // Update deduplication service with signature if successful
+        if (result.success && result.signature) {
+          transactionDeduplicationService.updateTransactionSignature(
+            params.userId,
+            params.to,
+            params.amount,
+            result.signature
+          );
+        }
+      } finally {
+        // Always cleanup, even on error
+        cleanup();
       }
 
       if (result.success) {

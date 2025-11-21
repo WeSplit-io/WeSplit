@@ -81,6 +81,34 @@ class ConsolidatedTransactionService {
         };
       }
 
+      // ✅ CRITICAL: Check for duplicate in-flight transaction before proceeding
+      // This prevents multiple simultaneous transactions with the same parameters
+      const { transactionDeduplicationService } = await import('./TransactionDeduplicationService');
+      const existingPromise = transactionDeduplicationService.checkInFlight(
+        params.userId,
+        params.to,
+        params.amount
+      );
+      
+      if (existingPromise) {
+        logger.warn('⚠️ Duplicate transaction detected - returning existing promise', {
+          userId: params.userId,
+          to: params.to.substring(0, 8) + '...',
+          amount: params.amount
+        }, 'ConsolidatedTransactionService');
+        
+        // Wait for existing transaction to complete
+        try {
+          const existingResult = await existingPromise;
+          return existingResult;
+        } catch (existingError) {
+          // If existing transaction failed, allow new attempt
+          logger.warn('Existing transaction failed, allowing new attempt', {
+            error: existingError instanceof Error ? existingError.message : String(existingError)
+          }, 'ConsolidatedTransactionService');
+        }
+      }
+
       // Load the user's wallet
       const { walletService } = await import('../wallet');
       const walletResult = await walletService.ensureUserWallet(params.userId);
@@ -116,7 +144,34 @@ class ConsolidatedTransactionService {
         userId: params.userId
       });
 
-      const result = await this.transactionProcessor.sendUSDCTransaction(params, keypairResult.keypair);
+      // ✅ CRITICAL: Wrap transaction in deduplication service
+      // Register transaction as in-flight and get cleanup function
+      const transactionPromise = this.transactionProcessor.sendUSDCTransaction(params, keypairResult.keypair);
+      const cleanup = transactionDeduplicationService.registerInFlight(
+        params.userId,
+        params.to,
+        params.amount,
+        transactionPromise
+      );
+
+      // Execute transaction with cleanup on completion
+      let result: TransactionResult;
+      try {
+        result = await transactionPromise;
+        
+        // Update deduplication service with signature if successful
+        if (result.success && result.signature) {
+          transactionDeduplicationService.updateTransactionSignature(
+            params.userId,
+            params.to,
+            params.amount,
+            result.signature
+          );
+        }
+      } finally {
+        // Always cleanup, even on error
+        cleanup();
+      }
       
       logger.info('📋 ConsolidatedTransactionService: Transaction result', {
         success: result.success,

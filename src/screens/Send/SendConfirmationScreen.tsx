@@ -182,8 +182,41 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     });
   }, [destinationType, recipientName, recipientAddress, amount, description, groupId, isSettlement, contact, requestId, recipient?.id]);
   const [sending, setSending] = useState(false);
+  
+  // ✅ CRITICAL: Use ref for immediate synchronous check to prevent race conditions
+  // State updates are async, so multiple clicks can happen before state is set
+  // Ref provides immediate synchronous check
+  const isProcessingRef = useRef(false);
+  const lastClickTimeRef = useRef(0);
+  const DEBOUNCE_MS = 500; // Minimum 500ms between clicks
 
   const handleConfirmSend = useCallback(async () => {
+    // ✅ CRITICAL: Immediate synchronous check using ref (not state)
+    // This prevents race conditions where multiple clicks happen before state updates
+    const now = Date.now();
+    const timeSinceLastClick = now - lastClickTimeRef.current;
+    
+    if (isProcessingRef.current) {
+      logger.warn('⚠️ Transaction already in progress - ignoring duplicate click', {
+        timeSinceLastClick: `${timeSinceLastClick}ms`
+      }, 'SendConfirmationScreen');
+      return;
+    }
+    
+    // Debounce: prevent clicks within 500ms of each other
+    if (timeSinceLastClick < DEBOUNCE_MS) {
+      logger.warn('⚠️ Click debounced - too soon after previous click', {
+        timeSinceLastClick: `${timeSinceLastClick}ms`,
+        debounceMs: DEBOUNCE_MS
+      }, 'SendConfirmationScreen');
+      return;
+    }
+    
+    // Set flags immediately (synchronous)
+    isProcessingRef.current = true;
+    lastClickTimeRef.current = now;
+    setSending(true); // Also update state for UI
+    
     try {
       if (!currentUser?.id) {
         Alert.alert('Wallet Error', 'User not authenticated');
@@ -367,6 +400,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         Alert.alert('Transaction Failed', errorMessage);
       }
     } finally {
+      // ✅ CRITICAL: Always reset both ref and state
+      isProcessingRef.current = false;
       setSending(false);
     }
   }, [currentUser?.id, recipientAddress, amount, description, groupId, isSettlement, requestId, destinationType, contact, wallet, navigation, route.params]);

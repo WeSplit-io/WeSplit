@@ -204,6 +204,8 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       console.error('Withdrawal error:', error);
       Alert.alert('Transaction Failed', error instanceof Error ? error.message : 'Failed to process withdrawal. Please try again.');
     } finally {
+      // ✅ CRITICAL: Always reset both ref and state
+      isProcessingRef.current = false;
       setSigning(false);
     }
   };

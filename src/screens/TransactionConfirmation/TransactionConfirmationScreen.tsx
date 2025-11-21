@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -43,8 +43,35 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
   const [processing, setProcessing] = useState(false);
   const [step, setStep] = useState<'confirm' | 'processing' | 'success' | 'error'>('confirm');
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // ✅ CRITICAL: Use ref for immediate synchronous check to prevent race conditions
+  const isProcessingRef = useRef(false);
+  const lastClickTimeRef = useRef(0);
+  const DEBOUNCE_MS = 500;
 
   const handleConfirmTransaction = async () => {
+    // ✅ CRITICAL: Immediate synchronous check using ref
+    const now = Date.now();
+    const timeSinceLastClick = now - lastClickTimeRef.current;
+    
+    if (isProcessingRef.current) {
+      logger.warn('⚠️ Transaction already in progress - ignoring duplicate click', {
+        timeSinceLastClick: `${timeSinceLastClick}ms`
+      }, 'TransactionConfirmationScreen');
+      return;
+    }
+    
+    if (timeSinceLastClick < DEBOUNCE_MS) {
+      logger.warn('⚠️ Click debounced - too soon after previous click', {
+        timeSinceLastClick: `${timeSinceLastClick}ms`
+      }, 'TransactionConfirmationScreen');
+      return;
+    }
+    
+    // Set flags immediately
+    isProcessingRef.current = true;
+    lastClickTimeRef.current = now;
+    
     try {
       setProcessing(true);
       setStep('processing');
@@ -89,6 +116,8 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
       setErrorMessage(error instanceof Error ? error.message : 'Transaction failed');
       setStep('error');
     } finally {
+      // ✅ CRITICAL: Always reset both ref and state
+      isProcessingRef.current = false;
       setProcessing(false);
     }
   };

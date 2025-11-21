@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import Icon from '../../../components/Icon';
 import { useApp } from '../../../context/AppContext';
@@ -26,6 +26,11 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   const [premiumFeatures, setPremiumFeatures] = useState<any[]>([]);
+  
+  // ✅ CRITICAL: Use ref for immediate synchronous check to prevent race conditions
+  const isProcessingRef = React.useRef(false);
+  const lastClickTimeRef = React.useRef(0);
+  const DEBOUNCE_MS = 500;
 
   useEffect(() => {
     loadPremiumData();
@@ -75,6 +80,18 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
   };
 
   const handleSubscribe = async (plan: SubscriptionPlan) => {
+    // ✅ CRITICAL: Immediate synchronous check using ref
+    const now = Date.now();
+    const timeSinceLastClick = now - lastClickTimeRef.current;
+    
+    if (isProcessingRef.current) {
+      return; // Already processing
+    }
+    
+    if (timeSinceLastClick < DEBOUNCE_MS) {
+      return; // Too soon after previous click
+    }
+    
     if (!currentUser) {
       Alert.alert('Error', 'Please log in to subscribe');
       return;
@@ -89,6 +106,10 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
       Alert.alert('Error', 'Please select a payment method');
       return;
     }
+
+    // Set flags immediately
+    isProcessingRef.current = true;
+    lastClickTimeRef.current = now;
 
     try {
       setSubscribing(true);
@@ -155,6 +176,8 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
       console.error('Subscription error:', error);
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to process subscription');
     } finally {
+      // ✅ CRITICAL: Always reset both ref and state
+      isProcessingRef.current = false;
       setSubscribing(false);
     }
   };

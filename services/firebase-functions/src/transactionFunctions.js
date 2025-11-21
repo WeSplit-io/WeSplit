@@ -481,31 +481,57 @@ exports.processUsdcTransfer = functions.runWith({
       note: 'Blockhash will be validated right before submission. Client sends fresh blockhash (0-100ms old).'
     });
 
-    // CRITICAL: Skip Firestore checks entirely to prevent blockhash expiration
-    // Blockhash expiration is more critical than Firestore security checks
-    // Firestore operations take 2-3 seconds which causes blockhash to expire
-    // Security is maintained through:
-    // 1. Transaction validation (ensures only valid transactions are signed)
-    // 2. User authentication (Firebase Auth ensures only authenticated users can call)
-    // 3. Transaction structure validation (invalid transactions are rejected)
-    // 4. Solana network validation (rejects invalid/duplicate transactions)
-    console.log('Skipping Firestore checks to prevent blockhash expiration', {
-      note: 'Blockhash expiration is critical. Firestore checks take 2-3 seconds which causes expiration. Security maintained through transaction validation, Firebase Auth, and Solana network validation.'
-    });
+    // ✅ CRITICAL: Check for duplicate transactions BEFORE processing
+    // This prevents duplicate submissions even if frontend has issues
+    // Use aggressive timeout (500ms) to prevent blockhash expiration
+    // If check times out, log warning but proceed (better than blocking all transactions)
+    try {
+      const duplicateCheckStart = Date.now();
+      await Promise.race([
+        checkTransactionHash(transactionBuffer, db),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Duplicate check timeout')), 500)
+        )
+      ]);
+      const duplicateCheckTime = Date.now() - duplicateCheckStart;
+      console.log('✅ Duplicate check passed', {
+        checkTimeMs: duplicateCheckTime,
+        note: 'Transaction hash verified as unique'
+      });
+    } catch (duplicateCheckError) {
+      const errorMessage = duplicateCheckError?.message || String(duplicateCheckError);
+      
+      // If it's an "already-exists" error, this is a real duplicate - REJECT
+      if (duplicateCheckError?.code === 'already-exists' || 
+          errorMessage.includes('already been signed')) {
+        console.error('❌ DUPLICATE TRANSACTION DETECTED', {
+          error: errorMessage,
+          note: 'This transaction has already been processed. Rejecting to prevent duplicate.'
+        });
+        throw new functions.https.HttpsError('already-exists', 'This transaction has already been processed. Please check your transaction history.');
+      }
+      
+      // If it's a timeout, log warning but proceed (better than blocking)
+      // The transaction hash will be recorded after processing
+      if (errorMessage.includes('timeout')) {
+        console.warn('⚠️ Duplicate check timed out - proceeding anyway', {
+          error: errorMessage,
+          note: 'Check took too long (>500ms). Proceeding to prevent blockhash expiration. Transaction will be recorded after processing.'
+        });
+      } else {
+        // Other errors - log and proceed
+        console.warn('⚠️ Duplicate check failed - proceeding anyway', {
+          error: errorMessage,
+          note: 'Check failed but proceeding to prevent blockhash expiration.'
+        });
+      }
+    }
     
-    // Fire-and-forget Firestore operations (truly non-blocking)
-    // These run in background and don't block transaction processing at all
-    // Use setImmediate to ensure they don't block the event loop
+    // Rate limiting check (non-blocking, but try to check)
+    // Run in background but don't block if it fails
     setImmediate(() => {
-      Promise.all([
-        checkTransactionHash(transactionBuffer, db).catch(err => {
-          console.warn('Background transaction hash check failed', { error: err.message });
-        }),
-        checkRateLimit(transactionBuffer, db).catch(err => {
-          console.warn('Background rate limit check failed', { error: err.message });
-        })
-      ]).catch(() => {
-        // Ignore errors - these are background operations
+      checkRateLimit(transactionBuffer, db).catch(err => {
+        console.warn('Background rate limit check failed', { error: err.message });
       });
     });
 
