@@ -25,6 +25,7 @@ import {
   Avatar,
   PhosphorIcon
 } from '../../components/shared';
+import UserNameWithBadges from '../../components/profile/UserNameWithBadges';
 import LogoPicker from '../../components/sharedWallet/LogoPicker';
 import ColorPicker from '../../components/sharedWallet/ColorPicker';
 
@@ -435,7 +436,12 @@ const SharedWalletSettingsScreen: React.FC = () => {
               />
               <View style={styles.memberInfo}>
                 <View style={styles.memberHeader}>
-                  <Text style={styles.memberName}>{member.name}</Text>
+                  <UserNameWithBadges
+                    userId={member.userId}
+                    userName={member.name}
+                    textStyle={styles.memberName}
+                    showBadges={true}
+                  />
                   {member.role === 'creator' && (
                     <View style={styles.creatorBadge}>
                       <PhosphorIcon name="Crown" size={12} color={colors.green} weight="fill" />

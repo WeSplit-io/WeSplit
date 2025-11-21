@@ -17,7 +17,7 @@ service firebase.storage {
       allow read: if true;
     }
     
-    // Allow read access to badge images
+    // Allow read access to badge images (including community badges in communauté folder)
     match /badges/{allPaths=**} {
       allow read: if true;
     }

@@ -12,6 +12,7 @@ import { typography } from '../../../theme/typography';
 import { styles } from '../styles';
 import { Participant } from '../../../services/payments/amountCalculationService';
 import BadgeDisplay from '../../../components/profile/BadgeDisplay';
+import UserNameWithBadges from '../../../components/profile/UserNameWithBadges';
 import { firebaseDataService } from '../../../services/data/firebaseDataService';
 
 interface FairSplitParticipantsProps {
@@ -80,7 +81,12 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
               }}
             />
             <View style={styles.participantInfo}>
-              <Text style={styles.participantName}>{participant.name}</Text>
+              <UserNameWithBadges
+                userId={participant.id}
+                userName={participant.name}
+                textStyle={styles.participantName}
+                showBadges={true}
+              />
               {badges && badges.badges.length > 0 && badges.active_badge && (
                 <BadgeDisplay
                   badges={badges.badges}

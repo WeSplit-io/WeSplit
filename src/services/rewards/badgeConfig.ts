@@ -260,36 +260,65 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
 
   // Event Badges - Can be claimed via redeem codes
   // Add event badges here as needed
-  // Example:
-  // 'event_summer_2024': {
-  //   badgeId: 'event_summer_2024',
-  //   title: 'Summer Event 2024',
-  //   description: 'Participated in Summer Event',
-  //   icon: '☀️',
-  //   category: 'event',
-  //   rarity: 'rare',
-  //   points: 200,
-  //   isEventBadge: true,
-  //   redeemCode: 'SUMMER2024'
-  // },
   
   // Community Badges - Represent communities, displayed next to user name
   // These badges can only be claimed via redeem codes
-  // Example community badges:
-  // 'community_solana_breakpoint_2025': {
-  //   badgeId: 'community_solana_breakpoint_2025',
-  //   title: 'Solana Breakpoint 2025',
-  //   description: 'Solana Breakpoint 2025 Abu Dhabi',
-  //   icon: '🕌',
-  //   iconUrl: 'https://example.com/breakpoint-badge.png',
-  //   category: 'community',
-  //   rarity: 'rare',
-  //   points: 0, // Community badges typically don't award points
-  //   isEventBadge: true,
-  //   isCommunityBadge: true,
-  //   showNextToName: true, // Display next to user name
-  //   redeemCode: 'BREAKPOINT2025'
-  // },
+  'community_wesplit': {
+    badgeId: 'community_wesplit',
+    title: 'WeSplit Community',
+    description: 'WeSplit community member',
+    icon: '👥',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/wesplit-badge.png',
+    category: 'community',
+    rarity: 'common',
+    points: 0, // Community badges typically don't award points
+    isEventBadge: true,
+    isCommunityBadge: true,
+    showNextToName: true, // Display next to user name
+    redeemCode: 'WESPLIT'
+  },
+  'community_superteamfrance': {
+    badgeId: 'community_superteamfrance',
+    title: 'Superteam France',
+    description: 'Superteam France community member',
+    icon: '🇫🇷',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/superteamfrance-badge.png',
+    category: 'community',
+    rarity: 'rare',
+    points: 0,
+    isEventBadge: true,
+    isCommunityBadge: true,
+    showNextToName: true,
+    redeemCode: 'SUPERTEAMFRANCE'
+  },
+  'community_monkedao': {
+    badgeId: 'community_monkedao',
+    title: 'MonkeDAO',
+    description: 'MonkeDAO community member',
+    icon: '🐵',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/monkedao-badge.png',
+    category: 'community',
+    rarity: 'rare',
+    points: 0,
+    isEventBadge: true,
+    isCommunityBadge: true,
+    showNextToName: true,
+    redeemCode: 'MONKEDAO'
+  },
+  'community_diggers': {
+    badgeId: 'community_diggers',
+    title: 'Diggers',
+    description: 'Diggers community member',
+    icon: '⛏️',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/diggers-badge.png',
+    category: 'community',
+    rarity: 'rare',
+    points: 0,
+    isEventBadge: true,
+    isCommunityBadge: true,
+    showNextToName: true,
+    redeemCode: 'DIGGERS'
+  },
 };
 
 /**

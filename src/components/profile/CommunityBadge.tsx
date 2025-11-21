@@ -33,6 +33,9 @@ const CommunityBadge: React.FC<CommunityBadgeProps> = ({
           source={{ uri: iconUrl }}
           style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
           resizeMode="cover"
+          onError={(error) => {
+            console.warn('Failed to load community badge image', { iconUrl, error });
+          }}
         />
       ) : (
         <View style={[styles.iconContainer, { width: size, height: size, borderRadius: size / 2 }]}>

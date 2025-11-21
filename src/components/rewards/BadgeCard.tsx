@@ -58,10 +58,10 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
 
       {/* Badge image - displayed directly from Firebase */}
       <View style={styles.badgeImageContainer}>
-        {progress.imageUrl ? (
-          <Image 
-            source={{ uri: progress.imageUrl }} 
-            style={styles.badgeImage}
+          {progress.imageUrl ? (
+            <Image 
+              source={{ uri: progress.imageUrl }} 
+              style={styles.badgeImage}
             resizeMode="contain"
             onError={(error) => {
               console.warn('Failed to load badge image', { 
@@ -75,13 +75,13 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
                 badgeId: progress.badgeId 
               });
             }}
-          />
-        ) : (
+            />
+          ) : (
           <View style={styles.badgeImagePlaceholder}>
             <PhosphorIcon name="Image" size={32} color={colors.white70} weight="regular" />
             <Text style={styles.badgeImagePlaceholderText}>Loading badge...</Text>
-          </View>
-        )}
+            </View>
+          )}
       </View>
 
       {/* Description */}
