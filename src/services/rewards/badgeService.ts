@@ -161,13 +161,20 @@ class BadgeService {
   private async getUserBadgeMetrics(userId: string): Promise<BadgeMetrics> {
     const cached = this.getCachedValue(this.badgeMetricsCache, userId);
     if (cached) {
+      logger.debug('Using cached badge metrics', { userId, metrics: cached }, 'BadgeService');
       return cached;
     }
 
     const serverMetrics = await this.getServerBadgeMetrics(userId);
     if (serverMetrics) {
-      this.setCachedValue(this.badgeMetricsCache, userId, serverMetrics);
-      return serverMetrics;
+      logger.debug('Using server badge metrics', { userId, metrics: serverMetrics }, 'BadgeService');
+      // Only use server metrics if they have non-zero values, otherwise recompute
+      if (serverMetrics.splitWithdrawals > 0 || serverMetrics.transactionCount > 0 || serverMetrics.transactionVolume > 0) {
+        this.setCachedValue(this.badgeMetricsCache, userId, serverMetrics);
+        return serverMetrics;
+      } else {
+        logger.debug('Server metrics are all zero, recomputing from transactions', { userId }, 'BadgeService');
+      }
     }
 
     const computedMetrics = await this.computeBadgeMetricsFromTransactions(userId);
@@ -181,6 +188,8 @@ class BadgeService {
    */
   private async computeBadgeMetricsFromTransactions(userId: string): Promise<BadgeMetrics> {
     try {
+      logger.debug('Starting badge metrics computation', { userId }, 'BadgeService');
+      
       const transactionsRef = collection(db, 'transactions');
       const sentQuery = query(
         transactionsRef,
@@ -198,6 +207,12 @@ class BadgeService {
         getDocs(receivedQuery)
       ]);
 
+      logger.debug('Transaction queries completed', {
+        userId,
+        sentCount: sentSnapshot.size,
+        receivedCount: receivedSnapshot.size
+      }, 'BadgeService');
+
       const transactionDocs = new Map<string, QueryDocumentSnapshot>();
       sentSnapshot.forEach((docSnap) => transactionDocs.set(docSnap.id, docSnap));
       receivedSnapshot.forEach((docSnap) => transactionDocs.set(docSnap.id, docSnap));
@@ -208,13 +223,36 @@ class BadgeService {
         transactionVolume: 0
       };
 
+      // Log sample transactions for debugging
+      if (transactionDocs.size > 0) {
+        const sampleTransaction = Array.from(transactionDocs.values())[0];
+        const sampleData = sampleTransaction.data();
+        logger.debug('Sample transaction data', {
+          userId,
+          transactionId: sampleTransaction.id,
+          fields: Object.keys(sampleData),
+          from_user: sampleData.from_user,
+          to_user: sampleData.to_user,
+          status: sampleData.status,
+          transactionType: sampleData.transactionType,
+          note: sampleData.note
+        }, 'BadgeService');
+      }
+
       for (const docSnap of transactionDocs.values()) {
         const data = docSnap.data() as Record<string, unknown>;
         metrics.transactionCount += 1;
         metrics.transactionVolume += await this.getUsdAmountForTransaction(data);
 
-        if (this.isSplitWithdrawal(data, userId)) {
+        const isSplit = this.isSplitWithdrawal(data, userId);
+        if (isSplit) {
           metrics.splitWithdrawals += 1;
+          logger.debug('Found split withdrawal', {
+            userId,
+            transactionId: docSnap.id,
+            transactionType: data.transactionType,
+            note: data.note
+          }, 'BadgeService');
         }
       }
 
