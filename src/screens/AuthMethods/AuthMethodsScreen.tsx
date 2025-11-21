@@ -852,7 +852,8 @@ const AuthMethodsScreen: React.FC = () => {
           <View style={styles.contentContainer}>
 
           {/* Auth Method Tabs */}
-          <Tabs
+          {/* Phone authentication temporarily hidden */}
+          {/* <Tabs
             tabs={[
               { label: 'Email', value: 'email' },
               { label: 'Phone', value: 'phone' }
@@ -860,10 +861,9 @@ const AuthMethodsScreen: React.FC = () => {
             activeTab={authMethod}
             onTabChange={(tab) => setAuthMethod(tab as 'email' | 'phone')}
             enableAnimation={false}
-          />
+          /> */}
 
           {/* Email Input */}
-          {authMethod === 'email' && (
           <Input
             label="Email"
             placeholder="Enter your email"
@@ -889,10 +889,9 @@ const AuthMethodsScreen: React.FC = () => {
             textContentType="emailAddress"
             autoComplete="email"
           />
-          )}
 
-          {/* Phone Input */}
-          {authMethod === 'phone' && (
+          {/* Phone Input - Temporarily hidden */}
+          {/* {authMethod === 'phone' && (
             <Input
               label="Phone Number"
               placeholder="+1234567890"
@@ -907,28 +906,19 @@ const AuthMethodsScreen: React.FC = () => {
               textContentType="telephoneNumber"
               autoComplete="tel"
             />
-          )}
+          )} */}
 
           {/* Next Button */}
           <Button
             title="Next"
             onPress={() => {
-              if (authMethod === 'email') {
-                logger.info('Next button pressed (email)', { email, loading }, 'AuthMethodsScreen');
+              logger.info('Next button pressed (email)', { email, loading }, 'AuthMethodsScreen');
               handleEmailAuth();
-              } else {
-                logger.info('Next button pressed (phone)', { phoneNumber, loading }, 'AuthMethodsScreen');
-                handlePhoneAuth();
-              }
             }}
             variant="primary"
             size="large"
             fullWidth={true}
-            disabled={
-              authMethod === 'email' 
-                ? (!email || !isValidEmail(email) || loading)
-                : (!phoneNumber || !isValidPhoneNumber(normalizePhoneNumber(phoneNumber)) || loading)
-            }
+            disabled={!email || !isValidEmail(email) || loading}
             loading={loading}
           />
 

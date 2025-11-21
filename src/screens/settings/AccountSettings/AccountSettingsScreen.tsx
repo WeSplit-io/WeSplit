@@ -504,8 +504,8 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
             editable={false}
           />
 
-          {/* Phone Number Field */}
-          {phoneNumber ? (
+          {/* Phone Number Field - Temporarily hidden */}
+          {/* {phoneNumber ? (
             <Input
               label="Phone Number"
               value={phoneNumber}
@@ -534,7 +534,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                 style={{ marginBottom: spacing.md }}
               />
             </View>
-          )}
+          )} */}
 
           {/* Settings Section */}
           <View style={{ marginTop: spacing.md }}>
@@ -687,8 +687,8 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
         />
       </View>
 
-      {/* Phone Input Modal */}
-      <PhoneInputModal
+      {/* Phone Input Modal - Temporarily hidden */}
+      {/* <PhoneInputModal
         visible={showPhoneInputModal}
         onDismiss={() => setShowPhoneInputModal(false)}
         onSendCode={async (phone) => {
@@ -715,7 +715,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
             setIsAddingPhone(false);
           }
         }}
-      />
+      /> */}
     </Container>
   );
 };

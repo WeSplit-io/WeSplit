@@ -3,8 +3,9 @@
  * Manages badge progress tracking and claims
  */
 
-import { db } from '../../config/firebase/firebase';
+import { db, storage } from '../../config/firebase/firebase';
 import { doc, getDoc, setDoc, collection, getDocs, serverTimestamp, query, where, runTransaction, QueryDocumentSnapshot } from 'firebase/firestore';
+import { ref, getDownloadURL } from 'firebase/storage';
 import { logger } from '../analytics/loggingService';
 import priceManagementService from '../core/priceManagementService';
 import { BADGE_DEFINITIONS, BadgeInfo } from './badgeConfig';
@@ -98,10 +99,21 @@ class BadgeService {
           // Get image URL - priority: claimed badge data > badge config > Firebase Storage
           const imageUrl = await this.getBadgeImageUrl(badge.badgeId, claimedBadgeData?.imageUrl || badge.iconUrl);
 
+          const current = this.getProgressValueForBadge(badge, badgeMetrics);
+          const target = badge.target || 0;
+          
+          logger.debug('Badge progress calculated', {
+            badgeId: badge.badgeId,
+            current,
+            target,
+            claimed,
+            canClaim: current >= target && !claimed
+          }, 'BadgeService');
+
           return {
             badgeId: badge.badgeId,
-            current: this.getProgressValueForBadge(badge, badgeMetrics),
-            target: badge.target || 0,
+            current,
+            target,
             claimed,
             claimedAt: claimedBadgeData?.claimedAt,
             imageUrl,
@@ -183,7 +195,7 @@ class BadgeService {
 
       const [sentSnapshot, receivedSnapshot] = await Promise.all([
         getDocs(sentQuery),
-        getDocs(receivedSnapshot)
+        getDocs(receivedQuery)
       ]);
 
       const transactionDocs = new Map<string, QueryDocumentSnapshot>();
@@ -205,6 +217,14 @@ class BadgeService {
           metrics.splitWithdrawals += 1;
         }
       }
+
+      logger.debug('Computed badge metrics from transactions', { 
+        userId, 
+        splitWithdrawals: metrics.splitWithdrawals,
+        transactionCount: metrics.transactionCount,
+        transactionVolume: metrics.transactionVolume,
+        totalTransactions: transactionDocs.size
+      }, 'BadgeService');
 
       return metrics;
     } catch (error) {
@@ -359,14 +379,82 @@ class BadgeService {
   }
 
   /**
+   * Convert gs:// URL to Firebase Storage download URL
+   */
+  private async convertGsUrlToDownloadUrl(gsUrl: string): Promise<string | undefined> {
+    try {
+      // Extract path from gs:// URL
+      // Format: gs://bucket/path/to/file.png or gs://bucket.firebasestorage.app/path/to/file.png
+      // We need to extract: path/to/file.png
+      
+      // Try different patterns to handle various gs:// URL formats
+      let storagePath: string | null = null;
+      
+      // Pattern 1: gs://bucket/path/to/file.png
+      let urlMatch = gsUrl.match(/^gs:\/\/[^/]+\/(.+)$/);
+      if (urlMatch && urlMatch[1]) {
+        storagePath = urlMatch[1];
+      } else {
+        // Pattern 2: gs://bucket.firebasestorage.app/path/to/file.png
+        // Extract everything after the domain
+        urlMatch = gsUrl.match(/^gs:\/\/[^/]+\.firebasestorage\.app\/(.+)$/);
+        if (urlMatch && urlMatch[1]) {
+          storagePath = urlMatch[1];
+        }
+      }
+      
+      if (!storagePath) {
+        logger.warn('Invalid gs:// URL format - could not extract path', { gsUrl }, 'BadgeService');
+        return undefined;
+      }
+
+      logger.debug('Converting gs:// URL to download URL', { gsUrl, storagePath }, 'BadgeService');
+      
+      const storageRef = ref(storage, storagePath);
+      const downloadUrl = await getDownloadURL(storageRef);
+      
+      logger.debug('Successfully converted gs:// URL', { gsUrl, downloadUrl }, 'BadgeService');
+      return downloadUrl;
+    } catch (error: any) {
+      // Handle specific Firebase Storage errors
+      if (error?.code === 'storage/object-not-found') {
+        logger.warn('Badge image not found in Firebase Storage', { gsUrl, error: error.message }, 'BadgeService');
+      } else if (error?.code === 'storage/unauthorized') {
+        logger.warn('Unauthorized access to badge image', { gsUrl, error: error.message }, 'BadgeService');
+      } else {
+        logger.error('Failed to convert gs:// URL to download URL', { error, gsUrl, errorCode: error?.code, errorMessage: error?.message }, 'BadgeService');
+      }
+      return undefined;
+    }
+  }
+
+  /**
    * Get badge image URL from Firebase Storage or badge configuration
-   * Priority: 1. Provided URL, 2. Firebase Storage badge images collection, 3. Badge config iconUrl
+   * Priority: 1. Provided URL (converted if gs://), 2. Firebase Storage badge images collection, 3. Badge config iconUrl
    */
   private async getBadgeImageUrl(badgeId: string, fallbackUrl?: string): Promise<string | undefined> {
     try {
-      // If a URL is already provided (from claimed badge or config), use it
-      if (fallbackUrl && fallbackUrl.startsWith('http')) {
-        return fallbackUrl;
+      logger.debug('Getting badge image URL', { badgeId, fallbackUrl }, 'BadgeService');
+      
+      // If a URL is already provided (from claimed badge or config), check its format
+      if (fallbackUrl) {
+        // If it's already an HTTPS URL, use it directly
+        if (fallbackUrl.startsWith('http')) {
+          logger.debug('Using HTTPS URL directly', { badgeId, url: fallbackUrl }, 'BadgeService');
+          return fallbackUrl;
+        }
+        
+        // If it's a gs:// URL, convert it to download URL
+        if (fallbackUrl.startsWith('gs://')) {
+          logger.debug('Converting gs:// URL', { badgeId, gsUrl: fallbackUrl }, 'BadgeService');
+          const downloadUrl = await this.convertGsUrlToDownloadUrl(fallbackUrl);
+          if (downloadUrl) {
+            logger.debug('Successfully converted gs:// URL', { badgeId, downloadUrl }, 'BadgeService');
+            return downloadUrl;
+          } else {
+            logger.warn('Failed to convert gs:// URL, will try badge_images collection', { badgeId, gsUrl: fallbackUrl }, 'BadgeService');
+          }
+        }
       }
 
       // Try to get image URL from Firebase Storage badge images collection
@@ -376,16 +464,25 @@ class BadgeService {
         
         if (badgeImageDoc.exists()) {
           const data = badgeImageDoc.data();
-          if (data.imageUrl && data.imageUrl.startsWith('http')) {
-            return data.imageUrl;
+          if (data.imageUrl) {
+            // Check if it's a gs:// URL and convert it
+            if (data.imageUrl.startsWith('gs://')) {
+              logger.debug('Found gs:// URL in badge_images collection', { badgeId, gsUrl: data.imageUrl }, 'BadgeService');
+              const downloadUrl = await this.convertGsUrlToDownloadUrl(data.imageUrl);
+              if (downloadUrl) {
+                return downloadUrl;
+              }
+            } else if (data.imageUrl.startsWith('http')) {
+              return data.imageUrl;
+            }
           }
         }
       } catch (storageError) {
         // If badge_images collection doesn't exist or badge not found, continue to fallback
-        logger.debug('Badge image not found in badge_images collection', { badgeId }, 'BadgeService');
+        logger.debug('Badge image not found in badge_images collection', { badgeId, error: storageError }, 'BadgeService');
       }
 
-      // Return fallback URL if provided
+      // Return fallback URL if provided (even if conversion failed, might still be useful)
       return fallbackUrl;
     } catch (error) {
       logger.error('Failed to get badge image URL', { error, badgeId }, 'BadgeService');
@@ -627,15 +724,29 @@ class BadgeService {
     transactionCount: number;
     transactionVolume: number;
   }): number {
+    let progressValue: number;
     switch (badge.progressMetric) {
       case 'transaction_count':
-        return metrics.transactionCount;
+        progressValue = metrics.transactionCount;
+        break;
       case 'transaction_volume':
-        return metrics.transactionVolume;
+        progressValue = metrics.transactionVolume;
+        break;
       case 'split_withdrawals':
       default:
-        return metrics.splitWithdrawals;
+        progressValue = metrics.splitWithdrawals;
+        break;
     }
+    
+    logger.debug('Calculated badge progress', {
+      badgeId: badge.badgeId,
+      progressMetric: badge.progressMetric,
+      progressValue,
+      target: badge.target,
+      metrics
+    }, 'BadgeService');
+    
+    return progressValue;
   }
 
   /**

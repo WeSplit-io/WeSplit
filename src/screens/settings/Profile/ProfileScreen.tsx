@@ -228,30 +228,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           style={styles.profileCard} 
           onPress={handleAccountInfo}
         >
-          <View style={[styles.profileAvatar, { position: 'relative' }]}>
+          <View style={styles.profileAvatar}>
             <AvatarComponent
               avatar={currentUser?.avatar}
               displayName={displayName}
               userId={currentUser?.id}
               style={{ width: '100%', height: '100%' }}
             />
-            {/* Red dot reminder badge */}
-            {needsPhoneReminder && (
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  right: 0,
-                  width: 12,
-                  height: 12,
-                  borderRadius: 6,
-                  backgroundColor: colors.error || '#FF3B30',
-                  borderWidth: 2,
-                  borderColor: colors.blackWhite5 || '#1A1A1A',
-                  zIndex: 10,
-                }}
-              />
-            )}
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{displayName}</Text>
@@ -292,26 +275,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={handleAccountInfo}>
-            <View style={{ position: 'relative' }}>
-              <PhosphorIcon name="UserCircle" size={20} color={colors.white} weight="regular" />
-              {/* Red dot reminder badge */}
-              {needsPhoneReminder && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -4,
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: colors.error || '#FF3B30',
-                    borderWidth: 2,
-                    borderColor: colors.blackWhite5 || '#1A1A1A',
-                    zIndex: 10,
-                  }}
-                />
-              )}
-            </View>
+            <PhosphorIcon name="UserCircle" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>Account info</Text>
             <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
           </TouchableOpacity>
