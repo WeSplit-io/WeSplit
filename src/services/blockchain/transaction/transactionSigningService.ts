@@ -254,8 +254,18 @@ const getProcessUsdcTransferFunction = () => {
       }, 'TransactionSigningService');
     }
     
+    // Production/mainnet needs longer timeout - transactions can take 30-60 seconds
+    const isProduction = !__DEV__;
+    // Check network from environment variable (synchronous, no await needed)
+    const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
+    const forceMainnet = getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
+    const isMainnet = networkEnv.toLowerCase() === 'mainnet' || 
+                      forceMainnet ||
+                      (isProduction && !networkEnv); // Default to mainnet in production if not set
+    const timeout = (isProduction && isMainnet) ? 120000 : 90000; // 120s for production mainnet, 90s otherwise
+    
     const callableFunction = httpsCallable(functions, 'processUsdcTransfer', {
-      timeout: 90000 // 90 seconds timeout (longer for sign + submit)
+      timeout: timeout // Increased timeout for production/mainnet
     });
     
     logger.info('✅ processUsdcTransfer callable function created', {
@@ -872,22 +882,36 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
       }, 'TransactionSigningService');
     } catch (firebaseError: any) {
       // CRITICAL: Log full error details to understand what's happening
+      const errorMessage = firebaseError?.message || 'No error message';
+      const errorCode = firebaseError?.code || 'NO_CODE';
+      const isTimeout = 
+        errorCode === 'deadline-exceeded' ||
+        errorCode === 'timeout' ||
+        errorMessage.toLowerCase().includes('timeout') ||
+        errorMessage.toLowerCase().includes('deadline exceeded') ||
+        errorMessage.toLowerCase().includes('timed out');
+      
       logger.error('❌ Firebase Function processUsdcTransfer FAILED', {
         error: firebaseError,
-        errorMessage: firebaseError?.message || 'No error message',
+        errorMessage,
         errorName: firebaseError?.name || 'Unknown',
-        errorCode: firebaseError?.code || 'NO_CODE',
+        errorCode,
+        isTimeout,
         errorDetails: firebaseError?.details || {},
         errorStack: firebaseError?.stack ? firebaseError.stack.substring(0, 500) : 'No stack trace',
         isFirebaseError: firebaseError?.code !== undefined,
         base64Length: base64Transaction.length,
         base64Preview: base64Transaction.substring(0, 50) + '...',
-        functionType: typeof processUsdcTransferFunction
+        functionType: typeof processUsdcTransferFunction,
+        note: isTimeout ? 'This may be a timeout - transaction might have succeeded on backend. Check Firebase logs.' : 'Standard error'
       }, 'TransactionSigningService');
       
-      // Re-throw with more context
-      const errorMessage = firebaseError?.message || 'Unknown Firebase Function error';
-      const errorCode = firebaseError?.code || 'UNKNOWN';
+      // For timeout errors, provide more helpful error message
+      if (isTimeout) {
+        throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history or try again. (Error: ${errorCode})`);
+      }
+      
+      // Re-throw with more context for other errors
       throw new Error(`Firebase Function error (${errorCode}): ${errorMessage}`);
     }
     

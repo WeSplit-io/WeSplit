@@ -1,5 +1,27 @@
 require('dotenv/config');
 
+// Helper to get environment variable with better error handling for production builds
+function getEnvVar(key, defaultValue = undefined) {
+  const value = process.env[key];
+  
+  // In production builds, if value is still a template string, it means it wasn't substituted
+  if (value && value.startsWith('${') && value.endsWith('}')) {
+    const isProduction = process.env.EAS_BUILD_PROFILE === 'production' || 
+                         process.env.APP_ENV === 'production' ||
+                         process.env.NODE_ENV === 'production';
+    
+    if (isProduction) {
+      console.warn(`⚠️  WARNING: Environment variable ${key} was not substituted during build.`);
+      console.warn(`   This usually means it needs to be set as an EAS secret.`);
+      console.warn(`   Run: eas secret:create --scope project --name ${key} --value "your-value"`);
+    }
+    
+    return defaultValue;
+  }
+  
+  return value || defaultValue;
+}
+
 module.exports = {
   expo: {
     name: "WeSplit Beta",
@@ -15,7 +37,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      buildNumber: "2",
+      buildNumber: "4",
       deploymentTarget: "15.1",
       infoPlist: {
         LSApplicationQueriesSchemes: [
@@ -39,7 +61,7 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      versionCode: 11200,
+      versionCode: 11202,
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"
@@ -105,55 +127,55 @@ module.exports = {
       },
       // Firebase configuration object for easy access
       firebase: {
-        apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-        authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-        storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-        measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
+        apiKey: getEnvVar('EXPO_PUBLIC_FIREBASE_API_KEY'),
+        authDomain: getEnvVar('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN', 'wesplit-35186.firebaseapp.com'),
+        projectId: getEnvVar('EXPO_PUBLIC_FIREBASE_PROJECT_ID', 'wesplit-35186'),
+        storageBucket: getEnvVar('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET', 'wesplit-35186.appspot.com'),
+        messagingSenderId: getEnvVar('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
+        appId: getEnvVar('EXPO_PUBLIC_FIREBASE_APP_ID'),
+        measurementId: getEnvVar('EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID'),
       },
       // Firebase configuration from environment variables (for backward compatibility)
-      EXPO_PUBLIC_FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-      EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-      EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
+      EXPO_PUBLIC_FIREBASE_API_KEY: getEnvVar('EXPO_PUBLIC_FIREBASE_API_KEY'),
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: getEnvVar('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN', 'wesplit-35186.firebaseapp.com'),
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: getEnvVar('EXPO_PUBLIC_FIREBASE_PROJECT_ID', 'wesplit-35186'),
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: getEnvVar('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET', 'wesplit-35186.appspot.com'),
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: getEnvVar('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
+      EXPO_PUBLIC_FIREBASE_APP_ID: getEnvVar('EXPO_PUBLIC_FIREBASE_APP_ID'),
+      EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: getEnvVar('EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID'),
       
       // Social Authentication configuration
       // SECURITY: Client secrets must NOT be exposed to client-side code
       // EXPO_PUBLIC_GOOGLE_CLIENT_SECRET and EXPO_PUBLIC_TWITTER_CLIENT_SECRET removed
       // These must be handled by backend services only
-      EXPO_PUBLIC_GOOGLE_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-      ANDROID_GOOGLE_CLIENT_ID: process.env.ANDROID_GOOGLE_CLIENT_ID,
-      IOS_GOOGLE_CLIENT_ID: process.env.IOS_GOOGLE_CLIENT_ID,
-      EXPO_PUBLIC_APPLE_CLIENT_ID: process.env.EXPO_PUBLIC_APPLE_CLIENT_ID,
-      EXPO_PUBLIC_APPLE_SERVICE_ID: process.env.EXPO_PUBLIC_APPLE_SERVICE_ID,
-      EXPO_PUBLIC_APPLE_TEAM_ID: process.env.EXPO_PUBLIC_APPLE_TEAM_ID,
-      EXPO_PUBLIC_APPLE_KEY_ID: process.env.EXPO_PUBLIC_APPLE_KEY_ID,
-      EXPO_PUBLIC_TWITTER_CLIENT_ID: process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID,
+      EXPO_PUBLIC_GOOGLE_CLIENT_ID: getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID'),
+      ANDROID_GOOGLE_CLIENT_ID: getEnvVar('ANDROID_GOOGLE_CLIENT_ID'),
+      IOS_GOOGLE_CLIENT_ID: getEnvVar('IOS_GOOGLE_CLIENT_ID'),
+      EXPO_PUBLIC_APPLE_CLIENT_ID: getEnvVar('EXPO_PUBLIC_APPLE_CLIENT_ID'),
+      EXPO_PUBLIC_APPLE_SERVICE_ID: getEnvVar('EXPO_PUBLIC_APPLE_SERVICE_ID'),
+      EXPO_PUBLIC_APPLE_TEAM_ID: getEnvVar('EXPO_PUBLIC_APPLE_TEAM_ID'),
+      EXPO_PUBLIC_APPLE_KEY_ID: getEnvVar('EXPO_PUBLIC_APPLE_KEY_ID'),
+      EXPO_PUBLIC_TWITTER_CLIENT_ID: getEnvVar('EXPO_PUBLIC_TWITTER_CLIENT_ID'),
       
       // Solana Configuration
       // Primary network selection (recommended)
-      EXPO_PUBLIC_NETWORK: process.env.EXPO_PUBLIC_NETWORK,
+      EXPO_PUBLIC_NETWORK: getEnvVar('EXPO_PUBLIC_NETWORK'),
       // Legacy network configuration (backward compatibility)
-      EXPO_PUBLIC_HELIUS_API_KEY: process.env.EXPO_PUBLIC_HELIUS_API_KEY,
-      EXPO_PUBLIC_FORCE_MAINNET: process.env.EXPO_PUBLIC_FORCE_MAINNET || 'false',
-      EXPO_PUBLIC_DEV_NETWORK: process.env.EXPO_PUBLIC_DEV_NETWORK || 'devnet',
+      EXPO_PUBLIC_HELIUS_API_KEY: getEnvVar('EXPO_PUBLIC_HELIUS_API_KEY'),
+      EXPO_PUBLIC_FORCE_MAINNET: getEnvVar('EXPO_PUBLIC_FORCE_MAINNET', 'false'),
+      EXPO_PUBLIC_DEV_NETWORK: getEnvVar('EXPO_PUBLIC_DEV_NETWORK', 'devnet'),
       
       // Company Fee Structure
-      EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE: process.env.EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE,
-      EXPO_PUBLIC_COMPANY_MIN_FEE: process.env.EXPO_PUBLIC_COMPANY_MIN_FEE,
-      EXPO_PUBLIC_COMPANY_MAX_FEE: process.env.EXPO_PUBLIC_COMPANY_MAX_FEE,
+      EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE: getEnvVar('EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE'),
+      EXPO_PUBLIC_COMPANY_MIN_FEE: getEnvVar('EXPO_PUBLIC_COMPANY_MIN_FEE'),
+      EXPO_PUBLIC_COMPANY_MAX_FEE: getEnvVar('EXPO_PUBLIC_COMPANY_MAX_FEE'),
       
       // Company Wallet Configuration
       // SECURITY: Secret key is NOT exposed to client-side code
       // EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY removed - must be handled by backend services only
-      EXPO_PUBLIC_COMPANY_WALLET_ADDRESS: process.env.EXPO_PUBLIC_COMPANY_WALLET_ADDRESS,
-      EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE: process.env.EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE,
-      EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE: process.env.EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE,
+      EXPO_PUBLIC_COMPANY_WALLET_ADDRESS: getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS'),
+      EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE: getEnvVar('EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE'),
+      EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE: getEnvVar('EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE'),
       
     },
     podfileProperties: {

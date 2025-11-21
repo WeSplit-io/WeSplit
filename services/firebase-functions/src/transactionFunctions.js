@@ -401,7 +401,7 @@ exports.processUsdcTransfer = functions.runWith({
     'HELIUS_API_KEY',
     'USE_PAID_RPC'
   ],
-  timeoutSeconds: 30,
+  timeoutSeconds: 60, // Increased from 30s to 60s for production/mainnet (transactions can take longer)
   memory: '512MB'
 }).https.onCall(async (data, context) => {
   // CRITICAL: Use try-catch at the very top level to catch ANY errors before they become "internal"

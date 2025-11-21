@@ -366,11 +366,23 @@ export class OptimizedTransactionUtils {
         }
       }
 
-      // Use a more resilient confirmation strategy with reduced timeout
-      // Reduced timeouts for faster response - transactions will eventually confirm
+      // Use a more resilient confirmation strategy with network-aware timeout
+      // Production/mainnet needs longer timeouts - RPC indexing can be slow
       const isIOS = Platform.OS === 'ios';
       const isProduction = __DEV__ === false;
-      const maxTimeout = isIOS && isProduction ? 30000 : 20000; // Reduced: 30s for iOS production, 20s for others
+      // Reuse isMainnet from above (already declared at line 351)
+      
+      // Production mainnet: 60s, Production devnet: 45s, Dev: 30s
+      let maxTimeout: number;
+      if (isProduction && isMainnet) {
+        maxTimeout = 60000; // 60s for production mainnet (RPC indexing can be slow)
+      } else if (isProduction) {
+        maxTimeout = 45000; // 45s for production devnet
+      } else if (isIOS) {
+        maxTimeout = 30000; // 30s for iOS dev
+      } else {
+        maxTimeout = 20000; // 20s for Android dev
+      }
       const shortTimeout = Math.min(timeout, maxTimeout);
       
       // Try confirmation with shorter timeout first

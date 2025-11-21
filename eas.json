@@ -38,9 +38,10 @@
         "APP_ENV": "production",
         "EXPO_PUBLIC_NETWORK": "mainnet",
         "EXPO_PUBLIC_FORCE_MAINNET": "true",
-        "EXPO_PUBLIC_DEV_NETWORK": "mainnet"
+        "EXPO_PUBLIC_DEV_NETWORK": "mainnet",
+        "EXPO_PUBLIC_USE_PROD_FUNCTIONS": "true"
       },
-      "prebuildCommand": "node scripts/validate-network-config.js"
+      "prebuildCommand": "node scripts/validate-network-config.js && node scripts/validate-env-vars.js"
     },
     "mass-distribution": {
       "distribution": "store",
@@ -55,9 +56,10 @@
         "APP_ENV": "production",
         "EXPO_PUBLIC_NETWORK": "mainnet",
         "EXPO_PUBLIC_FORCE_MAINNET": "true",
-        "EXPO_PUBLIC_DEV_NETWORK": "mainnet"
+        "EXPO_PUBLIC_DEV_NETWORK": "mainnet",
+        "EXPO_PUBLIC_USE_PROD_FUNCTIONS": "true"
       },
-      "prebuildCommand": "node scripts/validate-network-config.js"
+      "prebuildCommand": "node scripts/validate-network-config.js && node scripts/validate-env-vars.js"
     },
     "testflight": {
       "distribution": "store",
@@ -72,9 +74,10 @@
         "APP_ENV": "production",
         "EXPO_PUBLIC_NETWORK": "mainnet",
         "EXPO_PUBLIC_FORCE_MAINNET": "true",
-        "EXPO_PUBLIC_DEV_NETWORK": "mainnet"
+        "EXPO_PUBLIC_DEV_NETWORK": "mainnet",
+        "EXPO_PUBLIC_USE_PROD_FUNCTIONS": "true"
       },
-      "prebuildCommand": "node scripts/validate-network-config.js"
+      "prebuildCommand": "node scripts/validate-network-config.js && node scripts/validate-env-vars.js"
     },
     "internal-testing": {
       "distribution": "internal",

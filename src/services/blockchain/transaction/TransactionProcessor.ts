@@ -497,13 +497,18 @@ export class TransactionProcessor {
       let submissionAttempts = 0;
       const maxSubmissionAttempts = 3; // Retry up to 3 times with fresh blockhash for better reliability
       
+      // Get network info for timeout handling
+      const config = getConfig();
+      const isMainnet = config.blockchain.network === 'mainnet';
+      
       while (submissionAttempts < maxSubmissionAttempts) {
         try {
           logger.info('Processing USDC transfer (sign and submit)', {
             transactionSize: currentTxArray.length,
             attempt: submissionAttempts + 1,
             maxAttempts: maxSubmissionAttempts,
-            blockhashAge: Date.now() - currentBlockhashTimestamp
+            blockhashAge: Date.now() - currentBlockhashTimestamp,
+            isMainnet
           }, 'TransactionProcessor');
           
           const result = await processUsdcTransfer(currentTxArray);
@@ -512,6 +517,26 @@ export class TransactionProcessor {
           break; // Success, exit retry loop
         } catch (submissionError) {
           const errorMessage = submissionError instanceof Error ? submissionError.message : String(submissionError);
+          
+          // Check for timeout errors - transaction might have succeeded
+          const isTimeout = 
+            errorMessage.includes('timed out') ||
+            errorMessage.includes('timeout') ||
+            errorMessage.includes('deadline exceeded') ||
+            errorMessage.includes('deadline-exceeded');
+          
+          // If timeout and we're on mainnet, transaction might have succeeded
+          // Check if error message suggests transaction was submitted
+          if (isTimeout && isMainnet) {
+            logger.warn('Transaction processing timed out on mainnet - transaction may have succeeded', {
+              errorMessage,
+              note: 'Mainnet transactions can take longer. Transaction may have been submitted successfully despite timeout.'
+            }, 'TransactionProcessor');
+            // Don't retry on timeout - transaction likely succeeded
+            // The verification step will handle checking if it actually succeeded
+            throw new Error(`Transaction processing timed out. The transaction may have succeeded. Please check your transaction history. (${errorMessage})`);
+          }
+          
           const isBlockhashExpired = 
             errorMessage.includes('blockhash has expired') ||
             errorMessage.includes('blockhash expired') ||
@@ -572,8 +597,7 @@ export class TransactionProcessor {
 
       // CRITICAL: On mainnet, we need to properly verify the transaction succeeded
       // Don't assume success just because we got a signature - verify it actually confirmed
-      const config = getConfig();
-      const isMainnet = config.blockchain.network === 'mainnet';
+      // Note: isMainnet is already defined above
       
       if (isMainnet) {
         // On mainnet, use proper verification with delayed check
