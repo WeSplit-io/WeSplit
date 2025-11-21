@@ -91,10 +91,14 @@ class ConsolidatedTransactionService {
         rejectTransaction = reject;
       });
       
+      // ✅ CRITICAL: Import deduplication service BEFORE creating placeholder
+      // This ensures the service is ready before any async operations
+      const { transactionDeduplicationService } = await import('./TransactionDeduplicationService');
+      
       // ✅ CRITICAL: Atomic check-and-register to prevent race conditions
       // This method atomically checks if transaction exists and registers if not
       // This prevents multiple simultaneous calls from all passing the check
-      const { transactionDeduplicationService } = await import('./TransactionDeduplicationService');
+      // MUST be called synchronously after import (no await between import and call)
       const { existing: existingPromise, cleanup } = transactionDeduplicationService.checkAndRegisterInFlight(
         params.userId,
         params.to,
@@ -194,15 +198,27 @@ class ConsolidatedTransactionService {
             result.signature
           );
         }
-      } catch (error) {
-        // Re-throw error so caller can handle it
-        cleanup();
-        throw error;
-      } finally {
-        // Always cleanup, even on error (if not already cleaned up)
-        if (isNewTransaction) {
+        
+        // ✅ CRITICAL: Only cleanup on SUCCESS
+        // Failed transactions stay in deduplication service to prevent retries
+        // This ensures that if a transaction fails, retries within 60s are blocked
+        if (isNewTransaction && result.success) {
           cleanup();
         }
+      } catch (error) {
+        // ✅ CRITICAL: Don't cleanup on error immediately
+        // Keep failed transaction in deduplication service to prevent immediate retries
+        // This prevents duplicates when transaction fails/times out and user retries
+        // Cleanup will happen automatically after timeout (60s) or on success
+        logger.warn('Transaction failed - keeping in deduplication service to prevent retries', {
+          userId: params.userId,
+          to: params.to.substring(0, 8) + '...',
+          amount: params.amount,
+          error: error instanceof Error ? error.message : String(error),
+          note: 'Transaction will be cleaned up automatically after 60s timeout. Retries within 60s will be blocked.'
+        }, 'ConsolidatedTransactionService');
+        // Don't cleanup - let it expire naturally (60s timeout) to prevent retries
+        throw error;
       }
       
       logger.info('📋 ConsolidatedTransactionService: Transaction result', {

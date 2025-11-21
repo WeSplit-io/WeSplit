@@ -1,11 +1,21 @@
-# Centralized Environment Variables Setup
+# Environment Setup Guide
 
 **Date:** 2025-01-14  
-**Purpose:** Guide for using a single root `.env` file for all services
+**Purpose:** Complete guide for environment variable setup and network configuration
 
 ---
 
-## 📁 Current Setup
+## Overview
+
+The codebase supports separate environment files for development (devnet) and production (mainnet) configurations.
+
+**Recommended:** Use `EXPO_PUBLIC_NETWORK` for network selection (new approach).
+
+**Legacy:** `EXPO_PUBLIC_DEV_NETWORK` and `EXPO_PUBLIC_FORCE_MAINNET` are still supported for backward compatibility.
+
+---
+
+## 📁 Environment Files Setup
 
 ### **Root `.env` File (Centralized)**
 **Location:** `.env` (project root)
@@ -17,19 +27,40 @@
 - ✅ Firebase Functions emulator (via `dotenv` in `src/index.js`)
 - ✅ Backend service (can be configured to read from root)
 
-**Variables in root `.env`:**
+### `.env.development` (for local development)
 ```bash
-# Client-side (EXPO_PUBLIC_ prefix)
-EXPO_PUBLIC_FIREBASE_API_KEY=...
-EXPO_PUBLIC_COMPANY_WALLET_ADDRESS=...
-EXPO_PUBLIC_FORCE_MAINNET=true
-EXPO_PUBLIC_DEV_NETWORK=mainnet
+# Network Configuration
+EXPO_PUBLIC_NETWORK=devnet
+EXPO_PUBLIC_USE_PROD_FUNCTIONS=false
+EXPO_PUBLIC_DEV_NETWORK=devnet  # Legacy
+EXPO_PUBLIC_FORCE_MAINNET=false  # Legacy
+ALLOW_CLIENT_NETWORK_OVERRIDE=true
 
-# Backend/Firebase Functions (no prefix - server-side only)
-COMPANY_WALLET_ADDRESS=...
-COMPANY_WALLET_SECRET_KEY=...
-JWT_SECRET=...
-EMAIL_USER=...
+# Firebase Configuration
+EXPO_PUBLIC_FIREBASE_API_KEY=...
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=wesplit-35186.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=wesplit-35186
+# ... other Firebase variables
+```
+
+### `.env.production` (for production builds)
+```bash
+# Network Configuration (REQUIRED)
+EXPO_PUBLIC_NETWORK=mainnet
+EXPO_PUBLIC_USE_PROD_FUNCTIONS=true
+EXPO_PUBLIC_DEV_NETWORK=mainnet  # Legacy
+EXPO_PUBLIC_FORCE_MAINNET=true  # Legacy
+ALLOW_CLIENT_NETWORK_OVERRIDE=false
+
+# Firebase Configuration (REQUIRED)
+EXPO_PUBLIC_FIREBASE_API_KEY=...
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=wesplit-35186.firebaseapp.com
+# ... other Firebase variables
+
+# RPC Configuration (RECOMMENDED for better performance)
+EXPO_PUBLIC_HELIUS_API_KEY=your-helius-api-key
+# OR
+EXPO_PUBLIC_ALCHEMY_API_KEY=your-alchemy-api-key
 ```
 
 ---

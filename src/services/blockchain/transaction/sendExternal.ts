@@ -216,10 +216,26 @@ class ExternalTransferService {
             result.signature
           );
         }
-      } finally {
-        // Always cleanup, even on error
+      } catch (error) {
+        // ✅ CRITICAL: Don't cleanup on error immediately
+        // Keep failed transaction in deduplication service to prevent immediate retries
+        logger.warn('External transfer failed - keeping in deduplication service to prevent retries', {
+          userId: params.userId,
+          to: params.to.substring(0, 8) + '...',
+          amount: params.amount,
+          error: error instanceof Error ? error.message : String(error),
+          note: 'Transaction will be cleaned up automatically after 60s timeout'
+        }, 'ExternalTransferService');
+        // Don't cleanup - let it expire naturally (60s timeout) to prevent retries
+        throw error;
+      }
+      
+      // ✅ CRITICAL: Only cleanup on SUCCESS
+      // Failed transactions stay in deduplication service to prevent retries
+      if (result.success) {
         dedupCleanup();
       }
+      // If transaction failed, don't cleanup - let it expire naturally (60s timeout)
 
       if (result.success) {
         // Update last used timestamp for linked wallet

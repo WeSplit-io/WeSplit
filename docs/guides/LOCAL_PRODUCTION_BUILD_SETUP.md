@@ -1,7 +1,63 @@
-# Local Production Build Setup Guide
+# Production Build Quick Start Guide
 
 **Date:** 2025-01-16  
-**Purpose:** Guide for building production AAB files locally (without EAS Build)
+**Purpose:** Complete guide for building production AAB files locally (without EAS Build)
+
+---
+
+## 🚀 Quick Setup (5 minutes)
+
+### Step 1: Create `.env.production` file
+
+```bash
+# Copy the template
+cp config/environment/env.production.template .env.production
+
+# Edit and fill in the values
+nano .env.production  # or use your favorite editor
+```
+
+**Required values to fill:**
+- All `EXPO_PUBLIC_FIREBASE_*` variables (get from [Firebase Console](https://console.firebase.google.com/project/wesplit-35186/settings/general))
+- At least one RPC API key (recommended for better performance)
+
+### Step 2: Verify Firebase Secrets
+
+```bash
+# Run the verification script
+./scripts/verify-firebase-secrets.sh
+```
+
+### Step 3: Deploy Firebase Functions
+
+```bash
+cd services/firebase-functions
+firebase deploy --only functions
+```
+
+### Step 4: Run Complete Check
+
+```bash
+# Comprehensive check of everything
+./scripts/check-production-setup.sh
+```
+
+### Step 5: Build AAB
+
+```bash
+# Option 1: Using EAS (local build)
+export APP_ENV=production
+export NODE_ENV=production
+eas build --platform android --profile production --local
+
+# Option 2: Using Gradle directly
+cd android
+export APP_ENV=production
+export NODE_ENV=production
+./gradlew bundleRelease
+```
+
+The AAB will be at: `android/app/build/outputs/bundle/release/app-release.aab`
 
 ---
 
