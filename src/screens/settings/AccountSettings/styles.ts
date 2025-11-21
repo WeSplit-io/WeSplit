@@ -62,7 +62,6 @@ export default StyleSheet.create({
     width: spacing.xl,
     height: spacing.xl,
     borderRadius: spacing.md,
-    backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
   },

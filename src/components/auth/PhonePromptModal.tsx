@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Modal from '../shared/Modal';
 import Button from '../shared/Button';
 import Input from '../shared/Input';
@@ -46,7 +46,7 @@ const PhonePromptModal: React.FC<PhonePromptModalProps> = ({
       logger.info('Adding phone number from prompt modal', { phone: normalizedPhone.substring(0, 5) + '...' }, 'PhonePromptModal');
       onAddPhone(normalizedPhone);
     } catch (error) {
-      logger.error('Failed to add phone number', error, 'PhonePromptModal');
+      logger.error('Failed to add phone number', { error: error instanceof Error ? error.message : String(error) }, 'PhonePromptModal');
       setError(error instanceof Error ? error.message : 'Failed to add phone number');
       setLoading(false);
     }
@@ -64,6 +64,7 @@ const PhonePromptModal: React.FC<PhonePromptModalProps> = ({
       title="Add Your Phone Number"
       description="Add your phone number for faster login and enhanced account security"
       closeOnBackdrop={false}
+      showHandle={false}
     >
       <View style={styles.content}>
         <Input
@@ -95,15 +96,14 @@ const PhonePromptModal: React.FC<PhonePromptModalProps> = ({
             style={styles.addButton}
           />
 
-          <Button
-            title="Skip for now"
+          <TouchableOpacity
             onPress={handleSkip}
-            variant="secondary"
-            size="large"
-            fullWidth={true}
             disabled={loading}
+            activeOpacity={0.7}
             style={styles.skipButton}
-          />
+          >
+            <Text style={styles.skipButtonText}>Skip for now</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -112,7 +112,6 @@ const PhonePromptModal: React.FC<PhonePromptModalProps> = ({
 
 const styles = StyleSheet.create({
   content: {
-    paddingVertical: spacing.md,
   },
   inputContainer: {
     marginBottom: spacing.lg,
@@ -125,7 +124,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   skipButton: {
-    // Secondary button styling is handled by Button component
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  skipButtonText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.regular,
+    textDecorationLine: 'underline',
   },
 });
 

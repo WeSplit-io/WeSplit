@@ -419,16 +419,32 @@ const HowToEarnPointsScreen: React.FC = () => {
       {/* Secondary Navigation: All / Claimed / Redeem Code (only for badges) */}
       {activeSection === 'badges' && (
         <View style={styles.secondaryNavWrapper}>
-          <Tabs
-            tabs={[
+          <View style={styles.secondaryNavContainer}>
+            {[
               { label: 'All', value: 'all' },
               { label: 'Claimed', value: 'claimed' },
               { label: 'Redeem Code', value: 'redeem' },
-            ]}
-            activeTab={badgeTab}
-            onTabChange={(tab) => setBadgeTab(tab as 'all' | 'claimed' | 'redeem')}
-            enableAnimation={false}
-          />
+            ].map((tab) => (
+              <TouchableOpacity
+                key={tab.value}
+                style={styles.secondaryNavTab}
+                onPress={() => setBadgeTab(tab.value as 'all' | 'claimed' | 'redeem')}
+              >
+                <Text
+                  style={[
+                    styles.secondaryNavText,
+                    badgeTab === tab.value && styles.secondaryNavTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+                {badgeTab === tab.value && (
+                  <View style={styles.secondaryNavIndicator} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.secondaryNavUnderline} />
         </View>
       )}
 
@@ -520,7 +536,6 @@ const styles = StyleSheet.create({
   seasonBadge: {
     alignSelf: 'flex-start',
     backgroundColor: colors.green,
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 12,
     marginBottom: spacing.lg,
@@ -531,7 +546,6 @@ const styles = StyleSheet.create({
     color: colors.black,
   },
   cardsContainer: {
-    paddingHorizontal: spacing.screenPaddingHorizontal,
     gap: spacing.md,
   },
   questCard: {
@@ -635,13 +649,44 @@ const styles = StyleSheet.create({
   },
   // Primary Navigation Styles
   primaryNavWrapper: {
-    marginHorizontal: spacing.screenPaddingHorizontal,
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
   secondaryNavWrapper: {
-    marginHorizontal: spacing.screenPaddingHorizontal,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  secondaryNavContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'flex-start',
+    gap: spacing.lg,
+  },
+  secondaryNavTab: {
+    position: 'relative',
+    paddingBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  secondaryNavText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white70,
+  },
+  secondaryNavTextActive: {
+    color: colors.white,
+  },
+  secondaryNavIndicator: {
+    position: 'absolute',
+    bottom: -spacing.xs - 1,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: colors.green,
+  },
+  secondaryNavUnderline: {
+    width: '100%',
+    height: 1,
+    backgroundColor: colors.white10,
+    marginTop: spacing.xs,
   },
   // Badge Styles
   badgesGrid: {

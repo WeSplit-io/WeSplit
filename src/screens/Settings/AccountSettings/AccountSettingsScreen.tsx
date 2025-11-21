@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon from '../../../components/Icon';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../../context/AppContext';
-import { colors, spacing } from '../../../theme';
+import { colors, spacing, typography } from '../../../theme';
 import * as ImagePicker from 'expo-image-picker';
 import { accountDeletionService, DeletionProgress, AccountDeletionService } from '../../../services/core';
 import { AvatarUploadFallbackService } from '../../../services/core/avatarUploadFallbackService';
@@ -252,7 +252,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           const { userActionSyncService } = await import('../../../services/rewards/userActionSyncService');
           await userActionSyncService.syncProfileImage(currentUser.id.toString(), finalAvatarUrl);
         } catch (syncError) {
-          logger.error('❌ Error syncing profile image quest', syncError, 'AccountSettingsScreen');
+          logger.error('❌ Error syncing profile image quest', syncError as Record<string, unknown>, 'AccountSettingsScreen');
           // Don't fail the profile update if sync fails
         }
       }
@@ -264,7 +264,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           await AsyncStorage.removeItem(promptShownKey);
           logger.info('Phone reminder badge cleared', { userId: currentUser.id }, 'AccountSettingsScreen');
         } catch (error) {
-          logger.warn('Failed to clear phone reminder badge', error, 'AccountSettingsScreen');
+          logger.warn('Failed to clear phone reminder badge', error as Record<string, unknown>, 'AccountSettingsScreen');
         }
       }
       
@@ -474,9 +474,14 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                 </View>
               )}
               {(avatar || currentUser?.avatar) && (
-                <View style={styles.cameraIconContainer}>
-                  <PhosphorIcon name="Pencil" size={16} color={colors.white} weight="fill" />
-                </View>
+                <LinearGradient
+                  colors={[colors.green, colors.greenBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.cameraIconContainer}
+                >
+                  <PhosphorIcon name="PencilSimple" size={16} color={colors.black} weight="regular" />
+                </LinearGradient>
               )}
             </TouchableOpacity>
           </View>
@@ -512,11 +517,10 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           ) : (
             <View>
               <Text style={{
-                color: colors.textLight,
-                fontSize: 14,
-                fontWeight: '500',
-                marginBottom: spacing.sm,
-                marginTop: spacing.md,
+                fontSize: typography.fontSize.md,
+                fontWeight: typography.fontWeight.regular,
+                color: colors.white80,
+                marginBottom: spacing.md,
               }}>
                 Phone Number
               </Text>
@@ -535,10 +539,10 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           {/* Settings Section */}
           <View style={{ marginTop: spacing.md }}>
             <Text style={{
-              color: colors.textLight,
-              fontSize: 14,
-              fontWeight: '500',
-              marginBottom: spacing.sm,
+              fontSize: typography.fontSize.md,
+              fontWeight: typography.fontWeight.regular,
+              color: colors.white80,
+              marginBottom: spacing.md,
             }}>
               Settings
             </Text>
@@ -549,35 +553,57 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
               backgroundColor: colors.white5,
               borderRadius: spacing.md,
               padding: spacing.md,
-              borderWidth: 1,
-              borderColor: colors.white10,
             }}>
               <Text style={{
-                color: colors.textLight,
-                fontSize: 14,
+                color: colors.white,
+                fontSize: typography.fontSize.md,
               }}>
                 Show badges on my profile
               </Text>
               <TouchableOpacity
                 onPress={() => setShowBadgesOnProfile(!showBadgesOnProfile)}
                 style={{
-                  width: 50,
+                  width: 58,
                   height: 30,
                   borderRadius: 15,
-                  backgroundColor: showBadgesOnProfile ? colors.green : colors.white10,
+                  backgroundColor: showBadgesOnProfile ? 'transparent' : colors.white10,
                   justifyContent: 'center',
                   paddingHorizontal: 2,
+                  overflow: 'hidden',
                 }}
                 accessibilityRole="switch"
                 accessibilityState={{ checked: showBadgesOnProfile }}
               >
-                <View style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: 13,
-                  backgroundColor: colors.white,
-                  alignSelf: showBadgesOnProfile ? 'flex-end' : 'flex-start',
-                }} />
+                {showBadgesOnProfile ? (
+                  <LinearGradient
+                    colors={[colors.green, colors.greenBlue]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: 15,
+                      justifyContent: 'center',
+                      paddingHorizontal: 2,
+                    }}
+                  >
+                    <View style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 13,
+                      backgroundColor: colors.white,
+                      alignSelf: 'flex-end',
+                    }} />
+                  </LinearGradient>
+                ) : (
+                  <View style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 13,
+                    backgroundColor: colors.white,
+                    alignSelf: 'flex-start',
+                  }} />
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -591,7 +617,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
             {isDeletingAccount ? (
               <ActivityIndicator size="small" color="#FF6B6B" />
             ) : (
-              <Icon name="trash-2" size={20} color="#FF6B6B" />
+              <PhosphorIcon name="Trash" size={20} color="#FF6B6B" weight="regular" />
             )}
             <Text style={[styles.deleteAccountText, isDeletingAccount && { opacity: 0.6 }]}>
               {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
