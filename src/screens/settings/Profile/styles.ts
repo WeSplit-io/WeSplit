@@ -34,7 +34,7 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.md,
     paddingBottom: 150, // Add more bottom padding for NavBar and extra scrolling space
   },
   

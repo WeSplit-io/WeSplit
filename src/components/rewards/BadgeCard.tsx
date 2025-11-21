@@ -27,10 +27,8 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
   isClaiming = false,
 }) => {
   const targetValue = typeof progress.target === 'number' && progress.target > 0 ? progress.target : 1;
-  const isCompleted = progress.current >= (progress.target || 0);
   const progressPercentage = Math.min((progress.current / targetValue) * 100, 100);
   const canClaim = progress.current >= (progress.target || Number.POSITIVE_INFINITY) && !progress.claimed;
-  const progressLabel = badgeInfo.progressLabel || 'TOTAL SPLITS';
 
   const formatProgressValue = (value: number) => {
     const safeValue = Number.isFinite(value) ? value : 0;
@@ -58,23 +56,32 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
         </View>
       )}
 
-      {/* Badge icon - Pentagonal shape (diamond) */}
-      <View style={styles.badgeIconContainer}>
-        <View style={styles.badgePentagon}>
+      {/* Badge image - displayed directly from Firebase */}
+      <View style={styles.badgeImageContainer}>
           {progress.imageUrl ? (
             <Image 
               source={{ uri: progress.imageUrl }} 
               style={styles.badgeImage}
-              resizeMode="cover"
+            resizeMode="contain"
+            onError={(error) => {
+              console.warn('Failed to load badge image', { 
+                badgeId: progress.badgeId, 
+                imageUrl: progress.imageUrl,
+                error 
+              });
+            }}
+            onLoad={() => {
+              console.debug('Badge image loaded successfully', { 
+                badgeId: progress.badgeId 
+              });
+            }}
             />
           ) : (
-            <View style={styles.badgeIconPlaceholder}>
-              <Text style={styles.badgeIconText}>{badgeInfo.icon}</Text>
+          <View style={styles.badgeImagePlaceholder}>
+            <PhosphorIcon name="Image" size={32} color={colors.white70} weight="regular" />
+            <Text style={styles.badgeImagePlaceholderText}>Loading badge...</Text>
             </View>
           )}
-        </View>
-        <Text style={styles.badgeNumber}>{badgeInfo.icon}</Text>
-        <Text style={styles.badgeLabel}>{progressLabel}</Text>
       </View>
 
       {/* Description */}
@@ -156,57 +163,35 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.black,
   },
-  badgeIconContainer: {
+  badgeImageContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
-  },
-  badgePentagon: {
-    width: 90,
-    height: 90,
-    backgroundColor: colors.white10,
-    transform: [{ rotate: '45deg' }],
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.white10,
+    width: '100%',
+    minHeight: 120,
   },
   badgeImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 6,
-    transform: [{ rotate: '-45deg' }],
+    width: '100%',
+    height: 120,
+    maxWidth: 120,
+    maxHeight: 120,
   },
-  badgeIconPlaceholder: {
-    width: 70,
-    height: 70,
-    backgroundColor: 'transparent',
-    borderRadius: 6,
+  badgeImagePlaceholder: {
+    width: '100%',
+    height: 120,
+    maxWidth: 120,
+    maxHeight: 120,
+    backgroundColor: colors.white10,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [{ rotate: '-45deg' }],
+    gap: spacing.xs,
   },
-  badgeIconText: {
-    fontSize: 32,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
-  },
-  badgeNumber: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
-    marginTop: spacing.xs,
-  },
-  badgeLabel: {
+  badgeImagePlaceholderText: {
     fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium,
     color: colors.white70,
-    marginTop: spacing.xs / 2,
     textAlign: 'center',
-    letterSpacing: 0.5,
   },
   badgeDescription: {
     fontSize: typography.fontSize.sm,

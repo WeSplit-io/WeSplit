@@ -186,8 +186,7 @@ const RewardsScreen: React.FC = () => {
     <Container>
       <Header
         title="Rewards"
-        showBackButton={true}
-        onBackPress={() => navigation.navigate('Dashboard')}
+        showBackButton={false}
         backgroundColor={colors.black}
         rightElement={
           <TouchableOpacity 

@@ -3,8 +3,9 @@
  * Manages badge progress tracking and claims
  */
 
-import { db } from '../../config/firebase/firebase';
+import { db, storage } from '../../config/firebase/firebase';
 import { doc, getDoc, setDoc, collection, getDocs, serverTimestamp, query, where, runTransaction, QueryDocumentSnapshot } from 'firebase/firestore';
+import { ref, getDownloadURL } from 'firebase/storage';
 import { logger } from '../analytics/loggingService';
 import priceManagementService from '../core/priceManagementService';
 import { BADGE_DEFINITIONS, BadgeInfo } from './badgeConfig';
@@ -78,9 +79,9 @@ class BadgeService {
         badge => badge.category === 'achievement'
       );
 
-      // Get all event badges
+      // Get all event badges (including community badges)
       const eventBadges = Object.values(BADGE_DEFINITIONS).filter(
-        badge => badge.category === 'event' || badge.isEventBadge === true
+        badge => badge.category === 'event' || badge.category === 'community' || badge.isEventBadge === true
       );
 
       // Load badge metrics and claimed badges concurrently
@@ -98,10 +99,21 @@ class BadgeService {
           // Get image URL - priority: claimed badge data > badge config > Firebase Storage
           const imageUrl = await this.getBadgeImageUrl(badge.badgeId, claimedBadgeData?.imageUrl || badge.iconUrl);
 
+          const current = this.getProgressValueForBadge(badge, badgeMetrics);
+          const target = badge.target || 0;
+          
+          logger.debug('Badge progress calculated', {
+            badgeId: badge.badgeId,
+            current,
+            target,
+            claimed,
+            canClaim: current >= target && !claimed
+          }, 'BadgeService');
+
           return {
             badgeId: badge.badgeId,
-            current: this.getProgressValueForBadge(badge, badgeMetrics),
-            target: badge.target || 0,
+            current,
+            target,
             claimed,
             claimedAt: claimedBadgeData?.claimedAt,
             imageUrl,
@@ -149,13 +161,20 @@ class BadgeService {
   private async getUserBadgeMetrics(userId: string): Promise<BadgeMetrics> {
     const cached = this.getCachedValue(this.badgeMetricsCache, userId);
     if (cached) {
+      logger.debug('Using cached badge metrics', { userId, metrics: cached }, 'BadgeService');
       return cached;
     }
 
     const serverMetrics = await this.getServerBadgeMetrics(userId);
     if (serverMetrics) {
+      logger.debug('Using server badge metrics', { userId, metrics: serverMetrics }, 'BadgeService');
+      // Only use server metrics if they have non-zero values, otherwise recompute
+      if (serverMetrics.splitWithdrawals > 0 || serverMetrics.transactionCount > 0 || serverMetrics.transactionVolume > 0) {
       this.setCachedValue(this.badgeMetricsCache, userId, serverMetrics);
       return serverMetrics;
+      } else {
+        logger.debug('Server metrics are all zero, recomputing from transactions', { userId }, 'BadgeService');
+      }
     }
 
     const computedMetrics = await this.computeBadgeMetricsFromTransactions(userId);
@@ -166,9 +185,12 @@ class BadgeService {
 
   /**
    * Compute badge metrics by scanning user transactions and normalizing volumes
+   * Also counts completed splits from the splits collection
    */
   private async computeBadgeMetricsFromTransactions(userId: string): Promise<BadgeMetrics> {
     try {
+      logger.debug('Starting badge metrics computation', { userId }, 'BadgeService');
+      
       const transactionsRef = collection(db, 'transactions');
       const sentQuery = query(
         transactionsRef,
@@ -181,14 +203,59 @@ class BadgeService {
         where('status', '==', 'completed')
       );
 
-      const [sentSnapshot, receivedSnapshot] = await Promise.all([
+      // Also query completed splits where user is creator or participant
+      // Note: Firestore doesn't support array-contains on nested objects, so we query all and filter
+      const splitsRef = collection(db, 'splits');
+      const creatorSplitsQuery = query(
+        splitsRef,
+        where('creatorId', '==', userId),
+        where('status', '==', 'completed')
+      );
+      // For participant splits, we need to query all completed splits and filter client-side
+      // Limit to 1000 to avoid performance issues (should be enough for badge counting)
+      const allCompletedSplitsQuery = query(
+        splitsRef,
+        where('status', '==', 'completed'),
+        limit(1000)
+      );
+
+      const [sentSnapshot, receivedSnapshot, creatorSplitsSnapshot, allCompletedSplitsSnapshot] = await Promise.all([
         getDocs(sentQuery),
-        getDocs(receivedSnapshot)
+        getDocs(receivedQuery),
+        getDocs(creatorSplitsQuery),
+        getDocs(allCompletedSplitsQuery)
       ]);
+
+      logger.debug('Transaction and split queries completed', {
+        userId,
+        sentCount: sentSnapshot.size,
+        receivedCount: receivedSnapshot.size,
+        creatorSplitsCount: creatorSplitsSnapshot.size,
+        allCompletedSplitsCount: allCompletedSplitsSnapshot.size
+      }, 'BadgeService');
 
       const transactionDocs = new Map<string, QueryDocumentSnapshot>();
       sentSnapshot.forEach((docSnap) => transactionDocs.set(docSnap.id, docSnap));
       receivedSnapshot.forEach((docSnap) => transactionDocs.set(docSnap.id, docSnap));
+
+      // Count completed splits (deduplicated)
+      const completedSplitIds = new Set<string>();
+      
+      // Add creator splits
+      creatorSplitsSnapshot.forEach((docSnap) => {
+        completedSplitIds.add(docSnap.id);
+      });
+      
+      // Filter participant splits from all completed splits
+      allCompletedSplitsSnapshot.forEach((docSnap) => {
+        const splitData = docSnap.data();
+        const participants = splitData.participants || [];
+        const isParticipant = participants.some((p: any) => p.userId === userId);
+        // Only count if user is participant AND not already counted as creator
+        if (isParticipant && !completedSplitIds.has(docSnap.id)) {
+          completedSplitIds.add(docSnap.id);
+        }
+      });
 
       const metrics: BadgeMetrics = {
         splitWithdrawals: 0,
@@ -196,15 +263,59 @@ class BadgeService {
         transactionVolume: 0
       };
 
+      // Log sample transactions for debugging
+      if (transactionDocs.size > 0) {
+        const sampleTransaction = Array.from(transactionDocs.values())[0];
+        const sampleData = sampleTransaction.data();
+        logger.debug('Sample transaction data', {
+          userId,
+          transactionId: sampleTransaction.id,
+          fields: Object.keys(sampleData),
+          from_user: sampleData.from_user,
+          to_user: sampleData.to_user,
+          status: sampleData.status,
+          transactionType: sampleData.transactionType,
+          note: sampleData.note
+        }, 'BadgeService');
+      }
+
       for (const docSnap of transactionDocs.values()) {
         const data = docSnap.data() as Record<string, unknown>;
         metrics.transactionCount += 1;
         metrics.transactionVolume += await this.getUsdAmountForTransaction(data);
 
-        if (this.isSplitWithdrawal(data, userId)) {
+        const isSplit = this.isSplitWithdrawal(data, userId);
+        if (isSplit) {
           metrics.splitWithdrawals += 1;
+          logger.debug('Found split withdrawal transaction', {
+            userId,
+            transactionId: docSnap.id,
+            transactionType: data.transactionType,
+            note: data.note
+          }, 'BadgeService');
         }
       }
+
+      // Use completed splits count if it's higher than transaction-based count
+      // This handles cases where splits are completed but withdrawal transactions aren't saved
+      const completedSplitsCount = completedSplitIds.size;
+      if (completedSplitsCount > metrics.splitWithdrawals) {
+        logger.debug('Using completed splits count (higher than transaction count)', {
+          userId,
+          completedSplitsCount,
+          transactionBasedCount: metrics.splitWithdrawals
+        }, 'BadgeService');
+        metrics.splitWithdrawals = completedSplitsCount;
+      }
+
+      logger.debug('Computed badge metrics from transactions and splits', { 
+        userId, 
+        splitWithdrawals: metrics.splitWithdrawals,
+        transactionCount: metrics.transactionCount,
+        transactionVolume: metrics.transactionVolume,
+        totalTransactions: transactionDocs.size,
+        completedSplitsCount
+      }, 'BadgeService');
 
       return metrics;
     } catch (error) {
@@ -359,14 +470,82 @@ class BadgeService {
   }
 
   /**
+   * Convert gs:// URL to Firebase Storage download URL
+   */
+  private async convertGsUrlToDownloadUrl(gsUrl: string): Promise<string | undefined> {
+    try {
+      // Extract path from gs:// URL
+      // Format: gs://bucket/path/to/file.png or gs://bucket.firebasestorage.app/path/to/file.png
+      // We need to extract: path/to/file.png
+      
+      // Try different patterns to handle various gs:// URL formats
+      let storagePath: string | null = null;
+      
+      // Pattern 1: gs://bucket/path/to/file.png
+      let urlMatch = gsUrl.match(/^gs:\/\/[^/]+\/(.+)$/);
+      if (urlMatch && urlMatch[1]) {
+        storagePath = urlMatch[1];
+      } else {
+        // Pattern 2: gs://bucket.firebasestorage.app/path/to/file.png
+        // Extract everything after the domain
+        urlMatch = gsUrl.match(/^gs:\/\/[^/]+\.firebasestorage\.app\/(.+)$/);
+        if (urlMatch && urlMatch[1]) {
+          storagePath = urlMatch[1];
+        }
+      }
+      
+      if (!storagePath) {
+        logger.warn('Invalid gs:// URL format - could not extract path', { gsUrl }, 'BadgeService');
+        return undefined;
+      }
+
+      logger.debug('Converting gs:// URL to download URL', { gsUrl, storagePath }, 'BadgeService');
+      
+      const storageRef = ref(storage, storagePath);
+      const downloadUrl = await getDownloadURL(storageRef);
+      
+      logger.debug('Successfully converted gs:// URL', { gsUrl, downloadUrl }, 'BadgeService');
+      return downloadUrl;
+    } catch (error: any) {
+      // Handle specific Firebase Storage errors
+      if (error?.code === 'storage/object-not-found') {
+        logger.warn('Badge image not found in Firebase Storage', { gsUrl, error: error.message }, 'BadgeService');
+      } else if (error?.code === 'storage/unauthorized') {
+        logger.warn('Unauthorized access to badge image', { gsUrl, error: error.message }, 'BadgeService');
+      } else {
+        logger.error('Failed to convert gs:// URL to download URL', { error, gsUrl, errorCode: error?.code, errorMessage: error?.message }, 'BadgeService');
+      }
+      return undefined;
+    }
+  }
+
+  /**
    * Get badge image URL from Firebase Storage or badge configuration
-   * Priority: 1. Provided URL, 2. Firebase Storage badge images collection, 3. Badge config iconUrl
+   * Priority: 1. Provided URL (converted if gs://), 2. Firebase Storage badge images collection, 3. Badge config iconUrl
    */
   private async getBadgeImageUrl(badgeId: string, fallbackUrl?: string): Promise<string | undefined> {
     try {
-      // If a URL is already provided (from claimed badge or config), use it
-      if (fallbackUrl && fallbackUrl.startsWith('http')) {
+      logger.debug('Getting badge image URL', { badgeId, fallbackUrl }, 'BadgeService');
+      
+      // If a URL is already provided (from claimed badge or config), check its format
+      if (fallbackUrl) {
+        // If it's already an HTTPS URL, use it directly
+        if (fallbackUrl.startsWith('http')) {
+          logger.debug('Using HTTPS URL directly', { badgeId, url: fallbackUrl }, 'BadgeService');
         return fallbackUrl;
+        }
+        
+        // If it's a gs:// URL, convert it to download URL
+        if (fallbackUrl.startsWith('gs://')) {
+          logger.debug('Converting gs:// URL', { badgeId, gsUrl: fallbackUrl }, 'BadgeService');
+          const downloadUrl = await this.convertGsUrlToDownloadUrl(fallbackUrl);
+          if (downloadUrl) {
+            logger.debug('Successfully converted gs:// URL', { badgeId, downloadUrl }, 'BadgeService');
+            return downloadUrl;
+          } else {
+            logger.warn('Failed to convert gs:// URL, will try badge_images collection', { badgeId, gsUrl: fallbackUrl }, 'BadgeService');
+          }
+        }
       }
 
       // Try to get image URL from Firebase Storage badge images collection
@@ -376,16 +555,25 @@ class BadgeService {
         
         if (badgeImageDoc.exists()) {
           const data = badgeImageDoc.data();
-          if (data.imageUrl && data.imageUrl.startsWith('http')) {
+          if (data.imageUrl) {
+            // Check if it's a gs:// URL and convert it
+            if (data.imageUrl.startsWith('gs://')) {
+              logger.debug('Found gs:// URL in badge_images collection', { badgeId, gsUrl: data.imageUrl }, 'BadgeService');
+              const downloadUrl = await this.convertGsUrlToDownloadUrl(data.imageUrl);
+              if (downloadUrl) {
+                return downloadUrl;
+              }
+            } else if (data.imageUrl.startsWith('http')) {
             return data.imageUrl;
+            }
           }
         }
       } catch (storageError) {
         // If badge_images collection doesn't exist or badge not found, continue to fallback
-        logger.debug('Badge image not found in badge_images collection', { badgeId }, 'BadgeService');
+        logger.debug('Badge image not found in badge_images collection', { badgeId, error: storageError }, 'BadgeService');
       }
 
-      // Return fallback URL if provided
+      // Return fallback URL if provided (even if conversion failed, might still be useful)
       return fallbackUrl;
     } catch (error) {
       logger.error('Failed to get badge image URL', { error, badgeId }, 'BadgeService');
@@ -561,10 +749,10 @@ class BadgeService {
    */
   async claimEventBadge(userId: string, redeemCode: string): Promise<BadgeClaimResult> {
     try {
-      // Find badge by redeem code
+      // Find badge by redeem code (supports both event and community badges)
       const badgeInfo = Object.values(BADGE_DEFINITIONS).find(
         badge => badge.redeemCode?.toUpperCase() === redeemCode.toUpperCase() && 
-                 (badge.isEventBadge || badge.category === 'event')
+                 (badge.isEventBadge || badge.category === 'event' || badge.category === 'community')
       );
 
       if (!badgeInfo) {
@@ -627,15 +815,29 @@ class BadgeService {
     transactionCount: number;
     transactionVolume: number;
   }): number {
+    let progressValue: number;
     switch (badge.progressMetric) {
       case 'transaction_count':
-        return metrics.transactionCount;
+        progressValue = metrics.transactionCount;
+        break;
       case 'transaction_volume':
-        return metrics.transactionVolume;
+        progressValue = metrics.transactionVolume;
+        break;
       case 'split_withdrawals':
       default:
-        return metrics.splitWithdrawals;
+        progressValue = metrics.splitWithdrawals;
+        break;
     }
+    
+    logger.debug('Calculated badge progress', {
+      badgeId: badge.badgeId,
+      progressMetric: badge.progressMetric,
+      progressValue,
+      target: badge.target,
+      metrics
+    }, 'BadgeService');
+    
+    return progressValue;
   }
 
   /**

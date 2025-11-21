@@ -8,6 +8,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { formatBalance } from '../../utils/ui/format/formatUtils';
 import { Avatar, PhosphorIcon } from '../shared';
 import { ParticipationCircle } from '../shared/ParticipationCircle';
+import UserNameWithBadges from '../profile/UserNameWithBadges';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -70,7 +71,12 @@ const MembersList: React.FC<MembersListProps> = ({
               />
               <View style={styles.memberInfo}>
                 <View style={styles.memberHeader}>
-                  <Text style={styles.memberName}>{member.name}</Text>
+                  <UserNameWithBadges
+                    userId={member.userId}
+                    userName={member.name}
+                    textStyle={styles.memberName}
+                    showBadges={true}
+                  />
                   {member.role === 'creator' && (
                     <View style={styles.creatorBadge}>
                       <PhosphorIcon name="Crown" size={12} color={colors.green} weight="fill" />

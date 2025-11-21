@@ -15,6 +15,7 @@ import {
   getParticipantStatusColor 
 } from '../../../utils/statusUtils';
 import BadgeDisplay from '../../../components/profile/BadgeDisplay';
+import UserNameWithBadges from '../../../components/profile/UserNameWithBadges';
 import { firebaseDataService } from '../../../services/data/firebaseDataService';
 
 interface Participant {
@@ -114,10 +115,12 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
               />
               
               <View style={styles.participantInfo}>
-                <Text style={styles.participantName}>
-                  {participant.name || `Participant ${index + 1}`}
-                  {isCurrentUser && ' (You)'}
-                </Text>
+                <UserNameWithBadges
+                  userId={participant.userId || participant.id}
+                  userName={`${participant.name || `Participant ${index + 1}`}${isCurrentUser ? ' (You)' : ''}`}
+                  textStyle={styles.participantName}
+                  showBadges={true}
+                />
                 {badges && badges.badges.length > 0 && badges.active_badge && (
                   <BadgeDisplay
                     badges={badges.badges}

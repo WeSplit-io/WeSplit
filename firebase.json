@@ -15,7 +15,7 @@
     ]
   },
   "storage": {
-    "rules": "storage.rules"
+    "rules": "config/deployment/storage.rules"
   },
   "emulators": {
     "auth": {

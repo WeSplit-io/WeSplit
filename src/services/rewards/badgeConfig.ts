@@ -96,13 +96,13 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     category: 'christmas',
     rarity: 'rare'
   },
-  // Achievement Badges - Splits Withdrawn
+  // Achievement Badges - Splits Withdrawn (Bronze, Silver, Gold, Emerald)
   'splits_withdrawn_50': {
     badgeId: 'splits_withdrawn_50',
-    title: '50 Total Splits',
-    description: 'Split with your friend',
+    title: 'Bronze Split Badge',
+    description: 'Complete 50 total splits',
     icon: '50',
-    iconUrl: undefined, // Will be set from database
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/split-bronze.png',
     category: 'achievement',
     rarity: 'common',
     points: 50,
@@ -110,105 +110,149 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     progressMetric: 'split_withdrawals',
     progressLabel: 'TOTAL SPLITS'
   },
-  'splits_withdrawn_100': {
-    badgeId: 'splits_withdrawn_100',
-    title: '100 Total Splits',
-    description: 'Split with your friend',
-    icon: '100',
-    iconUrl: undefined,
-    category: 'achievement',
-    rarity: 'rare',
-    points: 100,
-    target: 100,
-    progressMetric: 'split_withdrawals',
-    progressLabel: 'TOTAL SPLITS'
-  },
-  'splits_withdrawn_250': {
-    badgeId: 'splits_withdrawn_250',
-    title: '250 Total Splits',
-    description: 'Split with your friend',
-    icon: '250',
-    iconUrl: undefined,
-    category: 'achievement',
-    rarity: 'epic',
-    points: 250,
-    target: 250,
-    progressMetric: 'split_withdrawals',
-    progressLabel: 'TOTAL SPLITS'
-  },
   'splits_withdrawn_500': {
     badgeId: 'splits_withdrawn_500',
-    title: '500 Total Splits',
-    description: 'Split with your friend',
+    title: 'Silver Split Badge',
+    description: 'Complete 500 total splits',
     icon: '500',
-    iconUrl: undefined,
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/split-silver.png',
     category: 'achievement',
-    rarity: 'legendary',
+    rarity: 'rare',
     points: 500,
     target: 500,
     progressMetric: 'split_withdrawals',
     progressLabel: 'TOTAL SPLITS'
   },
-
-  // Transaction Count Badges
-  'transactions_completed_10': {
-    badgeId: 'transactions_completed_10',
-    title: 'On the Board',
-    description: 'Complete 10 transactions',
-    icon: '🔟',
+  'splits_withdrawn_2500': {
+    badgeId: 'splits_withdrawn_2500',
+    title: 'Gold Split Badge',
+    description: 'Complete 2,500 total splits',
+    icon: '2500',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/split-gold.png',
     category: 'achievement',
-    rarity: 'common',
-    points: 25,
-    target: 10,
-    progressMetric: 'transaction_count',
-    progressLabel: 'TOTAL TRANSACTIONS'
+    rarity: 'epic',
+    points: 2500,
+    target: 2500,
+    progressMetric: 'split_withdrawals',
+    progressLabel: 'TOTAL SPLITS'
   },
+  'splits_withdrawn_10000': {
+    badgeId: 'splits_withdrawn_10000',
+    title: 'Emerald Split Badge',
+    description: 'Complete 10,000 total splits',
+    icon: '10000',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/split-emerald.png',
+    category: 'achievement',
+    rarity: 'legendary',
+    points: 10000,
+    target: 10000,
+    progressMetric: 'split_withdrawals',
+    progressLabel: 'TOTAL SPLITS'
+  },
+
+  // Transaction Count Badges (Bronze, Silver, Gold, Emerald)
   'transactions_completed_50': {
     badgeId: 'transactions_completed_50',
-    title: 'Consistent Closer',
-    description: 'Complete 50 transactions',
-    icon: '🧮',
+    title: 'Bronze Transaction Badge',
+    description: 'Complete 50 total transactions',
+    icon: '50',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/transaction-bronze.png',
     category: 'achievement',
-    rarity: 'rare',
-    points: 75,
+    rarity: 'common',
+    points: 50,
     target: 50,
     progressMetric: 'transaction_count',
     progressLabel: 'TOTAL TRANSACTIONS'
   },
-  'transactions_completed_200': {
-    badgeId: 'transactions_completed_200',
-    title: 'Deal Machine',
-    description: 'Complete 200 transactions',
-    icon: '🤝',
+  'transactions_completed_500': {
+    badgeId: 'transactions_completed_500',
+    title: 'Silver Transaction Badge',
+    description: 'Complete 500 total transactions',
+    icon: '500',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/transaction-silver.png',
+    category: 'achievement',
+    rarity: 'rare',
+    points: 500,
+    target: 500,
+    progressMetric: 'transaction_count',
+    progressLabel: 'TOTAL TRANSACTIONS'
+  },
+  'transactions_completed_2500': {
+    badgeId: 'transactions_completed_2500',
+    title: 'Gold Transaction Badge',
+    description: 'Complete 2,500 total transactions',
+    icon: '2500',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/transaction-gold.png',
     category: 'achievement',
     rarity: 'epic',
-    points: 200,
-    target: 200,
+    points: 2500,
+    target: 2500,
+    progressMetric: 'transaction_count',
+    progressLabel: 'TOTAL TRANSACTIONS'
+  },
+  'transactions_completed_10000': {
+    badgeId: 'transactions_completed_10000',
+    title: 'Emerald Transaction Badge',
+    description: 'Complete 10,000 total transactions',
+    icon: '10000',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/transaction-emerald.png',
+    category: 'achievement',
+    rarity: 'legendary',
+    points: 10000,
+    target: 10000,
     progressMetric: 'transaction_count',
     progressLabel: 'TOTAL TRANSACTIONS'
   },
 
-  // Transaction Volume Badges
-  'transaction_volume_1000': {
-    badgeId: 'transaction_volume_1000',
-    title: 'First Grand',
-    description: 'Move $1,000 through WeSplit',
-    icon: '💸',
+  // Transaction Volume Badges (Bronze, Silver, Gold, Emerald)
+  'transaction_volume_50': {
+    badgeId: 'transaction_volume_50',
+    title: 'Bronze Volume Badge',
+    description: 'Move $50 through WeSplit',
+    icon: '50',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/volume-bronze.png',
+    category: 'achievement',
+    rarity: 'common',
+    points: 50,
+    target: 50,
+    progressMetric: 'transaction_volume',
+    progressLabel: 'TOTAL VOLUME ($)'
+  },
+  'transaction_volume_500': {
+    badgeId: 'transaction_volume_500',
+    title: 'Silver Volume Badge',
+    description: 'Move $500 through WeSplit',
+    icon: '500',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/volume-silver.png',
     category: 'achievement',
     rarity: 'rare',
-    points: 100,
-    target: 1000,
+    points: 500,
+    target: 500,
+    progressMetric: 'transaction_volume',
+    progressLabel: 'TOTAL VOLUME ($)'
+  },
+  'transaction_volume_2500': {
+    badgeId: 'transaction_volume_2500',
+    title: 'Gold Volume Badge',
+    description: 'Move $2,500 through WeSplit',
+    icon: '2500',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/volume-gold.png',
+    category: 'achievement',
+    rarity: 'epic',
+    points: 2500,
+    target: 2500,
     progressMetric: 'transaction_volume',
     progressLabel: 'TOTAL VOLUME ($)'
   },
   'transaction_volume_10000': {
     badgeId: 'transaction_volume_10000',
-    title: 'High Roller',
+    title: 'Emerald Volume Badge',
     description: 'Move $10,000 through WeSplit',
-    icon: '🏦',
+    icon: '10000',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/volume-emerald.png',
     category: 'achievement',
     rarity: 'legendary',
-    points: 500,
+    points: 10000,
     target: 10000,
     progressMetric: 'transaction_volume',
     progressLabel: 'TOTAL VOLUME ($)'
@@ -216,36 +260,65 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
 
   // Event Badges - Can be claimed via redeem codes
   // Add event badges here as needed
-  // Example:
-  // 'event_summer_2024': {
-  //   badgeId: 'event_summer_2024',
-  //   title: 'Summer Event 2024',
-  //   description: 'Participated in Summer Event',
-  //   icon: '☀️',
-  //   category: 'event',
-  //   rarity: 'rare',
-  //   points: 200,
-  //   isEventBadge: true,
-  //   redeemCode: 'SUMMER2024'
-  // },
   
   // Community Badges - Represent communities, displayed next to user name
   // These badges can only be claimed via redeem codes
-  // Example community badges:
-  // 'community_solana_breakpoint_2025': {
-  //   badgeId: 'community_solana_breakpoint_2025',
-  //   title: 'Solana Breakpoint 2025',
-  //   description: 'Solana Breakpoint 2025 Abu Dhabi',
-  //   icon: '🕌',
-  //   iconUrl: 'https://example.com/breakpoint-badge.png',
-  //   category: 'community',
-  //   rarity: 'rare',
-  //   points: 0, // Community badges typically don't award points
-  //   isEventBadge: true,
-  //   isCommunityBadge: true,
-  //   showNextToName: true, // Display next to user name
-  //   redeemCode: 'BREAKPOINT2025'
-  // },
+  'community_wesplit': {
+    badgeId: 'community_wesplit',
+    title: 'WeSplit Community',
+    description: 'WeSplit community member',
+    icon: '👥',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/wesplit-badge.png',
+    category: 'community',
+    rarity: 'common',
+    points: 0, // Community badges typically don't award points
+    isEventBadge: true,
+    isCommunityBadge: true,
+    showNextToName: true, // Display next to user name
+    redeemCode: 'WESPLIT'
+  },
+  'community_superteamfrance': {
+    badgeId: 'community_superteamfrance',
+    title: 'Superteam France',
+    description: 'Superteam France community member',
+    icon: '🇫🇷',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/superteamfrance-badge.png',
+    category: 'community',
+    rarity: 'rare',
+    points: 0,
+    isEventBadge: true,
+    isCommunityBadge: true,
+    showNextToName: true,
+    redeemCode: 'SUPERTEAMFRANCE'
+  },
+  'community_monkedao': {
+    badgeId: 'community_monkedao',
+    title: 'MonkeDAO',
+    description: 'MonkeDAO community member',
+    icon: '🐵',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/monkedao-badge.png',
+    category: 'community',
+    rarity: 'rare',
+    points: 0,
+    isEventBadge: true,
+    isCommunityBadge: true,
+    showNextToName: true,
+    redeemCode: 'MONKEDAO'
+  },
+  'community_diggers': {
+    badgeId: 'community_diggers',
+    title: 'Diggers',
+    description: 'Diggers community member',
+    icon: '⛏️',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/diggers-badge.png',
+    category: 'community',
+    rarity: 'rare',
+    points: 0,
+    isEventBadge: true,
+    isCommunityBadge: true,
+    showNextToName: true,
+    redeemCode: 'DIGGERS'
+  },
 };
 
 /**

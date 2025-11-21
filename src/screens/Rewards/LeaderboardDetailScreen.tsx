@@ -28,6 +28,7 @@ import { leaderboardService } from '../../services/rewards/leaderboardService';
 import { LeaderboardEntry } from '../../types/rewards';
 import { logger } from '../../services/analytics/loggingService';
 import BadgeDisplay from '../../components/profile/BadgeDisplay';
+import UserNameWithBadges from '../../components/profile/UserNameWithBadges';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 import { TransactionBasedContactService } from '../../services/contacts/transactionBasedContactService';
@@ -189,9 +190,14 @@ const LeaderboardDetailScreen: React.FC = () => {
             <View style={styles.rankBadge}>
               <Text style={styles.rankBadgeText}>2</Text>
             </View>
-            <Text style={styles.topThreeName} numberOfLines={1}>
-              {topThree[1].name}
-            </Text>
+            <View style={styles.topThreeNameContainer}>
+              <UserNameWithBadges
+                userId={topThree[1].user_id}
+                userName={topThree[1].name}
+                textStyle={styles.topThreeName}
+                showBadges={true}
+              />
+            </View>
             {topThree[1].badges && topThree[1].badges.length > 0 && topThree[1].active_badge && (
               <BadgeDisplay
                 badges={topThree[1].badges}
@@ -232,9 +238,14 @@ const LeaderboardDetailScreen: React.FC = () => {
             <View style={styles.rankBadge}>
               <Text style={styles.rankBadgeText}>1</Text>
             </View>
-            <Text style={styles.topThreeName} numberOfLines={1}>
-              {topThree[0].name}
-            </Text>
+            <View style={styles.topThreeNameContainer}>
+              <UserNameWithBadges
+                userId={topThree[0].user_id}
+                userName={topThree[0].name}
+                textStyle={styles.topThreeName}
+                showBadges={true}
+              />
+            </View>
             {topThree[0].badges && topThree[0].badges.length > 0 && topThree[0].active_badge && (
               <BadgeDisplay
                 badges={topThree[0].badges}
@@ -259,9 +270,14 @@ const LeaderboardDetailScreen: React.FC = () => {
             <View style={styles.rankBadge}>
               <Text style={styles.rankBadgeText}>3</Text>
             </View>
-            <Text style={styles.topThreeName} numberOfLines={1}>
-              {topThree[2].name}
-            </Text>
+            <View style={styles.topThreeNameContainer}>
+              <UserNameWithBadges
+                userId={topThree[2].user_id}
+                userName={topThree[2].name}
+                textStyle={styles.topThreeName}
+                showBadges={true}
+              />
+            </View>
             {topThree[2].badges && topThree[2].badges.length > 0 && topThree[2].active_badge && (
               <BadgeDisplay
                 badges={topThree[2].badges}
@@ -384,15 +400,15 @@ const LeaderboardDetailScreen: React.FC = () => {
             style={styles.entryAvatar}
           />
           <View style={styles.entryInfo}>
-            <Text
-              style={[
+            <UserNameWithBadges
+              userId={entry.user_id}
+              userName={isCurrentUser ? 'You' : entry.name}
+              textStyle={[
                 styles.entryName,
                 isCurrentUser && styles.entryNameCurrent,
               ]}
-              numberOfLines={1}
-            >
-              {isCurrentUser ? 'You' : entry.name}
-            </Text>
+              showBadges={true}
+            />
             {entry.badges && entry.badges.length > 0 && entry.active_badge && (
               <BadgeDisplay
                 badges={entry.badges}
@@ -432,9 +448,12 @@ const LeaderboardDetailScreen: React.FC = () => {
             style={styles.entryAvatar}
           />
           <View style={styles.entryInfo}>
-            <Text style={styles.entryName} numberOfLines={1}>
-              {entry.name}
-            </Text>
+            <UserNameWithBadges
+              userId={entry.user_id}
+              userName={entry.name}
+              textStyle={styles.entryName}
+              showBadges={true}
+            />
             {entry.badges && entry.badges.length > 0 && entry.active_badge && (
               <BadgeDisplay
                 badges={entry.badges}
@@ -474,7 +493,12 @@ const LeaderboardDetailScreen: React.FC = () => {
           size={40}
         />
         <View style={styles.userRankInfo}>
-          <Text style={styles.userRankName}>You</Text>
+          <UserNameWithBadges
+            userId={userEntry.user_id}
+            userName="You"
+            textStyle={styles.userRankName}
+            showBadges={true}
+          />
           {userEntry.badges && userEntry.badges.length > 0 && userEntry.active_badge && (
             <BadgeDisplay
               badges={userEntry.badges}
@@ -651,6 +675,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  topThreeNameContainer: {
+    alignItems: 'center',
+    marginTop: spacing.xs,
   },
   topThreeName: {
     fontSize: typography.fontSize.md,

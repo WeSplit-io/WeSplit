@@ -1028,7 +1028,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             style={styles.headerLeft}
             onPress={() => navigation.navigate('Profile')}
           >
-            <View style={{ position: 'relative' }}>
             <Avatar
               userId={currentUser?.id}
               userName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
@@ -1036,25 +1035,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               style={styles.profileImage}
               size={50}
             />
-              {/* Red dot reminder badge */}
-              {needsPhoneReminder && (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Profile')}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    width: 12,
-                    height: 12,
-                    borderRadius: 6,
-                    backgroundColor: colors.error || '#FF3B30',
-                    borderWidth: 2,
-                    borderColor: colors.blackWhite5 || '#1A1A1A',
-                    zIndex: 10,
-                  }}
-                />
-              )}
-            </View>
             <View style={{ marginLeft: spacing.md }}>
               <Text style={styles.welcomeText}>Welcome back,</Text>
               <Text style={styles.userName}>

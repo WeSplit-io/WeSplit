@@ -42,6 +42,7 @@ import FallbackDataService from '../../services/data';
 import { MockupDataService } from '../../services/data/mockupData';
 import { notificationService } from '../../services/notifications';
 import Avatar from '../../components/shared/Avatar';
+import UserNameWithBadges from '../../components/profile/UserNameWithBadges';
 import QrCodeView from '../../services/core/QrCodeView';
 import {
   SplitDetailsNavigationParams,
@@ -2121,7 +2122,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 }}
               />
               <View style={styles.participantInfo}>
-                <Text style={styles.participantName}>{participant.name}</Text>
+                <UserNameWithBadges
+                  userId={participant.userId || participant.id}
+                  userName={participant.name}
+                  textStyle={styles.participantName}
+                  showBadges={true}
+                />
                 <Text style={styles.participantWallet}>
                   {participant.walletAddress ?
                     formatWalletAddress(participant.walletAddress) :

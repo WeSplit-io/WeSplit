@@ -4,13 +4,11 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Modal from '../shared/Modal';
 import Button from '../shared/Button';
 import Input from '../shared/Input';
-import { colors } from '../../theme';
 import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
 import { isValidPhoneNumber, normalizePhoneNumber } from '../../utils/validation/phone';
 import { logger } from '../../services/analytics/loggingService';
 
@@ -47,7 +45,7 @@ const PhoneInputModal: React.FC<PhoneInputModalProps> = ({
       onSendCode(normalizedPhone);
       // Modal will be closed by parent after navigation
     } catch (error) {
-      logger.error('Failed to send phone code', error, 'PhoneInputModal');
+      logger.error('Failed to send phone code', { error: error instanceof Error ? error.message : String(error) }, 'PhoneInputModal');
       setError(error instanceof Error ? error.message : 'Failed to send verification code');
       setLoading(false);
     }
@@ -66,6 +64,7 @@ const PhoneInputModal: React.FC<PhoneInputModalProps> = ({
       title="Add Phone Number"
       description="Enter your phone number to link it to your account. You'll be able to log in with either email or phone."
       closeOnBackdrop={true}
+      showHandle={true}
     >
       <View style={styles.content}>
         <Input
@@ -96,16 +95,6 @@ const PhoneInputModal: React.FC<PhoneInputModalProps> = ({
             loading={loading}
             style={styles.sendButton}
           />
-
-          <Button
-            title="Cancel"
-            onPress={handleClose}
-            variant="secondary"
-            size="large"
-            fullWidth={true}
-            disabled={loading}
-            style={styles.cancelButton}
-          />
         </View>
       </View>
     </Modal>
@@ -125,9 +114,6 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     marginBottom: spacing.sm,
-  },
-  cancelButton: {
-    // Secondary button styling is handled by Button component
   },
 });
 

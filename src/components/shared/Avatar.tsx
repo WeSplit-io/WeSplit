@@ -154,9 +154,7 @@ const Avatar: React.FC<AvatarProps> = ({
     // If loading and showLoading is true
     if (isLoading && showLoading) {
       return (
-        <View style={[avatarStyle, { justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="small" color={colors.textSecondary} />
-        </View>
+        <ActivityIndicator size="small" color={colors.textSecondary} />
       );
     }
 
@@ -174,24 +172,24 @@ const Avatar: React.FC<AvatarProps> = ({
     }
 
     // Fallback to initials or default avatar
-    return (
-      <View style={[avatarStyle, { justifyContent: 'center', alignItems: 'center' }]}>
-        {initials ? (
-          <Text style={initialsStyle}>{initials}</Text>
-        ) : (
-          <Image
-            source={{ uri: DEFAULT_AVATAR_URL }}
-            style={imageStyle}
-            resizeMode="cover"
-          />
-        )}
-      </View>
+    return initials ? (
+      <Text style={initialsStyle}>{initials}</Text>
+    ) : (
+      <Image
+        source={{ uri: DEFAULT_AVATAR_URL }}
+        style={imageStyle}
+        resizeMode="cover"
+      />
     );
   };
 
+  // Check if style has width/height that should override default size
+  const hasCustomDimensions = style && ((style as any).width === '100%' || (style as any).height === '100%');
+  
   const avatarStyle: ViewStyle = {
-    ...(dynamicSize ? {
-      flex: 1,
+    ...(dynamicSize || hasCustomDimensions ? {
+      width: '100%',
+      height: '100%',
       aspectRatio: 1,
       borderRadius: 999, // Large value to ensure circular shape
     } : {
@@ -217,15 +215,17 @@ const Avatar: React.FC<AvatarProps> = ({
 
   const imageStyle = dynamicSize ? {
     flex: 1,
+    width: '100%',
+    height: '100%',
     borderRadius: 999, // Large value to ensure circular shape
   } : {
-    width: size,
-    height: size,
+    width: '100%',
+    height: '100%',
     borderRadius: size / 2,
   };
 
   return (
-    <View style={avatarStyle}>
+    <View style={[avatarStyle, { justifyContent: 'center', alignItems: 'center' }]}>
       {getDisplayContent()}
     </View>
   );

@@ -106,12 +106,15 @@ export const styles = StyleSheet.create({
     fontSize: 24,
     color: colors.white,
   },
+  rouletteCardNameContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
   rouletteCardName: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: spacing.xs,
   },
   rouletteCardHash: {
     color: colors.white80,

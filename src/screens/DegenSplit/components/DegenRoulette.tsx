@@ -9,6 +9,7 @@ import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { styles } from './DegenRouletteStyles';
 import Avatar from '../../../components/shared/Avatar';
+import UserNameWithBadges from '../../../components/profile/UserNameWithBadges';
 import { getUserAvatar } from '../../../services/shared/dataUtils';
 import { logger } from '../../../services/analytics/loggingService';
 
@@ -166,7 +167,14 @@ const DegenRoulette: React.FC<DegenRouletteProps> = ({
               </View>
 
               {/* Name */}
-              <Text style={styles.rouletteCardName}>{participant.name}</Text>
+              <View style={styles.rouletteCardNameContainer}>
+                <UserNameWithBadges
+                  userId={participant.userId}
+                  userName={participant.name}
+                  textStyle={styles.rouletteCardName}
+                  showBadges={true}
+                />
+              </View>
 
               {/* Wallet Address */}
               <Text style={styles.rouletteCardHash}>
