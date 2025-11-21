@@ -31,14 +31,14 @@ const CommunityBadge: React.FC<CommunityBadgeProps> = ({
       {iconUrl ? (
         <Image
           source={{ uri: iconUrl }}
-          style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
+          style={[styles.image, { width: size, height: size }]}
           resizeMode="cover"
           onError={(error) => {
             console.warn('Failed to load community badge image', { iconUrl, error });
           }}
         />
       ) : (
-        <View style={[styles.iconContainer, { width: size, height: size, borderRadius: size / 2 }]}>
+        <View style={[styles.iconContainer, { width: size, height: size }]}>
           <Text style={[styles.icon, { fontSize: size * 0.6 }]}>{icon}</Text>
         </View>
       )}
@@ -48,11 +48,11 @@ const CommunityBadge: React.FC<CommunityBadgeProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 999,
     overflow: 'hidden',
-    backgroundColor: colors.white10,
     borderWidth: 1,
     borderColor: colors.white10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   image: {
     backgroundColor: 'transparent',

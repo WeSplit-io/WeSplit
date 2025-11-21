@@ -14,11 +14,10 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Container, Header, Button } from '../../components/shared';
+import { NavigationProp } from '@react-navigation/native';
+import { PaperPlaneTilt, HandCoins } from 'phosphor-react-native';
+import { Container, Header } from '../../components/shared';
 import Avatar from '../../components/shared/Avatar';
-import BadgeCard from '../../components/rewards/BadgeCard';
 import CommunityBadge from '../../components/profile/CommunityBadge';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing } from '../../theme';
@@ -375,7 +374,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
             <Avatar
               userId={profileUser.id}
               userName={displayName}
-              size={80}
+              size={110}
               avatarUrl={profileUser.avatar}
               style={styles.avatar}
             />
@@ -389,7 +388,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
                   icon={badge.icon}
                   iconUrl={badge.imageUrl}
                   title={badge.title}
-                  size={20}
+                  size={24}
                 />
               ))}
             </View>
@@ -401,22 +400,19 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
         {!isCurrentUser && (
           <View style={styles.quickActions}>
             <TouchableOpacity style={styles.actionButton} onPress={handleSend}>
-              <LinearGradient
-                colors={[colors.green, colors.greenBlue || colors.green]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.actionButtonGradient}
-              >
-                <PhosphorIcon name="PaperPlaneTilt" size={20} color={colors.black} />
+              <View style={styles.actionButtonCircle}>
+                <PaperPlaneTilt size={24} color={colors.white} />
                 <Text style={styles.actionButtonText}>Send</Text>
-              </LinearGradient>
+              </View>
+             
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionButton} onPress={handleRequest}>
-              <View style={styles.actionButtonSecondary}>
-                <PhosphorIcon name="HandCoins" size={20} color={colors.textLight} />
-                <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>Request</Text>
+              <View style={styles.actionButtonCircle}>
+                <HandCoins size={24} color={colors.white} />
+                <Text style={styles.actionButtonText}>Request</Text>
               </View>
+              
             </TouchableOpacity>
           </View>
         )}
@@ -438,7 +434,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
                           <Image
                             source={{ uri: badge.imageUrl }}
                             style={styles.badgeImage}
-                            resizeMode="cover"
+                            resizeMode="contain"
                           />
                         ) : (
                           <Text style={styles.badgeIcon}>{badge.icon}</Text>
@@ -508,15 +504,15 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xl,
   },
   avatarContainer: {
     marginBottom: spacing.md,
   },
   avatar: {
     borderWidth: 2,
-    borderColor: colors.white10,
+    borderColor: colors.white5,
   },
   nameContainer: {
     alignItems: 'center',
@@ -524,13 +520,14 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
     marginBottom: spacing.xs,
   },
   userName: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textLight,
+    marginBottom: 2,
   },
   userId: {
     fontSize: typography.fontSize.sm,
@@ -538,49 +535,49 @@ const styles = StyleSheet.create({
   },
   quickActions: {
     flexDirection: 'row',
-    gap: spacing.md,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
     marginBottom: spacing.xl,
   },
   actionButton: {
+    alignItems: 'center',
     flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  actionButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
+    minWidth: 80,
   },
-  actionButtonSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-    backgroundColor: colors.white5,
-    borderRadius: 12,
+  actionButtonCircle: {
+    width: '100%',
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginBottom: spacing.sm,
+    display: 'flex',
+    position: 'relative',
     borderWidth: 1,
-    borderColor: colors.white10,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
+    borderRightColor: 'rgba(10, 138, 90, 0.15)',
+    borderBottomColor: 'rgba(10, 138, 90, 0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    flex: 1,
+    paddingVertical: 12,
   },
   actionButtonText: {
+    color: colors.white,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.black,
-  },
-  actionButtonTextSecondary: {
-    color: colors.textLight,
+    fontWeight: typography.fontWeight.medium,
+    textAlign: 'center',
   },
   section: {
-    paddingHorizontal: spacing.screenPaddingHorizontal,
     marginBottom: spacing.xl,
   },
   sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white70,
     marginBottom: spacing.md,
   },
   badgesGrid: {
@@ -596,16 +593,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white5,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.sm,
   },
   badgeImage: {
-    width: '70%',
+    width: '80%',
     aspectRatio: 1,
-    borderRadius: 8,
     marginBottom: spacing.xs,
   },
   badgeIcon: {
