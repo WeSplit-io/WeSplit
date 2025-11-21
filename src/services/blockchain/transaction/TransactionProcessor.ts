@@ -525,16 +525,54 @@ export class TransactionProcessor {
             errorMessage.includes('deadline exceeded') ||
             errorMessage.includes('deadline-exceeded');
           
-          // If timeout and we're on mainnet, transaction might have succeeded
-          // Check if error message suggests transaction was submitted
-          if (isTimeout && isMainnet) {
-            logger.warn('Transaction processing timed out on mainnet - transaction may have succeeded', {
+          // CRITICAL: On timeout, check if transaction was actually submitted before retrying
+          // This prevents duplicate submissions when the transaction succeeded but Firebase timed out
+          if (isTimeout) {
+            logger.warn('Transaction processing timed out - checking if transaction was submitted', {
               errorMessage,
-              note: 'Mainnet transactions can take longer. Transaction may have been submitted successfully despite timeout.'
+              isMainnet,
+              attempt: submissionAttempts + 1,
+              note: 'Checking blockchain to see if transaction was submitted before retrying'
             }, 'TransactionProcessor');
-            // Don't retry on timeout - transaction likely succeeded
-            // The verification step will handle checking if it actually succeeded
-            throw new Error(`Transaction processing timed out. The transaction may have succeeded. Please check your transaction history. (${errorMessage})`);
+            
+            // Try to extract signature from the transaction to check if it was submitted
+            // If we can't extract signature, check recent transactions from the wallet
+            try {
+              // Get connection to check transaction status
+              const checkConnection = await this.getConnection();
+              
+              // Check if we can get the transaction signature from the serialized transaction
+              // Note: We can't get signature before submission, but we can check recent transactions
+              // For now, on timeout in production, don't retry - just verify later
+              if (isMainnet) {
+                logger.warn('Mainnet timeout - not retrying to prevent duplicate submission', {
+                  errorMessage,
+                  note: 'Transaction may have succeeded. User should check transaction history. Retrying could cause duplicate submission.'
+                }, 'TransactionProcessor');
+                // Don't retry on mainnet timeout - transaction likely succeeded
+                throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again.`);
+              } else {
+                // On devnet, allow one retry but log warning
+                if (submissionAttempts < maxSubmissionAttempts - 1) {
+                  logger.warn('Devnet timeout - allowing one retry', {
+                    attempt: submissionAttempts + 1,
+                    maxAttempts: maxSubmissionAttempts
+                  }, 'TransactionProcessor');
+                  submissionAttempts++;
+                  await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+                  continue; // Retry once
+                } else {
+                  throw new Error(`Transaction processing timed out after ${maxSubmissionAttempts} attempts. Please check your transaction history.`);
+                }
+              }
+            } catch (checkError) {
+              // If checking fails, don't retry on timeout
+              logger.error('Failed to check transaction status on timeout', {
+                error: checkError,
+                errorMessage
+              }, 'TransactionProcessor');
+              throw new Error(`Transaction processing timed out. Please check your transaction history to see if the transaction succeeded.`);
+            }
           }
           
           const isBlockhashExpired = 

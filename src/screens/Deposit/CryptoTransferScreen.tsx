@@ -153,33 +153,32 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
 
       // Check if result has success property or if it's a successful transaction
       if (result && result.signature) {
-        // Save deposit transaction to database for history
+        // Save deposit transaction using centralized helper
+        // NOTE: SOL deposits from external wallets are a special case - they go through WalletContext.sendTransaction
+        // which calls consolidatedTransactionService.sendSolTransaction. However, SOL transactions might not
+        // save automatically, so we use the centralized helper here for consistency.
         if (currentUser?.id) {
           try {
-            // Use firebaseDataService.transaction instead of firebaseTransactionService
-            const { firebaseDataService } = await import('../../services/data');
+            const { saveTransactionAndAwardPoints } = await import('../../services/shared/transactionPostProcessing');
             
-            const transactionData = {
-              type: 'deposit' as const,
+            // Deposits from external wallets don't award points and have no fees
+            await saveTransactionAndAwardPoints({
+              userId: currentUser.id.toString(),
+              toAddress: appWalletAddress || '',
               amount: amount,
-              currency: 'SOL',
-              from_user: externalWalletAddress || 'External Wallet',
-              to_user: currentUser.id.toString(),
-              from_wallet: externalWalletAddress || '',
-              to_wallet: appWalletAddress || '',
-              tx_hash: result.signature,
-              note: 'Deposit from external wallet',
-              status: 'completed' as const,
-              transaction_method: 'external_wallet' as const,
-              recipient_name: currentUser.name || 'You',
-              sender_name: 'External Wallet'
-            };
+              signature: result.signature,
+              transactionType: 'deposit',
+              companyFee: 0, // No fee for deposits
+              netAmount: amount,
+              memo: 'Deposit from external wallet',
+              currency: 'SOL'
+            });
             
-            await firebaseDataService.transaction.createTransaction(transactionData);
             logger.info('✅ Deposit transaction saved to database', {
               signature: result.signature,
               amount: amount,
-              currency: 'SOL'
+              currency: 'SOL',
+              note: 'Saved using centralized helper'
             }, 'CryptoTransferScreen');
           } catch (saveError) {
             logger.error('❌ Failed to save deposit transaction to database', saveError, 'CryptoTransferScreen');

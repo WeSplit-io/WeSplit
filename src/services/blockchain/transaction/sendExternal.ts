@@ -291,7 +291,9 @@ class ExternalTransferService {
       const currentBalance = balance?.usdcBalance || 0; // WeSplit only supports USDC
       
       // Calculate total required amount (including company fee)
-      const { fee: companyFee } = FeeService.calculateCompanyFee(amount);
+      // Use 'external_payment' transaction type for external transfers (2% fee)
+      const transactionType = 'external_payment';
+      const { fee: companyFee } = FeeService.calculateCompanyFee(amount, transactionType);
       const requiredAmount = amount + companyFee;
 
       logger.info('Balance check completed', {

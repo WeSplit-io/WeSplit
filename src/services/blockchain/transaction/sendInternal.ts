@@ -720,6 +720,26 @@ class InternalTransferService {
           break; // Success, exit retry loop
         } catch (submissionError) {
           const errorMessage = submissionError instanceof Error ? submissionError.message : String(submissionError);
+          
+          // Check for timeout errors first - these need special handling to prevent duplicates
+          const isTimeout = 
+            errorMessage.includes('timed out') ||
+            errorMessage.includes('timeout') ||
+            errorMessage.includes('deadline exceeded') ||
+            errorMessage.includes('deadline-exceeded');
+          
+          // CRITICAL: On timeout, don't retry - transaction may have succeeded
+          // Retrying could cause duplicate submission
+          if (isTimeout) {
+            logger.warn('Transaction processing timed out - not retrying to prevent duplicate submission', {
+              errorMessage,
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts,
+              note: 'Transaction may have succeeded. User should check transaction history. Retrying could cause duplicate submission.'
+            }, 'InternalTransferService');
+            throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again.`);
+          }
+          
           const isBlockhashExpired = 
             errorMessage.includes('blockhash has expired') ||
             errorMessage.includes('blockhash expired') ||
@@ -1371,6 +1391,29 @@ class InternalTransferService {
           break; // Success, exit retry loop
         } catch (submissionError) {
           const errorMessage = submissionError instanceof Error ? submissionError.message : String(submissionError);
+          
+          // Check for timeout errors first - these need special handling to prevent duplicates
+          const isTimeout = 
+            errorMessage.includes('timed out') ||
+            errorMessage.includes('timeout') ||
+            errorMessage.includes('deadline exceeded') ||
+            errorMessage.includes('deadline-exceeded');
+          
+          // CRITICAL: On timeout, don't retry - transaction may have succeeded
+          // Retrying could cause duplicate submission
+          if (isTimeout) {
+            logger.warn('Transaction processing timed out - not retrying to prevent duplicate submission', {
+              errorMessage,
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts,
+              note: 'Transaction may have succeeded. User should check transaction history. Retrying could cause duplicate submission.'
+            }, 'InternalTransferService');
+            return {
+              success: false,
+              error: `Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again.`
+            };
+          }
+          
           const isBlockhashExpired = 
             errorMessage.includes('blockhash has expired') ||
             errorMessage.includes('blockhash expired') ||
@@ -1465,32 +1508,36 @@ class InternalTransferService {
         };
       }
 
-      // Save transaction to Firestore (without recipient user lookup)
-      await notificationUtils.saveTransactionToFirestore({
-        userId: params.userId,
-        to: params.to,
-        amount: params.amount,
-        currency: params.currency,
-        signature,
-        companyFee,
-        netAmount: recipientAmount,
-        memo: params.memo
-      });
-
-      // Send money sent notification to sender only (non-blocking)
-      // Don't await - run in background to avoid blocking transaction
-      notificationUtils.sendMoneySentNotification({
-        userId: params.userId,
-        to: params.to,
-        amount: params.amount,
-        currency: params.currency,
-        signature,
-        companyFee,
-        netAmount: recipientAmount,
-        memo: params.memo
-      }).catch(error => {
-        logger.error('❌ Background notification failed (non-blocking)', error, 'InternalTransferService');
-      });
+      // Save transaction and award points using centralized helper
+      // This replaces the deprecated notificationUtils.saveTransactionToFirestore call
+      try {
+        const { saveTransactionAndAwardPoints } = await import('../../shared/transactionPostProcessing');
+        
+        // Determine transaction type based on memo (split wallet payments have no fees)
+        // Note: isSplitWalletPayment is defined earlier in the function
+        const finalTransactionType: TransactionType = isSplitWalletPayment ? 'split_wallet_withdrawal' : 'send';
+        
+        await saveTransactionAndAwardPoints({
+          userId: params.userId,
+          toAddress: params.to,
+          amount: params.amount,
+          signature: signature,
+          transactionType: finalTransactionType,
+          companyFee: companyFee,
+          netAmount: recipientAmount,
+          memo: params.memo,
+          currency: params.currency
+        });
+        
+        logger.info('✅ Internal transfer to address post-processing completed', {
+          signature: signature,
+          userId: params.userId,
+          transactionType: finalTransactionType
+        }, 'InternalTransferService');
+      } catch (postProcessingError) {
+        logger.error('❌ Error in internal transfer to address post-processing', postProcessingError, 'InternalTransferService');
+        // Don't fail the transaction if post-processing fails
+      }
 
       logger.info('Internal transfer to address completed successfully', {
         signature,

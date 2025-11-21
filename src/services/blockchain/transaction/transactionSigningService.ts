@@ -907,8 +907,18 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
       }, 'TransactionSigningService');
       
       // For timeout errors, provide more helpful error message
+      // CRITICAL: Don't suggest retrying immediately - transaction may have succeeded
+      // User should check transaction history first to avoid duplicate submissions
       if (isTimeout) {
-        throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history or try again. (Error: ${errorCode})`);
+        const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
+        const isMainnet = networkEnv.toLowerCase() === 'mainnet' || 
+                          (!__DEV__ && !networkEnv);
+        
+        if (isMainnet) {
+          throw new Error(`Transaction processing timed out on mainnet. The transaction may have succeeded on the blockchain. Please check your transaction history before trying again. If the transaction didn't go through, wait a few moments and try again. (Error: ${errorCode})`);
+        } else {
+          throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again. (Error: ${errorCode})`);
+        }
       }
       
       // Re-throw with more context for other errors

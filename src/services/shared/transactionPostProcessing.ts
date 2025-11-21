@@ -72,10 +72,18 @@ export async function saveTransactionAndAwardPoints(
       }
 
       // Create sender transaction record
+      // Map transaction types to Firestore transaction types
+      let firestoreTransactionType: 'send' | 'receive' | 'deposit' | 'withdraw';
+      if (params.transactionType === 'deposit') {
+        firestoreTransactionType = 'deposit';
+      } else if (params.transactionType === 'external_payment' || params.transactionType === 'withdraw' || params.transactionType === 'split_wallet_withdrawal') {
+        firestoreTransactionType = 'withdraw';
+      } else {
+        firestoreTransactionType = 'send';
+      }
+      
       const senderTransactionData = {
-        type: params.transactionType === 'external_payment' || params.transactionType === 'withdraw' 
-          ? 'withdraw' as const 
-          : 'send' as const,
+        type: firestoreTransactionType,
         amount: params.amount,
         currency: params.currency || 'USDC',
         from_user: params.userId,
@@ -158,7 +166,12 @@ export async function saveTransactionAndAwardPoints(
       }
 
       // Create recipient transaction record (only if recipient is a registered user)
-      if (recipientUser && params.transactionType !== 'external_payment' && params.transactionType !== 'withdraw') {
+      // For deposits, create a 'receive' record for the recipient
+      // For withdrawals/external payments, don't create recipient records (they're going to external wallets)
+      if (recipientUser && 
+          params.transactionType !== 'external_payment' && 
+          params.transactionType !== 'withdraw' && 
+          params.transactionType !== 'split_wallet_withdrawal') {
         try {
           const recipientTransactionData = {
             type: 'receive' as const,

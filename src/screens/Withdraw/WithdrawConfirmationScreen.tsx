@@ -159,49 +159,36 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           amount: safeTotalWithdraw
         });
 
-        transactionResult = await sendTransaction({
+        // Use consolidatedTransactionService directly with 'withdraw' transaction type
+        // This ensures proper fee calculation and transaction type mapping
+        const { consolidatedTransactionService } = await import('../../services/blockchain/transaction');
+        transactionResult = await consolidatedTransactionService.sendUSDCTransaction({
           to: externalWalletAddress || walletAddress, // Send to external wallet
           amount: safeTotalWithdraw, // Send the amount after fees
           currency: 'USDC',
-          memo: description || 'Withdrawal from WeSplit app wallet'
+          userId: currentUser.id.toString(),
+          memo: description || 'Withdrawal from WeSplit app wallet',
+          priority: 'medium',
+          transactionType: 'withdraw' // Use 'withdraw' type for proper fee calculation and transaction saving
         });
       }
 
       logger.info('Withdrawal transaction successful', { transactionResult }, 'WithdrawConfirmationScreen');
       
-      // Save withdrawal transaction to database for history
-      if (currentUser?.id && transactionResult?.signature) {
-        try {
-          const { firebaseDataService } = await import('../../services/data');
-          
-          const transactionData = {
-            type: 'withdraw' as const,
-            amount: amount,
-            currency: 'USDC',
-            from_user: currentUser.id,
-            to_user: externalWalletAddress || walletAddress, // External wallet address
-            from_wallet: appWalletAddress || '',
-            to_wallet: externalWalletAddress || walletAddress,
-            tx_hash: transactionResult.signature,
-            note: description || 'Withdrawal from WeSplit app wallet',
-            status: 'completed' as const,
-            group_id: null,
-            company_fee: safeWithdrawalFee || 0,
-            net_amount: safeTotalWithdraw
-          };
-          
-          await firebaseDataService.transaction.createTransaction(transactionData);
-          logger.info('✅ Withdrawal transaction saved to database', {
-            signature: transactionResult.signature,
-            userId: currentUser.id,
-            amount: amount
-          }, 'WithdrawConfirmationScreen');
-          
-        } catch (saveError) {
-          logger.error('❌ Failed to save withdrawal transaction to database', saveError, 'WithdrawConfirmationScreen');
-          // Don't fail the withdrawal if database save fails
-        }
-      }
+      // NOTE: Transaction is already saved by consolidatedTransactionService.sendUSDCTransaction
+      // which uses the centralized saveTransactionAndAwardPoints helper.
+      // No need to save again here - that would create duplicate transaction records.
+      // The centralized helper handles:
+      // - Transaction saving to Firestore
+      // - Fee calculation consistency
+      // - Point attribution (withdrawals don't award points, which is correct)
+      
+      logger.info('✅ Withdrawal transaction processed', {
+        signature: transactionResult.signature,
+        userId: currentUser.id,
+        amount: amount,
+        note: 'Transaction saved by centralized helper in consolidatedTransactionService'
+      }, 'WithdrawConfirmationScreen');
       
       // Navigate to success screen with transaction data
       navigation.navigate('WithdrawSuccess', {

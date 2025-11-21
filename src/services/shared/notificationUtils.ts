@@ -32,6 +32,9 @@ export class NotificationUtils {
 
   /**
    * Save transaction to Firestore for history and send notification to recipient
+   * @deprecated Use saveTransactionAndAwardPoints from transactionPostProcessing.ts instead
+   * This method is kept for backward compatibility but should not be used in new code.
+   * The new method handles both transaction saving AND point awarding in a centralized way.
    */
   async saveTransactionToFirestore(transactionData: TransactionData): Promise<void> {
     try {
