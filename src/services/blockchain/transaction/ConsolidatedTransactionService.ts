@@ -81,25 +81,31 @@ class ConsolidatedTransactionService {
         };
       }
 
-      // ✅ CRITICAL: Check for duplicate in-flight transaction before proceeding
-      // This prevents multiple simultaneous transactions with the same parameters
+      // ✅ CRITICAL: Create placeholder promise IMMEDIATELY (before any async operations)
+      // This ensures atomic check-and-register
+      let resolveTransaction: (result: TransactionResult) => void;
+      let rejectTransaction: (error: any) => void;
+      
+      const placeholderPromise = new Promise<TransactionResult>((resolve, reject) => {
+        resolveTransaction = resolve;
+        rejectTransaction = reject;
+      });
+      
+      // ✅ CRITICAL: Atomic check-and-register to prevent race conditions
+      // This method atomically checks if transaction exists and registers if not
+      // This prevents multiple simultaneous calls from all passing the check
       const { transactionDeduplicationService } = await import('./TransactionDeduplicationService');
-      
-      // ✅ CRITICAL: Create a placeholder promise IMMEDIATELY to prevent race conditions
-      // This ensures that if multiple calls happen simultaneously, they all get the same promise
-      let transactionPromise: Promise<TransactionResult>;
-      let cleanup: () => void;
-      let isNewTransaction = false;
-      
-      // Try to get existing transaction first
-      const existingPromise = transactionDeduplicationService.checkInFlight(
+      const { existing: existingPromise, cleanup } = transactionDeduplicationService.checkAndRegisterInFlight(
         params.userId,
         params.to,
-        params.amount
+        params.amount,
+        placeholderPromise
       );
       
+      let isNewTransaction = false;
+      
       if (existingPromise) {
-        logger.warn('⚠️ Duplicate transaction detected - returning existing promise', {
+        logger.warn('⚠️ Duplicate transaction detected (atomic) - returning existing promise', {
           userId: params.userId,
           to: params.to.substring(0, 8) + '...',
           amount: params.amount
@@ -116,29 +122,12 @@ class ConsolidatedTransactionService {
           }, 'ConsolidatedTransactionService');
           // Continue to create new transaction below
         }
+      } else {
+        // New transaction registered
+        isNewTransaction = true;
       }
-
-      // ✅ CRITICAL: Register placeholder promise IMMEDIATELY to prevent race conditions
-      // This must happen BEFORE any async operations (wallet loading, etc.)
-      // Create a promise that will be resolved/rejected when the actual transaction completes
-      let resolveTransaction: (result: TransactionResult) => void;
-      let rejectTransaction: (error: any) => void;
       
-      const placeholderPromise = new Promise<TransactionResult>((resolve, reject) => {
-        resolveTransaction = resolve;
-        rejectTransaction = reject;
-      });
-      
-      // Register the placeholder promise immediately
-      cleanup = transactionDeduplicationService.registerInFlight(
-        params.userId,
-        params.to,
-        params.amount,
-        placeholderPromise
-      );
-      
-      isNewTransaction = true;
-      transactionPromise = placeholderPromise;
+      const transactionPromise = placeholderPromise;
 
       // Now load wallet and create actual transaction
       // Load the user's wallet

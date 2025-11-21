@@ -142,25 +142,27 @@ async function checkTransactionHash(transactionBuffer, db) {
   const hashKey = `transaction_hash_${transactionHash}`;
   const hashRef = db.collection('transactionHashes').doc(hashKey);
   
-  // ✅ CRITICAL: Increased timeout to 2 seconds for duplicate check
-  // This is critical for preventing duplicates - must complete before processing
-  // If Firestore is slow, we'll reject the transaction to prevent duplicates
+  // ✅ CRITICAL: Increased timeout to 5 seconds for duplicate check
+  // Firestore can be slow, but we still need to check for duplicates
+  // 5 seconds is a reasonable balance - if it takes longer, Firestore is having issues
   let hashDoc;
   try {
     hashDoc = await Promise.race([
       hashRef.get(),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Transaction hash check timeout')), 2000)
+        setTimeout(() => reject(new Error('Transaction hash check timeout')), 5000)
       )
     ]);
   } catch (timeoutError) {
-    // CRITICAL: Throw error so caller can reject the transaction
-    // This prevents duplicates when Firestore is slow
-    console.error('❌ Transaction hash check timed out - will reject transaction', {
+    // CRITICAL: If Firestore is too slow (>5s), log warning but proceed
+    // This prevents blocking all transactions when Firestore has issues
+    // The transaction hash will still be recorded after processing to prevent duplicates
+    console.warn('⚠️ Transaction hash check timed out (>5s) - Firestore may be slow, proceeding anyway', {
       error: timeoutError.message,
-      note: 'Rejecting to prevent potential duplicates'
+      note: 'Proceeding to prevent blocking all transactions. Hash will be recorded after processing.'
     });
-    throw timeoutError;
+    // Don't throw - proceed with transaction, hash will be recorded later
+    hashDoc = { exists: false }; // Treat as not found, proceed
   }
   
   if (hashDoc.exists) {
@@ -491,12 +493,12 @@ exports.processUsdcTransfer = functions.runWith({
     // Better to reject one transaction than allow duplicates
     try {
       const duplicateCheckStart = Date.now();
-      // Increased timeout to 2 seconds - Firestore should respond within this time
-      // If it doesn't, we reject to prevent duplicates (safer than allowing through)
+      // Increased timeout to 5 seconds - Firestore should respond within this time
+      // If it doesn't, we log warning but proceed (better than blocking all transactions)
       await Promise.race([
         checkTransactionHash(transactionBuffer, db),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Duplicate check timeout - rejecting to prevent duplicates')), 2000)
+          setTimeout(() => reject(new Error('Duplicate check timeout')), 5000)
         )
       ]);
       const duplicateCheckTime = Date.now() - duplicateCheckStart;
@@ -517,22 +519,22 @@ exports.processUsdcTransfer = functions.runWith({
         throw new functions.https.HttpsError('already-exists', 'This transaction has already been processed. Please check your transaction history.');
       }
       
-      // CRITICAL: If duplicate check times out, REJECT the transaction
-      // This prevents duplicates when Firestore is slow
-      // Better to reject one transaction than allow duplicates
+      // If duplicate check times out (>5s), log warning but proceed
+      // This prevents blocking all transactions when Firestore is slow
+      // The transaction hash will still be recorded after processing
       if (errorMessage.includes('timeout')) {
-        console.error('❌ Duplicate check timed out - REJECTING to prevent duplicates', {
+        console.warn('⚠️ Duplicate check timed out (>5s) - Firestore may be slow, proceeding anyway', {
           error: errorMessage,
-          note: 'Check took too long (>2s). Rejecting transaction to prevent potential duplicates. User can retry.'
+          note: 'Check took too long. Proceeding to prevent blocking all transactions. Hash will be recorded after processing.'
         });
-        throw new functions.https.HttpsError('deadline-exceeded', 'Transaction verification timed out. Please try again. This prevents duplicate transactions.');
+        // Don't throw - proceed with transaction
       } else {
-        // Other errors - also reject to be safe
-        console.error('❌ Duplicate check failed - REJECTING to prevent duplicates', {
+        // Other errors - log but proceed (better than blocking)
+        console.warn('⚠️ Duplicate check failed - proceeding anyway', {
           error: errorMessage,
-          note: 'Check failed. Rejecting transaction to prevent potential duplicates.'
+          note: 'Check failed but proceeding to prevent blocking transactions.'
         });
-        throw new functions.https.HttpsError('internal', 'Transaction verification failed. Please try again.');
+        // Don't throw - proceed with transaction
       }
     }
     

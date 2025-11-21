@@ -69,8 +69,80 @@ class TransactionDeduplicationService {
   }
 
   /**
+   * ✅ CRITICAL: Atomic check-and-register
+   * This method atomically checks if a transaction is in-flight and registers it if not
+   * This prevents race conditions where multiple calls check before any register
+   */
+  public checkAndRegisterInFlight(
+    userId: string,
+    to: string,
+    amount: number,
+    transactionPromise: Promise<any>
+  ): { existing: Promise<any> | null; cleanup: () => void } {
+    const timestamp = Date.now();
+    const roundedAmount = Math.round(amount * 100) / 100;
+    const currentWindow = Math.floor(timestamp / 30000);
+    const previousWindow = currentWindow - 1;
+    
+    const currentKey = `${userId}:${to}:${roundedAmount}:${currentWindow}`;
+    const previousKey = `${userId}:${to}:${roundedAmount}:${previousWindow}`;
+    
+    // ✅ ATOMIC: Check both windows synchronously
+    const existing = this.inFlightTransactions.get(currentKey) || 
+                     this.inFlightTransactions.get(previousKey);
+    
+    if (existing) {
+      const age = Date.now() - existing.timestamp;
+      if (age < this.TRANSACTION_TIMEOUT_MS) {
+        logger.warn('⚠️ Duplicate transaction detected (atomic check) - returning existing promise', {
+          key: existing.key.substring(0, 50) + '...',
+          age: `${age}ms`,
+          userId,
+          to: to.substring(0, 8) + '...',
+          amount
+        }, 'TransactionDeduplicationService');
+        return { existing: existing.promise, cleanup: () => {} };
+      } else {
+        // Expired, remove it
+        this.inFlightTransactions.delete(existing.key);
+      }
+    }
+    
+    // ✅ ATOMIC: Register in both windows immediately (synchronous)
+    const inFlightTransaction: InFlightTransaction = {
+      key: currentKey,
+      userId,
+      to,
+      amount,
+      timestamp,
+      promise: transactionPromise
+    };
+    
+    this.inFlightTransactions.set(currentKey, inFlightTransaction);
+    this.inFlightTransactions.set(previousKey, inFlightTransaction);
+    
+    logger.debug('Registered new in-flight transaction (atomic)', {
+      currentKey: currentKey.substring(0, 50) + '...',
+      userId,
+      to: to.substring(0, 8) + '...',
+      amount
+    }, 'TransactionDeduplicationService');
+    
+    return {
+      existing: null,
+      cleanup: () => {
+        this.inFlightTransactions.delete(currentKey);
+        this.inFlightTransactions.delete(previousKey);
+      }
+    };
+  }
+
+  /**
    * Check if a transaction is already in-flight
    * Returns the existing promise if found, null otherwise
+   * 
+   * ✅ CRITICAL: This method checks multiple time windows to catch transactions
+   * that might have been registered in a slightly different time window
    */
   public checkInFlight(
     userId: string,
@@ -78,9 +150,19 @@ class TransactionDeduplicationService {
     amount: number
   ): Promise<any> | null {
     const timestamp = Date.now();
-    const key = generateTransactionKey(userId, to, amount, timestamp);
+    const roundedAmount = Math.round(amount * 100) / 100;
     
-    const existing = this.inFlightTransactions.get(key);
+    // ✅ CRITICAL: Check current window AND previous window
+    // This catches transactions registered milliseconds before/after window boundary
+    const currentWindow = Math.floor(timestamp / 30000);
+    const previousWindow = currentWindow - 1;
+    
+    const currentKey = `${userId}:${to}:${roundedAmount}:${currentWindow}`;
+    const previousKey = `${userId}:${to}:${roundedAmount}:${previousWindow}`;
+    
+    // Check both windows
+    const existing = this.inFlightTransactions.get(currentKey) || 
+                    this.inFlightTransactions.get(previousKey);
     
     if (existing) {
       const age = Date.now() - existing.timestamp;
@@ -88,7 +170,7 @@ class TransactionDeduplicationService {
       // If transaction is still within timeout window, return existing promise
       if (age < this.TRANSACTION_TIMEOUT_MS) {
         logger.warn('⚠️ Duplicate transaction attempt detected - transaction already in-flight', {
-          key: key.substring(0, 50) + '...',
+          key: existing.key.substring(0, 50) + '...',
           age: `${age}ms`,
           userId,
           to: to.substring(0, 8) + '...',
@@ -100,11 +182,11 @@ class TransactionDeduplicationService {
       } else {
         // Transaction expired, remove it
         logger.debug('Removing expired in-flight transaction', {
-          key: key.substring(0, 50) + '...',
+          key: existing.key.substring(0, 50) + '...',
           age: `${age}ms`
         }, 'TransactionDeduplicationService');
         
-        this.inFlightTransactions.delete(key);
+        this.inFlightTransactions.delete(existing.key);
       }
     }
     
@@ -114,6 +196,9 @@ class TransactionDeduplicationService {
   /**
    * Register a new in-flight transaction
    * Returns a cleanup function that should be called when transaction completes
+   * 
+   * ✅ CRITICAL: This method registers in BOTH current and previous time windows
+   * to ensure checkInFlight can find it regardless of timing
    */
   public registerInFlight(
     userId: string,
@@ -122,21 +207,37 @@ class TransactionDeduplicationService {
     transactionPromise: Promise<any>
   ): () => void {
     const timestamp = Date.now();
-    const key = generateTransactionKey(userId, to, amount, timestamp);
+    const roundedAmount = Math.round(amount * 100) / 100;
     
-    // Check if already exists (shouldn't happen if checkInFlight was called first)
-    const existing = this.inFlightTransactions.get(key);
+    // ✅ CRITICAL: Register in BOTH current and previous windows
+    // This ensures checkInFlight can find it even if called milliseconds before/after
+    const currentWindow = Math.floor(timestamp / 30000);
+    const previousWindow = currentWindow - 1;
+    
+    const currentKey = `${userId}:${to}:${roundedAmount}:${currentWindow}`;
+    const previousKey = `${userId}:${to}:${roundedAmount}:${previousWindow}`;
+    
+    // Check if already exists in either window (shouldn't happen if checkInFlight was called first)
+    const existing = this.inFlightTransactions.get(currentKey) || 
+                     this.inFlightTransactions.get(previousKey);
     if (existing) {
-      logger.warn('⚠️ Transaction key collision - overwriting existing transaction', {
-        key: key.substring(0, 50) + '...',
+      logger.warn('⚠️ Transaction key collision - transaction already registered!', {
+        existingKey: existing.key.substring(0, 50) + '...',
+        currentKey: currentKey.substring(0, 50) + '...',
         userId,
         to: to.substring(0, 8) + '...',
-        amount
+        amount,
+        note: 'This should not happen if checkInFlight was called first. Returning existing promise.'
       }, 'TransactionDeduplicationService');
+      
+      // Return existing promise instead of overwriting
+      return () => {
+        // Don't cleanup - let the original transaction handle it
+      };
     }
     
     const inFlightTransaction: InFlightTransaction = {
-      key,
+      key: currentKey, // Use current key as primary
       userId,
       to,
       amount,
@@ -144,19 +245,23 @@ class TransactionDeduplicationService {
       promise: transactionPromise
     };
     
-    this.inFlightTransactions.set(key, inFlightTransaction);
+    // ✅ CRITICAL: Register in BOTH windows to ensure detection
+    this.inFlightTransactions.set(currentKey, inFlightTransaction);
+    this.inFlightTransactions.set(previousKey, inFlightTransaction);
     
-    logger.debug('Registered in-flight transaction', {
-      key: key.substring(0, 50) + '...',
+    logger.debug('Registered in-flight transaction in both time windows', {
+      currentKey: currentKey.substring(0, 50) + '...',
+      previousKey: previousKey.substring(0, 50) + '...',
       userId,
       to: to.substring(0, 8) + '...',
       amount,
       totalInFlight: this.inFlightTransactions.size
     }, 'TransactionDeduplicationService');
     
-    // Return cleanup function
+    // Return cleanup function that removes from both windows
     return () => {
-      this.unregisterInFlight(key);
+      this.inFlightTransactions.delete(currentKey);
+      this.inFlightTransactions.delete(previousKey);
     };
   }
 

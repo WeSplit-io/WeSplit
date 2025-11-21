@@ -72,17 +72,27 @@ class ExternalTransferService {
         userId: params.userId
       }, 'ExternalTransferService');
 
-      // ✅ CRITICAL: Check for duplicate in-flight transaction before proceeding
+      // ✅ CRITICAL: Create placeholder promise IMMEDIATELY for atomic check-and-register
+      let resolveTransaction: (result: ExternalTransferResult) => void;
+      let rejectTransaction: (error: any) => void;
+      
+      const placeholderPromise = new Promise<ExternalTransferResult>((resolve, reject) => {
+        resolveTransaction = resolve;
+        rejectTransaction = reject;
+      });
+      
+      // ✅ CRITICAL: Atomic check-and-register to prevent race conditions
       // External transfers bypass ConsolidatedTransactionService, so we need deduplication here too
       const { transactionDeduplicationService } = await import('./TransactionDeduplicationService');
-      const existingPromise = transactionDeduplicationService.checkInFlight(
+      const { existing: existingPromise, cleanup: dedupCleanup } = transactionDeduplicationService.checkAndRegisterInFlight(
         params.userId,
         params.to,
-        params.amount
+        params.amount,
+        placeholderPromise
       );
       
       if (existingPromise) {
-        logger.warn('⚠️ Duplicate external transfer detected - returning existing promise', {
+        logger.warn('⚠️ Duplicate external transfer detected (atomic) - returning existing promise', {
           userId: params.userId,
           to: params.to.substring(0, 8) + '...',
           amount: params.amount
@@ -167,9 +177,9 @@ class ExternalTransferService {
         walletAddress: expectedWalletAddress 
       }, 'ExternalTransferService');
 
-      // ✅ CRITICAL: Wrap transaction in deduplication service
-      // Register transaction as in-flight and get cleanup function
-      const transactionPromise = (async () => {
+      // ✅ CRITICAL: Execute actual transaction and resolve placeholder promise
+      // This ensures all waiting calls get the same result
+      const actualTransactionPromise = (async () => {
         // Build and send transaction - WeSplit only supports USDC transfers
         if (params.currency === 'USDC') {
           return await this.sendUsdcTransfer(params, recipientAmount, companyFee, expectedWalletAddress, walletResult.wallet.secretKey);
@@ -183,17 +193,19 @@ class ExternalTransferService {
         }
       })();
       
-      const cleanup = transactionDeduplicationService.registerInFlight(
-        params.userId,
-        params.to,
-        params.amount,
-        transactionPromise
-      );
+      // Execute transaction and resolve/reject placeholder
+      actualTransactionPromise
+        .then((result) => {
+          resolveTransaction!(result);
+        })
+        .catch((error) => {
+          rejectTransaction!(error);
+        });
 
       // Execute transaction with cleanup on completion
       let result: ExternalTransferResult;
       try {
-        result = await transactionPromise;
+        result = await placeholderPromise;
         
         // Update deduplication service with signature if successful
         if (result.success && result.signature) {
@@ -206,7 +218,7 @@ class ExternalTransferService {
         }
       } finally {
         // Always cleanup, even on error
-        cleanup();
+        dedupCleanup();
       }
 
       if (result.success) {
