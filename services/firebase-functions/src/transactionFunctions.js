@@ -142,22 +142,25 @@ async function checkTransactionHash(transactionBuffer, db) {
   const hashKey = `transaction_hash_${transactionHash}`;
   const hashRef = db.collection('transactionHashes').doc(hashKey);
   
-  // CRITICAL: Aggressive timeout to prevent blockhash expiration
-  // Reduced to 500ms with no retries - fail fast to prevent blocking
+  // ✅ CRITICAL: Increased timeout to 2 seconds for duplicate check
+  // This is critical for preventing duplicates - must complete before processing
+  // If Firestore is slow, we'll reject the transaction to prevent duplicates
   let hashDoc;
   try {
     hashDoc = await Promise.race([
       hashRef.get(),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Transaction hash check timeout')), 500)
+        setTimeout(() => reject(new Error('Transaction hash check timeout')), 2000)
       )
     ]);
   } catch (timeoutError) {
-    // Don't retry - fail fast to prevent blockhash expiration
-    console.warn('Transaction hash check timed out - skipping to prevent blockhash expiration', {
-      error: timeoutError.message
+    // CRITICAL: Throw error so caller can reject the transaction
+    // This prevents duplicates when Firestore is slow
+    console.error('❌ Transaction hash check timed out - will reject transaction', {
+      error: timeoutError.message,
+      note: 'Rejecting to prevent potential duplicates'
     });
-    throw timeoutError; // Let caller handle (they'll continue anyway)
+    throw timeoutError;
   }
   
   if (hashDoc.exists) {
@@ -171,8 +174,8 @@ async function checkTransactionHash(transactionBuffer, db) {
     }
   }
   
-  // Record transaction hash with aggressive timeout to prevent blockhash expiration
-  // Reduced to 300ms with no retries - fail fast
+  // Record transaction hash - use shorter timeout for this (non-critical)
+  // If this fails, we still proceed (hash recording is less critical than duplicate check)
   try {
     await Promise.race([
       hashRef.set({
@@ -180,13 +183,14 @@ async function checkTransactionHash(transactionBuffer, db) {
         signedAt: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: false }), // merge: false is faster than merge: true
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Transaction hash set timeout')), 300)
+        setTimeout(() => reject(new Error('Transaction hash set timeout')), 1000)
       )
     ]);
   } catch (timeoutError) {
     // Don't throw - hash recording is not critical, continue processing
-    console.warn('Transaction hash set timed out - skipping to prevent blockhash expiration', {
-      error: timeoutError.message
+    console.warn('Transaction hash set timed out - continuing anyway', {
+      error: timeoutError.message,
+      note: 'Hash recording failed but transaction can proceed'
     });
   }
   
@@ -483,14 +487,16 @@ exports.processUsdcTransfer = functions.runWith({
 
     // ✅ CRITICAL: Check for duplicate transactions BEFORE processing
     // This prevents duplicate submissions even if frontend has issues
-    // Use aggressive timeout (500ms) to prevent blockhash expiration
-    // If check times out, log warning but proceed (better than blocking all transactions)
+    // CRITICAL: This check MUST complete - if it times out, we REJECT to prevent duplicates
+    // Better to reject one transaction than allow duplicates
     try {
       const duplicateCheckStart = Date.now();
+      // Increased timeout to 2 seconds - Firestore should respond within this time
+      // If it doesn't, we reject to prevent duplicates (safer than allowing through)
       await Promise.race([
         checkTransactionHash(transactionBuffer, db),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Duplicate check timeout')), 500)
+          setTimeout(() => reject(new Error('Duplicate check timeout - rejecting to prevent duplicates')), 2000)
         )
       ]);
       const duplicateCheckTime = Date.now() - duplicateCheckStart;
@@ -511,19 +517,22 @@ exports.processUsdcTransfer = functions.runWith({
         throw new functions.https.HttpsError('already-exists', 'This transaction has already been processed. Please check your transaction history.');
       }
       
-      // If it's a timeout, log warning but proceed (better than blocking)
-      // The transaction hash will be recorded after processing
+      // CRITICAL: If duplicate check times out, REJECT the transaction
+      // This prevents duplicates when Firestore is slow
+      // Better to reject one transaction than allow duplicates
       if (errorMessage.includes('timeout')) {
-        console.warn('⚠️ Duplicate check timed out - proceeding anyway', {
+        console.error('❌ Duplicate check timed out - REJECTING to prevent duplicates', {
           error: errorMessage,
-          note: 'Check took too long (>500ms). Proceeding to prevent blockhash expiration. Transaction will be recorded after processing.'
+          note: 'Check took too long (>2s). Rejecting transaction to prevent potential duplicates. User can retry.'
         });
+        throw new functions.https.HttpsError('deadline-exceeded', 'Transaction verification timed out. Please try again. This prevents duplicate transactions.');
       } else {
-        // Other errors - log and proceed
-        console.warn('⚠️ Duplicate check failed - proceeding anyway', {
+        // Other errors - also reject to be safe
+        console.error('❌ Duplicate check failed - REJECTING to prevent duplicates', {
           error: errorMessage,
-          note: 'Check failed but proceeding to prevent blockhash expiration.'
+          note: 'Check failed. Rejecting transaction to prevent potential duplicates.'
         });
+        throw new functions.https.HttpsError('internal', 'Transaction verification failed. Please try again.');
       }
     }
     

@@ -84,6 +84,14 @@ class ConsolidatedTransactionService {
       // ✅ CRITICAL: Check for duplicate in-flight transaction before proceeding
       // This prevents multiple simultaneous transactions with the same parameters
       const { transactionDeduplicationService } = await import('./TransactionDeduplicationService');
+      
+      // ✅ CRITICAL: Create a placeholder promise IMMEDIATELY to prevent race conditions
+      // This ensures that if multiple calls happen simultaneously, they all get the same promise
+      let transactionPromise: Promise<TransactionResult>;
+      let cleanup: () => void;
+      let isNewTransaction = false;
+      
+      // Try to get existing transaction first
       const existingPromise = transactionDeduplicationService.checkInFlight(
         params.userId,
         params.to,
@@ -106,14 +114,39 @@ class ConsolidatedTransactionService {
           logger.warn('Existing transaction failed, allowing new attempt', {
             error: existingError instanceof Error ? existingError.message : String(existingError)
           }, 'ConsolidatedTransactionService');
+          // Continue to create new transaction below
         }
       }
 
+      // ✅ CRITICAL: Register placeholder promise IMMEDIATELY to prevent race conditions
+      // This must happen BEFORE any async operations (wallet loading, etc.)
+      // Create a promise that will be resolved/rejected when the actual transaction completes
+      let resolveTransaction: (result: TransactionResult) => void;
+      let rejectTransaction: (error: any) => void;
+      
+      const placeholderPromise = new Promise<TransactionResult>((resolve, reject) => {
+        resolveTransaction = resolve;
+        rejectTransaction = reject;
+      });
+      
+      // Register the placeholder promise immediately
+      cleanup = transactionDeduplicationService.registerInFlight(
+        params.userId,
+        params.to,
+        params.amount,
+        placeholderPromise
+      );
+      
+      isNewTransaction = true;
+      transactionPromise = placeholderPromise;
+
+      // Now load wallet and create actual transaction
       // Load the user's wallet
       const { walletService } = await import('../wallet');
       const walletResult = await walletService.ensureUserWallet(params.userId);
       
       if (!walletResult.success || !walletResult.wallet) {
+        cleanup();
         return {
           signature: '',
           txId: '',
@@ -127,6 +160,7 @@ class ConsolidatedTransactionService {
       const keypairResult = keypairUtils.createKeypairFromSecretKey(walletResult.wallet.secretKey!);
       
       if (!keypairResult.success || !keypairResult.keypair) {
+        cleanup();
         logger.error('Failed to create keypair from wallet', { 
           success: keypairResult.success,
           error: keypairResult.error 
@@ -144,15 +178,18 @@ class ConsolidatedTransactionService {
         userId: params.userId
       });
 
-      // ✅ CRITICAL: Wrap transaction in deduplication service
-      // Register transaction as in-flight and get cleanup function
-      const transactionPromise = this.transactionProcessor.sendUSDCTransaction(params, keypairResult.keypair);
-      const cleanup = transactionDeduplicationService.registerInFlight(
-        params.userId,
-        params.to,
-        params.amount,
-        transactionPromise
-      );
+      // ✅ CRITICAL: Execute actual transaction and resolve placeholder promise
+      // This ensures all waiting calls get the same result
+      const actualTransactionPromise = this.transactionProcessor.sendUSDCTransaction(params, keypairResult.keypair);
+      
+      // Execute transaction and resolve/reject placeholder
+      actualTransactionPromise
+        .then((result) => {
+          resolveTransaction!(result);
+        })
+        .catch((error) => {
+          rejectTransaction!(error);
+        });
 
       // Execute transaction with cleanup on completion
       let result: TransactionResult;
@@ -168,9 +205,15 @@ class ConsolidatedTransactionService {
             result.signature
           );
         }
-      } finally {
-        // Always cleanup, even on error
+      } catch (error) {
+        // Re-throw error so caller can handle it
         cleanup();
+        throw error;
+      } finally {
+        // Always cleanup, even on error (if not already cleaned up)
+        if (isNewTransaction) {
+          cleanup();
+        }
       }
       
       logger.info('📋 ConsolidatedTransactionService: Transaction result', {

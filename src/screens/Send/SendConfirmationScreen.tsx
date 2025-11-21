@@ -362,14 +362,53 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       console.error('Send error:', error);
       
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // ✅ CRITICAL: Check if this is a timeout error
+      // Timeout errors mean transaction may have succeeded - check before showing error
+      const isTimeout = 
+        errorMessage.includes('timed out') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('deadline exceeded') ||
+        errorMessage.includes('deadline-exceeded');
+      
       const isBlockhashExpired = 
         errorMessage.includes('blockhash has expired') ||
         errorMessage.includes('blockhash expired') ||
         errorMessage.includes('Blockhash not found') ||
         errorMessage.includes('Please try again');
       
-      // Send payment failed notification (non-blocking)
-      if (currentUser?.id) {
+      // ✅ CRITICAL: For timeout errors, check if transaction actually succeeded
+      // before showing error to user
+      if (isTimeout && !isBlockhashExpired) {
+        // Timeout occurred - transaction may have succeeded
+        // Show message directing user to check transaction history
+        Alert.alert(
+          'Transaction Processing', 
+          'The transaction is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
+          [
+            {
+              text: 'Check History',
+              onPress: () => {
+                navigation.navigate('TransactionHistory');
+              }
+            },
+            {
+              text: 'OK',
+              style: 'cancel',
+              onPress: () => {
+                // Reset sending state so user can retry if needed
+                setSending(false);
+              }
+            }
+          ]
+        );
+        
+        // Don't send failed notification for timeout - transaction may have succeeded
+        return; // Exit early, don't show error
+      }
+      
+      // Send payment failed notification (non-blocking) - only for real failures
+      if (currentUser?.id && !isTimeout) {
         notificationService.instance.sendPaymentStatusNotification(
           currentUser.id,
           amount,
