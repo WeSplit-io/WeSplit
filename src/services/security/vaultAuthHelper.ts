@@ -28,15 +28,11 @@ import { logger } from '../analytics/loggingService';
  */
 export async function ensureVaultAuthenticated(forceReauth: boolean = false): Promise<boolean> {
   try {
-    // ✅ CRITICAL: Check cache FIRST before any Keychain access
-    // On Android, this prevents multiple Face ID prompts during navigation
-    if (!forceReauth && isVaultAuthenticated()) {
-      logger.debug('Vault already authenticated (using cached key), skipping re-authentication', {}, 'VaultAuthHelper');
-      return true;
-    }
-
-    // Pre-authenticate to ensure AES key is cached (if Keychain is available)
-    // This will only trigger biometrics if cache is empty/expired
+    // ✅ CRITICAL: Always call preAuthenticate which handles:
+    // 1. Checking if authentication is in progress (waits for it)
+    // 2. Checking if already authenticated (returns immediately)
+    // 3. Starting new authentication if needed (prevents duplicates)
+    // This ensures only ONE authentication happens across the entire app
     const authenticated = await secureVault.preAuthenticate(forceReauth);
     
     if (authenticated) {

@@ -856,6 +856,47 @@ export const firebaseDataService = {
         logger.error('Failed to delete transaction', { transactionId, error }, 'FirebaseDataService');
       throw error;
     }
+    },
+
+    // ✅ CRITICAL: Direct query by transaction signature (tx_hash) to prevent duplicates
+    // This is more reliable than getUserTransactions which only checks recent transactions
+    getTransactionBySignature: async (signature: string): Promise<Transaction | null> => {
+      try {
+        const q = query(
+          collection(db, 'transactions'),
+          where('tx_hash', '==', signature),
+          limit(1)
+        );
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          return firebaseDataTransformers.firestoreToTransaction(querySnapshot.docs[0]);
+        }
+        return null;
+      } catch (error) {
+        logger.error('Failed to get transaction by signature', { signature, error }, 'FirebaseDataService');
+        throw error;
+      }
+    },
+
+    // ✅ CRITICAL: Check for recipient transaction by signature and recipient user ID
+    getRecipientTransactionBySignature: async (signature: string, recipientUserId: string): Promise<Transaction | null> => {
+      try {
+        const q = query(
+          collection(db, 'transactions'),
+          where('tx_hash', '==', signature),
+          where('to_user', '==', recipientUserId),
+          where('type', '==', 'receive'),
+          limit(1)
+        );
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          return firebaseDataTransformers.firestoreToTransaction(querySnapshot.docs[0]);
+        }
+        return null;
+      } catch (error) {
+        logger.error('Failed to get recipient transaction by signature', { signature, recipientUserId, error }, 'FirebaseDataService');
+        throw error;
+      }
     }
   },
 

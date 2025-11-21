@@ -92,8 +92,39 @@ export class WalletRecoveryService {
     privateKey: string;
   }, userEmail?: string, userPhone?: string): Promise<boolean> {
     try {
-      // Primary: store private key via secure vault (Keychain+MMKV) using userId
-      const pkStored = await secureVault.store(userId, 'privateKey', wallet.privateKey);
+      // ✅ FIX: Use batchStore to store all keys with a single authentication
+      // This prevents multiple Face ID prompts when storing userId, emailHash, and phoneHash
+      const batchOperations: Array<{ userId: string; name: 'mnemonic' | 'privateKey'; value: string }> = [
+        { userId, name: 'privateKey', value: wallet.privateKey }
+      ];
+
+      // Add email hash storage if email provided
+      if (userEmail) {
+        try {
+          const emailHash = await this.hashEmail(userEmail);
+          batchOperations.push({ userId: emailHash, name: 'privateKey', value: wallet.privateKey });
+        } catch (emailError) {
+          logger.warn('Failed to hash email for batch storage (non-critical)', emailError, 'WalletRecoveryService');
+        }
+      }
+
+      // Add phone hash storage if phone provided
+      if (userPhone) {
+        try {
+          const phoneHash = await this.hashPhone(userPhone);
+          batchOperations.push({ userId: phoneHash, name: 'privateKey', value: wallet.privateKey });
+        } catch (phoneError) {
+          logger.warn('Failed to hash phone for batch storage (non-critical)', phoneError, 'WalletRecoveryService');
+        }
+      }
+
+      // ✅ CRITICAL: Store all keys in a single batch operation
+      // This ensures only ONE Face ID prompt for all storage operations
+      const batchResults = await secureVault.batchStore(batchOperations);
+      
+      // Check if primary storage (userId) succeeded
+      const pkStored = batchResults[0] === true;
+      
       if (!pkStored) {
         // Fallback: previous behavior in SecureStore (LAST RESORT - has issues in production)
         try {
@@ -111,51 +142,46 @@ export class WalletRecoveryService {
         }
       }
       
-      // ✅ CRITICAL: Also store by email hash as backup identifier
-      // This allows recovery even if userId changes after app update
-      if (userEmail) {
-        try {
-          const emailHash = await this.hashEmail(userEmail);
-          const emailStored = await secureVault.store(emailHash, 'privateKey', wallet.privateKey);
+      // Log results for email and phone storage (non-critical)
+      if (userEmail && batchResults.length > 1) {
+        const emailStored = batchResults[1] === true;
           if (emailStored) {
+          const emailHash = await this.hashEmail(userEmail);
             logger.info('Wallet also stored by email hash (backup identifier)', { 
               emailHash: emailHash.substring(0, 8) + '...',
               address: wallet.address 
             }, 'WalletRecoveryService');
           } else {
+          const emailHash = await this.hashEmail(userEmail);
             logger.warn('Failed to store wallet by email hash (non-critical)', { 
               emailHash: emailHash.substring(0, 8) + '...' 
             }, 'WalletRecoveryService');
           }
-        } catch (emailError) {
-          // Non-critical - email-based storage is backup only
-          logger.warn('Email-based wallet storage failed (non-critical)', emailError, 'WalletRecoveryService');
-        }
       }
 
-      // ✅ CRITICAL: Also store by phone hash as backup identifier
-      // This allows recovery even if userId changes after app update
-      if (userPhone) {
-        try {
-          const phoneHash = await this.hashPhone(userPhone);
-          const phoneStored = await secureVault.store(phoneHash, 'privateKey', wallet.privateKey);
+      if (userPhone && batchResults.length > (userEmail ? 2 : 1)) {
+        const phoneIndex = userEmail ? 2 : 1;
+        const phoneStored = batchResults[phoneIndex] === true;
           if (phoneStored) {
+          const phoneHash = await this.hashPhone(userPhone);
             logger.info('Wallet also stored by phone hash (backup identifier)', { 
               phoneHash: phoneHash.substring(0, 8) + '...',
               address: wallet.address 
             }, 'WalletRecoveryService');
           } else {
+          const phoneHash = await this.hashPhone(userPhone);
             logger.warn('Failed to store wallet by phone hash (non-critical)', { 
               phoneHash: phoneHash.substring(0, 8) + '...' 
             }, 'WalletRecoveryService');
           }
-        } catch (phoneError) {
-          // Non-critical - phone-based storage is backup only
-          logger.warn('Phone-based wallet storage failed (non-critical)', phoneError, 'WalletRecoveryService');
-        }
       }
       
-      logger.info('Wallet stored securely', { userId, address: wallet.address }, 'WalletRecoveryService');
+      logger.info('Wallet stored securely (batch operation)', { 
+        userId, 
+        address: wallet.address,
+        totalStored: batchResults.filter(r => r === true).length,
+        totalAttempted: batchResults.length
+      }, 'WalletRecoveryService');
       
       // Automatically create cloud backup if user has set backup password
       // This is done asynchronously to not block wallet storage
@@ -634,7 +660,9 @@ export class WalletRecoveryService {
                   address: recoveredAddress
                 }, 'WalletRecoveryService');
                 
-                // Re-store wallet using current userId for future recovery
+                // ✅ FIX: Re-store wallet using current userId for future recovery
+                // Use single store since we already have the key from get() above
+                // The cache should still be valid, so this won't trigger another Face ID
                 await secureVault.store(userId, 'privateKey', emailPrivateKey);
                 
                 return {
@@ -652,7 +680,9 @@ export class WalletRecoveryService {
                   address: recoveredAddress
                 }, 'WalletRecoveryService');
                 
-                // Re-store wallet using current userId
+                // ✅ FIX: Re-store wallet using current userId
+                // Use single store since we already have the key from get() above
+                // The cache should still be valid, so this won't trigger another Face ID
                 await secureVault.store(userId, 'privateKey', emailPrivateKey);
                 
                 return {

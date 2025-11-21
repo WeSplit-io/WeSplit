@@ -138,7 +138,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     refreshWallet
   } = useWalletState(currentUser?.id);
 
-  // Authenticate with Face ID before rendering dashboard (only once per user session)
+  // ✅ PRIMARY AUTHENTICATION POINT: Authenticate with Face ID/Knox before rendering dashboard
+  // This is the main entry point for biometric authentication after login.
+  // Other screens should NOT call ensureVaultAuthenticated() - they will automatically
+  // wait for this authentication via secureVault.get() which waits for authenticationPromise.
   // This runs only when the user changes, not on every screen focus
   useEffect(() => {
     const authenticate = async () => {
@@ -175,13 +178,24 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         setIsAuthenticating(true);
         setAuthenticationError(null);
         
-        // Pre-authenticate to trigger Face ID/Touch ID OR device passcode once before any vault access
+        // Pre-authenticate to trigger Face ID/Touch ID/Knox OR device passcode once before any vault access
         // Note: This will use biometrics if available, otherwise fall back to device passcode
         // In simulators, Keychain won't work, but SecureStore fallback will still work
-        // preAuthenticate() is idempotent - it won't prompt again if already authenticated
+        // preAuthenticate() handles concurrent requests - if another screen/service is already
+        // authenticating, it will wait for that instead of starting a duplicate authentication
+        logger.info('🔐 [FACE_ID] DashboardScreen: Requesting authentication - may trigger Face ID prompt', {
+          userId: currentUser.id,
+          timestamp: new Date().toISOString(),
+          note: 'Primary authentication point. User may be prompted for Face ID/Touch ID/fingerprint.'
+        }, 'DashboardScreen');
         const authenticated = await secureVault.preAuthenticate();
         
         if (authenticated) {
+          logger.info('✅ [FACE_ID] DashboardScreen: Authentication successful - user verified with Face ID', {
+            userId: currentUser.id,
+            timestamp: new Date().toISOString(),
+            note: 'User successfully authenticated. Cache valid for 30 minutes.'
+          }, 'DashboardScreen');
           logger.info('Authentication successful (biometrics or passcode)', { userId: currentUser.id }, 'DashboardScreen');
           vaultAuthSession.hasAuthenticated = true;
           vaultAuthSession.lastUserId = currentUser.id;
@@ -190,6 +204,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           // Keychain authentication failed (common in simulators or if user cancels)
           // This is okay - SecureStore fallback will work for vault access
           // Don't block the user, just log and continue
+          logger.info('⚠️ [FACE_ID] DashboardScreen: Keychain authentication not available (using SecureStore fallback)', {
+            userId: currentUser.id,
+            timestamp: new Date().toISOString(),
+            note: 'This is normal in Expo Go or if user cancelled. App will work with SecureStore fallback.'
+          }, 'DashboardScreen');
           logger.info('Keychain authentication not available (using SecureStore fallback)', { userId: currentUser.id }, 'DashboardScreen');
           vaultAuthSession.hasAuthenticated = true; // Mark as done even if Keychain failed
           vaultAuthSession.lastUserId = currentUser.id;

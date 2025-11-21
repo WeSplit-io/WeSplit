@@ -7,6 +7,15 @@
 import { logger } from '../analytics/loggingService';
 import { FeeService, TransactionType } from '../../config/constants/feeConfig';
 
+// ✅ CRITICAL: Request deduplication map to prevent race conditions
+// Key: transaction signature, Value: Promise that resolves when save completes
+// This prevents multiple simultaneous calls with the same signature from creating duplicates
+const pendingTransactionSaves = new Map<string, Promise<{
+  transactionSaved: boolean;
+  pointsAwarded: boolean;
+  error?: string;
+}>>();
+
 export interface TransactionPostProcessingParams {
   userId: string;
   toAddress: string;
@@ -23,6 +32,9 @@ export interface TransactionPostProcessingParams {
 /**
  * Save transaction to Firestore and award points (if applicable)
  * This ensures all transaction types follow the same pattern
+ * 
+ * ✅ CRITICAL: Uses request deduplication to prevent race conditions
+ * Multiple simultaneous calls with the same signature will share the same promise
  */
 export async function saveTransactionAndAwardPoints(
   params: TransactionPostProcessingParams
@@ -31,6 +43,26 @@ export async function saveTransactionAndAwardPoints(
   pointsAwarded: boolean;
   error?: string;
 }> {
+  // ✅ CRITICAL: Deduplicate simultaneous saves for the same transaction signature
+  // This prevents race conditions where multiple calls check before either saves
+  const signature = params.signature;
+  
+  // ✅ ATOMIC: Check if promise exists, if not create and store atomically
+  // This prevents race condition where two calls both check before either sets
+  let existingPromise = pendingTransactionSaves.get(signature);
+  if (existingPromise) {
+    logger.debug('Transaction save already in progress for this signature, waiting...', {
+      signature: signature.substring(0, 16) + '...',
+      userId: params.userId,
+      transactionType: params.transactionType
+    }, 'TransactionPostProcessing');
+    return await existingPromise;
+  }
+
+  // ✅ CRITICAL: Create promise and store it IMMEDIATELY in one atomic operation
+  // The promise is created synchronously and stored before any async operations
+  // This ensures that if two calls happen simultaneously, only one creates the promise
+  const savePromise = (async () => {
   const result = {
     transactionSaved: false,
     pointsAwarded: false,
@@ -82,6 +114,28 @@ export async function saveTransactionAndAwardPoints(
         firestoreTransactionType = 'send';
       }
       
+      // ✅ CRITICAL: Check if transaction with this signature already exists to prevent duplicates
+      // Use direct Firestore query by tx_hash for reliability (not just recent transactions)
+      // This prevents race conditions where multiple calls check before either saves
+      let existingTransaction: Transaction | null = null;
+      try {
+        existingTransaction = await firebaseDataService.transaction.getTransactionBySignature(params.signature);
+        
+        if (existingTransaction) {
+          logger.warn('⚠️ Transaction with this signature already exists, skipping duplicate save', {
+            signature: params.signature,
+            existingTransactionId: existingTransaction.id,
+            existingFromUser: existingTransaction.from_user,
+            existingToUser: existingTransaction.to_user,
+            existingAmount: existingTransaction.amount,
+            userId: params.userId,
+            transactionType: params.transactionType,
+            note: 'This transaction was already saved. Possible causes: retry, race condition, or duplicate call.'
+          }, 'TransactionPostProcessing');
+          result.transactionSaved = true; // Mark as saved since it already exists
+          // Continue to award points if needed (points might not have been awarded yet)
+        } else {
+          // Transaction doesn't exist, create it
       const senderTransactionData = {
         type: firestoreTransactionType,
         amount: params.amount,
@@ -104,13 +158,30 @@ export async function saveTransactionAndAwardPoints(
 
       await firebaseDataService.transaction.createTransaction(senderTransactionData);
       result.transactionSaved = true;
+        }
+      } catch (duplicateCheckError) {
+        // If duplicate check fails, this is a critical error - don't save to prevent duplicates
+        logger.error('❌ CRITICAL: Failed to check for duplicate transaction - NOT saving to prevent potential duplicates', {
+          signature: params.signature,
+          error: duplicateCheckError instanceof Error ? duplicateCheckError.message : String(duplicateCheckError),
+          errorStack: duplicateCheckError instanceof Error ? duplicateCheckError.stack : undefined,
+          note: 'Transaction will need to be saved manually or retried after fixing the duplicate check'
+        }, 'TransactionPostProcessing');
+        
+        // Don't save if we can't check for duplicates - this prevents creating duplicates
+        result.error = `Failed to verify transaction uniqueness: ${duplicateCheckError instanceof Error ? duplicateCheckError.message : String(duplicateCheckError)}`;
+        throw duplicateCheckError; // Re-throw to prevent saving
+      }
 
+      // Log transaction save status (only if actually saved, not if duplicate)
+      if (result.transactionSaved) {
       logger.info('✅ Transaction saved to database', {
         signature: params.signature,
         userId: params.userId,
         transactionType: params.transactionType,
         amount: params.amount
       }, 'TransactionPostProcessing');
+      }
 
       // Award points for internal transfers only (not external or withdrawals)
       // Points are awarded for: send, split_payment (funding), payment_request, settlement
@@ -173,6 +244,18 @@ export async function saveTransactionAndAwardPoints(
           params.transactionType !== 'withdraw' && 
           params.transactionType !== 'split_wallet_withdrawal') {
         try {
+          // ✅ CRITICAL: Check if recipient transaction already exists using direct query
+          const existingRecipientTransaction = await firebaseDataService.transaction.getRecipientTransactionBySignature(params.signature, recipientUserId);
+          
+          if (existingRecipientTransaction) {
+            logger.warn('⚠️ Recipient transaction with this signature already exists, skipping duplicate save', {
+              signature: params.signature,
+              existingTransactionId: existingRecipientTransaction.id,
+              recipientUserId,
+              transactionType: params.transactionType,
+              note: 'Recipient transaction was already saved. Possible causes: retry, race condition, or duplicate call.'
+            }, 'TransactionPostProcessing');
+          } else {
           const recipientTransactionData = {
             type: 'receive' as const,
             amount: params.amount,
@@ -199,6 +282,7 @@ export async function saveTransactionAndAwardPoints(
             recipientUserId,
             transactionType: params.transactionType
           }, 'TransactionPostProcessing');
+          }
         } catch (recipientSaveError) {
           logger.error('❌ Failed to save recipient transaction to database', recipientSaveError, 'TransactionPostProcessing');
           // Don't fail - sender transaction is already saved
@@ -216,6 +300,23 @@ export async function saveTransactionAndAwardPoints(
     logger.error('❌ Error in transaction post-processing', error, 'TransactionPostProcessing');
     result.error = error instanceof Error ? error.message : 'Unknown error';
     return result;
+    } finally {
+      // Remove from pending saves map
+      pendingTransactionSaves.delete(signature);
+    }
+  })();
+
+  // ✅ CRITICAL: Store the promise IMMEDIATELY (synchronously, before any await)
+  // This must happen before awaiting, so other simultaneous calls can find it
+  // This eliminates the race condition window between check and set
+  pendingTransactionSaves.set(signature, savePromise);
+  
+  try {
+    return await savePromise;
+  } catch (error) {
+    // If promise fails, remove from map so it can be retried
+    pendingTransactionSaves.delete(signature);
+    throw error;
   }
 }
 
