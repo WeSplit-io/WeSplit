@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import PhosphorIcon from '../shared/PhosphorIcon';
@@ -17,6 +18,7 @@ interface BadgeCardProps {
   onPress?: () => void;
   disabled?: boolean;
   isClaiming?: boolean;
+  hideClaimedOverlay?: boolean;
 }
 
 const BadgeCard: React.FC<BadgeCardProps> = ({
@@ -25,6 +27,7 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
   onPress,
   disabled = false,
   isClaiming = false,
+  hideClaimedOverlay = false,
 }) => {
   const targetValue = typeof progress.target === 'number' && progress.target > 0 ? progress.target : 1;
   const progressPercentage = Math.min((progress.current / targetValue) * 100, 100);
@@ -38,12 +41,13 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
     return safeValue.toLocaleString(undefined, { maximumFractionDigits: 0 });
   };
 
-  return (
+  const cardContent = (insideGradient: boolean = false) => (
     <TouchableOpacity
       style={[
         styles.badgeCard,
         progress.claimed && styles.badgeCardClaimed,
-        canClaim && styles.badgeCardClaimable
+        canClaim && styles.badgeCardClaimable,
+        insideGradient && styles.badgeCardInsideGradient
       ]}
       onPress={onPress}
       disabled={disabled || !canClaim}
@@ -51,9 +55,14 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
     >
       {/* Points label - only show if not claimed */}
       {!progress.claimed && (
-        <View style={styles.badgePointsLabel}>
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.badgePointsLabel}
+        >
           <Text style={styles.badgePointsLabelText}>{badgeInfo.points || 0} pts</Text>
-        </View>
+        </LinearGradient>
       )}
 
       {/* Badge image - displayed directly from Firebase */}
@@ -106,60 +115,98 @@ const BadgeCard: React.FC<BadgeCardProps> = ({
       {/* Claim button overlay */}
       {canClaim && (
         <View style={styles.badgeClaimOverlay}>
-          <Text style={styles.badgeClaimText}>
-            {isClaiming ? 'Claiming...' : 'Tap to Claim'}
-          </Text>
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.badgeClaimTextGradient}
+          >
+            <Text style={styles.badgeClaimText}>
+              {isClaiming ? 'Claiming...' : 'Tap to Claim'}
+            </Text>
+          </LinearGradient>
         </View>
       )}
       
-      {/* Claimed indicator - subtle checkmark */}
-      {progress.claimed && (
-        <View style={styles.claimedIndicator}>
-          <PhosphorIcon name="CheckCircle" size={16} color={colors.green} weight="fill" />
+      {/* Claimed overlay - similar to claim overlay but with "Already Claimed" */}
+      {progress.claimed && !hideClaimedOverlay && (
+        <View style={styles.badgeClaimOverlay}>
+          <View style={styles.badgeClaimedContent}>
+            <PhosphorIcon name="CheckCircle" size={24} color={colors.white} weight="fill" />
+            <Text style={styles.badgeClaimedText}>
+              Already Claimed
+            </Text>
+          </View>
         </View>
       )}
     </TouchableOpacity>
   );
+
+  // Wrap in LinearGradient for claimable and claimed cards to create gradient border
+  if (canClaim || progress.claimed) {
+    return (
+      <View style={styles.badgeCardWrapper}>
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.badgeCardGradientBorder}
+        >
+          {cardContent(true)}
+        </LinearGradient>
+      </View>
+    );
+  }
+
+  return cardContent(false);
 };
 
 const styles = StyleSheet.create({
   badgeCard: {
     width: '48%', // 2 badges per row
-    backgroundColor: colors.white5,
+    backgroundColor: colors.blackWhite5,
     borderRadius: 12,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white10,
     position: 'relative',
     minHeight: 220,
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
   badgeCardClaimed: {
-    borderColor: colors.green,
-    borderWidth: 2,
-    shadowColor: colors.green,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    // Border is handled by LinearGradient wrapper, no border needed here
+    marginBottom: 0, // Margin handled by wrapper
   },
   badgeCardClaimable: {
-    borderColor: colors.green,
-    borderWidth: 2,
+    // Border is handled by LinearGradient wrapper, no border needed here
+    marginBottom: 0, // Margin handled by wrapper
+  },
+  badgeCardInsideGradient: {
+    width: '100%', // Full width when inside gradient border
+    marginBottom: 0, // No margin when inside wrapper
+    borderRadius: 12, // Match badgeCard borderRadius
+  },
+  badgeCardWrapper: {
+    width: '48%', // Match badgeCard width for grid alignment
+    marginBottom: spacing.md, // Match badgeCard margin
+  },
+  badgeCardGradientBorder: {
+    borderRadius: 14, // badgeCard borderRadius (12) + borderWidth (2)
+    padding: 2, // This creates the gradient border effect (2px border width)
+    width: '100%', // Full width to fill wrapper
+    overflow: 'hidden', // Ensure border radius is respected
   },
   badgePointsLabel: {
     position: 'absolute',
-    top: spacing.xs,
-    left: spacing.xs,
-    backgroundColor: colors.green,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: 8,
+    top: spacing.md,
+    left: 0,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderTopRightRadius: spacing.sm,
+    borderBottomRightRadius: spacing.sm,
     zIndex: 1,
   },
   badgePointsLabelText: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.black,
   },
@@ -176,6 +223,7 @@ const styles = StyleSheet.create({
     height: 120,
     maxWidth: 120,
     maxHeight: 120,
+    resizeMode: 'contain',
   },
   badgeImagePlaceholder: {
     width: '100%',
@@ -239,10 +287,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  badgeClaimTextGradient: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+  },
   badgeClaimText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.green,
+    color: colors.black,
+    textAlign: 'center',
+  },
+  badgeClaimedContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  badgeClaimedText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
+    textAlign: 'center',
   },
   claimedIndicator: {
     position: 'absolute',

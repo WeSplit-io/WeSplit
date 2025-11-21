@@ -308,18 +308,37 @@ const HowToEarnPointsScreen: React.FC = () => {
     }
   }, [currentUser?.id, redeemCode, redeemingBadge, loadBadges]);
 
-  // Filter badges based on active tab
+  // Filter badges based on active tab - exclude community badges (only show point badges)
   const filteredBadges = useMemo(() => {
+    // Filter out community badges - only show badges with points
+    const pointBadges = badgeProgress.filter(p => {
+      const badgeInfo = BADGE_DEFINITIONS[p.badgeId];
+      return badgeInfo && !badgeInfo.isCommunityBadge && badgeInfo.points !== undefined && badgeInfo.points > 0;
+    });
+
     if (badgeTab === 'claimed') {
-      // Show all claimed badges (both achievement and event)
-      return badgeProgress.filter(p => p.claimed);
+      // Show claimed point badges AND claimed community badges
+      return badgeProgress.filter(p => {
+        if (!p.claimed) return false;
+        const badgeInfo = BADGE_DEFINITIONS[p.badgeId];
+        if (!badgeInfo) return false;
+        // Include point badges
+        if (!badgeInfo.isCommunityBadge && badgeInfo.points !== undefined && badgeInfo.points > 0) {
+          return true;
+        }
+        // Include community badges that are claimed
+        if (badgeInfo.isCommunityBadge) {
+          return true;
+        }
+        return false;
+      });
     }
     if (badgeTab === 'redeem') {
-      // Show only event badges that can be redeemed
-      return badgeProgress.filter(p => p.isEventBadge && !p.claimed);
+      // Redeem tab doesn't apply to point badges (only community/event badges)
+      return [];
     }
-    // "All" tab shows all badges (both achievement and event)
-    return badgeProgress;
+    // "All" tab shows all point badges
+    return pointBadges;
   }, [badgeProgress, badgeTab]);
 
   const renderBadgeCard = (progress: BadgeProgress) => {
@@ -337,6 +356,7 @@ const HowToEarnPointsScreen: React.FC = () => {
         onPress={() => canClaim && !isClaiming && handleClaimBadge(progress.badgeId)}
         disabled={!canClaim || isClaiming}
         isClaiming={isClaiming}
+        hideClaimedOverlay={badgeTab === 'claimed'}
       />
     );
   };
@@ -439,7 +459,12 @@ const HowToEarnPointsScreen: React.FC = () => {
                   {tab.label}
                 </Text>
                 {badgeTab === tab.value && (
-                  <View style={styles.secondaryNavIndicator} />
+                  <LinearGradient
+                    colors={[colors.gradientStart, colors.gradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.secondaryNavIndicator}
+                  />
                 )}
               </TouchableOpacity>
             ))}
@@ -653,7 +678,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   secondaryNavWrapper: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   secondaryNavContainer: {
     flexDirection: 'row',
@@ -663,11 +688,11 @@ const styles = StyleSheet.create({
   },
   secondaryNavTab: {
     position: 'relative',
-    paddingBottom: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   secondaryNavText: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.medium,
     color: colors.white70,
   },
@@ -680,7 +705,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: colors.green,
   },
   secondaryNavUnderline: {
     width: '100%',
