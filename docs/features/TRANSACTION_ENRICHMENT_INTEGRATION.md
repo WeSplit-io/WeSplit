@@ -1,7 +1,10 @@
-# Transaction Enrichment Integration
+# Transaction Enrichment Integration & Improvements
+
+**Date:** 2025-01-XX  
+**Purpose:** Complete guide for transaction enrichment system including integration, improvements, and best practices
 
 ## Overview
-This document describes the complete integration of transaction enrichment into the transaction history system, ensuring backward compatibility with old splits, maintaining 1/1 transfer logic, and preserving request transaction handling.
+This document describes the complete integration of transaction enrichment into the transaction history system, ensuring backward compatibility with old splits, maintaining 1/1 transfer logic, preserving request transaction handling, and displaying split names instead of wallet IDs with external destination labels.
 
 ## Integration Points
 
@@ -185,10 +188,71 @@ Display using TransactionItem
 - **Error Handling**: Graceful fallback if enrichment fails
 - **Deduplication**: Applied before enrichment to avoid duplicate processing
 
+## Key Improvements
+
+### 1. Bidirectional Split Wallet Detection
+
+#### Funding INTO Split Wallets
+- **Transaction Type**: `send` or `payment`
+- **Detection**: Checks `to_wallet` address against split wallet addresses
+- **Display**: Shows split name instead of wallet ID
+- **Example**: "Send to [Split Name]" instead of "Send to degen_split_wallet_176365..."
+
+#### Withdrawing FROM Split Wallets
+- **Transaction Type**: `withdrawal`, `send`, or `payment`
+- **Detection**: Checks `from_wallet` address against split wallet addresses
+- **Display**: Shows split name for withdrawals from split wallets
+- **Example**: "Withdrawal from [Split Name]" or shows split name in subtitle
+
+#### Receiving FROM Split Wallets
+- **Transaction Type**: `receive` or `deposit`
+- **Detection**: Checks `from_wallet` address against split wallet addresses
+- **Display**: Shows split name as source
+- **Example**: "Received from [Split Name]"
+
+### 2. External Destination Detection
+
+#### External Cards (KAST Cards)
+- **Detection**: Checks wallet address against user's linked KAST cards
+- **Display**: Shows "External Card" label
+- **Transaction Types**: `withdrawal`, `send`, `payment`
+
+#### External Wallets
+- **Detection**: Checks wallet address against user's linked external wallets
+- **Display**: Shows "External Wallet" label
+- **Transaction Types**: `withdrawal`, `send`, `payment`
+
+### 3. Enhanced Caching for Performance
+
+- **Split Wallet Cache**: Caches split wallet lookups by address
+- **External Destination Cache**: Caches external card/wallet lookups by address
+- **Benefit**: Reduces database queries when multiple transactions reference the same addresses
+
+### Transaction Types Handled
+
+| Transaction Type | Direction | Detection Field | Display |
+|-----------------|-----------|-----------------|---------|
+| `send` | Funding INTO split | `to_wallet` | Split name |
+| `send` | Withdrawing FROM split | `from_wallet` | Split name |
+| `payment` | Funding INTO split | `to_wallet` | Split name |
+| `payment` | Withdrawing FROM split | `from_wallet` | Split name |
+| `withdrawal` | To external card/wallet | `to_wallet` | "External Card" or "External Wallet" |
+| `withdrawal` | From split wallet | `from_wallet` | Split name |
+| `receive` | From split wallet | `from_wallet` | Split name |
+| `deposit` | From split wallet | `from_wallet` | Split name |
+
+## Consolidated Documentation
+
+The following file has been consolidated into this guide:
+- `TRANSACTION_ENRICHMENT_IMPROVEMENTS.md` - Improvements and enhancements (now included above)
+
 ## Future Enhancements
 
 1. **Local Caching**: Cache split names in local storage
 2. **Background Enrichment**: Pre-enrich transactions in background
 3. **Smart Grouping**: Group related transactions
 4. **Enhanced Memo Parsing**: Better extraction of split info from various memo formats
+5. **Split Wallet Name Caching**: Cache split names in local storage
+6. **Transaction Grouping**: Group related transactions (e.g., funding + fee)
+7. **Smart Labels**: More descriptive labels based on transaction context
 

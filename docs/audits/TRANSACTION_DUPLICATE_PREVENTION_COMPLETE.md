@@ -301,6 +301,86 @@ All frontend transaction entry points have been audited and protected with:
 
 ---
 
+---
+
+## Historical Context & Investigation Timeline
+
+This section summarizes the investigation and fix process that led to the current comprehensive solution.
+
+### Initial Problem (2025-11-21)
+- **User Report:** 3 transactions occurring seconds apart with same amount, from, and to wallets
+- **Symptoms:** Timeout errors in frontend, duplicate transactions in Firestore
+- **Initial Status:** All fixes deployed but issue persisted
+
+### Root Cause Analysis
+
+#### Issue #1: Cleanup on Error (CRITICAL)
+**Location:** `ConsolidatedTransactionService.ts` and `sendExternal.ts`
+
+**Problem:** When transactions failed or timed out, cleanup was called immediately, removing them from the deduplication service. This allowed retries to bypass deduplication.
+
+**Timeline:**
+1. Transaction 1 starts → registered in deduplication service
+2. Transaction 1 times out → cleanup() called → removed from deduplication
+3. Transaction 2 starts → NOT FOUND (Transaction 1 was cleaned up!) → registered
+4. Transaction 3 starts → NOT FOUND → registered
+
+**Fix:** Don't cleanup on error. Failed transactions stay in deduplication for 60 seconds to prevent immediate retries.
+
+#### Issue #2: Non-Atomic Check-and-Register
+**Location:** `TransactionDeduplicationService.ts`
+
+**Problem:** `checkInFlight()` and `registerInFlight()` used different timestamps, creating a race condition window where multiple calls could all pass the check before any registered.
+
+**Fix:** Implemented atomic `checkAndRegisterInFlight()` method that does both operations synchronously.
+
+#### Issue #3: Firebase Functions Skipping Duplicate Checks
+**Location:** `services/firebase-functions/src/transactionFunctions.js`
+
+**Problem:** Duplicate checks were fire-and-forget (non-blocking), allowing duplicates to be processed even when checks were running.
+
+**Fix:** Made duplicate checks synchronous with 500ms timeout, rejecting transactions on timeout to prevent duplicates.
+
+### Fix Timeline
+
+1. **2025-11-21:** Initial fixes applied (button guards, deduplication service)
+2. **2025-11-21:** Critical bug found - cleanup on error
+3. **2025-11-21:** Deep audit revealed race condition in check-and-register
+4. **2025-11-21:** Atomic check-and-register implemented
+5. **2025-01-XX:** Firebase Functions duplicate check made synchronous
+6. **2025-01-XX:** All fixes verified and deployed
+
+### Key Learnings
+
+1. **Synchronous Operations:** Async state updates create race condition windows. Use refs for immediate synchronous checks.
+
+2. **Error Handling:** Don't cleanup failed operations immediately - keep them in deduplication to prevent retries.
+
+3. **Atomic Operations:** Check-and-set operations must be atomic to prevent race conditions.
+
+4. **Backend Safety:** Frontend protection is not enough - backend must also check for duplicates synchronously.
+
+5. **Multi-Layer Protection:** No single layer is perfect - multiple layers provide defense in depth.
+
+### Related Documentation (Consolidated)
+
+The following files have been consolidated into this document:
+- `DUPLICATE_TRANSACTION_README.md` - Index of duplicate transaction docs
+- `CRITICAL_BUG_FOUND.md` - Cleanup on error issue
+- `CRITICAL_DUPLICATE_FIX_DEPLOYMENT.md` - Deployment instructions
+- `CRITICAL_FIXES_APPLIED.md` - AppleSlider and early return fixes
+- `DEEP_DUPLICATE_AUDIT.md` - Race condition analysis
+- `FINAL_DUPLICATION_VERIFICATION.md` - Final verification checklist
+- `FINAL_FIX_VERIFICATION.md` - Verification of fixes
+- `FINAL_VERIFICATION_SUMMARY.md` - Summary of all fixes
+- `FIX_VERIFICATION_CHECKLIST.md` - Pre-build verification
+- `TRANSACTION_DUPLICATE_CRITICAL_FIXES.md` - Critical fixes summary
+- `ROOT_CAUSE_ANALYSIS.md` - Root cause analysis
+- `LOGS_ANALYSIS_DUPLICATE_CHECK.md` - Log analysis
+- `LOG_CHECK_COMMANDS.md` - Log check commands reference
+- `PRE_BUILD_VERIFICATION.md` - Pre-build verification checklist
+
 **Last Updated:** 2025-01-XX
+
 
 

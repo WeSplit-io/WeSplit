@@ -2,6 +2,9 @@
 
 This guide explains how to build both Android AAB and iOS IPA files locally without using EAS cloud services.
 
+**Date:** 2025-01-16  
+**Purpose:** Complete guide for building production AAB and IPA files locally (without EAS Build)
+
 ## Prerequisites
 
 ### For Android AAB Builds
@@ -18,28 +21,62 @@ This guide explains how to build both Android AAB and iOS IPA files locally with
 - ✅ Apple Developer Account (for code signing)
 - ✅ Valid provisioning profiles
 
-## Quick Start
+## 🚀 Quick Start (5 minutes)
 
-### Build AAB Only
+### Step 1: Create `.env.production` file (For Production Builds)
+
+```bash
+# Copy the template
+cp config/environment/env.production.template .env.production
+
+# Edit and fill in the values
+nano .env.production  # or use your favorite editor
+```
+
+**Required values to fill:**
+- All `EXPO_PUBLIC_FIREBASE_*` variables (get from [Firebase Console](https://console.firebase.google.com/project/wesplit-35186/settings/general))
+- At least one RPC API key (recommended for better performance)
+- `EXPO_PUBLIC_NETWORK=mainnet` for production
+- `EXPO_PUBLIC_USE_PROD_FUNCTIONS=true` for production
+
+### Step 2: Verify Firebase Secrets (For Production Builds)
+
+```bash
+# Run the verification script
+./scripts/verify-firebase-secrets.sh
+```
+
+### Step 3: Deploy Firebase Functions (For Production Builds)
+
+```bash
+cd services/firebase-functions
+firebase deploy --only functions
+```
+
+### Step 4: Build
+
+#### Build AAB Only
 ```bash
 npm run build:aab:local
 # or
 bash scripts/build-aab-production-local.sh
 ```
 
-### Build IPA Only
+#### Build IPA Only
 ```bash
 npm run build:ipa:local
 # or
 bash scripts/build-ipa-production-local.sh
 ```
 
-### Build Both
+#### Build Both
 ```bash
 npm run build:both:local
 # or
 bash scripts/build-both-production-local.sh
 ```
+
+**Note:** For production builds, ensure `.env.production` is set up and Firebase Functions are deployed first.
 
 ## Build Output Locations
 
@@ -162,21 +199,36 @@ pod install
 
 ## Environment Variables
 
-Both scripts load environment variables from `.env` file. Required variables:
+Both scripts load environment variables from `.env` or `.env.production` file. Required variables:
 
 ```bash
-# Network Configuration
+# Network Configuration (REQUIRED for production)
 EXPO_PUBLIC_NETWORK=mainnet
 EXPO_PUBLIC_FORCE_MAINNET=true
 EXPO_PUBLIC_DEV_NETWORK=mainnet
+EXPO_PUBLIC_USE_PROD_FUNCTIONS=true
 
-# Firebase (if needed)
-EXPO_PUBLIC_FIREBASE_API_KEY=...
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+# Firebase Configuration (REQUIRED)
+EXPO_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=wesplit-35186.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=wesplit-35186
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=wesplit-35186.appspot.com
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+EXPO_PUBLIC_FIREBASE_APP_ID=your-app-id
+EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=your-measurement-id
 
-# Other Expo Public variables
-EXPO_PUBLIC_ALCHEMY_API_KEY=...
+# RPC Configuration (OPTIONAL but RECOMMENDED for better performance)
+EXPO_PUBLIC_HELIUS_API_KEY=your-helius-api-key
+# OR
+EXPO_PUBLIC_ALCHEMY_API_KEY=your-alchemy-api-key
+# OR
+EXPO_PUBLIC_GETBLOCK_API_KEY=your-getblock-api-key
 ```
+
+**Important:** 
+- Replace all placeholder values with actual values
+- Never commit `.env.production` to version control (it should be in `.gitignore`)
+- Get Firebase config values from [Firebase Console](https://console.firebase.google.com/project/wesplit-35186/settings/general)
 
 ## Build Time
 
@@ -226,6 +278,73 @@ unzip -l tools/builds/ios/WeSplit-*.ipa | head -20
 - ⚠️ **Code signing must be configured in Xcode first** - The script cannot set this up automatically
 - ✅ **Both scripts clean previous builds** - No need to manually clean
 - ✅ **Environment variables are validated** - Scripts check network config before building
+
+## Production Build Checklist
+
+Before building production AAB/IPA:
+
+- [ ] `.env.production` file exists with all required variables
+- [ ] All Firebase environment variables are set correctly
+- [ ] `EXPO_PUBLIC_USE_PROD_FUNCTIONS=true` in `.env.production`
+- [ ] `EXPO_PUBLIC_NETWORK=mainnet` in `.env.production`
+- [ ] Firebase Functions secrets are set (verified with script)
+- [ ] Firebase Functions are deployed to production
+- [ ] Test transaction works in production build
+
+## Troubleshooting
+
+### Issue: Environment variables show as `${VAR_NAME}` in logs
+
+**Cause:** `.env.production` not loaded or variables not set
+
+**Solution:**
+1. Verify `.env.production` exists in project root
+2. Check variables are set (no empty values)
+3. Rebuild with `--clear-cache` flag
+4. Verify `app.config.js` is reading from `.env.production`
+
+### Issue: Transactions fail with "internal" error
+
+**Possible Causes:**
+1. Firebase Functions not deployed
+2. Firebase Secrets not set
+3. `EXPO_PUBLIC_USE_PROD_FUNCTIONS` not set to `true`
+
+**Solution:**
+1. Verify functions are deployed: `firebase functions:list`
+2. Verify secrets are set: `./scripts/verify-firebase-secrets.sh`
+3. Check `.env.production` has `EXPO_PUBLIC_USE_PROD_FUNCTIONS=true`
+4. Check Firebase Functions logs: `firebase functions:log`
+
+### Issue: Firebase initialization fails
+
+**Cause:** Firebase environment variables missing or incorrect
+
+**Solution:**
+1. Verify all Firebase variables in `.env.production`
+2. Get correct values from [Firebase Console](https://console.firebase.google.com/project/wesplit-35186/settings/general)
+3. Rebuild after updating `.env.production`
+
+### Issue: "Secret not found" errors in Firebase Functions
+
+**Cause:** Firebase Secrets not set in Firebase Secret Manager
+
+**Solution:**
+1. Run `./scripts/verify-firebase-secrets.sh` to check which secrets are missing
+2. Set missing secrets (see Firebase Secrets Setup guide)
+3. Redeploy functions: `cd services/firebase-functions && firebase deploy --only functions`
+
+## Related Documentation
+
+- [Firebase Secrets Setup](./FIREBASE_SECRETS_SETUP_GUIDE.md)
+- [Firebase Functions Network Setup](./FIREBASE_FUNCTIONS_NETWORK_SETUP.md)
+- [Troubleshooting Transaction Errors](./TROUBLESHOOTING_TRANSACTION_ERRORS.md)
+- [Network Configuration](../NETWORK_CONFIGURATION.md)
+
+### Consolidated Documentation
+
+The following file has been consolidated into this guide:
+- `LOCAL_PRODUCTION_BUILD_SETUP.md` - Production build setup details (now included above)
 
 ## Support
 

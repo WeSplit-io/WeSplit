@@ -49,5 +49,15 @@ For questions or issues:
 
 ---
 
+---
+
+## Related Documentation (Consolidated)
+
+The following files have been consolidated into this README:
+- `SUMMARY.md` - GitBook summary (table of contents)
+- `SUMMARY_FIXED.md` - Updated GitBook summary
+
+**Note:** The main integration guide is in `EXTERNAL_WEB_APP_TECHNICAL_INTEGRATION.md`, which contains all the detailed information needed for integration.
+
 **Last Updated**: 2024
 

@@ -1,5 +1,8 @@
 # Local Testing with Firebase Functions Emulator
 
+**Date:** 2025-01-XX  
+**Purpose:** Complete guide for using Firebase Functions Emulator for local development and testing
+
 ## Problem
 
 Your client app is on **devnet**, but production Firebase Functions are on **mainnet**. This causes network mismatches and transaction failures.
@@ -146,6 +149,44 @@ firebase login
 2. App is in dev mode (`__DEV__ = true`)
 3. `.env` file has `SOLANA_NETWORK=devnet` (optional, emulator defaults to devnet)
 
+## Implementation Verification
+
+### ✅ Environment Variable Reading
+**Fixed:** Now uses `getEnvVar('EXPO_PUBLIC_USE_PROD_FUNCTIONS')` which:
+- Checks `process.env` first
+- Falls back to `Constants.expoConfig.extra`
+- Falls back to `Constants.manifest.extra`
+- Works correctly in Expo Go and standalone builds
+
+### ✅ Boolean Check
+**Fixed:** Explicitly checks for `=== 'true'` or `=== '1'`:
+```typescript
+const useProdFunctionsEnv = getEnvVar('EXPO_PUBLIC_USE_PROD_FUNCTIONS');
+const useProdFunctions = useProdFunctionsEnv === 'true' || useProdFunctionsEnv === '1';
+```
+
+### ✅ Singleton Pattern
+**Fixed:** Implemented singleton pattern to ensure:
+- `connectFunctionsEmulator` is called only once
+- Connection happens BEFORE any `httpsCallable` calls
+- Functions instance is cached for reuse
+
+### Implementation Flow
+```
+1. App starts
+2. Transaction is triggered
+3. getProcessUsdcTransferFunction() is called
+4. getFirebaseFunctions() is called (first time)
+   ├─ Checks if already initialized → returns cached instance
+   ├─ Gets Firebase app
+   ├─ Gets Functions instance
+   ├─ Checks __DEV__ and useProdFunctions
+   ├─ Calls connectFunctionsEmulator() if needed
+   └─ Caches instance
+5. httpsCallable() is called with connected Functions instance
+6. Function call goes to emulator (if connected) or production
+```
+
 ## Summary
 
 🎯 **For Local Testing:**
@@ -160,4 +201,10 @@ firebase login
 - No configuration needed
 
 ✅ **Result:** You can test devnet locally while production users continue using mainnet!
+
+### Consolidated Documentation
+
+The following files have been consolidated into this guide:
+- `EMULATOR_QUICK_START.md` - Quick start guide (now included above)
+- `EMULATOR_CONNECTION_VERIFICATION.md` - Implementation verification details (now included above)
 
