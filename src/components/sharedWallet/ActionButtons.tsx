@@ -4,10 +4,9 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
+import { View, StyleSheet } from 'react-native';
 import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
+import { Button } from '../../components/shared';
 
 interface ActionButtonsProps {
   onTopUp: () => void;
@@ -24,32 +23,33 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 }) => {
   return (
     <View style={styles.actionsGrid}>
-      <TouchableOpacity
-        style={[styles.actionButton, styles.actionButtonEnabled]}
+      <Button
+        title="Top Up"
         onPress={onTopUp}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.actionButtonText}>Top Up</Text>
-      </TouchableOpacity>
+        variant="secondary"
+        size="small"
+        style={styles.actionButton}
+        textStyle={styles.actionButtonText}
+      />
 
-      <TouchableOpacity
-        style={[styles.actionButton, styles.actionButtonEnabled]}
+      <Button
+        title="Link Card"
         onPress={onLinkCard}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.actionButtonText}>Link Card</Text>
-      </TouchableOpacity>
+        variant="secondary"
+        size="small"
+        style={styles.actionButton}
+        textStyle={styles.actionButtonText}
+      />
 
-      <TouchableOpacity
-        style={[styles.actionButton, canWithdraw ? styles.actionButtonEnabled : styles.actionButtonDisabled]}
+      <Button
+        title="Withdraw"
         onPress={onWithdraw}
-        activeOpacity={0.7}
+        variant="secondary"
+        size="small"
         disabled={!canWithdraw}
-      >
-        <Text style={[styles.actionButtonText, !canWithdraw && styles.actionButtonTextDisabled]}>
-          Withdraw
-        </Text>
-      </TouchableOpacity>
+        style={styles.actionButton}
+        textStyle={styles.actionButtonText}
+      />
     </View>
   );
 };
@@ -63,31 +63,11 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: spacing.sm,
-    borderWidth: 1,
-    minHeight: 44,
-  },
-  actionButtonEnabled: {
-    backgroundColor: colors.greenBlue20,
-    borderColor: colors.green + '40',
-  },
-  actionButtonDisabled: {
-    backgroundColor: colors.white10,
-    borderColor: colors.white10,
   },
   actionButtonText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.green,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 12,
     letterSpacing: 0.2,
     textTransform: 'uppercase',
-  },
-  actionButtonTextDisabled: {
-    color: colors.white50,
   },
 });
 

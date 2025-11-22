@@ -1587,11 +1587,9 @@ export const styles = StyleSheet.create({
     bottom: spacing.xl,
     left: spacing.md,
     right: spacing.md,
+  },
+  doneButtonWrapper: {
     backgroundColor: colors.black,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: spacing.radiusMd,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.green,
   },

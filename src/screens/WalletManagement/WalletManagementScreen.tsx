@@ -32,7 +32,7 @@ import { styles } from './styles';
 import { QRCodeScreen } from '../QRCode';
 import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, ModernLoader } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
 const WalletManagementScreen: React.FC = () => {
@@ -83,7 +83,7 @@ const WalletManagementScreen: React.FC = () => {
           setMultiSignRemainingDays(remainingDays);
         }
       } catch (error) {
-        console.error('Error loading multi-sign state:', error);
+        logger.error('Error loading multi-sign state', { error }, 'WalletManagementScreen');
         setMultiSignEnabled(false);
       }
     };
@@ -128,7 +128,7 @@ const WalletManagementScreen: React.FC = () => {
           // Load multi-signature wallets and transactions
           await loadMultiSigData();
         } else {
-          console.error('❌ Failed to ensure wallet:', walletResult.error);
+          logger.error('Failed to ensure wallet', { error: walletResult.error }, 'WalletManagementScreen');
           // Show error state
           setLocalAppWalletBalance(null);
 
@@ -149,7 +149,7 @@ const WalletManagementScreen: React.FC = () => {
                     try {
                       // Clear existing wallet data first
                       // Note: This would need to be implemented in the wallet service
-                      console.log('Clearing wallet data for user:', currentUser.id);
+                      logger.info('Clearing wallet data for user', { userId: currentUser.id }, 'WalletManagementScreen');
 
                       // Create a new wallet using context function
                       const newWalletResult = await ensureAppWallet(currentUser.id.toString());
@@ -174,7 +174,7 @@ const WalletManagementScreen: React.FC = () => {
                         );
                       }
                     } catch (error) {
-                      console.error('Error creating new wallet:', error);
+                      logger.error('Error creating new wallet', { error }, 'WalletManagementScreen');
                       Alert.alert(
                         'Error',
                         'Failed to create new wallet. Please try again or contact support.',
@@ -194,7 +194,7 @@ const WalletManagementScreen: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Error loading wallet info:', error);
+        logger.error('Error loading wallet info', { error }, 'WalletManagementScreen');
         setLocalAppWalletBalance(null);
         Alert.alert(
           'Loading Error',
@@ -230,7 +230,7 @@ const WalletManagementScreen: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('Error loading multi-signature data:', error);
+      logger.error('Error loading multi-signature data', { error }, 'WalletManagementScreen');
     }
   };
 
@@ -306,7 +306,7 @@ const WalletManagementScreen: React.FC = () => {
         logger.info('Loaded transactions', { count: formattedTransactions.length }, 'WalletManagementScreen');
       }
     } catch (error) {
-      console.error('Error loading transactions:', error);
+      logger.error('Error loading transactions', { error }, 'WalletManagementScreen');
       // Fallback to empty array
       setTransactions([]);
     } finally {
@@ -363,7 +363,7 @@ const WalletManagementScreen: React.FC = () => {
             isConnected: true
           });
         } else {
-          console.error('❌ WalletManagement: Failed to get wallet balance');
+          logger.error('Failed to get wallet balance', {}, 'WalletManagementScreen');
         }
 
         // Refresh transactions using consolidated function
@@ -383,10 +383,10 @@ const WalletManagementScreen: React.FC = () => {
 
         logger.info('Refresh completed successfully', null, 'WalletManagementScreen');
       } else {
-        console.error('❌ Failed to ensure wallet during refresh:', walletResult.error);
+        logger.error('Failed to ensure wallet during refresh', { error: walletResult.error }, 'WalletManagementScreen');
       }
     } catch (error) {
-      console.error('❌ WalletManagement: Error during refresh:', error);
+      logger.error('Error during refresh', { error }, 'WalletManagementScreen');
     } finally {
       setRefreshing(false);
     }
@@ -407,7 +407,7 @@ const WalletManagementScreen: React.FC = () => {
         setMultiSignEnabled(false);
         setMultiSignRemainingDays(0);
       } catch (error) {
-        console.error('Error saving multi-sign state:', error);
+        logger.error('Error saving multi-sign state', { error }, 'WalletManagementScreen');
         Alert.alert('Error', 'Failed to update multi-sign state');
       }
     }
@@ -428,7 +428,7 @@ const WalletManagementScreen: React.FC = () => {
         Alert.alert('Error', 'Failed to approve transaction');
       }
     } catch (error) {
-      console.error('Error approving transaction:', error);
+      logger.error('Error approving transaction', { error }, 'WalletManagementScreen');
       Alert.alert('Error', 'Failed to approve transaction');
     }
   };
@@ -447,7 +447,7 @@ const WalletManagementScreen: React.FC = () => {
         Alert.alert('Error', 'Failed to reject transaction');
       }
     } catch (error) {
-      console.error('Error rejecting transaction:', error);
+      logger.error('Error rejecting transaction', { error }, 'WalletManagementScreen');
       Alert.alert('Error', 'Failed to reject transaction');
     }
   };
@@ -572,9 +572,9 @@ const WalletManagementScreen: React.FC = () => {
 
       {loadingTransactions ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator
+          <ModernLoader
             size="large"
-            color={colors.primaryGreen}
+            text="Loading..."
             style={styles.loader}
           />
           <Text style={styles.loaderText}>Loading transactions...</Text>
@@ -823,7 +823,7 @@ const WalletManagementScreen: React.FC = () => {
 
           {refreshing ? (
             <View style={styles.priceLoadingContainer}>
-              <ActivityIndicator size="small" color={colors.black} />
+              <ModernLoader size="small" text="" />
               <Text style={styles.priceLoadingText}>
                 Updating balance...
               </Text>
@@ -936,7 +936,7 @@ const WalletManagementScreen: React.FC = () => {
               disabled={isRecovering}
             >
               {isRecovering ? (
-                <ActivityIndicator color="#FFF" style={{ marginRight: 8 }} />
+                <ModernLoader size="small" text="" style={{ marginRight: 8 }} />
               ) : (
                 <Text style={{ fontSize: 20, marginRight: 8 }}>🚨</Text>
               )}
@@ -1026,7 +1026,7 @@ const WalletManagementScreen: React.FC = () => {
                       // Refresh the multi-sign state
                       handleRefresh();
                     } catch (error) {
-                      console.error('Error saving multi-sign state:', error);
+                      logger.error('Error saving multi-sign state', { error }, 'WalletManagementScreen');
                       Alert.alert('Error', 'Failed to activate multi-sign');
                     }
                   }}

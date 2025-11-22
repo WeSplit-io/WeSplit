@@ -59,7 +59,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
         );
       }
     } catch (error) {
-      console.error('BillCameraScreen: Error requesting camera permission:', error);
+      logger.error('Error requesting camera permission', { error }, 'BillCameraScreen');
     }
   };
 
@@ -78,7 +78,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
         setCapturedImage(photo.uri);
       }
     } catch (error) {
-      console.error('Error taking picture:', error);
+      logger.error('Error taking picture', { error }, 'BillCameraScreen');
       Alert.alert('Error', 'Failed to capture image. Please try again.');
     } finally {
       setIsCapturing(false);
@@ -98,7 +98,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
         setCapturedImage(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error picking image:', error);
+      logger.error('Error picking image', { error }, 'BillCameraScreen');
       Alert.alert('Error', 'Failed to select image from gallery.');
     }
   };
@@ -115,7 +115,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
           isNewBill: true, // Flag to indicate this is a new bill from camera
         });
       } catch (error) {
-        console.error('Error navigating to BillProcessing:', error);
+        logger.error('Error navigating to BillProcessing', { error }, 'BillCameraScreen');
         Alert.alert('Navigation Error', 'Failed to open bill processing screen');
       }
     }
@@ -165,7 +165,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
               try {
                 navigation.navigate('SplitsList');
               } catch (error) {
-                console.error('Error navigating to SplitsList:', error);
+                logger.error('Error navigating to SplitsList', { error }, 'BillCameraScreen');
                 navigation.goBack();
               }
             }}
@@ -258,7 +258,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
               try {
                 navigation.navigate('ManualBillCreation');
               } catch (error) {
-                console.error('Error navigating to ManualBillCreation:', error);
+                logger.error('Error navigating to ManualBillCreation', { error }, 'BillCameraScreen');
                 navigation.goBack();
               }
             }}

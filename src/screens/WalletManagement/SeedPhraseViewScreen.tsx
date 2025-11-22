@@ -9,17 +9,15 @@ import {
   ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
-import { walletService, walletExportService } from '../../services/blockchain/wallet';
-import { firebaseDataService } from '../../services/data';
+import { walletExportService } from '../../services/blockchain/wallet';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Button } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
 const SeedPhraseViewScreen: React.FC = () => {
@@ -81,14 +79,14 @@ const SeedPhraseViewScreen: React.FC = () => {
             if (seedPhraseWords.length >= 12) { // Valid seed phrase should have at least 12 words
               setSeedPhrase(seedPhraseWords);
               setHasValidSeedPhrase(true);
-              console.log('🔐 SeedPhraseView: Seed phrase retrieved successfully', { wordCount: seedPhraseWords.length });
+              logger.debug('Seed phrase retrieved successfully', { wordCount: seedPhraseWords.length }, 'SeedPhraseViewScreen');
             } else {
-              console.log('🔐 SeedPhraseView: Invalid seed phrase format, will show private key', { wordCount: seedPhraseWords.length });
+              logger.debug('Invalid seed phrase format, will show private key', { wordCount: seedPhraseWords.length }, 'SeedPhraseViewScreen');
               setSeedPhrase([]); // Clear invalid seed phrase
               setHasValidSeedPhrase(false);
             }
           } else {
-            console.log('🔐 SeedPhraseView: No seed phrase available, will show private key');
+            logger.debug('No seed phrase available, will show private key', {}, 'SeedPhraseViewScreen');
             setSeedPhrase([]); // Ensure seed phrase is empty
             setHasValidSeedPhrase(false);
           }
@@ -96,7 +94,7 @@ const SeedPhraseViewScreen: React.FC = () => {
           setError(exportResult.error || 'Failed to retrieve wallet data');
         }
       } catch (err) {
-        console.error('🔐 SeedPhraseView: Error retrieving secure wallet export data:', err);
+        logger.error('Error retrieving secure wallet export data', { error: err }, 'SeedPhraseViewScreen');
         setError('Failed to retrieve wallet export data');
       } finally {
         setLoading(false);
@@ -243,12 +241,16 @@ const SeedPhraseViewScreen: React.FC = () => {
         </View>
         
         {/* Done Button */}
-        <TouchableOpacity 
-          style={styles.doneButtonFixed}
-          onPress={handleDone}
-        >
-          <Text style={styles.doneButtonText}>Done</Text>
-        </TouchableOpacity>
+        <View style={styles.doneButtonFixed}>
+          <Button
+            title="Done"
+            onPress={handleDone}
+            variant="secondary"
+            fullWidth
+            style={styles.doneButtonWrapper}
+            textStyle={styles.doneButtonText}
+          />
+        </View>
       </Container>
     );
   }
@@ -387,14 +389,13 @@ const SeedPhraseViewScreen: React.FC = () => {
         {/* Action Buttons - Simplified for production */}
         {(isRevealed || !hasValidSeedPhrase) && (
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity 
-              style={styles.copyButton}
+            <Button
+              title={showPrivateKey || !hasValidSeedPhrase ? 'Copy Private Key' : 'Copy Seed Phrase'}
               onPress={showPrivateKey || !hasValidSeedPhrase ? handleExportPrivateKey : handleCopySeedPhrase}
-            >
-              <Text style={styles.copyButtonText}>
-                {showPrivateKey || !hasValidSeedPhrase ? 'Copy Private Key' : 'Copy Seed Phrase'}
-              </Text>
-            </TouchableOpacity>
+              variant="primary"
+              style={styles.copyButton}
+              textStyle={styles.copyButtonText}
+            />
           </View>
         )}
 
@@ -403,12 +404,16 @@ const SeedPhraseViewScreen: React.FC = () => {
       </ScrollView>
       
       {/* Done Button - Fixed at bottom */}
-      <TouchableOpacity 
-        style={styles.doneButtonFixed}
-        onPress={handleDone}
-      >
-        <Text style={styles.doneButtonText}>Done</Text>
-      </TouchableOpacity>
+      <View style={styles.doneButtonFixed}>
+        <Button
+          title="Done"
+          onPress={handleDone}
+          variant="secondary"
+          fullWidth
+          style={styles.doneButtonWrapper}
+          textStyle={styles.doneButtonText}
+        />
+      </View>
 
     </Container>
   );

@@ -7,7 +7,7 @@ import { subscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod,
 import { consolidatedTransactionService } from '../../../services/blockchain/transaction';
 import { logger } from '../../../services/analytics/loggingService';
 import styles from './styles';
-import { Container, LoadingScreen } from '../../../components/shared';
+import { Container, LoadingScreen, ModernLoader } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 
 interface PremiumScreenProps {
@@ -73,7 +73,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
         }
       }
     } catch (error) {
-      console.error('Error loading premium data:', error);
+      logger.error('Error loading premium data', { error }, 'PremiumScreen');
       Alert.alert('Error', 'Failed to load premium features');
     } finally {
       setLoading(false);
@@ -249,7 +249,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
                   throw new Error(paymentResult.error || 'Payment processing failed');
                 }
               } catch (paymentError) {
-                console.error('Payment error:', paymentError);
+                logger.error('Payment error', { error: paymentError }, 'PremiumScreen');
                 Alert.alert('Payment Failed', paymentError instanceof Error ? paymentError.message : 'Payment could not be processed');
               }
             }
@@ -257,7 +257,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
         ]
       );
     } catch (error) {
-      console.error('Subscription error:', error);
+      logger.error('Subscription error', { error }, 'PremiumScreen');
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to process subscription');
     } finally {
       // ✅ CRITICAL: Always reset both ref and state
@@ -284,7 +284,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
               Alert.alert('Subscription Cancelled', 'Your subscription will end at the current period end.');
               loadPremiumData();
             } catch (error) {
-              console.error('Cancel error:', error);
+              logger.error('Cancel error', { error }, 'PremiumScreen');
               Alert.alert('Error', 'Failed to cancel subscription');
             } finally {
               setLoading(false);
@@ -313,7 +313,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
         Alert.alert('No Subscription Found', 'No active subscription found to restore.');
       }
     } catch (error) {
-      console.error('Restore error:', error);
+      logger.error('Restore error', { error }, 'PremiumScreen');
       Alert.alert('Error', 'Failed to restore subscription');
     } finally {
       setLoading(false);
@@ -467,7 +467,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
                   disabled={subscribing || !isConnected}
                 >
                   {subscribing ? (
-                    <ActivityIndicator size="small" color="#212121" />
+                    <ModernLoader size="small" text="" />
                   ) : (
                     <Icon name="star" size={20} color="#212121" />
                   )}

@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, Text, Image, ScrollView, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
+import { Button } from '../../components/shared';
 
 const slides = [
   {
@@ -53,7 +54,7 @@ const OnboardingScreen: React.FC = () => {
         // Don't fail onboarding if sync fails
       }
     } catch (error) {
-      console.error('❌ Failed to mark onboarding as completed:', error);
+      logger.error('Failed to mark onboarding as completed', { error }, 'OnboardingScreen');
     }
   };
 
@@ -81,9 +82,13 @@ const OnboardingScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Skip button */}
-      <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-        <Text style={styles.skipText}>Skip</Text>
-      </TouchableOpacity>
+      <Button
+        title="Skip"
+        onPress={handleSkip}
+        variant="secondary"
+        style={styles.skipButton}
+        textStyle={styles.skipText}
+      />
       
       {/* Centered content */}
       <ScrollView
@@ -105,9 +110,13 @@ const OnboardingScreen: React.FC = () => {
       </ScrollView>
       
       {/* Next button */}
-      <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-        <Text style={styles.nextButtonText}>→</Text>
-      </TouchableOpacity>
+      <Button
+        title="→"
+        onPress={handleNext}
+        variant="primary"
+        style={styles.nextButton}
+        textStyle={styles.nextButtonText}
+      />
       
       {/* Pagination - horizontal bars at bottom left */}
       <View style={styles.paginationContainer}>
