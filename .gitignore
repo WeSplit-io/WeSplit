@@ -8,6 +8,10 @@ node_modules/
 tools/builds/dist/
 tools/builds/dist-android/
 tools/builds/dist-ios/
+tools/builds/ios/*.ipa
+tools/builds/ios/*.xcarchive
+tools/builds/ios/export/
+tools/builds/android/
 web-build/
 expo-env.d.ts
 
