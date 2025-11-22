@@ -360,24 +360,57 @@ export const useDegenSplitLogic = (
     }
 
     try {
-      // Check user's actual USDC balance
-      const { walletService } = await import('../../../services/blockchain/wallet');
-      const balanceResult = await walletService.getUserWalletBalance(currentUser.id.toString());
+      // Check user's actual USDC balance using centralized utility
+      const { getUserBalanceWithFallback } = await import('../../../services/shared/balanceCheckUtils');
+      const balanceResult = await getUserBalanceWithFallback(currentUser.id.toString(), {
+        useLiveBalance: true,
+        walletAddress: currentUser.wallet_address
+      });
       
-      const userBalance = balanceResult?.usdcBalance || 0;
+      const userBalance = balanceResult.usdcBalance;
       
-      if (userBalance < totalAmount) {
-        logger.warn('Insufficient funds', { need: totalAmount, have: userBalance }, 'DegenSplitLogic');
+      logger.info('Balance check for degen split lock', {
+        userId: currentUser.id.toString(),
+        userBalance,
+        totalAmount,
+        source: balanceResult.source,
+        isReliable: balanceResult.isReliable
+      }, 'DegenSplitLogic');
+      
+      // Only block if we have a reliable balance check and it's insufficient
+      if (balanceResult.isReliable && userBalance < totalAmount) {
+        logger.warn('Insufficient funds', { 
+          need: totalAmount, 
+          have: userBalance,
+          source: balanceResult.source
+        }, 'DegenSplitLogic');
         return false;
       }
       
-      // User has sufficient funds, show confirmation modal
+      // If balance check is unreliable but we got a balance, still check if insufficient
+      if (!balanceResult.isReliable && userBalance > 0 && userBalance < totalAmount) {
+        logger.warn('Balance check unreliable but shows insufficient balance, blocking', {
+          need: totalAmount,
+          have: userBalance,
+          source: balanceResult.source
+        }, 'DegenSplitLogic');
+        return false;
+      }
+      
+      // If balance check unavailable, allow user to proceed (they'll see error when trying to pay)
+      if (!balanceResult.isReliable && userBalance === 0) {
+        logger.warn('Balance check unavailable, allowing user to proceed', {
+          source: balanceResult.source
+        }, 'DegenSplitLogic');
+      }
+      
+      // User has sufficient funds (or balance unavailable), show confirmation modal
       setState({ showLockModal: true });
       return true;
       
     } catch (error) {
       logger.error('Error checking user balance', { error: error instanceof Error ? error.message : String(error) }, 'DegenSplitLogic');
-      // Continue anyway - show modal
+      // Continue anyway - show modal (they'll see error when trying to pay)
       setState({ showLockModal: true });
       return true;
     }

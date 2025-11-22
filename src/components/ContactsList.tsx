@@ -428,20 +428,69 @@ const ContactsList: React.FC<ContactsListProps> = ({
     }
 
     // Find the contact to get current favorite status
+    // Check in all possible locations: contacts, searchResults, recentInteractions
     // Normalize IDs to strings for comparison (contactId can be number or string, c.id can be number or string)
-    const contact = contacts.find(c => String(c.id) === contactIdStr);
-    if (!contact) {
-      logger.warn('Contact not found for favorite toggle', { 
-        contactId, 
-        contactIdStr,
-        contactsCount: contacts.length,
-        contactIds: contacts.map(c => ({ id: c.id, idType: typeof c.id }))
+    const contact = contacts.find(c => String(c.id) === contactIdStr) ||
+                    searchResults.find(r => String(r.id) === contactIdStr) ||
+                    recentInteractions.find(c => String(c.id) === contactIdStr);
+    
+    // Determine the new favorite status
+    // If contact is found locally, use its current favorite status to toggle
+    // If not found, try to get it from the database, or let the backend handle it
+    let newFavoriteStatus: boolean;
+    
+    if (contact && 'isFavorite' in contact && typeof contact.isFavorite === 'boolean') {
+      // Contact found with favorite status - toggle it
+      newFavoriteStatus = !contact.isFavorite;
+      logger.debug('Using local contact favorite status', { 
+        contactId: contactIdStr,
+        currentFavorite: contact.isFavorite,
+        newFavorite: newFavoriteStatus
       }, 'ContactsList');
-      Alert.alert('Error', 'Contact not found');
-      return;
+    } else {
+      // Contact not found in local arrays - try to get current status from database
+      try {
+        // Try to find the contact in the database to get its current favorite status
+        // We'll query all contacts for the current user and find the one matching this contactId
+        const { firebaseDataService } = await import('../services/data');
+        
+        // Get all contacts for the current user
+        const allContacts = await firebaseDataService.contact.getContacts(currentUser.id.toString());
+        
+        // Find the contact by ID (which might be user ID or document ID)
+        const dbContact = allContacts.find(c => 
+          String(c.id) === contactIdStr || 
+          c.email === contact?.email || 
+          c.wallet_address === contact?.wallet_address
+        );
+        
+        if (dbContact && typeof dbContact.isFavorite === 'boolean') {
+          newFavoriteStatus = !dbContact.isFavorite;
+          logger.debug('Found contact in database, toggling favorite status', { 
+            contactId: contactIdStr,
+            currentFavorite: dbContact.isFavorite,
+            newFavorite: newFavoriteStatus
+          }, 'ContactsList');
+        } else {
+          // If we still can't find it, default to true (set as favorite)
+          // The backend will validate and handle errors if the contact doesn't exist
+          logger.warn('Contact not found in local arrays or database, defaulting to true', { 
+            contactId: contactIdStr,
+        contactsCount: contacts.length,
+            allContactsCount: allContacts.length
+      }, 'ContactsList');
+          newFavoriteStatus = true;
+        }
+      } catch (dbError) {
+        // If database lookup fails, default to true
+        // The backend will validate and return an error if the contact doesn't exist
+        logger.warn('Failed to get contact from database, defaulting to true', { 
+          contactId: contactIdStr,
+          error: dbError instanceof Error ? dbError.message : String(dbError)
+        }, 'ContactsList');
+        newFavoriteStatus = true;
+      }
     }
-
-    const newFavoriteStatus = !contact.isFavorite;
 
     // Mark as toggling
     togglingFavoritesRef.current.add(contactIdStr);
@@ -674,18 +723,29 @@ const ContactsList: React.FC<ContactsListProps> = ({
     const isSelected = multiSelect && selectedContacts.some(c => c.id === item.id);
 
     const handleContactPress = () => {
-      // Always navigate to user profile when clicking on a contact item
+      // If onContactSelect is provided, use it (for Send/Request flows)
+      // Otherwise, navigate to UserProfile (default behavior)
+      if (onContactSelect) {
+        onContactSelect(item);
+      } else {
       navigation.navigate('UserProfile', {
         userId: item.id,
         contact: item
       });
+      }
     };
 
     const handleAvatarPress = () => {
+      // If onContactSelect is provided, use it (for Send/Request flows)
+      // Otherwise, navigate to UserProfile (default behavior)
+      if (onContactSelect) {
+        onContactSelect(item);
+      } else {
       navigation.navigate('UserProfile', {
         userId: item.id,
         contact: item
       });
+      }
     };
 
     return (

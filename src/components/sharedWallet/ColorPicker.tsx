@@ -8,14 +8,13 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { PhosphorIcon } from '../shared';
 
 interface ColorPickerProps {
   selectedColor?: string;
   onSelectColor: (color: string) => void;
 }
 
-// Predefined color palette - vibrant and cohesive colors
+// Predefined color palette - reduced selection of vibrant colors
 const COLOR_PALETTE = [
   { name: 'Green', value: '#A5EA15' },
   { name: 'Teal', value: '#53EF97' },
@@ -24,11 +23,7 @@ const COLOR_PALETTE = [
   { name: 'Pink', value: '#FF6B9D' },
   { name: 'Orange', value: '#F5A623' },
   { name: 'Yellow', value: '#F8E71C' },
-  { name: 'Red', value: '#D0021B' },
   { name: 'Cyan', value: '#50E3C2' },
-  { name: 'Lime', value: '#B8E986' },
-  { name: 'Indigo', value: '#9013FE' },
-  { name: 'Emerald', value: '#7ED321' },
 ];
 
 const ColorPicker: React.FC<ColorPickerProps> = ({
@@ -54,18 +49,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
                   { backgroundColor: color.value },
                   isSelected && styles.colorOptionSelected,
                 ]}
-              >
-                {isSelected && (
-                  <View style={styles.selectedOverlay}>
-                    <PhosphorIcon
-                      name="Check"
-                      size={20}
-                      color={colors.black}
-                      weight="bold"
-                    />
-                  </View>
-                )}
-              </View>
+              />
               <Text style={styles.colorName} numberOfLines={1}>
                 {color.name}
               </Text>
@@ -91,7 +75,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.white70,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   colorGrid: {
@@ -105,26 +89,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   colorOption: {
-    width: 50,
-    height: 50,
-    borderRadius: spacing.md,
+    width: 44,
+    height: 44,
+    borderRadius: spacing.sm,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.xs / 2,
   },
   colorOptionSelected: {
-    borderColor: colors.white,
-    borderWidth: 3,
-  },
-  selectedOverlay: {
-    width: '100%',
-    height: '100%',
-    borderRadius: spacing.md - 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: colors.green,
+    borderWidth: 2,
   },
   colorName: {
     fontSize: typography.fontSize.xs,
@@ -139,6 +115,8 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     backgroundColor: colors.white5,
     borderRadius: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.white10,
   },
   previewLabel: {
     fontSize: typography.fontSize.sm,

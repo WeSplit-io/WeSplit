@@ -9,6 +9,7 @@ import { logger } from '../analytics/loggingService';
 import { pointsService } from './pointsService';
 import { questService } from './questService';
 import { firebaseDataService } from '../data/firebaseDataService';
+import { badgeService } from './badgeService';
 
 interface MigrationResult {
   userId: string;
@@ -321,6 +322,26 @@ class PointsMigrationService {
         const errorMsg = `Error backfilling transaction points: ${error instanceof Error ? error.message : String(error)}`;
         result.errors.push(errorMsg);
         logger.error('Error backfilling transaction points', { userId, error }, 'PointsMigrationService');
+      }
+
+      // Backfill badge points for previously claimed badges
+      try {
+        const badgePoints = await badgeService.backfillBadgePoints(userId);
+        if (badgePoints.pointsAwarded > 0) {
+          result.pointsAwarded += badgePoints.pointsAwarded;
+          logger.info('Badge points backfilled', {
+            userId,
+            pointsAwarded: badgePoints.pointsAwarded,
+            badgesProcessed: badgePoints.badgesProcessed
+          }, 'PointsMigrationService');
+        }
+        if (badgePoints.errors.length > 0) {
+          result.errors.push(...badgePoints.errors);
+        }
+      } catch (error) {
+        const errorMsg = `Error backfilling badge points: ${error instanceof Error ? error.message : String(error)}`;
+        result.errors.push(errorMsg);
+        logger.error('Error backfilling badge points', { userId, error }, 'PointsMigrationService');
       }
 
       logger.info('Points migration completed for user', {

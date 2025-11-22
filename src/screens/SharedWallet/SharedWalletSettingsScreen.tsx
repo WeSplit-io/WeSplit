@@ -28,19 +28,6 @@ import {
 import UserNameWithBadges from '../../components/profile/UserNameWithBadges';
 import LogoPicker from '../../components/sharedWallet/LogoPicker';
 import ColorPicker from '../../components/sharedWallet/ColorPicker';
-
-// Import logo bank for validation
-const LOGO_BANK = [
-  '💰', '💵', '💸', '💳', '💎', '🏦', '💼',
-  '👥', '🤝', '👫', '👬', '👭', '👨‍👩‍👧‍👦', '👪',
-  '🍕', '🍔', '🍟', '🍰', '☕', '🍺', '🍷',
-  '✈️', '🚗', '🏠', '🎉', '🎊', '🎈', '🎁',
-  '⭐', '🌟', '✨', '🔥', '💫', '⚡', '🎯',
-  '🎨', '🎭', '🎪', '🎬', '📱', '💻', '⌚',
-  '🌍', '🌎', '🌏', '🌊', '⛰️', '🏔️', '🌲',
-  '🍎', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓',
-  '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉',
-];
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -66,6 +53,55 @@ const SharedWalletSettingsScreen: React.FC = () => {
   const [customColor, setCustomColor] = useState<string>(wallet?.customColor || '');
   const [customLogo, setCustomLogo] = useState<string>(wallet?.customLogo || '');
   const [isSavingCustomization, setIsSavingCustomization] = useState(false);
+  
+  // Auto-save customization
+  const autoSaveCustomization = useCallback(async (color?: string, logo?: string) => {
+    if (!wallet || !currentUser?.id) return;
+    
+    const colorToSave = color !== undefined ? color : customColor;
+    const logoToSave = logo !== undefined ? logo : customLogo;
+    
+    // Don't save if nothing changed
+    if (colorToSave === wallet.customColor && logoToSave === wallet.customLogo) {
+      return;
+    }
+    
+    setIsSavingCustomization(true);
+    try {
+      const result = await SharedWalletService.updateSharedWalletSettings({
+        sharedWalletId: wallet.id,
+        userId: currentUser.id.toString(),
+        customColor: colorToSave.trim() || undefined,
+        customLogo: logoToSave.trim() || undefined,
+      });
+
+      if (result.success) {
+        // Reload wallet to reflect changes
+        const reloadResult = await SharedWalletService.getSharedWallet(wallet.id);
+        if (reloadResult.success && reloadResult.wallet) {
+          setWallet(reloadResult.wallet);
+        }
+      } else {
+        logger.error('Failed to auto-save customization', { error: result.error }, 'SharedWalletSettingsScreen');
+      }
+    } catch (error) {
+      logger.error('Error auto-saving customization', error, 'SharedWalletSettingsScreen');
+    } finally {
+      setIsSavingCustomization(false);
+    }
+  }, [wallet, currentUser?.id, customColor, customLogo]);
+  
+  // Handle logo selection with auto-save
+  const handleLogoSelect = useCallback(async (logo: string) => {
+    setCustomLogo(logo);
+    await autoSaveCustomization(undefined, logo);
+  }, [autoSaveCustomization]);
+  
+  // Handle color selection with auto-save
+  const handleColorSelect = useCallback(async (color: string) => {
+    setCustomColor(color);
+    await autoSaveCustomization(color, undefined);
+  }, [autoSaveCustomization]);
   
   // Update local state when wallet changes
   useEffect(() => {
@@ -420,7 +456,6 @@ const SharedWalletSettingsScreen: React.FC = () => {
                 onPress={handleAddParticipants}
                 activeOpacity={0.7}
               >
-                <PhosphorIcon name="Plus" size={20} color={colors.green} weight="bold" />
                 <Text style={styles.addButtonText}>Add</Text>
               </TouchableOpacity>
             )}
@@ -444,7 +479,6 @@ const SharedWalletSettingsScreen: React.FC = () => {
                   />
                   {member.role === 'creator' && (
                     <View style={styles.creatorBadge}>
-                      <PhosphorIcon name="Crown" size={12} color={colors.green} weight="fill" />
                       <Text style={styles.creatorText}>Creator</Text>
                     </View>
                   )}
@@ -483,10 +517,7 @@ const SharedWalletSettingsScreen: React.FC = () => {
                 <Text style={styles.privateKeyButtonText}>Retrieving...</Text>
               </View>
             ) : (
-              <>
-                <PhosphorIcon name="Eye" size={20} color={colors.white} weight="regular" />
-                <Text style={styles.privateKeyButtonText}>View Private Key</Text>
-              </>
+              <Text style={styles.privateKeyButtonText}>View Private Key</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -511,7 +542,6 @@ const SharedWalletSettingsScreen: React.FC = () => {
               <Text style={styles.addressText} numberOfLines={1}>
                 {wallet.walletAddress}
               </Text>
-              <PhosphorIcon name="Copy" size={16} color={colors.white70} weight="regular" />
             </TouchableOpacity>
           </View>
           <View style={styles.infoRow}>
@@ -548,7 +578,6 @@ const SharedWalletSettingsScreen: React.FC = () => {
               }}
               activeOpacity={0.7}
             >
-              <PhosphorIcon name="Palette" size={20} color={colors.white} weight="regular" />
               <Text style={styles.customizationButtonText}>Customize Wallet</Text>
             </TouchableOpacity>
           </View>
@@ -558,10 +587,15 @@ const SharedWalletSettingsScreen: React.FC = () => {
       {/* Customization Modal */}
       <Modal
         visible={showCustomizationModal}
-        onClose={() => {
+        onClose={async () => {
+          // Auto-save on modal close if there are changes
+          await autoSaveCustomization();
           setShowCustomizationModal(false);
-          setCustomColor(wallet?.customColor || '');
-          setCustomLogo(wallet?.customLogo || '');
+          // Reset to wallet values (will be updated after save completes)
+          if (wallet) {
+            setCustomColor(wallet.customColor || '');
+            setCustomLogo(wallet.customLogo || '');
+          }
         }}
         title="Customize Wallet"
       >
@@ -572,14 +606,14 @@ const SharedWalletSettingsScreen: React.FC = () => {
         >
           {/* Logo Picker */}
           <LogoPicker
-            selectedLogo={customLogo && LOGO_BANK.includes(customLogo) ? customLogo : undefined}
-            onSelectLogo={setCustomLogo}
+            selectedLogo={customLogo}
+            onSelectLogo={handleLogoSelect}
           />
 
           {/* Color Picker */}
           <ColorPicker
             selectedColor={customColor}
-            onSelectColor={setCustomColor}
+            onSelectColor={handleColorSelect}
           />
 
           {/* Optional: Custom URL input for advanced users */}
@@ -587,13 +621,13 @@ const SharedWalletSettingsScreen: React.FC = () => {
             <Text style={styles.advancedLabel}>Advanced: Custom Logo URL</Text>
             <Input
               placeholder="https://example.com/logo.png"
-              value={customLogo && !LOGO_BANK.includes(customLogo) ? customLogo : ''}
-              onChangeText={(text) => {
+              value={customLogo && typeof customLogo === 'string' && customLogo.startsWith('http') ? customLogo : ''}
+              onChangeText={async (text) => {
                 // Only set if it's a URL (starts with http) or empty
                 if (text.startsWith('http')) {
-                  setCustomLogo(text);
+                  await handleLogoSelect(text);
                 } else if (text === '') {
-                  setCustomLogo('');
+                  await handleLogoSelect('');
                 }
               }}
               leftIcon="Link"
@@ -602,44 +636,6 @@ const SharedWalletSettingsScreen: React.FC = () => {
               Or enter a custom image URL for your wallet logo
             </Text>
           </View>
-
-          <Button
-            title={isSavingCustomization ? 'Saving...' : 'Save Customization'}
-            onPress={async () => {
-              if (!wallet) return;
-              
-              setIsSavingCustomization(true);
-              try {
-                const result = await SharedWalletService.updateSharedWalletSettings({
-                  sharedWalletId: wallet.id,
-                  userId: currentUser?.id?.toString() || '',
-                  customColor: customColor.trim() || undefined,
-                  customLogo: customLogo.trim() || undefined,
-                });
-
-                if (result.success) {
-                  Alert.alert('Success', 'Wallet customization saved');
-                  setShowCustomizationModal(false);
-                  // Reload wallet
-                  const reloadResult = await SharedWalletService.getSharedWallet(wallet.id);
-                  if (reloadResult.success && reloadResult.wallet) {
-                    setWallet(reloadResult.wallet);
-                  }
-                } else {
-                  Alert.alert('Error', result.error || 'Failed to save customization');
-                }
-              } catch (error) {
-                logger.error('Error saving customization', error, 'SharedWalletSettingsScreen');
-                Alert.alert('Error', 'Failed to save customization');
-              } finally {
-                setIsSavingCustomization(false);
-              }
-            }}
-            variant="primary"
-            disabled={isSavingCustomization}
-            loading={isSavingCustomization}
-            style={styles.modalButton}
-          />
         </ScrollView>
       </Modal>
 
@@ -687,8 +683,8 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     padding: spacing.md,
-    gap: spacing.md,
-    paddingBottom: spacing.xxxl,
+    gap: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   loadingContainer: {
     flex: 1,
@@ -697,35 +693,40 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: colors.white5,
-    borderRadius: spacing.md,
+    borderRadius: spacing.sm,
     padding: spacing.md,
     gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.white10,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.md,
+    paddingBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.white10,
   },
   sectionTitle: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.white70,
+    color: colors.white,
+    letterSpacing: 0.3,
   },
   sectionDescription: {
     fontSize: typography.fontSize.xs,
-    color: colors.white70,
+    color: colors.white50,
     marginBottom: spacing.sm,
     lineHeight: 18,
   },
   addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     backgroundColor: colors.greenBlue20,
     borderRadius: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.green + '40',
   },
   addButtonText: {
     fontSize: typography.fontSize.sm,
@@ -736,12 +737,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.white10,
   },
   memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   memberInfo: {
     flex: 1,
@@ -787,14 +790,14 @@ const styles = StyleSheet.create({
     color: colors.white70,
   },
   privateKeyButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
     padding: spacing.md,
     backgroundColor: colors.greenBlue20,
-    borderRadius: spacing.md,
+    borderRadius: spacing.sm,
     marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.green + '40',
   },
   privateKeyButtonDisabled: {
     opacity: 0.5,
@@ -844,18 +847,16 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.white10,
   },
   infoLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-  },
-  infoValue: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white,
+    fontSize: typography.fontSize.xs,
+    color: colors.white50,
     fontWeight: typography.fontWeight.medium,
   },
+  infoValue: {
+    fontSize: typography.fontSize.xs,
+    color: colors.white,
+    fontWeight: typography.fontWeight.regular,
+  },
   addressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
     flex: 1,
     marginLeft: spacing.sm,
   },
@@ -868,11 +869,13 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: spacing.xs,
     backgroundColor: colors.greenBlue20,
     gap: spacing.xs / 2,
+    borderWidth: 1,
+    borderColor: colors.green + '40',
   },
   statusDot: {
     width: 6,
@@ -935,13 +938,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   customizationButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.md,
     backgroundColor: colors.white10,
-    borderRadius: spacing.md,
-    gap: spacing.sm,
+    borderRadius: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.white10,
   },
   customizationButtonText: {
     fontSize: typography.fontSize.md,

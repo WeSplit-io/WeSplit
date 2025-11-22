@@ -8,6 +8,10 @@ import { Animated } from 'react-native';
 import { SplitWallet } from '../../../services/split';
 
 export interface DegenSplitState {
+  // Initialization
+  isInitializing: boolean;
+  setIsInitializing: (initializing: boolean) => void;
+  
   // Wallet management
   isCreatingWallet: boolean;
   setIsCreatingWallet: (creating: boolean) => void;
@@ -81,6 +85,9 @@ export interface DegenSplitState {
 }
 
 export const useDegenSplitState = (existingSplitWallet?: SplitWallet): DegenSplitState => {
+  // Initialization
+  const [isInitializing, setIsInitializing] = useState(false);
+  
   // Wallet management
   const [isCreatingWallet, setIsCreatingWallet] = useState(false);
   const [splitWallet, setSplitWallet] = useState<SplitWallet | null>(existingSplitWallet || null);
@@ -127,6 +134,10 @@ export const useDegenSplitState = (existingSplitWallet?: SplitWallet): DegenSpli
   const cardScaleRef = useRef(new Animated.Value(1));
 
   return {
+    // Initialization
+    isInitializing,
+    setIsInitializing,
+    
     // Wallet management
     isCreatingWallet,
     setIsCreatingWallet,

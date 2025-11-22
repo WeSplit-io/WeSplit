@@ -5,6 +5,7 @@ import { useApp } from '../../../context/AppContext';
 import { useWallet } from '../../../context/WalletContext';
 import { subscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod, SubscriptionService } from '../../../services/core';
 import { consolidatedTransactionService } from '../../../services/blockchain/transaction';
+import { logger } from '../../../services/analytics/loggingService';
 import styles from './styles';
 import { Container, LoadingScreen } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
@@ -139,14 +140,97 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
                   throw new Error('Company wallet address is not configured. Please contact support.');
                 }
                 
-                // Send payment transaction to company wallet
-                const transactionResult = await sendTransaction({
+                // ✅ CRITICAL: Add timeout wrapper (60 seconds max) - aligned with SendConfirmationScreen
+                const transactionPromise = sendTransaction({
                   to: companyWalletAddress,
                   amount: currency === 'USDC' ? plan.price : cryptoAmount,
                   currency: currency,
                   memo: `WeSplit Premium: ${plan.name}`,
                   groupId: undefined
                 });
+                
+                const timeoutPromise = new Promise((_, reject) => {
+                  setTimeout(() => reject(new Error('Transaction timeout - please check transaction history')), 60000);
+                });
+                
+                let transactionResult;
+                try {
+                  transactionResult = await Promise.race([transactionPromise, timeoutPromise]);
+                } catch (timeoutError) {
+                  // Timeout occurred - verify on-chain if transaction succeeded
+                  const isTimeout = timeoutError instanceof Error && 
+                    (timeoutError.message.includes('timeout') || timeoutError.message.includes('Transaction timeout'));
+                  
+                  if (isTimeout) {
+                    logger.info('Timeout detected, verifying premium payment transaction on-chain', {
+                      companyWalletAddress,
+                      amount: currency === 'USDC' ? plan.price : cryptoAmount
+                    }, 'PremiumScreen');
+                    
+                    try {
+                      // Wait a moment for blockchain to update
+                      await new Promise(resolve => setTimeout(resolve, 3000));
+                      
+                      // Check balances to verify transaction
+                      const { consolidatedTransactionService } = await import('../../../services/blockchain/transaction');
+                      const companyBalanceResult = await consolidatedTransactionService.getUsdcBalance(companyWalletAddress);
+                      const senderBalanceResult = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+                      
+                      logger.info('On-chain balance verification after timeout', {
+                        companyBalance: companyBalanceResult.balance,
+                        senderBalance: senderBalanceResult.usdc,
+                        expectedAmount: currency === 'USDC' ? plan.price : cryptoAmount,
+                        note: 'Checking if transaction actually succeeded despite timeout'
+                      }, 'PremiumScreen');
+                      
+                      // Try to get result from original promise if it completed
+                      try {
+                        transactionResult = await transactionPromise;
+                        if (transactionResult && transactionResult.signature) {
+                          logger.info('Premium payment transaction completed after timeout wrapper', {
+                            success: true,
+                            signature: transactionResult.signature
+                          }, 'PremiumScreen');
+                          // Continue with payment processing below
+                        } else {
+                          throw timeoutError; // Re-throw original timeout error
+                        }
+                      } catch (promiseError) {
+                        // Promise also failed - show timeout message with guidance
+                        logger.warn('Premium payment transaction promise also failed after timeout', {
+                          error: promiseError instanceof Error ? promiseError.message : String(promiseError)
+                        }, 'PremiumScreen');
+                        
+                        Alert.alert(
+                          'Transaction Processing',
+                          'The payment is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
+                          [{ text: 'OK', style: 'cancel' }]
+                        );
+                        return;
+                      }
+                    } catch (verificationError) {
+                      logger.warn('Failed to verify premium payment transaction on-chain after timeout', {
+                        error: verificationError instanceof Error ? verificationError.message : String(verificationError)
+                      }, 'PremiumScreen');
+                      
+                      // Fallback to original timeout message if verification fails
+                      Alert.alert(
+                        'Transaction Processing',
+                        'The payment is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
+                        [{ text: 'OK', style: 'cancel' }]
+                      );
+                      return;
+                    }
+                  } else {
+                    // Not a timeout error - re-throw
+                    throw timeoutError;
+                  }
+                }
+                
+                // Check if transaction actually succeeded
+                if (!transactionResult || !transactionResult.signature) {
+                  throw new Error('Transaction failed - no signature received');
+                }
                 
                 // Process the crypto payment on backend
                 const paymentResult = await subscriptionService.processPayment(

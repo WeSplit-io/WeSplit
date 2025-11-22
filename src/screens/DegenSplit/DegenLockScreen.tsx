@@ -28,7 +28,7 @@ import { FallbackDataService } from '../../services/data/mockupData';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenSplitProgress, DegenSplitParticipants } from './components';
-import { Container, Button, Modal, AppleSlider, PhosphorIcon } from '../../components/shared';
+import { Container, Button, Modal, AppleSlider, PhosphorIcon, ModernLoader } from '../../components/shared';
 import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
 import { getSplitStatusDisplayText } from '../../utils/statusUtils';
 
@@ -254,12 +254,15 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   const insets = useSafeAreaInsets();
   const isResultReady = degenState.splitWallet?.status === 'spinning_completed' || degenState.splitWallet?.status === 'completed';
 
-  // Early return if essential data is missing
-  if (!splitData && !billData) {
+  // Show loader while split is initializing
+  if (degenState.isInitializing || (!splitData && !billData)) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Loading split data...</Text>
-      </SafeAreaView>
+      <Container>
+        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ModernLoader size="large" text="Loading split..." />
+        </View>
+      </Container>
     );
   }
 
@@ -365,12 +368,20 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   // CRITICAL FIX: Also reload wallet when participants change (e.g., after inviting users)
   useEffect(() => {
     const initialize = async () => {
-      // Refresh participant data first
-      const refreshedParticipants = await degenInit.refreshParticipantData(participants);
-      setParticipants(refreshedParticipants);
+      // Set initializing state to show loader
+      degenState.setIsInitializing(true);
       
-      // Initialize the degen split
-      await degenInit.initializeDegenSplit(splitData, currentUser, refreshedParticipants, totalAmount);
+      try {
+        // Refresh participant data first
+        const refreshedParticipants = await degenInit.refreshParticipantData(participants);
+        setParticipants(refreshedParticipants);
+        
+        // Initialize the degen split
+        await degenInit.initializeDegenSplit(splitData, currentUser, refreshedParticipants, totalAmount);
+      } finally {
+        // Initialization will set isInitializing to false when done, but ensure it's cleared here too
+        degenState.setIsInitializing(false);
+      }
     };
 
     // OPTIMIZED: Real-time updates will handle wallet refreshes automatically

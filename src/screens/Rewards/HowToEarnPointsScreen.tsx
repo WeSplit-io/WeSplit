@@ -29,11 +29,13 @@ import { seasonService, Season } from '../../services/rewards/seasonService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 import { badgeService, BadgeProgress } from '../../services/rewards/badgeService';
 import { BADGE_DEFINITIONS } from '../../services/rewards/badgeConfig';
+import { pointsService } from '../../services/rewards/pointsService';
+import { firebaseDataService } from '../../services/data/firebaseDataService';
 
 const HowToEarnPointsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
-  const { state } = useApp();
+  const { state, updateUser } = useApp();
   const { currentUser } = state;
   
   const [userQuests, setUserQuests] = useState<Quest[]>([]);
@@ -274,6 +276,18 @@ const HowToEarnPointsScreen: React.FC = () => {
     try {
       const result = await badgeService.claimBadge(currentUser.id, badgeId);
       if (result.success) {
+        // Refresh user points after badge claim
+        try {
+          const updatedPoints = await pointsService.getUserPoints(currentUser.id);
+          const freshUser = await firebaseDataService.user.getCurrentUser(currentUser.id);
+          updateUser({ 
+            points: freshUser.points || updatedPoints, 
+            total_points_earned: freshUser.total_points_earned 
+          });
+        } catch (pointsError) {
+          logger.error('Failed to refresh user points after badge claim', { error: pointsError }, 'HowToEarnPointsScreen');
+        }
+
         Alert.alert('Success', 'Badge claimed successfully!');
         await loadBadges();
       } else {
@@ -285,7 +299,7 @@ const HowToEarnPointsScreen: React.FC = () => {
     } finally {
       setClaimingBadge(null);
     }
-  }, [currentUser?.id, loadBadges]);
+  }, [currentUser?.id, loadBadges, updateUser]);
 
   const handleRedeemCode = useCallback(async () => {
     if (!currentUser?.id || !redeemCode.trim() || redeemingBadge) return;
@@ -294,6 +308,18 @@ const HowToEarnPointsScreen: React.FC = () => {
     try {
       const result = await badgeService.claimEventBadge(currentUser.id, redeemCode.trim());
       if (result.success) {
+        // Refresh user points after badge claim
+        try {
+          const updatedPoints = await pointsService.getUserPoints(currentUser.id);
+          const freshUser = await firebaseDataService.user.getCurrentUser(currentUser.id);
+          updateUser({ 
+            points: freshUser.points || updatedPoints, 
+            total_points_earned: freshUser.total_points_earned 
+          });
+        } catch (pointsError) {
+          logger.error('Failed to refresh user points after badge claim', { error: pointsError }, 'HowToEarnPointsScreen');
+        }
+
         Alert.alert('Success', 'Badge redeemed successfully!');
         setRedeemCode('');
         await loadBadges();
@@ -306,7 +332,7 @@ const HowToEarnPointsScreen: React.FC = () => {
     } finally {
       setRedeemingBadge(false);
     }
-  }, [currentUser?.id, redeemCode, redeemingBadge, loadBadges]);
+  }, [currentUser?.id, redeemCode, redeemingBadge, loadBadges, updateUser]);
 
   // Filter badges based on active tab - exclude community badges (only show point badges)
   const filteredBadges = useMemo(() => {

@@ -83,7 +83,19 @@ const SharedWalletCard: React.FC<SharedWalletCardProps> = ({
             wallet.customColor && { backgroundColor: wallet.customColor + '20' }
           ]}>
             {wallet.customLogo ? (
-              <Text style={styles.logoText}>{wallet.customLogo}</Text>
+              // Check if customLogo is a URL (starts with http) or a Phosphor icon name
+              wallet.customLogo.startsWith('http') ? (
+                // Custom URL logo (future support)
+                <Text style={styles.logoText}>{wallet.customLogo}</Text>
+              ) : (
+                // Phosphor icon
+                <PhosphorIcon
+                  name={wallet.customLogo as any}
+                  size={24}
+                  color={wallet.customColor || colors.green}
+                  weight="bold"
+                />
+              )
             ) : (
               <PhosphorIcon
                 name="Wallet"
@@ -171,11 +183,13 @@ const SharedWalletCard: React.FC<SharedWalletCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white5,
-    borderRadius: spacing.md,
+    borderRadius: spacing.sm,
     padding: spacing.md,
     marginBottom: spacing.md,
     flexDirection: 'column',
     gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.white10,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -190,12 +204,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: spacing.md,
+    width: 40,
+    height: 40,
+    borderRadius: spacing.sm,
     backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.white10,
   },
   logoText: {
     fontSize: 24,
@@ -222,10 +238,12 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: spacing.xs,
     gap: spacing.xs / 2,
+    borderWidth: 1,
+    borderColor: colors.green + '40',
   },
   statusBadgeActive: {
     backgroundColor: colors.greenBlue20,

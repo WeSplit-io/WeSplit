@@ -55,63 +55,12 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const handleCreditDebitCard = async () => {
-    if (!currentUser?.id) {
-      Alert.alert('Error', 'Please log in to fund your wallet.');
-      return;
-    }
-
-    // Verify app wallet is available
-    logger.info('Checking app wallet availability', {
-      appWalletAddress,
-      appWalletConnected: !!appWalletAddress,
-      currentUserWallet: currentUser?.wallet_address,
-      depositAddress
-    });
-
-    // If app wallet is not available, try to initialize it
-    if (!appWalletAddress) {
-      try {
-        logger.info('App wallet not available, attempting to initialize...');
-        await ensureAppWallet(currentUser.id.toString());
-        
-        // Check again after initialization attempt
-        if (!appWalletAddress) {
-          Alert.alert(
-            'App Wallet Not Available', 
-            'Your app wallet is not initialized. Please ensure your app wallet is set up before funding.'
-          );
-          return;
-        }
-      } catch (error) {
-        logger.error('Failed to initialize app wallet', error);
-        Alert.alert(
-          'App Wallet Error', 
-          'Failed to initialize your app wallet. Please try again or contact support.'
-        );
-        return;
-      }
-    }
-
-    if (!depositAddress) {
-      Alert.alert('Error', 'No app wallet address available for funding. Please ensure your app wallet is initialized.');
-      return;
-    }
-
-    // Verify we're using the app wallet (not external wallet)
-    if (depositAddress !== appWalletAddress) {
-      console.warn('🔍 DepositScreen: Warning - Using non-app wallet for deposit:', {
-        appWalletAddress,
-        depositAddress,
-        isAppWallet: depositAddress === appWalletAddress
-      });
-    }
-
-    logger.info('Opening MoonPay widget with app wallet', {
-      appWalletAddress,
-      depositAddress,
-      userId: currentUser.id
-    });
-    setShowMoonPayWidget(true);
+    // DISABLED FOR DEPLOYMENT - MoonPay funding temporarily unavailable
+    Alert.alert(
+      'Coming Soon',
+      'Credit/Debit card funding via MoonPay is currently unavailable. This feature will be available in a future update. Please use Crypto Transfer to deposit funds.'
+    );
+    return;
   };
 
   const handleCryptoTransfer = () => {
@@ -137,20 +86,20 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
         
         {/* Payment Method Selection */}
         <View style={styles.paymentMethodsContainer}>
-          {/* Credit/Debit Card Option */}
+          {/* Credit/Debit Card Option - DISABLED FOR DEPLOYMENT */}
           <TouchableOpacity 
-            style={styles.paymentMethodCard}
+            style={[styles.paymentMethodCard, styles.paymentMethodCardDisabled]}
             onPress={handleCreditDebitCard}
+            activeOpacity={0.7}
+            disabled={true}
           >
-           
-              <Image
-                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftopup-img-card.png?alt=media&token=b362caf8-0072-4fd7-9542-4ee0751769ea' }}
-                style={styles.paymentMethodIcon}
-              />
-        
-            <Text style={styles.paymentMethodTitle}>Credit/Debit Card</Text>
+            <Image
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftopup-img-card.png?alt=media&token=b362caf8-0072-4fd7-9542-4ee0751769ea' }}
+              style={[styles.paymentMethodIcon, styles.paymentMethodIconDisabled]}
+            />
+            <Text style={[styles.paymentMethodTitle, styles.paymentMethodTitleDisabled]}>Credit/Debit Card</Text>
             <Text style={styles.paymentMethodDescription}>
-              Use your Visa or Mastercard to buy crypto via Moonpay
+              Coming soon - Feature in development
             </Text>
           </TouchableOpacity>
 

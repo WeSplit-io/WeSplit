@@ -6,6 +6,7 @@ import Icon from '../../components/Icon';
 import { GroupMember } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
+import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import Avatar from '../../components/shared/Avatar';
@@ -35,7 +36,120 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
   const { state } = useApp();
   const { currentUser } = state;
-  const { appWalletBalance, appWalletConnected } = useWallet();
+  const { appWalletBalance, appWalletConnected, ensureAppWallet, getAppWalletBalance } = useWallet();
+  
+  // Track if balance refresh is in progress to prevent duplicate calls
+  const balanceRefreshInProgressRef = useRef(false);
+  const lastBalanceRefreshRef = useRef<number>(0);
+  const BALANCE_REFRESH_DEBOUNCE_MS = 2000; // 2 seconds debounce
+  
+  // Subscribe to live balance updates to ensure we get the latest balance
+  // This is critical because network requests may fail initially but succeed later
+  // The LiveBalanceService successfully fetches the balance even when direct calls fail
+  const { balance: liveBalance } = useLiveBalance(
+    currentUser?.wallet_address || null,
+    {
+      enabled: !!currentUser?.wallet_address,
+      onBalanceChange: async (update) => {
+        // Update WalletContext when live balance updates by calling getAppWalletBalance
+        // This ensures the balance state is synced across the app
+        // Only sync if we have a valid balance and haven't refreshed recently
+        if (update.usdcBalance !== null && update.usdcBalance !== undefined && currentUser?.id) {
+          const now = Date.now();
+          const timeSinceLastRefresh = now - lastBalanceRefreshRef.current;
+          
+          // Debounce: only sync if it's been at least 2 seconds since last refresh
+          if (timeSinceLastRefresh < BALANCE_REFRESH_DEBOUNCE_MS) {
+            logger.debug('Skipping balance sync - too soon after last refresh', {
+              timeSinceLastRefresh,
+              usdcBalance: update.usdcBalance
+            }, 'SendAmountScreen');
+            return;
+          }
+          
+          // Prevent concurrent balance refreshes
+          if (balanceRefreshInProgressRef.current) {
+            logger.debug('Balance refresh already in progress, skipping', {
+              usdcBalance: update.usdcBalance
+            }, 'SendAmountScreen');
+            return;
+          }
+          
+          balanceRefreshInProgressRef.current = true;
+          lastBalanceRefreshRef.current = now;
+          
+          try {
+            logger.info('Live balance update received, syncing WalletContext', {
+              usdcBalance: update.usdcBalance,
+              address: update.address
+            }, 'SendAmountScreen');
+            // getAppWalletBalance internally calls setAppWalletBalance
+            await getAppWalletBalance(currentUser.id.toString());
+          } catch (error) {
+            logger.error('Failed to sync balance from live update', { error }, 'SendAmountScreen');
+          } finally {
+            balanceRefreshInProgressRef.current = false;
+          }
+        }
+      }
+    }
+  );
+
+  // Ensure app wallet is connected and balance is refreshed on mount
+  // This is critical when navigating directly from UserProfileScreen (skipping SendScreen)
+  useEffect(() => {
+    const initializeWallet = async () => {
+      if (!currentUser?.id) return;
+      
+      // Prevent duplicate initialization
+      if (balanceRefreshInProgressRef.current) {
+        logger.debug('Wallet initialization already in progress, skipping', { userId: currentUser.id }, 'SendAmountScreen');
+        return;
+      }
+      
+      balanceRefreshInProgressRef.current = true;
+      
+      try {
+        // Ensure wallet is connected
+        if (!appWalletConnected) {
+          logger.info('Wallet not connected, ensuring wallet connection', { userId: currentUser.id }, 'SendAmountScreen');
+          await ensureAppWallet(currentUser.id.toString());
+        }
+        
+        // Refresh balance to ensure we have the latest data
+        // This is important when navigating directly to this screen
+        // Only refresh if it's been at least 2 seconds since last refresh
+        const now = Date.now();
+        const timeSinceLastRefresh = now - lastBalanceRefreshRef.current;
+        
+        if (timeSinceLastRefresh >= BALANCE_REFRESH_DEBOUNCE_MS) {
+          try {
+            logger.info('Refreshing wallet balance', { userId: currentUser.id }, 'SendAmountScreen');
+            lastBalanceRefreshRef.current = now;
+            await getAppWalletBalance(currentUser.id.toString());
+          } catch (error) {
+            logger.error('Failed to refresh wallet balance', { error, userId: currentUser.id }, 'SendAmountScreen');
+          }
+        } else {
+          logger.debug('Skipping balance refresh - too soon after last refresh', {
+            timeSinceLastRefresh,
+            userId: currentUser.id
+          }, 'SendAmountScreen');
+        }
+      } finally {
+        balanceRefreshInProgressRef.current = false;
+      }
+    };
+    
+    initializeWallet();
+    // Remove getAppWalletBalance from dependencies - it's a stable function from context
+    // Only depend on currentUser.id and appWalletConnected which are the actual triggers
+  }, [currentUser?.id, appWalletConnected, ensureAppWallet]);
+  
+  // Use live balance if available, otherwise fall back to appWalletBalance
+  const effectiveBalance = liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined
+    ? liveBalance.usdcBalance
+    : appWalletBalance;
 
   // Debug logging to ensure data is passed correctly
   useEffect(() => {
@@ -100,9 +214,9 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const handleChipPress = (percentage: '25' | '50' | '100') => {
-    if (appWalletBalance !== null) {
+    if (effectiveBalance !== null && effectiveBalance !== undefined) {
       const percentageValue = parseInt(percentage);
-      const calculatedAmount = (appWalletBalance * percentageValue) / 100;
+      const calculatedAmount = (effectiveBalance * percentageValue) / 100;
       setAmount(calculatedAmount.toFixed(2));
       setSelectedChip(percentage);
     }
@@ -268,7 +382,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
              
              
               {/* Quick Amount Chips - Only for External Wallet */}
-              {destinationType === 'external' && appWalletBalance !== null && (
+              {destinationType === 'external' && effectiveBalance !== null && effectiveBalance !== undefined && (
                 <View style={styles.quickAmountChips}>
                   <TouchableOpacity
                     style={[

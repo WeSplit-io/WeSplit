@@ -12,8 +12,7 @@ import {
   Alert,
   StyleSheet,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 import { 
   Container, 
   Button, 
@@ -120,6 +119,15 @@ const CreateSharedWalletScreen: React.FC<CreateSharedWalletScreenProps> = () => 
       });
     }
   }, [creatorAsContact]);
+
+  // Sync state when ContactsList closes
+  useEffect(() => {
+    if (!showContactsPicker) {
+      logger.debug('Contacts picker closed', { 
+        selectedCount: selectedMembers.length 
+      }, 'CreateSharedWalletScreen');
+    }
+  }, [showContactsPicker, selectedMembers.length]);
 
   const validateForm = useCallback((): boolean => {
     const newErrors: { name?: string; members?: string } = {};
@@ -238,19 +246,23 @@ const CreateSharedWalletScreen: React.FC<CreateSharedWalletScreenProps> = () => 
   }, [validateForm, currentUser, walletAddress, name, description, selectedMembers, navigation]);
 
   const handleSelectContact = useCallback((contact: UserContact) => {
-    // Check if contact is already selected
-    const isSelected = selectedMembers.some(m => m.id === contact.id);
-    
-    if (isSelected) {
-      // Remove if already selected (but don't allow removing creator)
-      if (contact.id !== currentUser?.id?.toString()) {
-        setSelectedMembers(prev => prev.filter(m => m.id !== contact.id));
-      }
-    } else {
-      // Add to selected members
-      setSelectedMembers(prev => [...prev, contact]);
+    // Don't allow selecting/removing creator
+    if (contact.id === currentUser?.id?.toString()) {
+      return;
     }
-  }, [selectedMembers, currentUser?.id]);
+    
+    // Use functional update to avoid stale closure
+    setSelectedMembers(prev => {
+      const isSelected = prev.some(m => m.id === contact.id);
+    if (isSelected) {
+        // Remove if already selected
+        return prev.filter(m => m.id !== contact.id);
+    } else {
+        // Add if not selected
+        return [...prev, contact];
+    }
+    });
+  }, [currentUser?.id]);
 
   const handleRemoveMember = useCallback((memberId: string) => {
     // Don't allow removing creator
@@ -345,7 +357,7 @@ const CreateSharedWalletScreen: React.FC<CreateSharedWalletScreenProps> = () => 
                     userId={member.id}
                     userName={member.name}
                     avatarUrl={member.avatar}
-                    size={40}
+                    size={32}
                     style={styles.memberAvatar}
                   />
                   <View style={styles.memberInfo}>
@@ -363,7 +375,7 @@ const CreateSharedWalletScreen: React.FC<CreateSharedWalletScreenProps> = () => 
                     >
                       <PhosphorIcon
                         name="X"
-                        size={20}
+                        size={18}
                         color={colors.red}
                         weight="bold"
                       />
@@ -407,75 +419,76 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollViewContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xl,
+    padding: spacing.md,
+    paddingBottom: spacing.lg,
+    gap: spacing.sm,
   },
   inputContainer: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   section: {
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   sectionTitle: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
   },
   sectionSubtitle: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     color: colors.white70,
   },
   errorText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     color: colors.red,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   membersList: {
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white5,
-    borderRadius: spacing.md,
-    padding: spacing.md,
-    gap: spacing.md,
+    borderRadius: spacing.sm,
+    padding: spacing.sm,
+    gap: spacing.sm,
   },
   memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: colors.white10,
   },
   memberInfo: {
     flex: 1,
   },
   memberName: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     color: colors.white,
-    marginBottom: spacing.xs / 2,
+    marginBottom: spacing.xs / 4,
   },
   memberRole: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     color: colors.white70,
   },
   removeButton: {
-    padding: spacing.xs,
+    padding: spacing.xs / 2,
   },
   addMembersButton: {
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   createButton: {
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
   },
 });
 

@@ -11,6 +11,7 @@ import { seasonService } from './seasonService';
 import { getSeasonReward, calculateRewardPoints } from './seasonRewardsConfig';
 import { pointsService } from './pointsService';
 import { referralService } from './referralService';
+import { badgeService } from './badgeService';
 
 class UserActionSyncService {
   /**
@@ -295,6 +296,24 @@ class UserActionSyncService {
         synced.push('external_wallet_linking');
       } catch (error) {
         errors.push(`Failed to sync external wallet linking: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      // 8. Backfill badge points for previously claimed badges
+      try {
+        const backfillResult = await badgeService.backfillBadgePoints(userId);
+        if (backfillResult.pointsAwarded > 0) {
+          synced.push(`badge_points_backfill (${backfillResult.pointsAwarded} points)`);
+          logger.info('Badge points backfilled', {
+            userId,
+            pointsAwarded: backfillResult.pointsAwarded,
+            badgesProcessed: backfillResult.badgesProcessed
+          }, 'UserActionSyncService');
+        }
+        if (backfillResult.errors.length > 0) {
+          errors.push(...backfillResult.errors);
+        }
+      } catch (error) {
+        errors.push(`Failed to backfill badge points: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       logger.info('User actions verified and synced', {

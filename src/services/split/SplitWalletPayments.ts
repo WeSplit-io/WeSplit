@@ -369,6 +369,30 @@ async function executeFairSplitTransaction(
       note: 'Sending to Firebase immediately to minimize blockhash expiration risk'
     }, 'SplitWalletPayments');
     
+    // For withdrawals, capture balance BEFORE transaction for verification
+    let fromBalanceBefore: number | null = null;
+    let toBalanceBefore: number | null = null;
+    
+    if (transactionType === 'withdrawal') {
+      try {
+        const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+        const fromBalanceResult = await consolidatedTransactionService.getUsdcBalance(fromAddress);
+        const toBalanceResult = await consolidatedTransactionService.getUsdcBalance(toAddress);
+        fromBalanceBefore = fromBalanceResult.balance;
+        toBalanceBefore = toBalanceResult.balance;
+        
+        logger.info('Captured balances before fair split withdrawal transaction', {
+          fromBalanceBefore,
+          toBalanceBefore,
+          expectedAmount: amount
+        }, 'SplitWalletPayments');
+      } catch (error) {
+        logger.warn('Failed to capture balances before transaction, proceeding without balance verification', {
+          error: error instanceof Error ? error.message : String(error)
+        }, 'SplitWalletPayments');
+      }
+    }
+
     // Use processUsdcTransfer which combines signing and submission in one Firebase call
     // This minimizes blockhash expiration risk and reduces network round trips
     let signature: string;
@@ -391,10 +415,219 @@ async function executeFairSplitTransaction(
       };
     }
 
-            return {
-              success: true,
-            signature
+    // For withdrawals, use optimized confirmation strategy with timeout handling
+    // Mainnet-aware: Use longer timeouts for mainnet since it's slower
+    if (transactionType === 'withdrawal') {
+      const { getConfig } = await import('../../config/unified');
+      const config = getConfig();
+      const isMainnet = config.blockchain.network === 'mainnet';
+      
+      let confirmed = false;
+      let attempts = 0;
+      // Mainnet needs more time - transactions can take 30+ seconds
+      const maxAttempts = isMainnet ? 30 : 15; // 30 attempts for mainnet (60 seconds), 15 for devnet (30 seconds)
+      const waitTime = isMainnet ? 2000 : 2000; // 2 seconds for both
+
+      logger.info('Starting fair split withdrawal transaction confirmation', {
+        signature,
+        maxAttempts,
+        waitTime
+      }, 'SplitWalletPayments');
+
+      // Use Promise.race for faster confirmation with timeout
+      const confirmationPromise = new Promise<boolean>((resolve) => {
+        const checkStatus = async () => {
+          try {
+            const status = await connection.getSignatureStatus(signature, { 
+              searchTransactionHistory: true 
+            });
+            
+            logger.debug('Transaction status check', {
+              signature,
+              attempt: attempts + 1,
+              status: status.value,
+              confirmationStatus: status.value?.confirmationStatus,
+              err: status.value?.err
+            }, 'SplitWalletPayments');
+            
+            if (status.value?.confirmationStatus === 'confirmed' || 
+                status.value?.confirmationStatus === 'finalized') {
+              logger.info('Fair split withdrawal transaction confirmed', {
+                signature,
+                confirmationStatus: status.value.confirmationStatus,
+                attempts
+              }, 'SplitWalletPayments');
+              resolve(true);
+              return;
+            } else if (status.value?.err) {
+              logger.error('Fair split withdrawal transaction failed', {
+                signature,
+                error: status.value.err
+              }, 'SplitWalletPayments');
+              resolve(false);
+              return;
+            } else if (status.value === null && attempts < maxAttempts) {
+              // Transaction not found yet - continue checking
+              logger.debug('Transaction not found in blockchain yet', {
+                signature,
+                attempt: attempts + 1
+              }, 'SplitWalletPayments');
+              attempts++;
+              setTimeout(checkStatus, waitTime);
+            } else {
+              // Max attempts reached or other condition
+              resolve(false);
+            }
+          } catch (error) {
+            logger.warn('Error checking fair split withdrawal transaction status', {
+              signature,
+              attempt: attempts + 1,
+              error
+            }, 'SplitWalletPayments');
+            attempts++;
+            if (attempts < maxAttempts) {
+              setTimeout(checkStatus, waitTime);
+            } else {
+              resolve(false);
+            }
+          }
+        };
+        
+        checkStatus();
+      });
+
+      // Wait for confirmation with a maximum timeout
+      const timeoutPromise = new Promise<boolean>((resolve) => {
+        setTimeout(() => resolve(false), maxAttempts * waitTime);
+      });
+
+      confirmed = await Promise.race([confirmationPromise, timeoutPromise]);
+
+      if (!confirmed) {
+        logger.warn('Fair split withdrawal transaction confirmation timed out - verifying balance change', {
+          signature,
+          attempts
+        }, 'SplitWalletPayments');
+          
+        // For withdrawals, verify the balance actually changed before declaring success
+        try {
+          const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+          
+          // Use Promise.all for parallel balance checks
+          const [fromBalanceResult, toBalanceResult] = await Promise.all([
+            consolidatedTransactionService.getUsdcBalance(fromAddress),
+            consolidatedTransactionService.getUsdcBalance(toAddress)
+          ]);
+          
+          const fromBalance = fromBalanceResult.balance;
+          const toBalance = toBalanceResult.balance;
+          
+          logger.info('Balance verification after timeout', {
+            signature,
+            fromAddress,
+            fromBalance,
+            toAddress,
+            toBalance,
+            expectedAmount: amount
+          }, 'SplitWalletPayments');
+          
+          // Check if the sender balance decreased by approximately the expected amount
+          // This is a more reliable indicator that the transaction actually occurred
+          const tolerance = 0.001; // 0.001 USDC tolerance
+          
+          // If we captured balances before the transaction, use them for verification
+          if (fromBalanceBefore !== null && toBalanceBefore !== null) {
+            const fromBalanceDecrease = fromBalanceBefore - fromBalance;
+            const toBalanceIncrease = toBalance - toBalanceBefore;
+            
+            logger.info('Balance change verification', {
+              signature,
+              fromBalanceBefore,
+              fromBalanceAfter: fromBalance,
+              fromBalanceDecrease,
+              toBalanceBefore,
+              toBalanceAfter: toBalance,
+              toBalanceIncrease,
+              expectedAmount: amount,
+              tolerance
+            }, 'SplitWalletPayments');
+            
+            // Check if the sender's balance decreased by approximately the expected amount
+            // and the recipient's balance increased by approximately the expected amount
+            const fromBalanceCorrect = Math.abs(fromBalanceDecrease - amount) <= tolerance;
+            const toBalanceCorrect = Math.abs(toBalanceIncrease - amount) <= tolerance;
+            
+            if (fromBalanceCorrect && toBalanceCorrect) {
+              logger.info('Fair split withdrawal verified by balance change', {
+                signature,
+                fromBalanceDecrease,
+                toBalanceIncrease,
+                expectedAmount: amount
+              }, 'SplitWalletPayments');
+              return {
+                success: true,
+                signature
+              };
+            } else {
+              logger.error('Fair split withdrawal verification failed - balance change mismatch', {
+                signature,
+                fromBalanceDecrease,
+                toBalanceIncrease,
+                expectedAmount: amount,
+                fromBalanceCorrect,
+                toBalanceCorrect
+              }, 'SplitWalletPayments');
+              return {
+                success: false,
+                signature,
+                error: 'Transaction is taking longer than expected to confirm. Please check your wallet in a few minutes - the transaction may still be processing.'
+              };
+            }
+          } else {
+            // Fallback to blockchain verification if we don't have previous balances
+            const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
+            
+            if (transactionConfirmed) {
+              logger.info('Fair split withdrawal verified by blockchain confirmation', {
+                signature,
+                expectedAmount: amount
+              }, 'SplitWalletPayments');
+              return {
+                success: true,
+                signature
+              };
+            } else {
+              logger.error('Fair split withdrawal verification failed - transaction not confirmed on blockchain', {
+                signature,
+                expectedAmount: amount
+              }, 'SplitWalletPayments');
+              return {
+                success: false,
+                signature,
+                error: 'Transaction is taking longer than expected to confirm. Please check your wallet in a few minutes - the transaction may still be processing.'
+              };
+            }
+          }
+        } catch (balanceError) {
+          logger.error('Failed to verify fair split withdrawal balance', {
+            signature,
+            error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+          }, 'SplitWalletPayments');
+          return {
+            success: false,
+            signature,
+            error: 'Transaction is taking longer than expected to confirm. Please check your wallet in a few minutes - the transaction may still be processing.'
           };
+        }
+      }
+    }
+
+    // For funding transactions, return success immediately (no confirmation needed)
+    // Funding transactions are typically faster and don't require the same level of verification
+    return {
+      success: true,
+      signature
+    };
   } catch (error) {
     logger.error('Fair split transaction failed', error, 'SplitWalletPayments');
             return {
@@ -1887,12 +2120,16 @@ export class SplitWalletPayments {
 
       // Check user's USDC balance before attempting transaction
       try {
-        const { balanceUtils } = await import('../shared/balanceUtils');
-        const { PublicKey } = await import('@solana/web3.js');
         const { FeeService } = await import('../../config/constants/feeConfig');
-        const { USDC_CONFIG } = await import('../shared/walletConstants');
-        const usdcMint = new PublicKey(USDC_CONFIG.mintAddress);
-        const userBalance = await balanceUtils.getUsdcBalance(new PublicKey(userWallet.address), usdcMint);
+        const { getUserBalanceWithFallback } = await import('../shared/balanceCheckUtils');
+        
+        // Use centralized balance check utility with intelligent fallback
+        const balanceResult = await getUserBalanceWithFallback(participantId, {
+          useLiveBalance: true,
+          walletAddress: userWallet.address
+        });
+        
+        const userUsdcBalance = balanceResult.usdcBalance;
         
         // Calculate total amount user needs to pay (share + fees)
         const { totalAmount: totalPaymentAmount } = FeeService.calculateCompanyFee(roundedAmount, 'split_payment');
@@ -1901,18 +2138,41 @@ export class SplitWalletPayments {
           splitWalletId,
           participantId,
           userWalletAddress: userWallet.address,
-          userUsdcBalance: userBalance.balance,
+          userUsdcBalance,
           shareAmount: roundedAmount,
           totalPaymentAmount,
           feeAmount: totalPaymentAmount - roundedAmount,
-          hasSufficientBalance: userBalance.balance >= totalPaymentAmount
+          source: balanceResult.source,
+          isReliable: balanceResult.isReliable
         }, 'SplitWalletPayments');
 
-        if (userBalance.balance < totalPaymentAmount) {
+        // Only block if we have a reliable balance check and it's insufficient
+        if (balanceResult.isReliable && userUsdcBalance < totalPaymentAmount) {
           return {
             success: false,
-            error: `Insufficient USDC balance. You have ${userBalance.balance.toFixed(6)} USDC but need ${totalPaymentAmount.toFixed(6)} USDC to make this payment (${roundedAmount.toFixed(6)} USDC for your share + ${(totalPaymentAmount - roundedAmount).toFixed(6)} USDC in fees). Please add USDC to your wallet first.`
+            error: `Insufficient USDC balance. You have ${userUsdcBalance.toFixed(6)} USDC but need ${totalPaymentAmount.toFixed(6)} USDC to make this payment (${roundedAmount.toFixed(6)} USDC for your share + ${(totalPaymentAmount - roundedAmount).toFixed(6)} USDC in fees). Please add USDC to your wallet first.`
           };
+        }
+        
+        // If balance check is unreliable but we got a balance, still check if insufficient
+        if (!balanceResult.isReliable && userUsdcBalance > 0 && userUsdcBalance < totalPaymentAmount) {
+          logger.warn('Balance check unreliable but shows insufficient balance, blocking transaction', {
+            userUsdcBalance,
+            totalPaymentAmount,
+            source: balanceResult.source
+          }, 'SplitWalletPayments');
+          return {
+            success: false,
+            error: `Insufficient USDC balance. You have ${userUsdcBalance.toFixed(6)} USDC but need ${totalPaymentAmount.toFixed(6)} USDC to make this payment (${roundedAmount.toFixed(6)} USDC for your share + ${(totalPaymentAmount - roundedAmount).toFixed(6)} USDC in fees). Please add USDC to your wallet first.`
+          };
+        }
+        
+        // If balance check unavailable, allow transaction to proceed (will fail at blockchain if insufficient)
+        if (!balanceResult.isReliable && userUsdcBalance === 0) {
+          logger.warn('Balance check unavailable, allowing transaction to proceed (will fail at blockchain if insufficient)', {
+            walletAddress: userWallet.address,
+            source: balanceResult.source
+          }, 'SplitWalletPayments');
         }
       } catch (balanceError) {
         logger.warn('Failed to check user USDC balance, proceeding with transaction', {
@@ -2162,40 +2422,64 @@ export class SplitWalletPayments {
 
       // Check user's USDC balance before attempting transaction
       try {
-        const { BalanceUtils } = await import('../shared/balanceUtils');
-        const { PublicKey } = await import('@solana/web3.js');
-        const { getConfig } = await import('../../config/unified');
         const { FeeService } = await import('../../config/constants/feeConfig');
+        const { getUserBalanceWithFallback } = await import('../shared/balanceCheckUtils');
         
-        const userPublicKey = new PublicKey(userWallet.address);
-        const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
+        // Use centralized balance check utility with intelligent fallback
+        const balanceResult = await getUserBalanceWithFallback(participantId, {
+          useLiveBalance: true,
+          walletAddress: userWallet.address
+        });
         
-        const balanceResult = await BalanceUtils.getUsdcBalance(userPublicKey, usdcMint);
-        const userUsdcBalance = balanceResult.balance;
+        const userUsdcBalance = balanceResult.usdcBalance;
         
         // Calculate total amount user needs to pay (share + fees)
         const { totalAmount: totalPaymentAmount } = FeeService.calculateCompanyFee(roundedAmount, 'split_payment');
         
-        logger.info('User USDC balance check', {
+        logger.info('User USDC balance check for fair split funding', {
           participantId,
           userAddress: userWallet.address,
           userUsdcBalance,
           shareAmount: roundedAmount,
           totalPaymentAmount,
-          feeAmount: totalPaymentAmount - roundedAmount
+          feeAmount: totalPaymentAmount - roundedAmount,
+          source: balanceResult.source,
+          isReliable: balanceResult.isReliable
         }, 'SplitWalletPayments');
         
-        if (userUsdcBalance < totalPaymentAmount) {
-            return {
-              success: false,
+        // Only block if we have a reliable balance check and it's insufficient
+        if (balanceResult.isReliable && userUsdcBalance < totalPaymentAmount) {
+          return {
+            success: false,
             error: `Insufficient USDC balance. You have ${userUsdcBalance.toFixed(6)} USDC but need ${totalPaymentAmount.toFixed(6)} USDC to make this payment (${roundedAmount.toFixed(6)} USDC for your share + ${(totalPaymentAmount - roundedAmount).toFixed(6)} USDC in fees). Please add USDC to your wallet first.`,
           };
+        }
+        
+        // If balance check is unreliable but we got a balance, still check if insufficient
+        if (!balanceResult.isReliable && userUsdcBalance > 0 && userUsdcBalance < totalPaymentAmount) {
+          logger.warn('Balance check unreliable but shows insufficient balance, blocking transaction', {
+            userUsdcBalance,
+            totalPaymentAmount,
+            source: balanceResult.source
+          }, 'SplitWalletPayments');
+          return {
+            success: false,
+            error: `Insufficient USDC balance. You have ${userUsdcBalance.toFixed(6)} USDC but need ${totalPaymentAmount.toFixed(6)} USDC to make this payment (${roundedAmount.toFixed(6)} USDC for your share + ${(totalPaymentAmount - roundedAmount).toFixed(6)} USDC in fees). Please add USDC to your wallet first.`,
+          };
+        }
+        
+        // If balance check unavailable, allow transaction to proceed (will fail at blockchain if insufficient)
+        if (!balanceResult.isReliable && userUsdcBalance === 0) {
+          logger.warn('Balance check unavailable, allowing transaction to proceed (will fail at blockchain if insufficient)', {
+            walletAddress: userWallet.address,
+            source: balanceResult.source
+          }, 'SplitWalletPayments');
         }
       } catch (error) {
         logger.warn('Could not check user USDC balance, proceeding with transaction', {
           error: error instanceof Error ? error.message : String(error),
-            participantId
-          }, 'SplitWalletPayments');
+          participantId
+        }, 'SplitWalletPayments');
         // Continue with transaction - balance check is not critical
       }
 

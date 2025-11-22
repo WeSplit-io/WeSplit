@@ -9,6 +9,7 @@ import { TransactionProcessor } from './TransactionProcessor';
 import { PaymentRequestManager } from './PaymentRequestManager';
 import { BalanceManager } from './BalanceManager';
 import { logger } from '../../analytics/loggingService';
+import { transactionDeduplicationService } from './TransactionDeduplicationService'; // ✅ CRITICAL: Static import for singleton
 import { 
   TransactionParams, 
   TransactionResult, 
@@ -90,10 +91,6 @@ class ConsolidatedTransactionService {
         resolveTransaction = resolve;
         rejectTransaction = reject;
       });
-      
-      // ✅ CRITICAL: Import deduplication service BEFORE creating placeholder
-      // This ensures the service is ready before any async operations
-      const { transactionDeduplicationService } = await import('./TransactionDeduplicationService');
       
       // ✅ CRITICAL: Atomic check-and-register to prevent race conditions
       // This method atomically checks if transaction exists and registers if not

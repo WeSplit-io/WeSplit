@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import Modal from './Modal';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -72,30 +72,31 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
           />
         </TouchableOpacity>
 
-        {/* Create Shared Wallet Option */}
+        {/* Create Shared Wallet Option - DISABLED FOR DEPLOYMENT */}
         <TouchableOpacity
-          style={styles.optionCard}
-          onPress={handleCreateSharedWallet}
+          style={[styles.optionCard, styles.optionCardDisabled]}
+          onPress={() => Alert.alert('Coming Soon', 'Shared wallet creation is currently unavailable. This feature will be available in a future update.')}
           activeOpacity={0.7}
+          disabled={true}
         >
-          <View style={styles.optionIconContainer}>
+          <View style={[styles.optionIconContainer, styles.optionIconContainerDisabled]}>
             <PhosphorIcon
               name="Wallet"
               size={32}
-              color={colors.greenBlue}
+              color={colors.white50}
               weight="fill"
             />
           </View>
           <View style={styles.optionContent}>
-            <Text style={styles.optionTitle}>Create Shared Wallet</Text>
+            <Text style={[styles.optionTitle, styles.optionTitleDisabled]}>Create Shared Wallet</Text>
             <Text style={styles.optionDescription}>
-              Shared account for ongoing expenses
+              Coming soon - Feature in development
             </Text>
           </View>
           <PhosphorIcon
             name="CaretRight"
             size={20}
-            color={colors.white70}
+            color={colors.white50}
             weight="regular"
           />
         </TouchableOpacity>
@@ -137,6 +138,15 @@ const styles = StyleSheet.create({
   optionDescription: {
     fontSize: typography.fontSize.sm,
     color: colors.white70,
+  },
+  optionCardDisabled: {
+    opacity: 0.5,
+  },
+  optionIconContainerDisabled: {
+    backgroundColor: colors.white10,
+  },
+  optionTitleDisabled: {
+    color: colors.white50,
   },
 });
 

@@ -312,109 +312,115 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
           }, 'SplitsListScreen');
         }
 
-        // Fix existing splits where creator has 'pending' status and validate prices
-        // Also sync wallet status for degen splits
-        const updatedSplits = await Promise.all(result.splits.map(async (split) => {
-          // Get authoritative price from centralized price management
+        // OPTIMIZED: Apply price updates synchronously (fast operation)
+        // Defer wallet checks and status fixes to background to show splits immediately
+        const updatedSplits = result.splits.map((split) => {
+          // Get authoritative price from centralized price management (synchronous, fast)
           const billId = split.billId || split.id;
           const authoritativePrice = priceManagementService.getBillPrice(billId);
 
-          let updatedSplit = split;
-
           // Update price if authoritative price is available
           if (authoritativePrice) {
-            logger.debug('Using authoritative price for split', {
-              splitId: split.id,
-              originalAmount: split.totalAmount,
-              authoritativeAmount: authoritativePrice.amount
-            });
-            updatedSplit = {
+            return {
               ...split,
               totalAmount: authoritativePrice.amount
             };
           }
+          return split;
+        });
 
-          // CRITICAL: For degen splits, check wallet status and sync if needed
-          if (updatedSplit.splitType === 'degen' && updatedSplit.walletId) {
-            try {
-              const { SplitWalletService } = await import('../../../services/split');
-              const walletResult = await SplitWalletService.getSplitWallet(updatedSplit.walletId);
-              
-              if (walletResult.success && walletResult.wallet) {
-                const wallet = walletResult.wallet;
-                
-                // If wallet status is 'closed' but split status is not synced, update it
-                if (wallet.status === 'closed' && updatedSplit.status !== 'completed') {
-                  logger.info('Syncing split status from closed wallet', {
-                    splitId: updatedSplit.id,
-                    walletId: wallet.id,
-                    walletStatus: wallet.status,
-                    splitStatus: updatedSplit.status
-                  }, 'SplitsListScreen');
-                  
-                  try {
-                    const { SplitDataSynchronizer } = await import('../../../services/split/SplitDataSynchronizer');
-                    await SplitDataSynchronizer.syncSplitStatusFromSplitWalletToSplitStorage(
-                      updatedSplit.billId,
-                      'closed',
-                      wallet.completedAt
-                    );
-                    
-                    // Update local split status for immediate display
-                    updatedSplit = {
-                      ...updatedSplit,
-                      status: 'completed' as const
-                    };
-                  } catch (syncError) {
-                    logger.error('Failed to sync split status from wallet', {
-                      splitId: updatedSplit.id,
-                      error: syncError instanceof Error ? syncError.message : String(syncError)
-                    }, 'SplitsListScreen');
-                    // Still update local status for display even if sync fails
-                    updatedSplit = {
-                      ...updatedSplit,
-                      status: 'completed' as const
-                    };
-                  }
-                } else if (wallet.status === 'spinning_completed' && updatedSplit.status === 'completed') {
-                  // Wallet is still spinning_completed, but split was marked completed
-                  // Keep the split status as is (it's already synced)
-                }
-              }
-            } catch (walletError) {
-              logger.debug('Could not check wallet status for split', {
-                splitId: updatedSplit.id,
-                walletId: updatedSplit.walletId,
-                error: walletError instanceof Error ? walletError.message : String(walletError)
-              }, 'SplitsListScreen');
-              // Continue with split as-is if wallet check fails
-            }
-          }
-
-          const creatorParticipant = updatedSplit.participants.find(p => p.userId === updatedSplit.creatorId);
-          if (creatorParticipant && creatorParticipant.status === 'pending') {
-            logger.debug('Fixing creator status for split', { splitId: updatedSplit.id }, 'SplitsListScreen');
-            try {
-              await SplitStorageService.updateParticipantStatus(
-                updatedSplit.firebaseDocId || updatedSplit.id,
-                updatedSplit.creatorId,
-                'accepted'
-              );
-              // Update the local split data
-              const updatedParticipants = updatedSplit.participants.map(p =>
-                p.userId === updatedSplit.creatorId ? { ...p, status: 'accepted' as const } : p
-              );
-              return { ...updatedSplit, participants: updatedParticipants };
-            } catch (error) {
-              console.error('🔍 SplitsListScreen: Error updating creator status:', error);
-              return updatedSplit;
-            }
-          }
-          return updatedSplit;
-        }));
-
-        // Set the splits without test data
+        // Set splits immediately to show UI quickly
         setSplits(updatedSplits);
+        
+        // Perform background updates asynchronously (don't block UI)
+        // This includes wallet status checks and creator status fixes
+        Promise.all(updatedSplits.map(async (split) => {
+          try {
+            // Only check wallet status for degen splits that might need syncing
+            // Skip if already completed to avoid unnecessary checks
+            if (split.splitType === 'degen' && split.walletId && split.status !== 'completed') {
+              try {
+                const { SplitWalletService } = await import('../../../services/split');
+                const walletResult = await SplitWalletService.getSplitWallet(split.walletId);
+                
+                if (walletResult.success && walletResult.wallet) {
+                  const wallet = walletResult.wallet;
+                  
+                  // Only sync if wallet is closed but split isn't marked completed
+                  if (wallet.status === 'closed' && split.status !== 'completed') {
+                    logger.info('Syncing split status from closed wallet (background)', {
+                      splitId: split.id,
+                      walletId: wallet.id
+                    }, 'SplitsListScreen');
+                    
+                    try {
+                      const { SplitDataSynchronizer } = await import('../../../services/split/SplitDataSynchronizer');
+                      await SplitDataSynchronizer.syncSplitStatusFromSplitWalletToSplitStorage(
+                        split.billId,
+                        'closed',
+                        wallet.completedAt
+                      );
+                      
+                      // Update local state after sync
+                      setSplits(prev => prev.map(s => 
+                        s.id === split.id ? { ...s, status: 'completed' as const } : s
+                      ));
+                    } catch (syncError) {
+                      logger.error('Failed to sync split status from wallet (background)', {
+                        splitId: split.id,
+                        error: syncError instanceof Error ? syncError.message : String(syncError)
+                      }, 'SplitsListScreen');
+                    }
+                  }
+                }
+              } catch (walletError) {
+                // Silently fail - wallet check is non-critical for list display
+                logger.debug('Could not check wallet status for split (background)', {
+                  splitId: split.id,
+                  walletId: split.walletId
+                }, 'SplitsListScreen');
+              }
+            }
+
+            // Fix creator status in background (non-blocking)
+            const creatorParticipant = split.participants.find(p => p.userId === split.creatorId);
+            if (creatorParticipant && creatorParticipant.status === 'pending') {
+              try {
+                await SplitStorageService.updateParticipantStatus(
+                  split.firebaseDocId || split.id,
+                  split.creatorId,
+                  'accepted'
+                );
+                
+                // Update local state after fix
+                setSplits(prev => prev.map(s => {
+                  if (s.id === split.id) {
+                    const updatedParticipants = s.participants.map(p =>
+                      p.userId === split.creatorId ? { ...p, status: 'accepted' as const } : p
+                    );
+                    return { ...s, participants: updatedParticipants };
+                  }
+                  return s;
+                }));
+              } catch (error) {
+                // Silently fail - status fix is non-critical for list display
+                logger.debug('Could not fix creator status (background)', {
+                  splitId: split.id
+                }, 'SplitsListScreen');
+              }
+            }
+          } catch (error) {
+            // Silently fail - background updates shouldn't block UI
+            logger.debug('Background update failed for split', {
+              splitId: split.id
+            }, 'SplitsListScreen');
+          }
+        })).catch(error => {
+          // Log but don't block - background updates failed
+          logger.debug('Some background updates failed', { error }, 'SplitsListScreen');
+        });
+
+        // Splits already set above for immediate display
         // hasMore is true if we got exactly SPLITS_PER_PAGE splits (meaning there might be more)
         const calculatedHasMore = result.hasMore !== undefined ? result.hasMore : (updatedSplits.length === SPLITS_PER_PAGE);
         setHasMore(calculatedHasMore);
@@ -862,18 +868,19 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Pools</Text>
           <TouchableOpacity
-            style={styles.newPoolButton}
-            onPress={activeTab === 'splits' ? handleCreateSplit : handleCreateSharedWallet}
+            style={[styles.newPoolButton, activeTab === 'sharedWallets' && styles.newPoolButtonDisabled]}
+            onPress={activeTab === 'splits' ? handleCreateSplit : undefined}
             activeOpacity={0.8}
+            disabled={activeTab === 'sharedWallets'}
           >
             <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
+              colors={activeTab === 'sharedWallets' ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.newPoolButton}
             >
-              <Icon name="plus" size={16} color={colors.black} />
-              <Text style={styles.newPoolButtonText}>
+              <Icon name="plus" size={16} color={activeTab === 'sharedWallets' ? colors.white50 : colors.black} />
+              <Text style={[styles.newPoolButtonText, activeTab === 'sharedWallets' && styles.newPoolButtonTextDisabled]}>
                 {activeTab === 'splits' ? 'New Pool' : 'New Wallet'}
               </Text>
             </LinearGradient>
@@ -1034,24 +1041,13 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
               <ModernLoader size="large" text="Loading shared wallets..." />
             </View>
           ) : sharedWallets.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Image
-                source={require('../../../../assets/pool-empty-icon.png')}
-                style={styles.emptyStateIcon}
-              />
-              <View style={styles.emptyStateContent}>
-                <Text style={styles.emptyStateTitle}>No Shared Wallets</Text>
-                <Text style={styles.emptyStateSubtitle}>
-                  Create a shared wallet to manage ongoing expenses with friends and family.
+            <View style={styles.sharedWalletEmptyState}>
+              <View style={styles.sharedWalletEmptyContent}>
+                <Text style={styles.sharedWalletEmptyTitle}>No Shared Wallets</Text>
+                <Text style={styles.sharedWalletEmptySubtitle}>
+                  Shared wallets allow you to manage ongoing expenses with friends and family.
                 </Text>
               </View>
-              <Button
-                title="Create Shared Wallet"
-                onPress={handleCreateSharedWallet}
-                variant="primary"
-                size="large"
-                style={styles.createFirstButtonWrapper}
-              />
             </View>
           ) : (
             <View>

@@ -470,7 +470,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
     } finally {
       setIsFunding(false);
     }
-  }, [wallet, currentUser?.id, topUpAmount, topUpSource, appWalletAddress, appWalletBalance, formatBalance, navigation]);
+  }, [wallet, currentUser?.id, topUpAmount, topUpSource, appWalletAddress, appWalletBalance, navigation]);
 
   // Handle link card
   const handleLinkCard = useCallback(() => {
@@ -679,7 +679,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
             })}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="Gear" size={24} color={colors.white} weight="regular" />
+            <PhosphorIcon name="Gear" size={18} color={colors.white} weight="regular" />
           </TouchableOpacity>
         }
       />
@@ -689,178 +689,181 @@ const SharedWalletDetailsScreen: React.FC = () => {
         contentContainerStyle={styles.scrollViewContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Balance Card */}
-        <BalanceCard
-          balance={wallet.totalBalance}
-          currency={wallet.currency}
-          status={wallet.status}
-          customColor={wallet.customColor}
-          customLogo={wallet.customLogo}
-        />
+        {/* Hero Section - Balance Card with Clean Design */}
+        <View style={styles.heroSection}>
+          <BalanceCard
+            balance={wallet.totalBalance}
+            currency={wallet.currency}
+            status={wallet.status}
+            customColor={wallet.customColor}
+            customLogo={wallet.customLogo}
+          />
+        </View>
 
-        {/* Action Buttons */}
-        <ActionButtons
-          onTopUp={() => setShowTopUpModal(true)}
-          onLinkCard={handleLinkCard}
-          onWithdraw={() => {
-            if (userLinkedCards.length === 0) {
-              Alert.alert('No Cards', 'Please link a card first to withdraw funds');
-              return;
-            }
-            setShowWithdrawModal(true);
-          }}
-          canWithdraw={userLinkedCards.length > 0}
-        />
+        {/* Quick Actions - Clean Grid Layout */}
+        <View style={styles.actionsSection}>
+          <ActionButtons
+            onTopUp={() => setShowTopUpModal(true)}
+            onLinkCard={handleLinkCard}
+            onWithdraw={() => {
+              if (userLinkedCards.length === 0) {
+                Alert.alert('No Cards', 'Please link a card first to withdraw funds');
+                return;
+              }
+              setShowWithdrawModal(true);
+            }}
+            canWithdraw={userLinkedCards.length > 0}
+          />
+        </View>
 
-        {/* Quick Stats */}
-        <View style={styles.quickStatsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Members</Text>
+        {/* Stats Row - Minimalist Horizontal Layout */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
             <Text style={styles.statValue}>{wallet.members.length}</Text>
+            <Text style={styles.statLabel}>Members</Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Transactions</Text>
+          <View style={styles.statCard}>
             <Text style={styles.statValue}>{transactions.length}</Text>
+            <Text style={styles.statLabel}>Transactions</Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Status</Text>
-            <View style={styles.statusIndicator}>
+          <View style={styles.statCard}>
+            <View style={styles.statusBadgeInline}>
               <View style={[styles.statusDot, { backgroundColor: wallet.status === 'active' ? colors.green : colors.white50 }]} />
-              <Text style={styles.statValue}>{wallet.status}</Text>
+              <Text style={[styles.statValue, { fontSize: typography.fontSize.sm }]}>{wallet.status}</Text>
             </View>
+            <Text style={styles.statLabel}>Status</Text>
           </View>
         </View>
 
-        {/* Your Contribution */}
+        {/* Your Balance - Clean Card Design */}
         {userMember && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Contribution</Text>
-            <View style={styles.contributionContainer}>
-              <Text style={styles.contributionValue}>
+          <View style={styles.balanceCard}>
+            <View style={styles.balanceCardHeader}>
+              <Text style={styles.balanceCardTitle}>Your Balance</Text>
+              {userBalance > 0 && (
+                <View style={styles.availableBadge}>
+                  <Text style={styles.availableBadgeText}>Available</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.balanceCardContent}>
+              <Text style={styles.balanceCardAmount}>
                 {formatBalance(userContribution, wallet.currency)}
               </Text>
               {userBalance > 0 && (
-                <View style={styles.availableBalanceContainer}>
-                  <PhosphorIcon name="CheckCircle" size={16} color={colors.green} weight="fill" />
-                  <Text style={styles.availableBalance}>
-                    {formatBalance(userBalance, wallet.currency)} available
-                  </Text>
-                </View>
+                <Text style={styles.balanceCardSubtext}>
+                  {formatBalance(userBalance, wallet.currency)} available to withdraw
+                </Text>
               )}
             </View>
           </View>
         )}
 
-        {/* Linked Cards */}
-        <View style={styles.section}>
+        {/* Linked Cards - Clean List Design */}
+        <View style={styles.cardsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your Linked Cards</Text>
+            <Text style={styles.sectionTitle}>Linked Cards</Text>
             <TouchableOpacity onPress={handleLinkCard} activeOpacity={0.7}>
-              <View style={styles.linkCardButton}>
-                <PhosphorIcon name="Plus" size={16} color={colors.green} weight="bold" />
-                <Text style={styles.linkCardText}>Link Card</Text>
+              <View style={styles.addButton}>
+                <PhosphorIcon name="Plus" size={14} color={colors.green} weight="bold" />
               </View>
             </TouchableOpacity>
           </View>
           
           {isLoadingCards ? (
-            <View style={styles.loadingCardsContainer}>
+            <View style={styles.loadingContainer}>
               <ModernLoader size="small" text="Loading cards..." />
             </View>
           ) : userLinkedCards.length > 0 ? (
-            userLinkedCards.map((card) => (
-              <View key={card.id} style={styles.cardRowContainer}>
+            <View style={styles.cardsList}>
+              {userLinkedCards.map((card) => (
                 <TouchableOpacity
-                  style={styles.cardRow}
+                  key={card.id}
+                  style={styles.cardItem}
                   onPress={() => {
                     setSelectedWithdrawCard(card);
                     setShowWithdrawModal(true);
                   }}
                   activeOpacity={0.7}
                 >
-                  <PhosphorIcon name="CreditCard" size={24} color={colors.green} weight="fill" />
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardName}>{card.label}</Text>
-                    <Text style={styles.cardType}>{card.cardType || 'Card'}</Text>
+                  <View style={styles.cardItemLeft}>
+                    <View style={styles.cardItemInfo}>
+                      <Text style={styles.cardItemName}>{card.label}</Text>
+                      <Text style={styles.cardItemType}>{card.cardType || 'Card'}</Text>
+                    </View>
                   </View>
-                  <PhosphorIcon name="CaretRight" size={20} color={colors.white70} weight="regular" />
+                  <View style={styles.cardItemRight}>
+                    <TouchableOpacity
+                      style={styles.cardItemAction}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleUnlinkCard(card);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <PhosphorIcon name="X" size={14} color={colors.white50} weight="bold" />
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.unlinkButton}
-                  onPress={() => handleUnlinkCard(card)}
-                  activeOpacity={0.7}
-                >
-                  <PhosphorIcon name="X" size={16} color={colors.error} weight="bold" />
-                </TouchableOpacity>
-              </View>
-            ))
-          ) : linkedCards.length > 0 ? (
-            <View style={styles.noLinkedCardsContainer}>
-              <Text style={styles.noLinkedCardsText}>No cards linked to this wallet</Text>
-              <Button
-                title="Link a Card"
-                onPress={handleLinkCard}
-                variant="secondary"
-                size="small"
-                style={styles.linkCardButton}
-              />
+              ))}
             </View>
           ) : (
-            <View style={styles.noLinkedCardsContainer}>
-              <Text style={styles.noLinkedCardsText}>No cards available</Text>
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                {linkedCards.length > 0 ? 'No cards linked' : 'No cards available'}
+              </Text>
               <Button
-                title="Add Card"
-                onPress={() => navigation.navigate('LinkedCards', {
+                title={linkedCards.length > 0 ? "Link a Card" : "Add Card"}
+                onPress={linkedCards.length > 0 ? handleLinkCard : () => navigation.navigate('LinkedCards', {
                   returnRoute: 'SharedWalletDetails',
                   returnParams: { walletId: wallet.id, wallet: wallet },
                 })}
                 variant="secondary"
                 size="small"
-                style={styles.linkCardButton}
+                style={styles.emptyStateButton}
               />
             </View>
           )}
         </View>
 
-        {/* Members List with Participation Circle */}
-        <MembersList
-          members={wallet.members}
-          currency={wallet.currency}
-          showParticipationCircle={true}
-        />
+        {/* Members - Clean Section */}
+        <View style={styles.membersSection}>
+          <MembersList
+            members={wallet.members}
+            currency={wallet.currency}
+            showParticipationCircle={true}
+          />
+        </View>
 
-        {/* Transaction History */}
-        <TransactionHistory
-          transactions={transactions}
-          isLoading={isLoadingTransactions}
-          variant="sharedWallet"
-          onTransactionPress={(tx) => {
-            // Could navigate to transaction details if needed
-            logger.debug('Transaction pressed', { transactionId: tx.id }, 'SharedWalletDetailsScreen');
-          }}
-        />
+        {/* Transactions - Clean Section */}
+        <View style={styles.transactionsSection}>
+          <TransactionHistory
+            transactions={transactions}
+            isLoading={isLoadingTransactions}
+            variant="sharedWallet"
+            onTransactionPress={(tx) => {
+              logger.debug('Transaction pressed', { transactionId: tx.id }, 'SharedWalletDetailsScreen');
+            }}
+          />
+        </View>
 
-        {/* Wallet Address */}
-        <View style={styles.section}>
+        {/* Wallet Address - Minimalist Design */}
+        <View style={styles.addressSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Wallet Address</Text>
             <TouchableOpacity
               onPress={() => handleCopy(wallet.walletAddress, 'Wallet address')}
               activeOpacity={0.7}
-              style={styles.copyButton}
+              style={styles.copyButtonMinimal}
             >
-              <PhosphorIcon name="Copy" size={18} color={colors.green} weight="regular" />
-              <Text style={styles.copyButtonText}>Copy</Text>
+              <PhosphorIcon name="Copy" size={14} color={colors.green} weight="regular" />
             </TouchableOpacity>
           </View>
           <TouchableOpacity
-            style={styles.addressContainer}
+            style={styles.addressCard}
             onPress={() => handleCopy(wallet.walletAddress, 'Wallet address')}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="Wallet" size={20} color={colors.white70} weight="regular" />
             <Text style={styles.addressText} numberOfLines={1}>
               {wallet.walletAddress}
             </Text>
@@ -894,7 +897,6 @@ const SharedWalletDetailsScreen: React.FC = () => {
             onPress={() => setTopUpSource('in-app-wallet')}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="Wallet" size={24} color={topUpSource === 'in-app-wallet' ? colors.green : colors.white70} weight="fill" />
             <View style={styles.sourceOptionInfo}>
               <Text style={styles.sourceOptionTitle}>In-App Wallet</Text>
               <Text style={styles.sourceOptionSubtitle}>
@@ -906,7 +908,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
               </Text>
             </View>
             {topUpSource === 'in-app-wallet' && (
-              <PhosphorIcon name="CheckCircle" size={20} color={colors.green} weight="fill" />
+              <View style={styles.checkIndicator} />
             )}
           </TouchableOpacity>
 
@@ -915,13 +917,12 @@ const SharedWalletDetailsScreen: React.FC = () => {
             onPress={() => setTopUpSource('moonpay')}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="CreditCard" size={24} color={topUpSource === 'moonpay' ? colors.green : colors.white70} weight="fill" />
             <View style={styles.sourceOptionInfo}>
               <Text style={styles.sourceOptionTitle}>Credit/Debit Card</Text>
               <Text style={styles.sourceOptionSubtitle}>Via MoonPay</Text>
             </View>
             {topUpSource === 'moonpay' && (
-              <PhosphorIcon name="CheckCircle" size={20} color={colors.green} weight="fill" />
+              <View style={styles.checkIndicator} />
             )}
           </TouchableOpacity>
 
@@ -953,16 +954,17 @@ const SharedWalletDetailsScreen: React.FC = () => {
               {userLinkedCards.map((card) => (
                 <TouchableOpacity
                   key={card.id}
-                  style={styles.cardOption}
+                  style={[styles.cardOption, selectedWithdrawCard?.id === card.id && styles.sourceOptionActive]}
                   onPress={() => setSelectedWithdrawCard(card)}
                   activeOpacity={0.7}
                 >
-                  <PhosphorIcon name="CreditCard" size={24} color={colors.green} weight="fill" />
                   <View style={styles.sourceOptionInfo}>
                     <Text style={styles.sourceOptionTitle}>{card.label}</Text>
                     <Text style={styles.sourceOptionSubtitle}>{card.cardType || 'Card'}</Text>
                   </View>
-                  <PhosphorIcon name="CaretRight" size={20} color={colors.white70} weight="regular" />
+                  {selectedWithdrawCard?.id === card.id && (
+                    <View style={styles.checkIndicator} />
+                  )}
                 </TouchableOpacity>
               ))}
             </>
@@ -975,7 +977,6 @@ const SharedWalletDetailsScreen: React.FC = () => {
                 onPress={() => setSelectedWithdrawCard(null)}
                 activeOpacity={0.7}
               >
-                <PhosphorIcon name="CreditCard" size={24} color={colors.green} weight="fill" />
                 <View style={styles.sourceOptionInfo}>
                   <Text style={styles.sourceOptionTitle}>{selectedWithdrawCard.label}</Text>
                   <Text style={styles.sourceOptionSubtitle}>Tap to change</Text>
@@ -1096,7 +1097,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
                   >
                     <PhosphorIcon 
                       name={item.type === 'kast' ? "CreditCard" : "Wallet"} 
-                      size={24} 
+                      size={20} 
                       color={colors.green} 
                       weight="fill" 
                     />
@@ -1111,7 +1112,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
                         <ModernLoader size="small" text="" />
                       </View>
                     ) : (
-                      <PhosphorIcon name="Plus" size={20} color={colors.green} weight="bold" />
+                      <PhosphorIcon name="Plus" size={18} color={colors.green} weight="bold" />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -1130,264 +1131,343 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     padding: spacing.md,
+    paddingBottom: spacing.lg,
     gap: spacing.md,
-    paddingBottom: spacing.xxxl,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  // Hero Section - Clean Balance Display
+  heroSection: {
+    marginBottom: spacing.xs,
   },
-  section: {
-    backgroundColor: colors.white5,
-    borderRadius: spacing.md,
-    padding: spacing.md,
+  // Actions Section - Clean Grid
+  actionsSection: {
+    marginBottom: spacing.xs,
+  },
+  // Stats Row - Minimalist Horizontal Cards
+  statsRow: {
+    flexDirection: 'row',
     gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.white10,
+    minHeight: 64,
+    justifyContent: 'center',
+  },
+  statValue: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.xs / 2,
+    lineHeight: typography.fontSize.lg * 1.2,
+  },
+  statLabel: {
+    fontSize: typography.fontSize.xs,
+    color: colors.white50,
+    fontWeight: typography.fontWeight.regular,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    lineHeight: typography.fontSize.xs * 1.2,
+  },
+  statusBadgeInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs / 2,
+    marginBottom: spacing.xs / 2,
+  },
+  statusDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  // Balance Card - Clean Design
+  balanceCard: {
+    backgroundColor: colors.white5,
+    borderRadius: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    marginBottom: spacing.xs,
+  },
+  balanceCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  balanceCardTitle: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white50,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    lineHeight: typography.fontSize.xs * 1.3,
+  },
+  availableBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: spacing.xs / 2,
+    paddingVertical: 1,
+    backgroundColor: colors.greenBlue20,
+    borderRadius: spacing.xs / 2,
+    borderWidth: 0.5,
+    borderColor: colors.green + '25',
+  },
+  availableBadgeText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.green,
+    fontWeight: typography.fontWeight.semibold,
+    letterSpacing: 0.2,
+  },
+  balanceCardContent: {
+    gap: spacing.xs / 2,
+  },
+  balanceCardAmount: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    lineHeight: typography.fontSize.xl * 1.2,
+  },
+  balanceCardSubtext: {
+    fontSize: typography.fontSize.xs,
+    color: colors.white50,
+    lineHeight: typography.fontSize.xs * 1.3,
+  },
+  // Cards Section - Clean List
+  cardsSection: {
+    marginBottom: spacing.xs,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.white10,
   },
   sectionTitle: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.white70,
-  },
-  linkCardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs / 2,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.greenBlue20,
-    borderRadius: spacing.sm,
-  },
-  linkCardText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.green,
-    fontWeight: typography.fontWeight.medium,
-  },
-  contributionContainer: {
-    gap: spacing.xs,
-  },
-  availableBalanceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs / 2,
-    marginTop: spacing.xs,
-  },
-  loadingCardsContainer: {
-    padding: spacing.md,
-    alignItems: 'center',
-  },
-  contributionValue: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
     color: colors.white,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    lineHeight: typography.fontSize.sm * 1.3,
   },
-  availableBalance: {
-    fontSize: typography.fontSize.sm,
-    color: colors.green,
-    marginTop: spacing.xs,
-  },
-  cardRowContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  cardRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.sm,
-    backgroundColor: colors.white10,
-    borderRadius: spacing.sm,
-    gap: spacing.sm,
-  },
-  unlinkButton: {
-    padding: spacing.xs,
+  addButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.greenBlue20,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.green + '40',
   },
-  noLinkedCardsContainer: {
-    alignItems: 'center',
-    padding: spacing.md,
-    gap: spacing.sm,
+  cardsList: {
+    gap: spacing.xs,
   },
-  noLinkedCardsText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-    textAlign: 'center',
-  },
-  linkCardButton: {
-    marginTop: spacing.xs,
-  },
-  noCardsContainer: {
-    alignItems: 'center',
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  noCardsText: {
-    fontSize: typography.fontSize.md,
-    color: colors.white70,
-    textAlign: 'center',
-  },
-  allCardsLinkedText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-    textAlign: 'center',
-    padding: spacing.md,
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  cardName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.white,
-  },
-  cardType: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white70,
-  },
-  addressContainer: {
+  cardItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white10,
-    padding: spacing.md,
+    justifyContent: 'space-between',
+    backgroundColor: colors.white5,
     borderRadius: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    marginBottom: spacing.xs,
+  },
+  cardItemLeft: {
+    flex: 1,
+  },
+  cardItemInfo: {
+    flex: 1,
+  },
+  cardItemName: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
+    marginBottom: spacing.xs / 2,
+    lineHeight: typography.fontSize.sm * 1.3,
+  },
+  cardItemType: {
+    fontSize: typography.fontSize.xs,
+    color: colors.white50,
+    lineHeight: typography.fontSize.xs * 1.2,
+  },
+  cardItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  cardItemAction: {
+    padding: spacing.xs / 2,
+    borderRadius: spacing.xs,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  emptyStateText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white50,
+    textAlign: 'center',
+    lineHeight: typography.fontSize.sm * 1.3,
+  },
+  emptyStateButton: {
+    marginTop: spacing.xs,
+  },
+  // Members Section
+  membersSection: {
+    marginBottom: spacing.xs,
+  },
+  // Transactions Section
+  transactionsSection: {
+    marginBottom: spacing.xs,
+  },
+  // Address Section - Minimalist
+  addressSection: {
+    marginBottom: spacing.xs,
+  },
+  addressCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white5,
+    borderRadius: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.white10,
   },
   addressText: {
     flex: 1,
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     color: colors.white,
     fontFamily: 'monospace',
+    lineHeight: typography.fontSize.xs * 1.3,
   },
-  copyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs / 2,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+  copyButtonMinimal: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.greenBlue20,
-    borderRadius: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.green + '40',
   },
-  copyButtonText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.green,
-    fontWeight: typography.fontWeight.medium,
+  // Loading
+  loadingContainer: {
+    padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalContent: {
-    gap: spacing.md,
+    gap: spacing.xs / 2,
   },
   modalSectionTitle: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white70,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginTop: spacing.xs / 2,
+    marginBottom: spacing.xs / 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    lineHeight: typography.fontSize.xs * 1.3,
   },
   modalSectionSubtitle: {
     fontSize: typography.fontSize.xs,
-    color: colors.white70,
-    marginBottom: spacing.sm,
+    color: colors.white50,
+    marginBottom: spacing.xs / 2,
     fontStyle: 'italic',
+    lineHeight: typography.fontSize.xs * 1.2,
   },
   sourceOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.white10,
-    borderRadius: spacing.md,
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.xs,
+    gap: spacing.xs,
+    marginBottom: spacing.xs / 2,
+    borderWidth: 0.5,
+    borderColor: colors.white10,
   },
   sourceOptionActive: {
     backgroundColor: colors.greenBlue20,
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: colors.green,
   },
   sourceOptionInfo: {
     flex: 1,
   },
   sourceOptionTitle: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
+    lineHeight: typography.fontSize.xs * 1.3,
   },
   sourceOptionSubtitle: {
     fontSize: typography.fontSize.xs,
-    color: colors.white70,
-    marginTop: 2,
+    color: colors.white50,
+    marginTop: 1,
+    lineHeight: typography.fontSize.xs * 1.2,
   },
   cardOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.white10,
-    borderRadius: spacing.md,
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.xs,
+    gap: spacing.xs,
+    marginBottom: spacing.xs / 2,
+    borderWidth: 0.5,
+    borderColor: colors.white10,
   },
   selectedCardDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     backgroundColor: colors.greenBlue20,
-    borderRadius: spacing.md,
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    borderRadius: spacing.xs,
+    gap: spacing.xs,
+    marginBottom: spacing.xs / 2,
+    borderWidth: 0.5,
+    borderColor: colors.green + '40',
   },
   availableBalanceText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     color: colors.white70,
     textAlign: 'center',
-    marginTop: spacing.xs,
+    marginTop: spacing.xs / 2,
+    lineHeight: typography.fontSize.xs * 1.3,
+  },
+  checkIndicator: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.green,
+    borderWidth: 0.5,
+    borderColor: colors.green,
   },
   modalButton: {
-    marginTop: spacing.md,
+    marginTop: spacing.xs / 2,
   },
-  quickStatsContainer: {
-    flexDirection: 'row',
-    backgroundColor: colors.white5,
-    borderRadius: spacing.md,
-    padding: spacing.md,
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statLabel: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white50,
-    marginBottom: spacing.xs / 2,
-  },
-  statValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: colors.white10,
-  },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs / 2,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
+  // Modal Styles - Keep existing
 });
 
 export default SharedWalletDetailsScreen;

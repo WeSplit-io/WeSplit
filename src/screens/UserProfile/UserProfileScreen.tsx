@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
 import { PaperPlaneTilt, HandCoins } from 'phosphor-react-native';
@@ -209,14 +210,25 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
 
   const handleSend = () => {
     if (!profileUser) return;
-    navigation.navigate('Send', {
+    
+    // Ensure we have wallet address before navigating
+    if (!profileUser.wallet_address) {
+      Alert.alert('Error', 'Recipient wallet address not found. Please ask them to set up their wallet.');
+      return;
+    }
+    
+    // Pass the full contact object with all necessary fields
+    // This matches the structure expected by SendAmountScreen
+    navigation.navigate('SendAmount', {
       destinationType: 'friend',
       contact: {
         id: profileUser.id,
-        name: profileUser.name,
-        email: profileUser.email,
-        wallet_address: profileUser.wallet_address,
-        avatar: profileUser.avatar
+        name: profileUser.name || profileUser.email || 'Unknown User',
+        email: profileUser.email || '',
+        wallet_address: profileUser.wallet_address || profileUser.wallet_public_key || '',
+        wallet_public_key: profileUser.wallet_public_key,
+        avatar: profileUser.avatar || profileUser.photoURL || '',
+        photoURL: profileUser.photoURL || profileUser.avatar || ''
       }
     });
   };

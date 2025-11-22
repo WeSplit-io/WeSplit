@@ -27,7 +27,8 @@ import {
   writeBatch,
   onSnapshot,
   DocumentData,
-  runTransaction
+  runTransaction,
+  QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { notificationService } from '../notifications/notificationService';
@@ -522,29 +523,138 @@ export const firebaseDataService = {
 
     toggleFavorite: async (userId: string, contactId: string, isFavorite: boolean): Promise<void> => {
       try {
-        // Get the contact document directly by ID (contactId is the Firestore document ID)
-        const contactRef = doc(db, 'contacts', contactId);
-        const contactDoc = await getDoc(contactRef);
+        // First, try to get the contact document directly by ID (in case contactId is the Firestore document ID)
+        let contactRef = doc(db, 'contacts', contactId);
+        let contactDoc = await getDoc(contactRef);
         
-        if (!contactDoc.exists()) {
+        // If not found by direct ID, or if it doesn't belong to the current user, 
+        // the contactId might be a user ID - we need to find the contact document by querying
+        if (!contactDoc.exists() || contactDoc.data().user_id !== userId) {
+          logger.debug('Contact not found by direct ID, searching by user_id and contact details', { 
+            userId, 
+            contactId,
+            docExists: contactDoc.exists(),
+            docUserId: contactDoc.exists() ? contactDoc.data().user_id : null
+          }, 'FirebaseDataService');
+          
+          // Try to get the user by ID to get their email/wallet for matching
+          let contactUserEmail: string | undefined;
+          let contactUserWallet: string | undefined;
+          
+          try {
+            const contactUser = await firebaseDataService.user.getCurrentUser(contactId);
+            contactUserEmail = contactUser.email;
+            contactUserWallet = contactUser.wallet_address;
+            logger.debug('Retrieved contact user details', { 
+              contactId, 
+              email: contactUserEmail ? 'present' : 'missing',
+              wallet: contactUserWallet ? 'present' : 'missing'
+            }, 'FirebaseDataService');
+          } catch (userError) {
+            logger.debug('Could not get user by ID, will search contacts collection directly', { 
+              contactId, 
+              error: userError instanceof Error ? userError.message : String(userError)
+            }, 'FirebaseDataService');
+          }
+          
+          // Query contacts collection to find the document
+          // We need to find a contact document where:
+          // - user_id == userId (belongs to current user)
+          // - AND (email matches OR wallet_address matches OR the document ID matches contactId)
+          const contactsQuery = query(
+            collection(db, 'contacts'),
+            where('user_id', '==', userId)
+          );
+          const contactsSnapshot = await getDocs(contactsQuery);
+          
+          logger.debug('Queried contacts collection', { 
+            userId, 
+            contactId,
+            totalContacts: contactsSnapshot.size,
+            searchEmail: contactUserEmail,
+            searchWallet: contactUserWallet
+          }, 'FirebaseDataService');
+          
+          let foundContactDoc: QueryDocumentSnapshot | null = null;
+          
+          // Check each contact document
+          for (const docSnap of contactsSnapshot.docs) {
+            const data = docSnap.data();
+            
+            // Check if this document matches the contactId
+            // It could match by:
+            // 1. Document ID (if contactId is the Firestore document ID)
+            if (docSnap.id === contactId) {
+              foundContactDoc = docSnap;
+              logger.debug('Found contact by document ID', { documentId: docSnap.id }, 'FirebaseDataService');
+              break;
+            }
+            
+            // 2. Email (if contactId is a user ID and we have their email)
+            if (contactUserEmail && data.email && data.email === contactUserEmail) {
+              foundContactDoc = docSnap;
+              logger.debug('Found contact by email', { documentId: docSnap.id, email: contactUserEmail }, 'FirebaseDataService');
+              break;
+            }
+            
+            // 3. Wallet address (if contactId is a user ID and we have their wallet)
+            if (contactUserWallet && data.wallet_address && data.wallet_address === contactUserWallet) {
+              foundContactDoc = docSnap;
+              logger.debug('Found contact by wallet address', { documentId: docSnap.id, wallet: contactUserWallet }, 'FirebaseDataService');
+              break;
+            }
+          }
+          
+          if (!foundContactDoc) {
+            logger.error('Contact not found in contacts collection', { 
+              userId, 
+              contactId,
+              searchedEmail: contactUserEmail,
+              searchedWallet: contactUserWallet,
+              totalContacts: contactsSnapshot.size
+            }, 'FirebaseDataService');
           throw new Error('Contact not found');
         }
         
-        // Verify the contact belongs to the current user
+          contactDoc = foundContactDoc;
+          contactRef = foundContactDoc.ref;
+        } else {
+          // Contact found by direct ID and belongs to current user - verify
         const contactData = contactDoc.data();
         if (contactData.user_id !== userId) {
+            logger.error('Contact does not belong to current user', { 
+              userId, 
+              contactId,
+              contactUserId: contactData.user_id
+            }, 'FirebaseDataService');
           throw new Error('Contact does not belong to current user');
         }
+        }
         
-        // Update the favorite status
+        // Get current favorite status from the document
+        const currentFavoriteStatus = contactDoc.data().isFavorite || false;
+        
+        // Use the provided isFavorite value (it's already the desired new state from the frontend)
+        // The frontend calculates this by toggling the current state: !contact.isFavorite
         await updateDoc(contactRef, { 
           isFavorite,
           updated_at: serverTimestamp()
         });
         
-        logger.info('Contact favorite status updated', { userId, contactId, isFavorite }, 'FirebaseDataService');
+        logger.info('Contact favorite status updated', { 
+          userId, 
+          contactId, 
+          currentFavorite: currentFavoriteStatus,
+          newFavorite: isFavorite,
+          documentId: contactRef.id 
+        }, 'FirebaseDataService');
       } catch (error) {
-        logger.error('Failed to toggle contact favorite', { userId, contactId, isFavorite, error }, 'FirebaseDataService');
+        logger.error('Failed to toggle contact favorite', { 
+          userId, 
+          contactId, 
+          isFavorite, 
+          error: error instanceof Error ? error.message : String(error)
+        }, 'FirebaseDataService');
         throw error;
       }
     }

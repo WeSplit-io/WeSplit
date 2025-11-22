@@ -64,7 +64,7 @@ export const useDegenSplitInitialization = (
     }
     
     state.isInitializingRef.current = true;
-    setState({ error: null });
+    setState({ error: null, isInitializing: true });
     
     try {
       logger.info('Initializing degen split', {
@@ -132,6 +132,7 @@ export const useDegenSplitInitialization = (
       logic.handleError(error, 'initialize degen split');
     } finally {
       state.isInitializingRef.current = false;
+      setState({ isInitializing: false });
     }
   }, [state.isInitializingRef, setState, logic]);
 

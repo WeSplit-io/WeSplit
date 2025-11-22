@@ -69,6 +69,15 @@ export default StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  paymentMethodCardDisabled: {
+    opacity: 0.5,
+  },
+  paymentMethodIconDisabled: {
+    opacity: 0.5,
+  },
+  paymentMethodTitleDisabled: {
+    color: colors.white50,
+  },
   // WebView Styles
   webViewHeader: {
     flexDirection: 'row',

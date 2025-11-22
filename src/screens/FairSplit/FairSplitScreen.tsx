@@ -3,7 +3,7 @@
  * Allows users to configure and manage fair bill splitting with equal or manual options
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import { DataSourceService } from '../../services/data/dataSourceService';
 import { logger } from '../../services/analytics/loggingService';
 import { debugSplitData, validateSplitData, clearSplitCaches } from '../../services/shared/splitDataUtils';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
+import { useLiveBalance } from '../../hooks/useLiveBalance';
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
@@ -49,6 +50,31 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const { state } = useApp();
   const { currentUser } = state;
   
+  // Subscribe to live balance updates as a fallback when direct balance fetch fails
+  // This ensures we get the correct balance even when network requests fail initially
+  const [balanceCheckError, setBalanceCheckError] = useState<string | null>(null); // Track balance check errors
+  const { balance: liveBalance } = useLiveBalance(
+    currentUser?.wallet_address || null,
+    {
+      enabled: !!currentUser?.wallet_address,
+      onBalanceChange: (update) => {
+        // Clear balance check error if live balance shows sufficient funds
+        // This handles cases where initial balance check failed but live balance succeeds
+        if (update.usdcBalance !== null && update.usdcBalance !== undefined && balanceCheckError) {
+          logger.info('Live balance update received, clearing balance check error if sufficient', {
+            usdcBalance: update.usdcBalance,
+            address: update.address,
+            hasError: !!balanceCheckError
+          }, 'FairSplitScreen');
+          
+          // Clear error if balance is now available (we'll re-check when user tries to pay)
+          // The actual balance check will use live balance as fallback
+          setBalanceCheckError(null);
+        }
+      }
+    }
+  );
+  
   const [splitMethod, setSplitMethod] = useState<'equal' | 'manual'>('equal');
   const [isCreatingWallet, setIsCreatingWallet] = useState(false);
   const [splitWallet, setSplitWallet] = useState<SplitWallet | null>((existingSplitWallet as SplitWallet) || null);
@@ -60,8 +86,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const [showPaymentModal, setShowPaymentModal] = useState(false); // Track if payment modal is shown
   const [paymentAmount, setPaymentAmount] = useState(''); // Track the payment amount
   const [isCheckingBalance, setIsCheckingBalance] = useState(false); // Track if balance check is in progress
-  const [balanceCheckError, setBalanceCheckError] = useState<string | null>(null); // Track balance check errors
-  const [isInitializing, setIsInitializing] = useState(false); // Track if initialization is in progress
+  const [isInitializing, setIsInitializing] = useState(true); // Track if initialization is in progress - start as true to show loader immediately
   const [showSplitModal, setShowSplitModal] = useState(false); // Track if split modal is shown
   const [selectedTransferMethod, setSelectedTransferMethod] = useState<'external-wallet' | 'in-app-wallet' | null>(null);
   const [showSignatureStep, setShowSignatureStep] = useState(false);
@@ -268,229 +293,246 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   // Initialize split confirmation status and method
   useEffect(() => {
     const initializeSplitData = async () => {
-      if (splitData && !isInitializing && !isInitializingRef.current) {
+      if (splitData && !isInitializingRef.current) {
         isInitializingRef.current = true;
         setIsInitializing(true);
-        // Always load fresh data from database to ensure we have the latest participant information
+        
+        // Perform background refresh and updates
+        // Keep loader visible until all critical data is ready to prevent intermediate renders
+        // BATCH all updates together to prevent multiple re-renders
         if (splitData.id) {
-          try {
-            // Clear any potential caches first
-            clearSplitCaches();
-            
-            // Debug the incoming split data
-            debugSplitData(splitData, 'FairSplitScreen-incoming');
-            
-            const { SplitStorageService } = await import('../../services/splits');
-            const result = await SplitStorageService.forceRefreshSplit(splitData.id);
-            if (result.success && result.split) {
-              // Update the split data with full information
-              const fullSplitData = result.split;
-              
-              // Debug the loaded split data
-              debugSplitData(fullSplitData, 'FairSplitScreen-loaded');
-              
-              // Validate the split data
-              const validation = validateSplitData(fullSplitData);
-              if (!validation.isValid) {
-                logger.error('Invalid split data loaded', { errors: validation.errors }, 'FairSplitScreen');
-              }
-              
-              // Check if split is already confirmed
-              const isConfirmed = fullSplitData.status === 'active' && fullSplitData.splitType === 'fair';
-      setIsSplitConfirmed(isConfirmed);
-              
-              // Set the split method from stored data if confirmed
-              if (isConfirmed && fullSplitData.splitMethod) {
-                setSplitMethod(fullSplitData.splitMethod as 'equal' | 'manual');
-              }
-              
-              // Transform participants to local format and ensure correct amounts
-              // CRITICAL: Always use split data amount as the source of truth, not split wallet amount
-              const totalAmount = fullSplitData.totalAmount; // Use split data amount as source of truth
-              const amountPerPerson = totalAmount / fullSplitData.participants.length;
-              
-              // Fetch latest user data for all participants to get current wallet addresses
-              const participantsWithLatestData = await Promise.all(
-                fullSplitData.participants.map(async (p: any) => {
-                  try {
-                    const { firebaseDataService } = await import('../../services/data');
-                    const latestUserData = await firebaseDataService.user.getCurrentUser(p.userId);
-                    
-                    return {
-                      ...p,
-                      walletAddress: latestUserData?.wallet_address || p.walletAddress || '',
-                      avatar: latestUserData?.avatar || p.avatar || '', // Include avatar from latest user data
-                    };
-                  } catch (error) {
-                    logger.warn('Could not fetch latest data for participant', { userId: p.userId, error: error as Record<string, unknown> }, 'FairSplitScreen');
-                    return p; // Return original participant data if fetch fails
-                  }
-                })
-              );
-              
-              // Using split data amount as source of truth for calculations
-              
-              const transformedParticipants = participantsWithLatestData.map((p: any) => ({
-                id: p.userId,
-                name: p.name,
-                walletAddress: p.walletAddress,
-                amountOwed: p.amountOwed > 0 ? p.amountOwed : amountPerPerson, // Use existing amount or calculate equal split
-                amountPaid: p.amountPaid || 0,
-                amountLocked: 0,
-                status: p.status,
-                avatar: p.avatar, // Include avatar from participant data
-              }));
-              setParticipants(transformedParticipants);
-              
-              // Load split wallet if wallet ID is available
-              if (fullSplitData.walletId) {
-                try {
-                  const { SplitWalletService } = await import('../../services/split');
-              const walletResult = await SplitWalletService.getSplitWallet(fullSplitData.walletId);
-              if (walletResult.success && walletResult.wallet) {
-                const wallet = walletResult.wallet;
-                
-                // Check if the wallet has been burned (completed and cleaned up)
-                // Only block access if the wallet status is completed AND it's been cleaned up
-                if (wallet.status === 'completed') {
-                  // Check if the wallet still exists in Firebase (not burned yet)
-                  // If it exists, it's just completed but not burned, so allow access
-                  if (__DEV__) {
-                  }
-                }
-                    
-                    // Check if wallet participants match split participants
-                    const splitParticipantIds = fullSplitData.participants.map((p: { userId: string }) => p.userId);
-                    const walletParticipantIds = wallet.participants.map((p: SplitWalletParticipant) => p.userId);
-                    
-                    // If participants don't match, we need to sync them
-                    if (splitParticipantIds.length !== walletParticipantIds.length || 
-                        !splitParticipantIds.every(id => walletParticipantIds.includes(id))) {
-                      if (__DEV__) {
-                      }
-                      
-                      // Create updated wallet participants from split data with correct amounts
-                      // CRITICAL: Use split data amount as source of truth, not split wallet amount
-                      const totalAmount = fullSplitData.totalAmount; // Use split data amount as source of truth
-                      const amountPerPerson = totalAmount / fullSplitData.participants.length;
-                      
-                      
-                      const updatedWalletParticipants = fullSplitData.participants.map((p: { userId: string; name: string; walletAddress: string; amountOwed: number }) => {
-                        const existingWalletParticipant = wallet.participants.find((wp: SplitWalletParticipant) => wp.userId === p.userId);
-                        return {
-                          userId: p.userId,
-                          name: p.name,
-                          walletAddress: p.walletAddress,
-                          amountOwed: p.amountOwed > 0 ? p.amountOwed : amountPerPerson, // Use existing amount or calculate equal split
-                          amountPaid: existingWalletParticipant?.amountPaid || 0,
-                          status: existingWalletParticipant?.status || 'locked' as const,
-                          transactionSignature: existingWalletParticipant?.transactionSignature,
-                          paidAt: existingWalletParticipant?.paidAt,
-                        };
-                      });
-                      
-                      // Update the wallet with synced participants using the existing method
-                      const participantsForUpdate = updatedWalletParticipants.map(p => ({
-                        userId: p.userId,
-                        name: p.name,
-                        walletAddress: p.walletAddress,
-                        amountOwed: p.amountOwed, // This now has the correct calculated amount
-                      }));
-                      
-                      const updateResult = await SplitWalletService.updateSplitWalletParticipants(fullSplitData.walletId, participantsForUpdate);
-                      
-                      if (updateResult.success) {
-                        // Reload the wallet to get updated data
-                        const reloadResult = await SplitWalletService.getSplitWallet(fullSplitData.walletId);
-                        if (reloadResult.success && reloadResult.wallet) {
-                          setSplitWallet(reloadResult.wallet);
-                        }
-                      } else {
-                        if (__DEV__) {
-                          logger.error('Failed to sync wallet participants', { error: updateResult.error }, 'FairSplitScreen');
-                        }
-                        setSplitWallet(wallet); // Use original wallet data
-                      }
-                    } else {
-                      setSplitWallet(wallet);
-                    }
-                  } else {
-                    if (__DEV__) {
-                      logger.error('Failed to load split wallet', { error: walletResult.error }, 'FairSplitScreen');
-                    }
-                  }
-                } catch (error) {
-                  if (__DEV__) {
-                    logger.error('Error loading split wallet', error as Record<string, unknown>, 'FairSplitScreen');
-                  }
-                }
-              }
-              
-            }
-          } catch (error) {
-            if (__DEV__) {
-              logger.error('Error loading split data', error as Record<string, unknown>, 'FairSplitScreen');
-            }
-            setIsInitializing(false);
-            isInitializingRef.current = false;
-          }
-        } else {
-          // We have full split data, proceed normally
-          const isConfirmed = splitData.status === 'active' && splitData.splitType === 'fair';
-          setIsSplitConfirmed(isConfirmed);
-          
-          // Set the split method from stored data if confirmed
-          if (isConfirmed && splitData.splitMethod) {
-            setSplitMethod(splitData.splitMethod as 'equal' | 'manual');
-          }
-          
-          // Load split wallet if wallet ID is available
-          if (splitData.walletId) {
+          Promise.resolve().then(async () => {
             try {
-              const { SplitWalletService } = await import('../../services/split');
-              const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
-              if (walletResult.success && walletResult.wallet) {
-                const wallet = walletResult.wallet;
+              // Clear any potential caches
+              clearSplitCaches();
+              
+              const { SplitStorageService } = await import('../../services/splits');
+              const result = await SplitStorageService.forceRefreshSplit(splitData.id);
+              
+              if (result.success && result.split) {
+                const fullSplitData = result.split;
                 
-                // CRITICAL: Check if withdrawal has already been completed
-                if (wallet.status === 'completed') {
-                  if (__DEV__) {
-                    logger.debug('Split wallet withdrawal already completed during initialization', {
-                      status: wallet.status,
-                      completedAt: wallet.completedAt
-                    }, 'FairSplitScreen');
-                  }
-                  
-                  Alert.alert(
-                    'Withdrawal Already Completed',
-                    'The funds from this split have already been withdrawn. You cannot withdraw funds from this split again.',
-                    [
-                      {
-                        text: 'OK',
-                        onPress: () => navigation.navigate('SplitsList' as never)
+                // Fetch latest user data for participants and load wallet in parallel
+                const totalAmount = fullSplitData.totalAmount;
+                const amountPerPerson = totalAmount / fullSplitData.participants.length;
+                
+                // Run participant fetch and wallet load in parallel
+                const [participantsWithLatestData, walletData] = await Promise.allSettled([
+                  // Fetch participant data
+                  Promise.all(
+                    fullSplitData.participants.map(async (p: any) => {
+                      try {
+                        const { firebaseDataService } = await import('../../services/data');
+                        const latestUserData = await firebaseDataService.user.getCurrentUser(p.userId);
+                        
+                        return {
+                          ...p,
+                          walletAddress: latestUserData?.wallet_address || p.walletAddress || '',
+                          avatar: latestUserData?.avatar || p.avatar || '',
+                        };
+                      } catch (error) {
+                        logger.debug('Could not fetch latest data for participant (background)', { userId: p.userId }, 'FairSplitScreen');
+                        return p;
                       }
-                    ]
-                  );
-                  return;
-                }
+                    })
+                  ),
+                  // Load wallet if needed
+                  (async () => {
+                    if (fullSplitData.walletId && !existingSplitWallet) {
+                      try {
+                        const { SplitWalletService } = await import('../../services/split');
+                        const walletResult = await SplitWalletService.getSplitWallet(fullSplitData.walletId);
+                        
+                        if (walletResult.success && walletResult.wallet) {
+                          const wallet = walletResult.wallet;
+                          
+                          // Check if wallet status is completed (critical check)
+                          if (wallet.status === 'completed') {
+                            Alert.alert(
+                              'Withdrawal Already Completed',
+                              'The funds from this split have already been withdrawn. You cannot withdraw funds from this split again.',
+                              [
+                                {
+                                  text: 'OK',
+                                  onPress: () => navigation.navigate('SplitsList' as never)
+                                }
+                              ]
+                            );
+                            return null;
+                          }
+                          
+                          // Check if wallet participants match split participants
+                          const splitParticipantIds = fullSplitData.participants.map((p: { userId: string }) => p.userId);
+                          const walletParticipantIds = wallet.participants.map((p: SplitWalletParticipant) => p.userId);
+                          
+                          // If participants don't match, sync them
+                          if (splitParticipantIds.length !== walletParticipantIds.length || 
+                              !splitParticipantIds.every(id => walletParticipantIds.includes(id))) {
+                            const totalAmount = fullSplitData.totalAmount;
+                            const amountPerPerson = totalAmount / fullSplitData.participants.length;
+                            
+                            const updatedWalletParticipants = fullSplitData.participants.map((p: { userId: string; name: string; walletAddress: string; amountOwed: number }) => {
+                              const existingWalletParticipant = wallet.participants.find((wp: SplitWalletParticipant) => wp.userId === p.userId);
+                              return {
+                                userId: p.userId,
+                                name: p.name,
+                                walletAddress: p.walletAddress,
+                                amountOwed: p.amountOwed > 0 ? p.amountOwed : amountPerPerson,
+                                amountPaid: existingWalletParticipant?.amountPaid || 0,
+                                status: existingWalletParticipant?.status || 'locked' as const,
+                                transactionSignature: existingWalletParticipant?.transactionSignature,
+                                paidAt: existingWalletParticipant?.paidAt,
+                              };
+                            });
+                            
+                            const participantsForUpdate = updatedWalletParticipants.map(p => ({
+                              userId: p.userId,
+                              name: p.name,
+                              walletAddress: p.walletAddress,
+                              amountOwed: p.amountOwed,
+                            }));
+                            
+                            const updateResult = await SplitWalletService.updateSplitWalletParticipants(fullSplitData.walletId, participantsForUpdate);
+                            
+                            if (updateResult.success) {
+                              const reloadResult = await SplitWalletService.getSplitWallet(fullSplitData.walletId);
+                              if (reloadResult.success && reloadResult.wallet) {
+                                return reloadResult.wallet;
+                              }
+                            }
+                            return wallet;
+                          }
+                          return wallet;
+                        }
+                        return null;
+                      } catch (error) {
+                        logger.debug('Background wallet load failed', { error }, 'FairSplitScreen');
+                        return null;
+                      }
+                    }
+                    return null;
+                  })()
+                ]);
                 
-                setSplitWallet(wallet);
+                // BATCH all state updates together in a single React update cycle
+                // Use startTransition to batch all updates and prevent intermediate renders
+                const newIsConfirmed = fullSplitData.status === 'active' && fullSplitData.splitType === 'fair';
+                const finalWallet = walletData.status === 'fulfilled' ? walletData.value : null;
+                
+                // Use startTransition to batch all state updates together
+                // This ensures React batches all updates and only renders once with the final state
+                startTransition(() => {
+                  if (participantsWithLatestData.status === 'fulfilled') {
+                    const transformedParticipants = participantsWithLatestData.value.map((p: any) => ({
+                      id: p.userId,
+                      name: p.name,
+                      walletAddress: p.walletAddress,
+                      amountOwed: p.amountOwed > 0 ? p.amountOwed : amountPerPerson,
+                      amountPaid: p.amountPaid || 0,
+                      amountLocked: 0,
+                      status: p.status,
+                      avatar: p.avatar,
+                    }));
+                    
+                    // All state updates batched together - React will render once with all updates
+                    setIsSplitConfirmed(newIsConfirmed);
+                    if (newIsConfirmed && fullSplitData.splitMethod) {
+                      setSplitMethod(fullSplitData.splitMethod as 'equal' | 'manual');
+                    }
+                    setParticipants(transformedParticipants);
+                    if (finalWallet) {
+                      setSplitWallet(finalWallet);
+                    }
+                    
+                    // Hide loader only after all critical data is ready
+                    setIsInitializing(false);
+                    isInitializingRef.current = false;
+                  }
+                });
               } else {
-                if (__DEV__) {
-                  logger.error('Failed to load split wallet from full data', { error: walletResult.error }, 'FairSplitScreen');
-                }
+                // Refresh failed - hide loader and use route params data
+                startTransition(() => {
+                  setIsInitializing(false);
+                  isInitializingRef.current = false;
+                });
               }
             } catch (error) {
-              if (__DEV__) {
-                logger.error('Error loading split wallet from full data', error as Record<string, unknown>, 'FairSplitScreen');
-              }
+              logger.debug('Background split refresh failed', { error }, 'FairSplitScreen');
+              // Hide loader even if refresh failed - use route params data
+              startTransition(() => {
+                setIsInitializing(false);
+                isInitializingRef.current = false;
+              });
+            }
+          }).catch(error => {
+            logger.debug('Background initialization failed', { error }, 'FairSplitScreen');
+            // Hide loader even if background init failed - use route params data
+            startTransition(() => {
               setIsInitializing(false);
               isInitializingRef.current = false;
-            }
+            });
+          });
+        } else {
+          // No split ID - use route params data directly
+          // Load split wallet if wallet ID is available
+          if (splitData.walletId && !existingSplitWallet) {
+            Promise.resolve().then(async () => {
+              try {
+                const { SplitWalletService } = await import('../../services/split');
+                const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
+                if (walletResult.success && walletResult.wallet) {
+                  const wallet = walletResult.wallet;
+                  
+                  if (wallet.status === 'completed') {
+                    Alert.alert(
+                      'Withdrawal Already Completed',
+                      'The funds from this split have already been withdrawn. You cannot withdraw funds from this split again.',
+                      [
+                        {
+                          text: 'OK',
+                          onPress: () => navigation.navigate('SplitsList' as never)
+                        }
+                      ]
+                    );
+                    return;
+                  }
+                  
+                  startTransition(() => {
+                    setSplitWallet(wallet);
+                    setIsInitializing(false);
+                    isInitializingRef.current = false;
+                  });
+                } else {
+                  // Wallet load failed - hide loader
+                  startTransition(() => {
+                    setIsInitializing(false);
+                    isInitializingRef.current = false;
+                  });
+                }
+              } catch (error) {
+                logger.debug('Background wallet load failed', { error }, 'FairSplitScreen');
+                // Hide loader even if wallet load failed
+                startTransition(() => {
+                  setIsInitializing(false);
+                  isInitializingRef.current = false;
+                });
+              }
+            }).catch(error => {
+              logger.debug('Background wallet operation failed', { error }, 'FairSplitScreen');
+              // Hide loader even if wallet operation failed
+              startTransition(() => {
+                setIsInitializing(false);
+                isInitializingRef.current = false;
+              });
+            });
+          } else {
+            // No wallet to load - hide loader immediately
+            startTransition(() => {
+              setIsInitializing(false);
+              isInitializingRef.current = false;
+            });
           }
         }
-        setIsInitializing(false);
-        isInitializingRef.current = false;
       }
     };
 
@@ -2143,6 +2185,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     if (!currentUser) return;
 
     try {
+      setIsCheckingBalance(true);
+      setBalanceCheckError(null);
+      
+      // Get wallet address for live balance fallback
       const { walletService } = await import('../../services/blockchain/wallet');
       const userWallet = await walletService.getWalletInfo(currentUser.id.toString());
       
@@ -2152,32 +2198,78 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         return;
       }
 
-      const { BalanceUtils } = await import('../../services/shared/balanceUtils');
-      const { PublicKey } = await import('@solana/web3.js');
-      const { getConfig } = await import('../../config/unified');
+      // PRIORITY 1: Use live balance if already available (from useLiveBalance hook)
+      // This is the most reliable source since it's already polling
+      if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined && liveBalance.usdcBalance > 0) {
+        const userUsdcBalance = liveBalance.usdcBalance;
+        
+        logger.info('User balance check completed using live balance', {
+          userUsdcBalance,
+          requiredAmount,
+          userAddress: userWallet.address,
+          source: 'live'
+        }, 'FairSplitScreen');
+        
+        if (userUsdcBalance < requiredAmount) {
+          setBalanceCheckError(
+            `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
+          );
+        } else {
+          setBalanceCheckError(null);
+        }
+        setIsCheckingBalance(false);
+        return;
+      }
+
+      // PRIORITY 2: Use centralized balance check utility with live balance fallback
+      const { getUserBalanceWithFallback } = await import('../../services/shared/balanceCheckUtils');
+      const balanceResult = await getUserBalanceWithFallback(currentUser.id.toString(), {
+        useLiveBalance: true,
+        walletAddress: userWallet.address || currentUser.wallet_address
+      });
       
-      const userPublicKey = new PublicKey(userWallet.address);
-      const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
-      
-      const balanceResult = await BalanceUtils.getUsdcBalance(userPublicKey, usdcMint);
-      const userUsdcBalance = balanceResult.balance;
+      const userUsdcBalance = balanceResult.usdcBalance;
       
       logger.info('User balance check completed', {
         userUsdcBalance,
         requiredAmount,
-        userAddress: userWallet.address
+        userAddress: userWallet.address,
+        source: balanceResult.source,
+        isReliable: balanceResult.isReliable
       }, 'FairSplitScreen');
       
-      if (userUsdcBalance < requiredAmount) {
+      // Only show error if we have a reliable balance check and it's insufficient
+      if (balanceResult.isReliable && userUsdcBalance < requiredAmount) {
         setBalanceCheckError(
           `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
         );
+      } else if (!balanceResult.isReliable && userUsdcBalance > 0 && userUsdcBalance < requiredAmount) {
+        // If balance check is unreliable but we got a balance, still warn if insufficient
+        setBalanceCheckError(
+          `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
+        );
+      } else {
+        // Clear any previous error if balance is sufficient or check unavailable
+        setBalanceCheckError(null);
       }
     } catch (error) {
       logger.warn('Could not check user balance', {
         error: error instanceof Error ? error.message : String(error)
       }, 'FairSplitScreen');
-      // Don't set error - allow user to proceed (they'll see error when trying to pay)
+      
+      // If error occurs but we have live balance, use it as fallback
+      if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined) {
+        const userUsdcBalance = liveBalance.usdcBalance;
+        if (userUsdcBalance < requiredAmount) {
+          setBalanceCheckError(
+            `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
+          );
+        } else {
+          setBalanceCheckError(null);
+        }
+      } else {
+        // Don't set error - allow user to proceed (they'll see error when trying to pay)
+      }
     } finally {
       setIsCheckingBalance(false);
     }
@@ -2242,18 +2334,33 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     
     // CRITICAL: Capture recipient balance before transaction for verification
     let recipientBalanceBefore = 0;
+    let splitBalanceBefore = 0;
     try {
       const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
-      const balanceResult = await consolidatedTransactionService.getUsdcBalance(selectedWallet.address);
-      if (balanceResult.success) {
-        recipientBalanceBefore = balanceResult.balance;
+      
+      // Capture both recipient and split wallet balances before transaction
+      const [recipientBalanceResult, splitBalanceResult] = await Promise.all([
+        consolidatedTransactionService.getUsdcBalance(selectedWallet.address),
+        consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress)
+      ]);
+      
+      if (recipientBalanceResult.success) {
+        recipientBalanceBefore = recipientBalanceResult.balance;
         logger.info('Captured recipient balance before withdrawal', {
           recipientAddress: selectedWallet.address,
           balanceBefore: recipientBalanceBefore
         }, 'FairSplitScreen');
       }
+      
+      if (splitBalanceResult.success) {
+        splitBalanceBefore = splitBalanceResult.balance;
+        logger.info('Captured split wallet balance before withdrawal', {
+          splitWalletAddress: splitWallet.walletAddress,
+          balanceBefore: splitBalanceBefore
+        }, 'FairSplitScreen');
+      }
     } catch (balanceError) {
-      logger.warn('Failed to capture recipient balance before withdrawal', {
+      logger.warn('Failed to capture balances before withdrawal', {
         error: balanceError instanceof Error ? balanceError.message : String(balanceError)
       }, 'FairSplitScreen');
       // Continue anyway - we'll try to verify later
@@ -2561,12 +2668,48 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         description
       );
       
-      // Add timeout wrapper (60 seconds max)
+      // Add timeout wrapper (90 seconds max - increased to account for balance verification)
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Transfer timeout - please try again')), 60000);
+        setTimeout(() => reject(new Error('Transfer timeout - please check transaction history')), 90000);
       });
       
-      const transferResult = await Promise.race([transferPromise, timeoutPromise]) as any;
+      let transferResult: any;
+      try {
+        transferResult = await Promise.race([transferPromise, timeoutPromise]) as any;
+      } catch (timeoutError) {
+        // ✅ CRITICAL: Timeout occurred - check if transaction was actually submitted
+        // Try to get result from original promise if it completed
+        logger.warn('Transfer timeout wrapper triggered, checking if transaction completed', {
+          splitWalletId: splitWallet.id,
+          error: timeoutError instanceof Error ? timeoutError.message : String(timeoutError)
+        }, 'FairSplitScreen');
+        
+        try {
+          // Wait a moment for the promise to potentially complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Try to get result from original promise (non-blocking)
+          transferResult = await Promise.race([
+            transferPromise.catch(() => null), // Don't throw if it fails
+            new Promise(resolve => setTimeout(() => resolve(null), 1000)) // 1 second timeout
+          ]) as any;
+          
+          // If we got a result with signature, transaction succeeded
+          if (transferResult && transferResult.success && transferResult.transactionSignature) {
+            logger.info('Transaction completed after timeout wrapper - treating as success', {
+              signature: transferResult.transactionSignature,
+              splitWalletId: splitWallet.id
+            }, 'FairSplitScreen');
+            // Continue with success handling below
+          } else {
+            // No result or no signature - transaction likely failed or still processing
+            throw timeoutError; // Re-throw original timeout error
+          }
+        } catch (checkError) {
+          // Couldn't get result - throw original timeout error
+          throw timeoutError;
+        }
+      }
       
       logger.info('Transfer result received', {
         success: transferResult.success,
@@ -2952,30 +3095,153 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       
     } catch (error) {
       // Handle timeout errors specifically
-      if (error instanceof Error && error.message.includes('Transfer timeout')) {
-        logger.warn('Transfer timeout occurred', {
+      if (error instanceof Error && (error.message.includes('Transfer timeout') || error.message.includes('timeout'))) {
+        logger.warn('Transfer timeout occurred, verifying if transaction succeeded', {
           splitWalletId: splitWallet.id,
           error: error.message
         }, 'FairSplitScreen');
         
+        // ✅ CRITICAL: Verify on-chain if transaction actually succeeded despite timeout
+        // This aligns with the fix we applied - don't show error if transaction succeeded
+        try {
+          // Wait a moment for blockchain to update
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Check balances to verify transaction
+          const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+          const [splitBalanceResult, recipientBalanceResult] = await Promise.all([
+            consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress),
+            consolidatedTransactionService.getUsdcBalance(selectedWallet.address)
+          ]);
+          
+          logger.info('On-chain balance verification after timeout', {
+            splitWalletBalanceBefore: splitBalanceBefore,
+            splitWalletBalanceAfter: splitBalanceResult.balance,
+            recipientBalanceBefore: recipientBalanceBefore,
+            recipientBalanceAfter: recipientBalanceResult.balance,
+            expectedAmount: splitWallet.totalAmount,
+            note: 'Checking if transaction actually succeeded despite timeout'
+          }, 'FairSplitScreen');
+          
+          // ✅ CRITICAL: Verify both balances changed correctly
+          // 1. Split wallet should be empty (or very close to 0)
+          // 2. Recipient balance should have increased by approximately the expected amount
+          const splitWalletEmpty = splitBalanceResult.balance < 0.01;
+          const balanceIncrease = recipientBalanceBefore > 0 
+            ? recipientBalanceResult.balance - recipientBalanceBefore
+            : 0;
+          const expectedAmount = splitWallet.totalAmount;
+          const tolerance = 0.01; // 0.01 USDC tolerance
+          
+          // Check if transaction succeeded based on balance changes
+          const recipientBalanceCorrect = recipientBalanceBefore > 0 && 
+            Math.abs(balanceIncrease - expectedAmount) <= tolerance;
+          const splitWalletCorrect = splitBalanceBefore > 0 && splitWalletEmpty;
+          
+          // If we have both balances before, verify both changed correctly
+          if (splitBalanceBefore > 0 && recipientBalanceBefore > 0) {
+            if (splitWalletCorrect && recipientBalanceCorrect) {
+              logger.info('Transaction verified on-chain despite timeout - both balances correct', {
+                splitWalletId: splitWallet.id,
+                splitBalanceDecrease: splitBalanceBefore - splitBalanceResult.balance,
+                balanceIncrease,
+                expectedAmount
+              }, 'FairSplitScreen');
+              
+              // Update local state and show success
+              setSplitWallet(prev => prev ? { 
+                ...prev, 
+                status: 'completed' as const,
+                completedAt: new Date().toISOString()
+              } : null);
+              
+              Alert.alert(
+                '✅ Transfer Verified!', 
+                `Successfully transferred ${splitWallet.totalAmount.toFixed(6)} USDC to ${selectedWallet.name || 'your wallet'}!\n\nAlthough the initial confirmation timed out, we confirmed the transaction succeeded on the blockchain.`,
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      setShowSignatureStep(false);
+                      setShowSplitModal(false);
+                      setSelectedTransferMethod(null);
+                      setSelectedWallet(null);
+                      navigation.navigate('SplitsList');
+                    }
+                  }
+                ]
+              );
+              return; // Exit early - transaction succeeded
+            } else {
+              logger.warn('Balance verification failed - balances do not match expected changes', {
+                splitWalletCorrect,
+                recipientBalanceCorrect,
+                splitBalanceBefore,
+                splitBalanceAfter: splitBalanceResult.balance,
+                recipientBalanceBefore,
+                recipientBalanceAfter: recipientBalanceResult.balance,
+                expectedAmount
+              }, 'FairSplitScreen');
+            }
+          } else if (splitWalletEmpty && recipientBalanceBefore > 0 && recipientBalanceCorrect) {
+            // Fallback: If split wallet is empty and recipient balance increased correctly
+            logger.info('Transaction verified on-chain despite timeout - split wallet empty and recipient balance correct', {
+              splitWalletId: splitWallet.id,
+              balanceIncrease,
+              expectedAmount
+            }, 'FairSplitScreen');
+            
+            // Update local state and show success
+            setSplitWallet(prev => prev ? { 
+              ...prev, 
+              status: 'completed' as const,
+              completedAt: new Date().toISOString()
+            } : null);
+            
+            Alert.alert(
+              '✅ Transfer Verified!', 
+              `Successfully transferred ${splitWallet.totalAmount.toFixed(6)} USDC to ${selectedWallet.name || 'your wallet'}!\n\nAlthough the initial confirmation timed out, we confirmed the transaction succeeded on the blockchain.`,
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    setShowSignatureStep(false);
+                    setShowSplitModal(false);
+                    setSelectedTransferMethod(null);
+                    setSelectedWallet(null);
+                    navigation.navigate('SplitsList');
+                  }
+                }
+              ]
+            );
+            return; // Exit early - transaction succeeded
+          }
+        } catch (verificationError) {
+          logger.warn('Failed to verify transaction on-chain after timeout', {
+            error: verificationError instanceof Error ? verificationError.message : String(verificationError)
+          }, 'FairSplitScreen');
+          // Continue with timeout error handling below
+        }
+        
+        // If verification failed or couldn't verify, show timeout message
         Alert.alert(
-          'Transfer Timeout',
-          'The transfer is taking longer than expected. This can happen during high network congestion.\n\nYour transaction may still be processing. Please check your wallet balance or try again in a few minutes.',
+          'Transaction Processing',
+          'The transfer is taking longer than expected to confirm. This can happen during high network congestion.\n\nYour transaction may still be processing. Please check your wallet balance or transaction history in a few minutes.',
           [
             {
-              text: 'Try Again',
+              text: 'Check History',
               onPress: () => {
-                // Reset state and allow retry
+                navigation.navigate('TransactionHistory');
+              }
+            },
+            {
+              text: 'OK',
+              style: 'cancel',
+              onPress: () => {
                 setShowSignatureStep(false);
                 setShowSplitModal(false);
                 setSelectedTransferMethod(null);
                 setSelectedWallet(null);
-              }
-            },
-            {
-              text: 'Check Later',
-              onPress: () => {
-                // Navigate back to splits list
                 navigation.navigate('SplitsList');
               }
             }
@@ -3285,6 +3551,18 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         onRetry={() => setError(null)}
         retryText="Try Again"
       />
+    );
+  }
+
+  // Show loader while split is initializing or if splitData is missing
+  if (isInitializing || !splitData) {
+    return (
+      <Container>
+        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ModernLoader size="large" text="Loading split..." />
+        </View>
+      </Container>
     );
   }
 

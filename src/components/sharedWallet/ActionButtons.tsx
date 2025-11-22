@@ -5,8 +5,6 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { PhosphorIcon } from '../shared';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -27,50 +25,27 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   return (
     <View style={styles.actionsGrid}>
       <TouchableOpacity
-        style={styles.actionButton}
+        style={[styles.actionButton, styles.actionButtonEnabled]}
         onPress={onTopUp}
         activeOpacity={0.7}
       >
-        <LinearGradient
-          colors={[colors.greenBlue20, colors.greenBlue10]}
-          style={styles.actionButtonGradient}
-        >
-          <PhosphorIcon name="Plus" size={24} color={colors.green} weight="bold" />
-        </LinearGradient>
         <Text style={styles.actionButtonText}>Top Up</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.actionButton}
+        style={[styles.actionButton, styles.actionButtonEnabled]}
         onPress={onLinkCard}
         activeOpacity={0.7}
       >
-        <LinearGradient
-          colors={[colors.greenBlue20, colors.greenBlue10]}
-          style={styles.actionButtonGradient}
-        >
-          <PhosphorIcon name="CreditCard" size={24} color={colors.green} weight="bold" />
-        </LinearGradient>
         <Text style={styles.actionButtonText}>Link Card</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.actionButton}
+        style={[styles.actionButton, canWithdraw ? styles.actionButtonEnabled : styles.actionButtonDisabled]}
         onPress={onWithdraw}
         activeOpacity={0.7}
         disabled={!canWithdraw}
       >
-        <LinearGradient
-          colors={canWithdraw ? [colors.greenBlue20, colors.greenBlue10] : [colors.white10, colors.white5]}
-          style={styles.actionButtonGradient}
-        >
-          <PhosphorIcon 
-            name="ArrowDown" 
-            size={24} 
-            color={canWithdraw ? colors.green : colors.white70} 
-            weight="bold" 
-          />
-        </LinearGradient>
         <Text style={[styles.actionButtonText, !canWithdraw && styles.actionButtonTextDisabled]}>
           Withdraw
         </Text>
@@ -89,22 +64,30 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
     alignItems: 'center',
-  },
-  actionButtonGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: spacing.md,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: spacing.sm,
+    borderWidth: 1,
+    minHeight: 44,
+  },
+  actionButtonEnabled: {
+    backgroundColor: colors.greenBlue20,
+    borderColor: colors.green + '40',
+  },
+  actionButtonDisabled: {
+    backgroundColor: colors.white10,
+    borderColor: colors.white10,
   },
   actionButtonText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: typography.fontSize.sm,
+    color: colors.green,
+    fontWeight: typography.fontWeight.semibold,
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
   },
   actionButtonTextDisabled: {
-    color: colors.white70,
+    color: colors.white50,
   },
 });
 

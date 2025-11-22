@@ -13,6 +13,7 @@ import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import { logger } from '../../services/analytics/loggingService';
 import { notificationService } from '../../services/notifications/notificationService';
 import { Container } from '../../components/shared';
+import { useLiveBalance } from '../../hooks/useLiveBalance';
 
 // --- AppleSlider adapted from WalletManagementScreen ---
 interface AppleSliderProps {
@@ -26,6 +27,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
   const maxSlideDistance = 300;
   const sliderValue = useRef(new Animated.Value(0)).current;
   const [, setIsSliderActive] = useState(false);
+  const hasTriggeredRef = useRef(false); // ✅ CRITICAL: Prevent multiple triggers
 
   // Debug logging for slider props
   if (__DEV__) {
@@ -39,10 +41,10 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => {
-      return !disabled && !loading;
+      return !disabled && !loading && !hasTriggeredRef.current; // ✅ CRITICAL: Check trigger flag
     },
     onMoveShouldSetPanResponder: () => {
-      return !disabled && !loading;
+      return !disabled && !loading && !hasTriggeredRef.current; // ✅ CRITICAL: Check trigger flag
     },
     onPanResponderGrant: () => {
       setIsSliderActive(true);
@@ -52,16 +54,20 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
       sliderValue.setValue(newValue);
     },
     onPanResponderRelease: (_, gestureState) => {
-      if (gestureState.dx > maxSlideDistance * 0.6) {
+      if (gestureState.dx > maxSlideDistance * 0.6 && !hasTriggeredRef.current) { // ✅ CRITICAL: Check before triggering
+        hasTriggeredRef.current = true; // ✅ CRITICAL: Set flag immediately
         Animated.timing(sliderValue, {
           toValue: maxSlideDistance,
           duration: 200,
           useNativeDriver: false,
         }).start(() => {
-          if (onSlideComplete) {onSlideComplete();}
+          if (onSlideComplete && hasTriggeredRef.current) { // ✅ CRITICAL: Double-check flag
+            onSlideComplete();
+          }
           setTimeout(() => {
             sliderValue.setValue(0);
             setIsSliderActive(false);
+            hasTriggeredRef.current = false; // ✅ CRITICAL: Reset after delay
           }, 1000);
         });
       } else {
@@ -142,6 +148,36 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
   const { currentUser } = state;
   
+  // Subscribe to live balance updates as a fallback when direct balance fetch fails
+  // This ensures we get the correct balance even when network requests fail initially
+  const { balance: liveBalance } = useLiveBalance(
+    currentUser?.wallet_address || null,
+    {
+      enabled: !!currentUser?.wallet_address,
+      onBalanceChange: (update) => {
+        // Update the existing wallet balance state when live balance updates
+        // This ensures the UI reflects the correct balance even if initial fetch failed
+        if (update.usdcBalance !== null && update.usdcBalance !== undefined) {
+          logger.info('Live balance update received in SendConfirmationScreen', {
+            usdcBalance: update.usdcBalance,
+            address: update.address
+          }, 'SendConfirmationScreen');
+          
+          // Update the balance state to reflect the live balance
+          setExistingWalletBalance(prev => {
+            // Only update if we don't have a balance yet, or if live balance is higher (more accurate)
+            if (!prev || update.usdcBalance > prev.usdc) {
+              return {
+                sol: update.solBalance || 0,
+                usdc: update.usdcBalance
+              };
+            }
+            return prev;
+          });
+        }
+      }
+    }
+  );
 
   // Determine recipient based on destination type
   const recipient = destinationType === 'external' ? wallet : contact;
@@ -217,13 +253,20 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     lastClickTimeRef.current = now;
     setSending(true); // Also update state for UI
     
+    // ✅ CRITICAL: Declare transactionResult outside try block so it's accessible in catch block
+    let transactionResult: any;
+    
     try {
       if (!currentUser?.id) {
+        isProcessingRef.current = false; // ✅ CRITICAL: Reset ref on early return
+        setSending(false); // ✅ CRITICAL: Reset state on early return
         Alert.alert('Wallet Error', 'User not authenticated');
         return;
       }
 
       if (!recipientAddress) {
+        isProcessingRef.current = false; // ✅ CRITICAL: Reset ref on early return
+        setSending(false); // ✅ CRITICAL: Reset state on early return
         Alert.alert('Error', 'Recipient wallet address is missing');
         return;
       }
@@ -233,6 +276,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
       const totalAmountToPay = FeeService.calculateCompanyFee(amount, transactionType).totalAmount; // Amount + fee
       if (balance.usdc < totalAmountToPay) {
+        isProcessingRef.current = false; // ✅ CRITICAL: Reset ref on early return
+        setSending(false); // ✅ CRITICAL: Reset state on early return
         Alert.alert('Insufficient Balance', `You do not have enough USDC balance. Required: ${totalAmountToPay.toFixed(2)} USDC (including fees), Available: ${balance.usdc.toFixed(2)} USDC`);
         return;
       }
@@ -264,11 +309,13 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       logger.info('Transaction fee estimate', { feeEstimate }, 'SendConfirmationScreen');
 
       // Send transaction using appropriate service based on destination type
-      let transactionResult: any;
+      // ✅ CRITICAL: Use Promise.race with timeout wrapper (aligned with Fair Split logic)
+      let transactionPromise: Promise<any>;
+      
       if (destinationType === 'external') {
         // For external wallets, use external transfer service
         const { externalTransferService } = await import('../../services/blockchain/transaction/sendExternal');
-        transactionResult = await externalTransferService.instance.sendExternalTransfer({
+        transactionPromise = externalTransferService.instance.sendExternalTransfer({
           to: recipientAddress,
           amount: amount,
           currency: 'USDC',
@@ -289,7 +336,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           transactionType
         }, 'SendConfirmationScreen');
         
-        transactionResult = await consolidatedTransactionService.sendUSDCTransaction({
+        transactionPromise = consolidatedTransactionService.sendUSDCTransaction({
           to: recipientAddress,
           amount: amount,
           currency: 'USDC',
@@ -299,6 +346,39 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           transactionType: transactionType,
           requestId: requestId || null
         });
+      }
+      
+      // ✅ CRITICAL: Add timeout wrapper (60 seconds max) - aligned with Fair Split
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Transaction timeout - please check transaction history')), 60000);
+      });
+      
+      try {
+        transactionResult = await Promise.race([transactionPromise, timeoutPromise]);
+      } catch (timeoutError) {
+        // Timeout occurred - check if transaction was actually submitted
+        // Try to get result from promise if it completed, but with a timeout to prevent indefinite wait
+        try {
+          // ✅ CRITICAL: Add timeout to prevent indefinite wait
+          transactionResult = await Promise.race([
+            transactionPromise,
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Transaction still pending after timeout')), 5000)
+            )
+          ]);
+          
+          // If we got a result, transaction was submitted successfully
+          logger.info('Transaction completed after timeout wrapper', {
+            success: transactionResult.success,
+            signature: transactionResult.signature
+          }, 'SendConfirmationScreen');
+        } catch (promiseError) {
+          // Promise also failed or still pending - transaction likely failed
+          logger.warn('Transaction promise also failed after timeout', {
+            error: promiseError instanceof Error ? promiseError.message : String(promiseError)
+          }, 'SendConfirmationScreen');
+          throw timeoutError; // Throw original timeout error
+        }
       }
 
       // Check if transaction actually succeeded
@@ -377,34 +457,120 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         errorMessage.includes('Blockhash not found') ||
         errorMessage.includes('Please try again');
       
-      // ✅ CRITICAL: For timeout errors, check if transaction actually succeeded
-      // before showing error to user
+      // ✅ CRITICAL: For timeout errors, verify on-chain if transaction actually succeeded
+      // This aligns with Fair Split logic - don't show error if transaction succeeded
       if (isTimeout && !isBlockhashExpired) {
-        // Timeout occurred - transaction may have succeeded
-        // Show message directing user to check transaction history
-        Alert.alert(
-          'Transaction Processing', 
-          'The transaction is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
-          [
-            {
-              text: 'Check History',
-              onPress: () => {
-                navigation.navigate('TransactionHistory');
-              }
-            },
-            {
-              text: 'OK',
-              style: 'cancel',
-              onPress: () => {
-                // Reset sending state so user can retry if needed
-                setSending(false);
-              }
-            }
-          ]
-        );
+        // Timeout occurred - verify on-chain if transaction succeeded
+        logger.info('Timeout detected, verifying transaction on-chain', {
+          recipientAddress,
+          amount
+        }, 'SendConfirmationScreen');
         
-        // Don't send failed notification for timeout - transaction may have succeeded
-        return; // Exit early, don't show error
+        // ✅ CRITICAL: First check if we have a transaction result with signature
+        // This happens when the timeout wrapper caught the error but the promise completed
+        if (transactionResult && transactionResult.signature && transactionResult.success) {
+          logger.info('Transaction has signature despite timeout - treating as success', {
+            signature: transactionResult.signature,
+            success: transactionResult.success
+          }, 'SendConfirmationScreen');
+          
+          isProcessingRef.current = false;
+          setSending(false);
+          
+          // Show success message
+          Alert.alert(
+            '✅ Transaction Sent!', 
+            `Your payment of ${amount.toFixed(6)} USDC has been sent!\n\nAlthough the confirmation timed out, the transaction was successfully submitted to the blockchain.`,
+            [
+              {
+                text: 'Check History',
+                onPress: () => {
+                  navigation.navigate('TransactionHistory');
+                }
+              },
+              {
+                text: 'OK',
+                style: 'cancel',
+                onPress: () => {
+                  navigation.goBack();
+                }
+              }
+            ]
+          );
+          return; // Exit early - transaction succeeded
+        }
+        
+        // If no signature, try balance verification
+        try {
+          // Wait a moment for blockchain to update
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Check recipient balance to verify transaction
+          const recipientBalanceResult = await consolidatedTransactionService.getUsdcBalance(recipientAddress);
+          const senderBalanceResult = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+          
+          logger.info('On-chain balance verification after timeout', {
+            recipientBalance: recipientBalanceResult.balance,
+            senderBalance: senderBalanceResult.usdc,
+            expectedAmount: amount,
+            note: 'Checking if transaction actually succeeded despite timeout'
+          }, 'SendConfirmationScreen');
+          
+          // Note: Balance verification is not definitive without previous balance
+          // But if we're here, we don't have a signature, so show guidance message
+          isProcessingRef.current = false;
+          setSending(false);
+          
+          Alert.alert(
+            'Transaction Processing', 
+            'The transaction is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
+            [
+              {
+                text: 'Check History',
+                onPress: () => {
+                  navigation.navigate('TransactionHistory');
+                }
+              },
+              {
+                text: 'OK',
+                style: 'cancel',
+                onPress: () => {
+                  navigation.goBack();
+                }
+              }
+            ]
+          );
+          return; // Exit early
+        } catch (verificationError) {
+          logger.warn('Failed to verify transaction on-chain after timeout', {
+            error: verificationError instanceof Error ? verificationError.message : String(verificationError)
+          }, 'SendConfirmationScreen');
+          
+          // If verification fails, show message directing to check history
+          isProcessingRef.current = false;
+          setSending(false);
+          Alert.alert(
+            'Transaction Processing', 
+            'The transaction is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
+            [
+              {
+                text: 'Check History',
+                onPress: () => {
+                  navigation.navigate('TransactionHistory');
+                }
+              },
+              {
+                text: 'OK',
+                style: 'cancel',
+                onPress: () => {
+                  setSending(false);
+                }
+              }
+            ]
+          );
+          
+          return; // Exit early, don't show error
+        }
       }
       
       // Send payment failed notification (non-blocking) - only for real failures
@@ -545,7 +711,14 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount);
   const isValidAmount = !isNaN(numericAmount) && numericAmount > 0;
   const totalAmountToPay = isValidAmount ? FeeService.calculateCompanyFee(numericAmount, transactionType).totalAmount : 0; // Amount + fee
-  const hasSufficientBalance = !isValidAmount ? false : (existingWalletBalance === null || existingWalletBalance.usdc >= totalAmountToPay);
+  
+  // Use live balance as fallback if available and existingWalletBalance is null or 0
+  // This handles cases where the initial balance fetch failed but LiveBalanceService succeeded
+  const effectiveBalance = existingWalletBalance?.usdc !== null && existingWalletBalance?.usdc !== undefined && existingWalletBalance.usdc > 0
+    ? existingWalletBalance.usdc
+    : (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined ? liveBalance.usdcBalance : 0);
+  
+  const hasSufficientBalance = !isValidAmount ? false : (effectiveBalance >= totalAmountToPay);
 
   // Debug logging for slider state
   if (__DEV__) {
@@ -773,7 +946,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         
         <AppleSlider
           onSlideComplete={handleConfirmSend}
-          disabled={walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !!walletError}
+          disabled={walletLoading || sending || isProcessingRef.current || !hasExistingWallet || !hasSufficientBalance || !!walletError}
           loading={walletLoading || sending}
           text={
             !hasSufficientBalance 

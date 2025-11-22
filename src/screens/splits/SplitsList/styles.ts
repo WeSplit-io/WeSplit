@@ -57,6 +57,12 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: '600',
   },
+  newPoolButtonDisabled: {
+    opacity: 0.5,
+  },
+  newPoolButtonTextDisabled: {
+    color: colors.white50,
+  },
   filtersContainer: {
     flexDirection: 'row',
     padding: spacing.sm,
@@ -344,6 +350,34 @@ export const styles = StyleSheet.create({
     color: colors.black,
     fontSize: typography.fontSize.lg,
     fontWeight: '500',
+  },
+  // Shared Wallet Empty State - Clean and Minimalist
+  sharedWalletEmptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+    minHeight: 300,
+  },
+  sharedWalletEmptyContent: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    maxWidth: 280,
+  },
+  sharedWalletEmptyTitle: {
+    color: colors.white,
+    textAlign: 'center',
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs,
+    letterSpacing: 0.2,
+  },
+  sharedWalletEmptySubtitle: {
+    color: colors.white50,
+    textAlign: 'center',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.regular,
+    lineHeight: typography.fontSize.sm * 1.5,
   },
   loadingContainer: {
     alignItems: 'center',

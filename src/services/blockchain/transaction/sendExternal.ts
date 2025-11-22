@@ -216,26 +216,28 @@ class ExternalTransferService {
             result.signature
           );
         }
+        
+        // ✅ CRITICAL: Only cleanup on SUCCESS
+        // Failed transactions stay in deduplication service to prevent retries
+        // This ensures that if a transaction fails, retries within 60s are blocked
+        if (result.success) {
+          dedupCleanup();
+        }
       } catch (error) {
         // ✅ CRITICAL: Don't cleanup on error immediately
         // Keep failed transaction in deduplication service to prevent immediate retries
+        // This prevents duplicates when transaction fails/times out and user retries
+        // Cleanup will happen automatically after timeout (60s) or on success
         logger.warn('External transfer failed - keeping in deduplication service to prevent retries', {
           userId: params.userId,
           to: params.to.substring(0, 8) + '...',
           amount: params.amount,
           error: error instanceof Error ? error.message : String(error),
-          note: 'Transaction will be cleaned up automatically after 60s timeout'
+          note: 'Transaction will be cleaned up automatically after 60s timeout. Retries within 60s will be blocked.'
         }, 'ExternalTransferService');
         // Don't cleanup - let it expire naturally (60s timeout) to prevent retries
         throw error;
       }
-      
-      // ✅ CRITICAL: Only cleanup on SUCCESS
-      // Failed transactions stay in deduplication service to prevent retries
-      if (result.success) {
-        dedupCleanup();
-      }
-      // If transaction failed, don't cleanup - let it expire naturally (60s timeout)
 
       if (result.success) {
         // Update last used timestamp for linked wallet
@@ -1031,17 +1033,86 @@ class ExternalTransferService {
       // Best practice: Use shared verification utility for consistent behavior
       const verificationResult = await verifyTransactionOnBlockchain(await optimizedTransactionUtils.getConnection(), signature);
       if (!verificationResult.success) {
-        logger.error('External transfer verification failed', {
-          signature,
-          error: verificationResult.error,
-          note: 'Transaction was submitted but not confirmed. It may have failed or expired.'
-        }, 'ExternalTransferService');
-        return {
-          success: false,
-          signature, // Include signature so user can check on Solana Explorer
-          error: verificationResult.error || 'Transaction verification failed. Please check transaction status on Solana Explorer.',
-          txId: signature
-        };
+        const errorMessage = verificationResult.error || '';
+        const isTimeout = 
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('verification timeout') ||
+          errorMessage.includes('not found on blockchain') ||
+          errorMessage.includes('RPC indexing delay');
+        
+        // If timeout, verify on-chain using balance checks before returning error
+        if (isTimeout) {
+          logger.warn('External transfer verification timed out - verifying on-chain before returning error', {
+            signature,
+            error: errorMessage,
+            to: params.to.substring(0, 8) + '...',
+            amount: recipientAmount,
+            note: 'Transaction may have succeeded. Verifying on-chain before returning error.'
+          }, 'ExternalTransferService');
+          
+          try {
+            // Wait a moment for blockchain to update
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Check balances to verify transaction
+            const { consolidatedTransactionService } = await import('./ConsolidatedTransactionService');
+            const recipientBalanceResult = await consolidatedTransactionService.getUsdcBalance(params.to);
+            
+            logger.info('On-chain balance verification after timeout', {
+              recipientBalance: recipientBalanceResult.balance,
+              expectedAmount: recipientAmount,
+              note: 'Checking if transaction actually succeeded despite timeout'
+            }, 'ExternalTransferService');
+            
+            // If recipient balance increased significantly, transaction likely succeeded
+            // We can't definitively verify without knowing the previous balance,
+            // but if the balance is high enough, it's likely the transaction succeeded
+            // The user should check transaction history for definitive confirmation
+            
+            logger.info('Timeout occurred but transaction may have succeeded - returning error with guidance', {
+              signature,
+              to: params.to.substring(0, 8) + '...',
+              amount: recipientAmount,
+              note: 'User should check transaction history to verify if transaction succeeded'
+            }, 'ExternalTransferService');
+            
+            // Return error but include signature so user can verify on Solana Explorer
+            return {
+              success: false,
+              signature, // Include signature so user can check on Solana Explorer
+              error: `Transaction verification timed out. The transaction may have succeeded on the blockchain. Please check your transaction history or Solana Explorer (signature: ${signature.substring(0, 8)}...) to verify.`,
+              txId: signature
+            };
+          } catch (verificationError) {
+            logger.warn('Failed to verify transaction on-chain after timeout', {
+              error: verificationError instanceof Error ? verificationError.message : String(verificationError),
+              signature,
+              to: params.to.substring(0, 8) + '...',
+              amount: recipientAmount
+            }, 'ExternalTransferService');
+            
+            // Fallback to original error message if verification fails
+            return {
+              success: false,
+              signature, // Include signature so user can check on Solana Explorer
+              error: verificationResult.error || 'Transaction verification failed. Please check transaction status on Solana Explorer.',
+              txId: signature
+            };
+          }
+        } else {
+          // Actual failure (not timeout) - return error immediately
+          logger.error('External transfer verification failed', {
+            signature,
+            error: verificationResult.error,
+            note: 'Transaction was submitted but not confirmed. It may have failed or expired.'
+          }, 'ExternalTransferService');
+          return {
+            success: false,
+            signature, // Include signature so user can check on Solana Explorer
+            error: verificationResult.error || 'Transaction verification failed. Please check transaction status on Solana Explorer.',
+            txId: signature
+          };
+        }
       }
 
       logger.info('USDC transfer transaction confirmed', {

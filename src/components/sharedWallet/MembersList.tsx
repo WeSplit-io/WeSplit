@@ -47,8 +47,8 @@ const MembersList: React.FC<MembersListProps> = ({
           <ParticipationCircle
             members={members}
             totalContributed={totalContributed}
-            size={140}
-            strokeWidth={14}
+            size={80}
+            strokeWidth={6}
           />
         </View>
       )}
@@ -104,20 +104,28 @@ const MembersList: React.FC<MembersListProps> = ({
 const styles = StyleSheet.create({
   section: {
     backgroundColor: colors.white5,
-    borderRadius: spacing.md,
+    borderRadius: spacing.sm,
     padding: spacing.md,
-    gap: spacing.sm,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    marginBottom: spacing.sm,
   },
   sectionTitle: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.white70,
+    color: colors.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: spacing.xs,
   },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.white10,
   },
   memberAvatar: {
     width: 40,
@@ -132,25 +140,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+    marginBottom: spacing.xs / 2,
   },
   memberName: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
+    lineHeight: typography.fontSize.md * 1.3,
   },
   creatorBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs / 2,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 2,
     backgroundColor: colors.greenBlue20,
     borderRadius: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.green + '40',
   },
   creatorText: {
     fontSize: typography.fontSize.xs,
     color: colors.green,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
+    letterSpacing: 0.2,
   },
   memberStatsRow: {
     flexDirection: 'row',
@@ -160,11 +173,13 @@ const styles = StyleSheet.create({
   memberStats: {
     fontSize: typography.fontSize.xs,
     color: colors.white70,
+    lineHeight: typography.fontSize.xs * 1.3,
   },
   memberPercentage: {
     fontSize: typography.fontSize.sm,
     color: colors.green,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 0.2,
   },
 });
 

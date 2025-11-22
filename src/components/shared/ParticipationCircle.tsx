@@ -35,8 +35,8 @@ const PARTICIPANT_COLORS = [
 export const ParticipationCircle: React.FC<ParticipationCircleProps> = ({
   members,
   totalContributed,
-  size = 120,
-  strokeWidth = 12,
+  size = 80,
+  strokeWidth = 6,
 }) => {
   const participationData = useMemo(() => {
     if (totalContributed === 0) {
@@ -100,18 +100,7 @@ export const ParticipationCircle: React.FC<ParticipationCircleProps> = ({
     <View style={styles.container}>
       <View style={[styles.circleContainer, { width: size, height: size }]}>
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-          {/* Background circle - subtle gray ring */}
-          <Circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke={colors.white10}
-            strokeWidth={strokeWidth * 0.2}
-            opacity={0.2}
-          />
-          
-          {/* Segments - pie slices with clean edges */}
+          {/* Segments - thin pie slices with clean edges */}
           {segments.map((segment, index) => (
             <Path
               key={`${segment.member.userId}-${index}`}
@@ -119,17 +108,17 @@ export const ParticipationCircle: React.FC<ParticipationCircleProps> = ({
               fill={segment.color}
               stroke={colors.black}
               strokeWidth={0.5}
-              opacity={1}
+              opacity={0.85}
             />
           ))}
           
-          {/* Inner circle for cleaner look - smaller to leave room for text */}
+          {/* Inner circle for cleaner look - minimal inner circle */}
           <Circle
             cx={center}
             cy={center}
-            r={radius * 0.45}
+            r={radius * 0.6}
             fill={colors.black}
-            opacity={0.9}
+            opacity={1}
           />
         </Svg>
         
@@ -167,7 +156,7 @@ export const ParticipationCircle: React.FC<ParticipationCircleProps> = ({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   circleContainer: {
     position: 'relative',
@@ -185,47 +174,47 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   centerTextMain: {
-    fontSize: typography.fontSize.xxl,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
-    lineHeight: typography.fontSize.xxl * 1.2,
+    lineHeight: typography.fontSize.lg * 1.2,
     textAlign: 'center',
   },
   centerTextSub: {
     fontSize: typography.fontSize.xs,
-    color: colors.white70,
-    marginTop: spacing.xs / 2,
+    color: colors.white50,
+    marginTop: spacing.xs / 4,
     textAlign: 'center',
   },
   legend: {
     width: '100%',
-    gap: spacing.sm,
-    paddingTop: spacing.xs,
+    gap: spacing.xs,
+    paddingTop: spacing.xs / 2,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs / 2,
+    gap: spacing.xs,
+    paddingVertical: spacing.xs / 4,
   },
   legendColor: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 1.5,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
     borderColor: colors.white10,
   },
   legendText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white,
+    fontSize: typography.fontSize.xs,
+    color: colors.white70,
     flex: 1,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
   },
   legendMore: {
     fontSize: typography.fontSize.xs,
     color: colors.white50,
     fontStyle: 'italic',
-    marginTop: spacing.xs / 2,
+    marginTop: spacing.xs / 4,
   },
 });
 

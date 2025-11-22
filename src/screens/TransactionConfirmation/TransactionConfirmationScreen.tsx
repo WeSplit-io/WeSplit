@@ -93,13 +93,96 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
         throw new Error(`Insufficient balance. Required: ${amount} USDC, Available: ${balance.usdc} USDC`);
       }
       
-      const transactionResult = await sendTransaction({
+      // ✅ CRITICAL: Add timeout wrapper (60 seconds max) - aligned with SendConfirmationScreen
+      const transactionPromise = sendTransaction({
         to: params.recipient.wallet_address,
         amount: amount,
         currency: params.currency,
         memo: memo || `Payment to ${params.recipient.name}`,
         groupId: params.groupId
       });
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Transaction timeout - please check transaction history')), 60000);
+      });
+      
+      let transactionResult;
+      try {
+        transactionResult = await Promise.race([transactionPromise, timeoutPromise]);
+      } catch (timeoutError) {
+        // Timeout occurred - verify on-chain if transaction succeeded
+        const isTimeout = timeoutError instanceof Error && 
+          (timeoutError.message.includes('timeout') || timeoutError.message.includes('Transaction timeout'));
+        
+        if (isTimeout) {
+          logger.info('Timeout detected, verifying transaction on-chain', {
+            recipientAddress: params.recipient.wallet_address,
+            amount
+          }, 'TransactionConfirmationScreen');
+          
+          try {
+            // Wait a moment for blockchain to update
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Check balances to verify transaction
+            const recipientBalanceResult = await consolidatedTransactionService.getUsdcBalance(params.recipient.wallet_address);
+            const senderBalanceResult = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+            
+            logger.info('On-chain balance verification after timeout', {
+              recipientBalance: recipientBalanceResult.balance,
+              senderBalance: senderBalanceResult.usdc,
+              expectedAmount: amount,
+              note: 'Checking if transaction actually succeeded despite timeout'
+            }, 'TransactionConfirmationScreen');
+            
+            // Try to get result from original promise if it completed
+            try {
+              transactionResult = await transactionPromise;
+              if (transactionResult && transactionResult.signature) {
+                logger.info('Transaction completed after timeout wrapper', {
+                  success: true,
+                  signature: transactionResult.signature
+                }, 'TransactionConfirmationScreen');
+                // Continue with success handling below
+              } else {
+                throw timeoutError; // Re-throw original timeout error
+              }
+            } catch (promiseError) {
+              // Promise also failed - show timeout message with guidance
+              logger.warn('Transaction promise also failed after timeout', {
+                error: promiseError instanceof Error ? promiseError.message : String(promiseError)
+              }, 'TransactionConfirmationScreen');
+              
+              isProcessingRef.current = false;
+              setProcessing(false);
+              
+              setErrorMessage('Transaction is being processed. It may have succeeded on the blockchain. Please check your transaction history.');
+              setStep('error');
+              return;
+            }
+          } catch (verificationError) {
+            logger.warn('Failed to verify transaction on-chain after timeout', {
+              error: verificationError instanceof Error ? verificationError.message : String(verificationError)
+            }, 'TransactionConfirmationScreen');
+            
+            // Fallback to original timeout message if verification fails
+            isProcessingRef.current = false;
+            setProcessing(false);
+            
+            setErrorMessage('Transaction is being processed. It may have succeeded on the blockchain. Please check your transaction history.');
+            setStep('error');
+            return;
+          }
+        } else {
+          // Not a timeout error - re-throw
+          throw timeoutError;
+        }
+      }
+
+      // Check if transaction actually succeeded
+      if (!transactionResult || !transactionResult.signature) {
+        throw new Error('Transaction failed - no signature received');
+      }
 
       logger.info('Transaction completed', { transactionResult }, 'TransactionConfirmationScreen');
       

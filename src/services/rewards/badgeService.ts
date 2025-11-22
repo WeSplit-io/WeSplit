@@ -9,6 +9,8 @@ import { ref, getDownloadURL } from 'firebase/storage';
 import { logger } from '../analytics/loggingService';
 import priceManagementService from '../core/priceManagementService';
 import { BADGE_DEFINITIONS, BadgeInfo } from './badgeConfig';
+import { pointsService } from './pointsService';
+import { seasonService } from './seasonService';
 
 export interface BadgeProgress {
   badgeId: string;
@@ -640,6 +642,46 @@ class BadgeService {
         description: badgeInfo.description
       });
 
+      // Award points if badge has points
+      if (badgeInfo.points && badgeInfo.points > 0) {
+        try {
+          const currentSeason = seasonService.getCurrentSeason();
+          const pointsResult = await pointsService.awardSeasonPoints(
+            userId,
+            badgeInfo.points,
+            'quest_completion',
+            badgeId,
+            `Points for claiming badge: ${badgeInfo.title}`,
+            currentSeason,
+            'badge_claim'
+          );
+
+          if (pointsResult.success) {
+            logger.info('Points awarded for badge claim', {
+              userId,
+              badgeId,
+              pointsAwarded: pointsResult.pointsAwarded,
+              totalPoints: pointsResult.totalPoints
+            }, 'BadgeService');
+          } else {
+            logger.warn('Failed to award points for badge claim', {
+              userId,
+              badgeId,
+              points: badgeInfo.points,
+              error: pointsResult.error
+            }, 'BadgeService');
+          }
+        } catch (pointsError) {
+          logger.error('Error awarding points for badge claim', {
+            error: pointsError,
+            userId,
+            badgeId,
+            points: badgeInfo.points
+          }, 'BadgeService');
+          // Don't fail the badge claim if points award fails
+        }
+      }
+
       logger.info('Badge claimed successfully', {
         userId,
         badgeId,
@@ -786,6 +828,49 @@ class BadgeService {
         redeemCode: redeemCode.toUpperCase()
       });
 
+      // Award points if badge has points
+      if (badgeInfo.points && badgeInfo.points > 0) {
+        try {
+          const currentSeason = seasonService.getCurrentSeason();
+          const pointsResult = await pointsService.awardSeasonPoints(
+            userId,
+            badgeInfo.points,
+            'quest_completion',
+            badgeInfo.badgeId,
+            `Points for claiming badge: ${badgeInfo.title}`,
+            currentSeason,
+            'badge_claim'
+          );
+
+          if (pointsResult.success) {
+            logger.info('Points awarded for event badge claim', {
+              userId,
+              badgeId: badgeInfo.badgeId,
+              redeemCode,
+              pointsAwarded: pointsResult.pointsAwarded,
+              totalPoints: pointsResult.totalPoints
+            }, 'BadgeService');
+          } else {
+            logger.warn('Failed to award points for event badge claim', {
+              userId,
+              badgeId: badgeInfo.badgeId,
+              redeemCode,
+              points: badgeInfo.points,
+              error: pointsResult.error
+            }, 'BadgeService');
+          }
+        } catch (pointsError) {
+          logger.error('Error awarding points for event badge claim', {
+            error: pointsError,
+            userId,
+            badgeId: badgeInfo.badgeId,
+            redeemCode,
+            points: badgeInfo.points
+          }, 'BadgeService');
+          // Don't fail the badge claim if points award fails
+        }
+      }
+
       logger.info('Event badge claimed successfully', {
         userId,
         badgeId: badgeInfo.badgeId,
@@ -927,6 +1012,135 @@ class BadgeService {
     this.claimedBadgeIdsCache.delete(userId);
     this.userClaimedBadgesCache.delete(userId);
     this.communityBadgesCache.delete(userId);
+  }
+
+  /**
+   * Backfill points for badges that were claimed before points awarding was implemented
+   * Checks all claimed badges and awards points if they haven't been awarded yet
+   */
+  async backfillBadgePoints(userId: string): Promise<{
+    pointsAwarded: number;
+    badgesProcessed: number;
+    errors: string[];
+  }> {
+    const result = {
+      pointsAwarded: 0,
+      badgesProcessed: 0,
+      errors: [] as string[]
+    };
+
+    try {
+      // Get all claimed badges for the user
+      const claimedBadgeIds = await this.getClaimedBadges(userId);
+      
+      if (claimedBadgeIds.length === 0) {
+        logger.debug('No claimed badges to backfill', { userId }, 'BadgeService');
+        return result;
+      }
+
+      // Check which badges already have points awarded
+      const pointsTransactionsQuery = query(
+        collection(db, 'points_transactions'),
+        where('user_id', '==', userId),
+        where('source', '==', 'quest_completion'),
+        where('task_type', '==', 'badge_claim')
+      );
+      const pointsTransactionsSnapshot = await getDocs(pointsTransactionsQuery);
+      const badgesWithPointsAwarded = new Set<string>();
+      
+      pointsTransactionsSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.source_id) {
+          badgesWithPointsAwarded.add(data.source_id);
+        }
+      });
+
+      logger.info('Checking badges for backfill', {
+        userId,
+        totalClaimedBadges: claimedBadgeIds.length,
+        badgesWithPointsAwarded: badgesWithPointsAwarded.size
+      }, 'BadgeService');
+
+      // Process each claimed badge
+      for (const badgeId of claimedBadgeIds) {
+        try {
+          // Skip if points were already awarded
+          if (badgesWithPointsAwarded.has(badgeId)) {
+            logger.debug('Badge already has points awarded', { userId, badgeId }, 'BadgeService');
+            result.badgesProcessed++;
+            continue;
+          }
+
+          // Get badge info
+          const badgeInfo = BADGE_DEFINITIONS[badgeId];
+          if (!badgeInfo) {
+            logger.warn('Badge definition not found', { userId, badgeId }, 'BadgeService');
+            result.errors.push(`Badge definition not found: ${badgeId}`);
+            continue;
+          }
+
+          // Only award points if badge has points
+          if (!badgeInfo.points || badgeInfo.points <= 0) {
+            logger.debug('Badge has no points to award', { userId, badgeId }, 'BadgeService');
+            result.badgesProcessed++;
+            continue;
+          }
+
+          // Award points for this badge
+          const currentSeason = seasonService.getCurrentSeason();
+          const pointsResult = await pointsService.awardSeasonPoints(
+            userId,
+            badgeInfo.points,
+            'quest_completion',
+            badgeId,
+            `Retroactive points for claiming badge: ${badgeInfo.title}`,
+            currentSeason,
+            'badge_claim'
+          );
+
+          if (pointsResult.success) {
+            result.pointsAwarded += pointsResult.pointsAwarded;
+            result.badgesProcessed++;
+            logger.info('Points backfilled for badge', {
+              userId,
+              badgeId,
+              badgeTitle: badgeInfo.title,
+              pointsAwarded: pointsResult.pointsAwarded,
+              totalPoints: pointsResult.totalPoints
+            }, 'BadgeService');
+          } else {
+            const errorMsg = `Failed to award points for badge ${badgeId}: ${pointsResult.error}`;
+            result.errors.push(errorMsg);
+            logger.error('Failed to backfill points for badge', {
+              userId,
+              badgeId,
+              error: pointsResult.error
+            }, 'BadgeService');
+          }
+        } catch (error) {
+          const errorMsg = `Error processing badge ${badgeId}: ${error instanceof Error ? error.message : String(error)}`;
+          result.errors.push(errorMsg);
+          logger.error('Error processing badge for backfill', {
+            userId,
+            badgeId,
+            error
+          }, 'BadgeService');
+        }
+      }
+
+      logger.info('Badge points backfill completed', {
+        userId,
+        pointsAwarded: result.pointsAwarded,
+        badgesProcessed: result.badgesProcessed,
+        errors: result.errors.length
+      }, 'BadgeService');
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to backfill badge points', { userId, error }, 'BadgeService');
+      result.errors.push(`Backfill failed: ${error instanceof Error ? error.message : String(error)}`);
+      return result;
+    }
   }
 }
 

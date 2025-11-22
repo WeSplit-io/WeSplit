@@ -145,11 +145,92 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       setIsTransferring(true);
       
-      const result = await sendTransaction({
+      // ✅ CRITICAL: Add timeout wrapper (60 seconds max) - aligned with SendConfirmationScreen
+      const transactionPromise = sendTransaction({
         to: appWalletAddress,
         amount: amount,
         currency: 'SOL'
       });
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Transaction timeout - please check transaction history')), 60000);
+      });
+      
+      let result;
+      try {
+        result = await Promise.race([transactionPromise, timeoutPromise]);
+      } catch (timeoutError) {
+        // Timeout occurred - verify on-chain if transaction succeeded
+        const isTimeout = timeoutError instanceof Error && 
+          (timeoutError.message.includes('timeout') || timeoutError.message.includes('Transaction timeout'));
+        
+        if (isTimeout) {
+          logger.info('Timeout detected, verifying deposit transaction on-chain', {
+            appWalletAddress,
+            amount
+          }, 'CryptoTransferScreen');
+          
+          try {
+            // Wait a moment for blockchain to update
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Check balances to verify transaction
+            const { consolidatedTransactionService } = await import('../../services/blockchain/transaction');
+            const appBalanceResult = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+            
+            logger.info('On-chain balance verification after timeout', {
+              appBalance: appBalanceResult.sol,
+              expectedAmount: amount,
+              note: 'Checking if transaction actually succeeded despite timeout'
+            }, 'CryptoTransferScreen');
+            
+            // Try to get result from original promise if it completed
+            try {
+              result = await transactionPromise;
+              if (result && result.signature) {
+                logger.info('Deposit transaction completed after timeout wrapper', {
+                  success: true,
+                  signature: result.signature
+                }, 'CryptoTransferScreen');
+                // Continue with success handling below
+              } else {
+                throw timeoutError; // Re-throw original timeout error
+              }
+            } catch (promiseError) {
+              // Promise also failed - show timeout message with guidance
+              logger.warn('Deposit transaction promise also failed after timeout', {
+                error: promiseError instanceof Error ? promiseError.message : String(promiseError)
+              }, 'CryptoTransferScreen');
+              
+              setIsTransferring(false);
+              
+              Alert.alert(
+                'Transaction Processing',
+                'The deposit is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
+                [{ text: 'OK', style: 'cancel' }]
+              );
+              return;
+            }
+          } catch (verificationError) {
+            logger.warn('Failed to verify deposit transaction on-chain after timeout', {
+              error: verificationError instanceof Error ? verificationError.message : String(verificationError)
+            }, 'CryptoTransferScreen');
+            
+            // Fallback to original timeout message if verification fails
+            setIsTransferring(false);
+            
+            Alert.alert(
+              'Transaction Processing',
+              'The deposit is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
+              [{ text: 'OK', style: 'cancel' }]
+            );
+            return;
+          }
+        } else {
+          // Not a timeout error - re-throw
+          throw timeoutError;
+        }
+      }
 
       // Check if result has success property or if it's a successful transaction
       if (result && result.signature) {

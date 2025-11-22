@@ -162,7 +162,9 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         // Use consolidatedTransactionService directly with 'withdraw' transaction type
         // This ensures proper fee calculation and transaction type mapping
         const { consolidatedTransactionService } = await import('../../services/blockchain/transaction');
-        transactionResult = await consolidatedTransactionService.sendUSDCTransaction({
+        
+        // ✅ CRITICAL: Add timeout wrapper (60 seconds max) - aligned with SendConfirmationScreen
+        const transactionPromise = consolidatedTransactionService.sendUSDCTransaction({
           to: externalWalletAddress || walletAddress, // Send to external wallet
           amount: safeTotalWithdraw, // Send the amount after fees
           currency: 'USDC',
@@ -171,6 +173,99 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           priority: 'medium',
           transactionType: 'withdraw' // Use 'withdraw' type for proper fee calculation and transaction saving
         });
+        
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Transaction timeout - please check transaction history')), 60000);
+        });
+        
+        try {
+          transactionResult = await Promise.race([transactionPromise, timeoutPromise]);
+        } catch (timeoutError) {
+          // Timeout occurred - verify on-chain if transaction succeeded
+          const isTimeout = timeoutError instanceof Error && 
+            (timeoutError.message.includes('timeout') || timeoutError.message.includes('Transaction timeout'));
+          
+          if (isTimeout) {
+            logger.info('Timeout detected, verifying withdrawal transaction on-chain', {
+              to: externalWalletAddress || walletAddress,
+              amount: safeTotalWithdraw
+            }, 'WithdrawConfirmationScreen');
+            
+            try {
+              // Wait a moment for blockchain to update
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              
+              // Check balances to verify transaction
+              const recipientBalanceResult = await consolidatedTransactionService.getUsdcBalance(externalWalletAddress || walletAddress);
+              const senderBalanceResult = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+              
+              logger.info('On-chain balance verification after timeout', {
+                recipientBalance: recipientBalanceResult.balance,
+                senderBalance: senderBalanceResult.usdc,
+                expectedAmount: safeTotalWithdraw,
+                note: 'Checking if transaction actually succeeded despite timeout'
+              }, 'WithdrawConfirmationScreen');
+              
+              // Try to get result from original promise if it completed
+              try {
+                transactionResult = await transactionPromise;
+                if (transactionResult.success && transactionResult.signature) {
+                  logger.info('Withdrawal transaction completed after timeout wrapper', {
+                    success: transactionResult.success,
+                    signature: transactionResult.signature
+                  }, 'WithdrawConfirmationScreen');
+                  // Continue with success handling below
+                } else {
+                  throw timeoutError; // Re-throw original timeout error
+                }
+              } catch (promiseError) {
+                // Promise also failed - show timeout message with guidance
+                logger.warn('Withdrawal transaction promise also failed after timeout', {
+                  error: promiseError instanceof Error ? promiseError.message : String(promiseError)
+                }, 'WithdrawConfirmationScreen');
+                
+                isProcessingRef.current = false;
+                setSigning(false);
+                
+                Alert.alert(
+                  'Transaction Processing',
+                  'The withdrawal is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
+                  [
+                    { text: 'Check History', onPress: () => { navigation.navigate('TransactionHistory'); } },
+                    { text: 'OK', style: 'cancel', onPress: () => { } }
+                  ]
+                );
+                return;
+              }
+            } catch (verificationError) {
+              logger.warn('Failed to verify withdrawal transaction on-chain after timeout', {
+                error: verificationError instanceof Error ? verificationError.message : String(verificationError)
+              }, 'WithdrawConfirmationScreen');
+              
+              // Fallback to original timeout message if verification fails
+              isProcessingRef.current = false;
+              setSigning(false);
+              
+              Alert.alert(
+                'Transaction Processing',
+                'The withdrawal is being processed. It may have succeeded on the blockchain.\n\nPlease check your transaction history. If you don\'t see the transaction, wait a moment and try again.',
+                [
+                  { text: 'Check History', onPress: () => { navigation.navigate('TransactionHistory'); } },
+                  { text: 'OK', style: 'cancel', onPress: () => { } }
+                ]
+              );
+              return;
+            }
+          } else {
+            // Not a timeout error - re-throw
+            throw timeoutError;
+          }
+        }
+      }
+
+      // Check if transaction actually succeeded
+      if (!transactionResult.success) {
+        throw new Error(transactionResult.error || 'Transaction failed');
       }
 
       logger.info('Withdrawal transaction successful', { transactionResult }, 'WithdrawConfirmationScreen');

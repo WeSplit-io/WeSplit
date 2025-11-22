@@ -69,8 +69,11 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
         }
       });
     } else {
-      // Navigate to the new ContactAction screen with toggle
-      navigation.navigate('ContactAction', { selectedContact: contact });
+      // Navigate to UserProfile screen
+      navigation.navigate('UserProfile', { 
+        contact: contact,
+        userId: contact.id
+      });
     }
   };
 
