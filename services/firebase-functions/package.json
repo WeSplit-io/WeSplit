@@ -6,6 +6,7 @@
   "scripts": {
     "build": "echo 'No build step needed for JavaScript'",
     "serve": "firebase emulators:start --only functions",
+    "serve:all": "firebase emulators:start --only firestore,functions",
     "emulator": "./start-emulator.sh",
     "dev": "./start-emulator.sh",
     "shell": "firebase functions:shell",

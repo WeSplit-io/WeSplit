@@ -147,8 +147,8 @@ const Button: React.FC<ButtonProps> = ({
     switch (size) {
       case 'small':
         return {
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.sm,
+          paddingVertical: spacing.xs,
         };
       case 'large':
         return {

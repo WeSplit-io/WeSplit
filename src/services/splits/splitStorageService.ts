@@ -46,7 +46,7 @@ export interface Split {
   totalAmount: number;
   currency: string;
   category?: string; // Category for the split (trip, food, home, event, rocket)
-  splitType?: 'fair' | 'degen';
+  splitType?: 'fair' | 'degen' | 'spend';
   splitMethod?: 'equal' | 'manual'; // Locked split method after confirmation
   status: 'draft' | 'pending' | 'active' | 'locked' | 'completed' | 'cancelled';
   creatorId: string;
@@ -96,6 +96,23 @@ export interface Split {
     loserUserId: string;
     totalParticipants: number;
   }[];
+  // External payment integration metadata
+  externalSource?: string; // Source identifier (e.g., "spend", "spend-amazon")
+  externalInvoiceId?: string; // Original invoice ID for reference
+  externalMetadata?: {
+    paymentMode?: 'personal' | 'merchant_gateway';
+    treasuryWallet?: string;
+    orderId?: string;
+    webhookUrl?: string;
+    webhookSecret?: string;
+    paymentThreshold?: number;
+    paymentTimeout?: number;
+    paymentStatus?: 'pending' | 'processing' | 'paid' | 'failed' | 'refunded';
+    paymentTransactionSig?: string;
+    paymentAttempts?: number;
+    lastPaymentAttempt?: string;
+    idempotencyKey?: string;
+  };
 }
 
 export interface SplitParticipant {
@@ -363,17 +380,87 @@ export class SplitStorageServiceClass {
   }
 
   /**
+   * Get total count of splits for a user (as creator or participant)
+   * @param userId - User ID
+   */
+  static async getUserSplitsCount(userId: string): Promise<number> {
+    try {
+      const splitsRef = collection(db, this.COLLECTION_NAME);
+      
+      // Query creator splits
+      const creatorQuery = query(
+        splitsRef,
+        where('creatorId', '==', userId)
+      );
+      
+      // Query all splits to find participant splits (with reasonable limit)
+      // We'll filter client-side for participants
+      const allSplitsQuery = query(
+        splitsRef,
+        orderBy('createdAt', 'desc'),
+        limit(1000) // Reasonable limit for counting
+      );
+
+      const [creatorSnapshot, allSplitsSnapshot] = await Promise.all([
+        getDocs(creatorQuery),
+        getDocs(allSplitsQuery)
+      ]);
+
+      const seenIds = new Set<string>();
+      
+      // Count creator splits
+      creatorSnapshot.docs.forEach(doc => {
+        const splitData = doc.data() as Split;
+        seenIds.add(splitData.id);
+      });
+
+      // Count participant splits (avoid duplicates)
+      allSplitsSnapshot.docs.forEach(doc => {
+        const splitData = doc.data() as Split;
+        
+        // Check if user is a participant in this split with accepted status
+        const userParticipant = splitData.participants.find(participant => 
+          participant.userId === userId
+        );
+        
+        // Only include splits where user has accepted the invitation
+        const isAcceptedParticipant = userParticipant && 
+          (userParticipant.status === 'accepted' || userParticipant.status === 'paid' || userParticipant.status === 'locked');
+        
+        if (isAcceptedParticipant && !seenIds.has(splitData.id)) {
+          seenIds.add(splitData.id);
+        }
+      });
+
+      const totalCount = seenIds.size;
+      
+      logger.debug('User splits count retrieved', {
+        userId,
+        totalCount
+      }, 'splitStorageService');
+
+      return totalCount;
+    } catch (error) {
+      logger.error('Error getting user splits count', { error: (error as Error).message }, 'splitStorageService');
+      // Return 0 on error to allow pagination to still work
+      return 0;
+    }
+  }
+
+  /**
    * Get splits for a user (as creator or participant) with pagination
    * @param userId - User ID
    * @param limitCount - Maximum number of splits to return (default: 20)
    * @param pageNumber - Page number (1-indexed, default: 1)
    * @param lastDoc - Last document snapshot from previous page (for pagination)
+   * @param totalCount - Optional total count (if already fetched)
    */
   static async getUserSplits(
     userId: string, 
     limitCount: number = 20,
     pageNumber: number = 1,
-    lastDoc?: QueryDocumentSnapshot
+    lastDoc?: QueryDocumentSnapshot,
+    totalCount?: number
   ): Promise<SplitListResult> {
     try {
       const splitsRef = collection(db, this.COLLECTION_NAME);
@@ -472,12 +559,17 @@ export class SplitStorageServiceClass {
       
       // Check if there are more splits by trying to get one more
       const hasMore = limitedSplits.length === limitCount;
+      
+      // Calculate total pages if totalCount is provided
+      const totalPages = totalCount !== undefined ? Math.ceil(totalCount / limitCount) : undefined;
 
       return {
         success: true,
         splits: limitedSplits,
         hasMore,
         currentPage: pageNumber,
+        totalCount,
+        totalPages,
         lastDoc: lastDocument,
       };
 

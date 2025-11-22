@@ -459,15 +459,18 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.white10,
-    backgroundColor: colors.black, // Ensure it has a background
-    minHeight: 60, // Ensure minimum height for visibility
+    backgroundColor: colors.black,
   },
   paginationButton: {
-    minWidth: 100,
+    minWidth: 44,
+    width: 44,
+    height: 44,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   pageInfo: {
     flex: 1,
@@ -477,5 +480,25 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
+  },
+  // Swipe-to-delete styles
+  deleteAction: {
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 100,
+    borderRadius: 16,
+    marginVertical: spacing.xs,
+    marginRight: spacing.md,
+  },
+  deleteActionContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs / 2,
+  },
+  deleteText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
   },
 });

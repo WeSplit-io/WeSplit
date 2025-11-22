@@ -53,6 +53,7 @@ import FairSplitScreen from './src/screens/FairSplit/FairSplitScreen';
 import PaymentConfirmationScreen from './src/screens/PaymentConfirmation/PaymentConfirmationScreen';
 import KastAccountLinkingScreen from './src/screens/KastAccountLinking/KastAccountLinkingScreen';
 import DegenLockScreen from './src/screens/DegenSplit/DegenLockScreen';
+import SpendSplitScreen from './src/screens/SpendSplit/SpendSplitScreen';
 import DegenSpinScreen from './src/screens/DegenSplit/DegenSpinScreen';
 import DegenResultScreen from './src/screens/DegenSplit/DegenResultScreen';
 import SplitPaymentScreen from './src/screens/SplitPayment/SplitPaymentScreen';
@@ -176,6 +177,7 @@ export default function App() {
                     <Stack.Screen name="SplitDetails" component={SplitDetailsScreen} />
                     <Stack.Screen name="SplitsList" component={SplitsListScreen} />
                     <Stack.Screen name="FairSplit" component={FairSplitScreen} />
+                    <Stack.Screen name="SpendSplit" component={SpendSplitScreen} />
                     <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} />
                     <Stack.Screen name="KastAccountLinking" component={KastAccountLinkingScreen} />
                     <Stack.Screen name="Rewards" component={RewardsScreen} />

@@ -86,3 +86,9 @@ exports.testCreateSplitFromPayment = externalPaymentIntegration.testCreateSplitF
 // Import and export degen roulette functions
 const degenRouletteFunctions = require('./degenRouletteFunctions');
 exports.executeDegenRoulette = degenRouletteFunctions.executeDegenRoulette;
+
+// Import and export SPEND integration functions
+const spendIntegration = require('./spendIntegration');
+exports.mockSpendWebhook = spendIntegration.mockSpendWebhook;
+exports.testSpendPaymentFlow = spendIntegration.testSpendPaymentFlow;
+exports.getSpendWebhookFormat = spendIntegration.getSpendWebhookFormat;

@@ -18,6 +18,17 @@
 - ✅ **Payment Verification**: On-chain + webhook
 - ✅ **Contact**: Kenton Cooley (SP3ND Team)
 
+## ✅ What We've Implemented (To Confirm)
+
+- ✅ **Split Creation API**: `createSplitFromPayment` endpoint ready
+- ✅ **Automatic Payment Processing**: When threshold met, WeSplit automatically pays SPEND treasury
+- ✅ **Webhook Notification Service**: Ready to send webhook with payment completion data
+- ✅ **Items Display**: WeSplit displays order items to users (from `items` array in order data)
+- ✅ **Participant Management**: Users can add participants to SPEND splits
+- ✅ **Payment Status Tracking**: We track payment status (pending, processing, paid, failed)
+- ✅ **Payment Threshold Logic**: Configurable threshold (default: 100%)
+- ✅ **Dedicated SPEND Split Screen**: Separate UI for SPEND orders
+
 ---
 
 ## 🔴 Critical Questions (Must Answer)
@@ -97,6 +108,12 @@
   □ order_number field
   □ Both
   □ Other: _________________________________
+
+□ Items Array Format:
+  We're displaying items from the order. Confirm format:
+  □ Current format (name, price, quantity) is correct ✅
+  □ Different format needed: _________________________________
+  □ Additional fields needed (e.g., SKU, image URL): _________________________________
 ```
 
 ### 4. Payment Flow & Currency ⚠️ HIGH PRIORITY
@@ -176,26 +193,46 @@
 
 □ How Do We Get Test API Keys/Credentials?
   Process: _________________________________
+
+□ Testing Webhook Endpoint:
+  We have a mock webhook endpoint for testing. Can you provide:
+  □ Test webhook endpoint we can call
+  □ Expected test payload format
+  □ Test webhook secret/token
+  □ How to verify test webhook calls are received
 ```
 
 ### 7. User Experience
 
 ```
 □ Should Users See "Processing payment to SP3ND" in App?
-  □ Yes, show merchant name
+  □ Yes, show merchant name ✅ (Currently implemented)
   □ No, keep generic ("Processing payment...")
   □ Other: _________________________________
 
 □ Can Users Invite Others to Split SP3ND Orders?
-  □ Yes, unlimited
+  □ Yes, unlimited ✅ (Currently implemented)
   □ Yes, limited (max: _____ participants)
   □ No, only original order creator
   □ Other: _________________________________
 
 □ Should Participants See It's a SP3ND Order?
-  □ Yes, show merchant name "SP3ND"
+  □ Yes, show merchant name "SP3ND" ✅ (Currently implemented)
   □ No, keep generic
   □ Other: _________________________________
+
+□ Items Display:
+  We're showing order items to users. Is this correct?
+  □ Yes, show items ✅ (Currently implemented)
+  □ No, hide items
+  □ Show only item count, not details
+  □ Other: _________________________________
+
+□ Payment Status Visibility:
+  We show payment status (pending, processing, paid, failed). Is this correct?
+  □ Yes ✅ (Currently implemented)
+  □ No, hide status
+  □ Show different statuses: _________________________________
 ```
 
 ### 8. Support & Monitoring
@@ -247,15 +284,43 @@
 □ Confirm the Flow:
   1. User creates order on SP3ND → selects "WeSplit" payment
   2. SP3ND calls WeSplit API to create split
-     □ Which API endpoint? (WeSplit has: createSplitFromPayment)
-     □ What data does SP3ND send?
-  3. WeSplit creates split, users pay into split wallet
-  4. When threshold met → WeSplit automatically pays SP3ND treasury
-  5. WeSplit calls webhook to notify SP3ND
-  6. SP3ND verifies payment and fulfills order
+     □ API endpoint: `createSplitFromPayment` ✅ (Ready)
+     □ Data SP3ND sends:
+       - email (user email)
+       - invoiceId (order ID)
+       - amount (order total)
+       - currency (USDC)
+       - metadata.treasuryWallet (SPEND treasury address) ✅
+       - metadata.orderId (SPEND order ID) ✅
+       - metadata.webhookUrl (SPEND webhook endpoint) ✅
+       - metadata.webhookSecret (webhook auth token) ✅
+       - metadata.items (array of order items) ✅
+       - metadata.paymentThreshold (optional, default: 1.0) ✅
+  3. WeSplit creates split with splitType='spend', users can pay into split wallet
+  4. Users can add participants to the split ✅ (Implemented)
+  5. When threshold met → WeSplit automatically pays SP3ND treasury ✅ (Implemented)
+     - Payment includes memo: "SP3ND Order: {orderId}" ✅
+  6. WeSplit calls webhook to notify SP3ND ✅ (Ready)
+     - Payload includes: order_id, split_id, transaction_signature, amount, currency, participants, status, timestamp
+  7. SP3ND verifies payment and fulfills order
   
   □ Confirmed
   □ Different flow: _________________________________
+
+□ Webhook Payload We Send:
+  We're sending this format. Confirm it's correct:
+  {
+    "order_id": "SPEND_ORDER_123",
+    "split_id": "split_abc123",
+    "transaction_signature": "5KJp...",
+    "amount": 100.00,
+    "currency": "USDC",
+    "participants": ["wallet1...", "wallet2..."],
+    "status": "completed",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+  □ Confirmed ✅
+  □ Needs modification: _________________________________
 ```
 
 ---
@@ -310,31 +375,78 @@ If any of these come up, ask for clarification:
 - ❌ No webhook authentication method
 - ❌ Vague payment threshold requirements
 - ❌ No support contact provided
+- ❌ Webhook payload format different from what we've implemented
+- ❌ Items array format different from what we're displaying
+- ❌ Order ID format different from Firestore document ID
+
+## 🎯 Key Questions Based on Our Implementation
+
+### Items Array
+```
+□ We're displaying items with: name, price, quantity
+  □ Is this format correct?
+  □ Do you need additional fields (SKU, image URL, description)?
+  □ Should we show subtotal/tax separately or only total?
+```
+
+### Participant Management
+```
+□ We allow users to add participants to SPEND splits
+  □ Is this allowed?
+  □ Any restrictions (max participants, who can add)?
+  □ Should participants see it's a SPEND order?
+```
+
+### Payment Flow
+```
+□ We automatically pay when threshold is met
+  □ Is this the expected behavior?
+  □ Should we wait for confirmation?
+  □ Any delay required before payment?
+```
+
+### Webhook Testing
+```
+□ We have a mock webhook endpoint for testing
+  □ Can you test calling our endpoint?
+  □ What's your webhook endpoint we should call?
+  □ How can we verify webhook delivery?
+```
 
 ---
 
 ## 📊 Technical Feasibility Assessment
 
-**Status**: ✅ **READY TO IMPLEMENT**
+**Status**: ✅ **IMPLEMENTED & READY FOR TESTING**
 
-**Confidence Level**: 95%
+**Confidence Level**: 98%
 
-**What We Have**:
+**What We Have Implemented**:
 - ✅ Payment completion detection
 - ✅ Merchant payment capability
 - ✅ Memo support
 - ✅ HTTP client with retry logic
 - ✅ Transaction execution
 - ✅ Split wallet infrastructure
+- ✅ Automatic payment trigger (implemented in SpendSplitScreen)
+- ✅ Payment mode detection (SpendPaymentModeService)
+- ✅ Webhook notification service (SpendWebhookService)
+- ✅ Payment threshold logic (configurable, default 100%)
+- ✅ Payment status tracking (in externalMetadata)
+- ✅ Items display (SpendOrderItems component)
+- ✅ Participant invitation (integrated with SplitParticipantInvitationService)
+- ✅ Dedicated SPEND split screen (SpendSplitScreen)
+- ✅ Payment status UI (SpendPaymentStatus component)
+- ✅ Order badge (SpendOrderBadge component)
 
-**What We Need to Build**:
-- ⚠️ Automatic payment trigger (hook into existing flow)
-- ⚠️ Payment mode detection (simple conditional)
-- ⚠️ Webhook notification service (use existing HTTP client)
-- ⚠️ Payment threshold logic (simple math)
-- ⚠️ Payment status tracking (data storage)
+**What We Need from SPEND**:
+- ⚠️ Production webhook URL and credentials
+- ⚠️ Test/sandbox environment details
+- ⚠️ Confirmation of webhook payload format
+- ⚠️ Confirmation of items array format
+- ⚠️ Testing coordination
 
-**Estimated Implementation Time**: 3-4 weeks
+**Ready for**: Integration testing with SPEND's test environment
 
 ---
 

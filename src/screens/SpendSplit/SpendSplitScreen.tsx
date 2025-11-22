@@ -1,0 +1,854 @@
+/**
+ * SPEND Split Screen
+ * Dedicated screen for SPEND merchant gateway splits
+ * Handles automatic payment to SPEND when threshold is met
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  Alert,
+  StatusBar,
+} from 'react-native';
+import { colors } from '../../theme/colors';
+import { spacing, typography } from '../../theme';
+import { SplitWalletService, SplitWallet } from '../../services/split';
+import { useApp } from '../../context/AppContext';
+import { logger } from '../../services/analytics/loggingService';
+import { SpendPaymentModeService, SpendMerchantPaymentService } from '../../services/integrations/spend';
+import { SpendPaymentStatus, SpendOrderItems } from '../../components/spend';
+import { Container, Header, Button, ModernLoader, AppleSlider } from '../../components/shared';
+import Modal from '../../components/shared/Modal';
+import { useLiveBalance } from '../../hooks/useLiveBalance';
+import { SpendSplitHeader, SpendSplitProgress, SpendSplitParticipants } from './components';
+import { SplitStorageService } from '../../services/splits';
+import { SplitParticipantInvitationService } from '../../services/splits/SplitParticipantInvitationService';
+
+interface SpendSplitScreenProps {
+  navigation: any;
+  route: any;
+}
+
+const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }) => {
+  const { billData, processedBillData, splitWallet: existingSplitWallet, splitData } = route.params || {};
+  const { state } = useApp();
+  const { currentUser } = state;
+
+  const [splitWallet, setSplitWallet] = useState<SplitWallet | null>((existingSplitWallet as SplitWallet) || null);
+  const [isSplitConfirmed, setIsSplitConfirmed] = useState(false);
+  const [isSendingPayment, setIsSendingPayment] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isCheckingCompletion, setIsCheckingCompletion] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Payment modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+  const [balanceCheckError, setBalanceCheckError] = useState<string | null>(null);
+  
+  // Participant invitation state
+  const [isInvitingUsers, setIsInvitingUsers] = useState(false);
+  
+  // Subscribe to live balance updates
+  const { balance: liveBalance } = useLiveBalance(
+    currentUser?.wallet_address || null,
+    {
+      enabled: !!currentUser?.wallet_address,
+      onBalanceChange: (update) => {
+        if (update.usdcBalance !== null && update.usdcBalance !== undefined && balanceCheckError) {
+          setBalanceCheckError(null);
+        }
+      }
+    }
+  );
+
+  // Verify this is a SPEND split
+  useEffect(() => {
+    if (splitData && !SpendPaymentModeService.requiresMerchantPayment(splitData)) {
+      logger.warn('SpendSplitScreen opened for non-SPEND split, redirecting to FairSplit', {
+        splitId: splitData.id,
+        splitType: splitData.splitType,
+      }, 'SpendSplitScreen');
+      navigation.replace('FairSplit', route.params);
+    }
+  }, [splitData, navigation, route.params]);
+
+  // Initialize split wallet
+  useEffect(() => {
+    const initializeSplit = async () => {
+      if (!splitData) {
+        setError('Split data not found');
+        setIsInitializing(false);
+        return;
+      }
+
+      try {
+        // Load split wallet if it exists
+        if (splitData.walletId) {
+          const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
+          if (walletResult.success && walletResult.wallet) {
+            setSplitWallet(walletResult.wallet);
+            setIsSplitConfirmed(walletResult.wallet.status === 'active' || walletResult.wallet.status === 'locked');
+          }
+        }
+      } catch (err) {
+        logger.error('Error initializing SPEND split', {
+          error: err instanceof Error ? err.message : String(err),
+        }, 'SpendSplitScreen');
+        setError('Failed to load split data');
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initializeSplit();
+  }, [splitData]);
+
+  // Handle selected contacts from Contacts screen
+  useEffect(() => {
+    const handleSelectedContacts = async () => {
+      if (!route?.params?.selectedContacts || !Array.isArray(route.params.selectedContacts) || route.params.selectedContacts.length === 0) {
+        return;
+      }
+
+      if (!currentUser || !splitData) {
+        logger.warn('Cannot process selected contacts: missing current user or split data', null, 'SpendSplitScreen');
+        return;
+      }
+
+      setIsInvitingUsers(true);
+      try {
+        // Filter out existing participants
+        const newContacts = SplitParticipantInvitationService.filterExistingParticipants(
+          route.params.selectedContacts,
+          splitData.participants || []
+        );
+
+        if (newContacts.length === 0) {
+          Alert.alert('Info', 'All selected contacts are already participants in this split.');
+          navigation.setParams({ selectedContacts: undefined });
+          setIsInvitingUsers(false);
+          return;
+        }
+
+        const result = await SplitParticipantInvitationService.inviteParticipants({
+          splitId: splitData.id,
+          inviterId: currentUser.id.toString(),
+          inviterName: currentUser.name || 'User',
+          contacts: newContacts,
+          billName: splitData.title || 'SPEND Order',
+          totalAmount: splitData.totalAmount || 0,
+          existingParticipants: splitData.participants || [],
+          splitWalletId: splitData.walletId,
+        });
+
+        if (result.success) {
+          // Reload split data to show the newly added participants
+          const updatedSplitResult = await SplitStorageService.getSplit(splitData.id);
+          if (updatedSplitResult.success && updatedSplitResult.split) {
+            // Update local state
+            if (updatedSplitResult.split.walletId) {
+              const walletResult = await SplitWalletService.getSplitWallet(updatedSplitResult.split.walletId);
+              if (walletResult.success && walletResult.wallet) {
+                setSplitWallet(walletResult.wallet);
+              }
+            }
+          }
+
+          Alert.alert('Success', result.message || `Successfully invited ${result.invitedCount} participant(s).`);
+        } else {
+          Alert.alert('Error', result.error || 'Failed to invite participants.');
+        }
+      } catch (error) {
+        logger.error('Error inviting participants', {
+          error: error instanceof Error ? error.message : String(error),
+        }, 'SpendSplitScreen');
+        Alert.alert('Error', 'An error occurred while inviting participants.');
+      } finally {
+        setIsInvitingUsers(false);
+        navigation.setParams({ selectedContacts: undefined });
+      }
+    };
+
+    handleSelectedContacts();
+  }, [route?.params?.selectedContacts, currentUser, splitData, navigation]);
+
+  // Handle add participants
+  const handleAddParticipants = useCallback(() => {
+    if (!splitData || !currentUser) {
+      Alert.alert('Error', 'Split data not available');
+      return;
+    }
+
+    navigation.navigate('Contacts', {
+      action: 'split',
+      splitId: splitData.id,
+      splitName: splitData.title,
+      returnRoute: 'SpendSplit',
+      returnParams: {
+        splitData,
+        billData,
+        processedBillData,
+        splitWallet,
+      },
+    });
+  }, [splitData, currentUser, navigation, billData, processedBillData, splitWallet]);
+
+  // Check payment completion and trigger merchant payment
+  const checkPaymentCompletion = useCallback(async () => {
+    if (!splitWallet?.id || !splitData) {
+      return;
+    }
+
+    // Prevent duplicate completion checks
+    if (isSplitConfirmed || splitWallet.status === 'completed' || isCheckingCompletion) {
+      return;
+    }
+
+    setIsCheckingCompletion(true);
+
+    try {
+      const result = await SplitWalletService.getSplitWallet(splitWallet.id);
+      if (!result.success || !result.wallet) {
+        return;
+      }
+
+      const wallet = result.wallet;
+      const allParticipantsPaid = wallet.participants.every((p: any) => p.status === 'paid');
+      const totalPaid = wallet.participants.reduce((sum: number, p: any) => sum + (p.amountPaid || 0), 0);
+
+      // Check if payment threshold is met for SPEND
+      if (allParticipantsPaid && SpendPaymentModeService.isPaymentThresholdMet(splitData, totalPaid)) {
+        // Check if payment has already been processed
+        if (!SpendPaymentModeService.isPaymentAlreadyProcessed(splitData)) {
+          logger.info('SPEND merchant payment threshold met, processing automatic payment', {
+            splitId: splitData.id,
+            splitWalletId: wallet.id,
+            totalPaid,
+            threshold: SpendPaymentModeService.getPaymentThreshold(splitData),
+            orderId: SpendPaymentModeService.getOrderId(splitData),
+          }, 'SpendSplitScreen');
+
+          setIsSplitConfirmed(true);
+
+          // Show processing alert
+          Alert.alert(
+            'Processing Payment to SPEND',
+            'All payments received. Processing automatic payment to SPEND merchant...',
+            [{ text: 'OK' }]
+          );
+
+          // Trigger automatic payment
+          const paymentResult = await SpendMerchantPaymentService.processMerchantPayment(
+            splitData.id,
+            wallet.id
+          );
+
+          if (paymentResult.success) {
+            logger.info('SPEND merchant payment processed successfully', {
+              splitId: splitData.id,
+              transactionSignature: paymentResult.transactionSignature,
+            }, 'SpendSplitScreen');
+
+            Alert.alert(
+              'Payment Sent to SPEND ✅',
+              `Payment of ${wallet.totalAmount} USDC has been sent to SPEND. Your order will be fulfilled shortly.`,
+              [{ text: 'OK' }]
+            );
+
+            // Reload split data to get updated payment status
+            const { SplitStorageService } = await import('../../services/splits');
+            const updatedSplit = await SplitStorageService.getSplitByBillId(splitData.billId);
+            if (updatedSplit.success && updatedSplit.split) {
+              // Update local state if needed
+            }
+          } else {
+            logger.error('SPEND merchant payment failed', {
+              splitId: splitData.id,
+              error: paymentResult.error,
+            }, 'SpendSplitScreen');
+
+            Alert.alert(
+              'Payment Failed',
+              `Failed to send payment to SPEND: ${paymentResult.error || 'Unknown error'}. Please try again or contact support.`,
+              [
+                { text: 'OK' },
+                {
+                  text: 'Retry',
+                  onPress: async () => {
+                    const retryResult = await SpendMerchantPaymentService.processMerchantPayment(
+                      splitData.id,
+                      wallet.id
+                    );
+                    if (!retryResult.success) {
+                      Alert.alert('Retry Failed', retryResult.error || 'Unknown error');
+                    }
+                  },
+                },
+              ]
+            );
+          }
+        } else {
+          // Payment already processed
+          logger.info('SPEND merchant payment already processed', {
+            splitId: splitData.id,
+            paymentStatus: splitData.externalMetadata?.paymentStatus,
+          }, 'SpendSplitScreen');
+        }
+      }
+    } catch (error) {
+      logger.error('Error checking payment completion', {
+        error: error instanceof Error ? error.message : String(error),
+      }, 'SpendSplitScreen');
+    } finally {
+      setIsCheckingCompletion(false);
+    }
+  }, [splitWallet, splitData, isSplitConfirmed, isCheckingCompletion]);
+
+  // Poll for payment completion
+  useEffect(() => {
+    if (!splitWallet || isSplitConfirmed) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      checkPaymentCompletion();
+    }, 3000); // Check every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [splitWallet, isSplitConfirmed, checkPaymentCompletion]);
+
+  // Check user balance
+  const checkUserBalance = async (requiredAmount: number) => {
+    if (!currentUser) return;
+
+    try {
+      setIsCheckingBalance(true);
+      setBalanceCheckError(null);
+      
+      const { walletService } = await import('../../services/blockchain/wallet');
+      const userWallet = await walletService.getWalletInfo(currentUser.id.toString());
+      
+      if (!userWallet) {
+        setBalanceCheckError('Could not load wallet information');
+        setIsCheckingBalance(false);
+        return;
+      }
+
+      // Use live balance if available
+      if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined && liveBalance.usdcBalance > 0) {
+        const userUsdcBalance = liveBalance.usdcBalance;
+        
+        if (userUsdcBalance < requiredAmount) {
+          setBalanceCheckError(
+            `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
+          );
+        } else {
+          setBalanceCheckError(null);
+        }
+        setIsCheckingBalance(false);
+        return;
+      }
+
+      // Fallback to balance check utility
+      const { getUserBalanceWithFallback } = await import('../../services/shared/balanceCheckUtils');
+      const balanceResult = await getUserBalanceWithFallback(currentUser.id.toString(), {
+        useLiveBalance: true,
+        walletAddress: userWallet.address || currentUser.wallet_address
+      });
+      
+      const userUsdcBalance = balanceResult.usdcBalance;
+      
+      if (balanceResult.isReliable && userUsdcBalance < requiredAmount) {
+        setBalanceCheckError(
+          `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
+        );
+      } else {
+        setBalanceCheckError(null);
+      }
+    } catch (error) {
+      logger.warn('Balance check failed', {
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SpendSplitScreen');
+      setBalanceCheckError('Could not verify balance. You can still attempt to pay.');
+    } finally {
+      setIsCheckingBalance(false);
+    }
+  };
+
+  // Handle send payment button
+  const handleSendMyShares = async () => {
+    if (!currentUser || !splitData) {
+      Alert.alert('Error', 'Unable to process payment');
+      return;
+    }
+
+    // Ensure split wallet exists - create if needed
+    let wallet = splitWallet;
+    if (!wallet && splitData.walletId) {
+      const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
+      if (walletResult.success && walletResult.wallet) {
+        wallet = walletResult.wallet;
+        setSplitWallet(wallet);
+      }
+    }
+
+    // If still no wallet, we need to create one (this shouldn't happen for SPEND splits, but handle it)
+    if (!wallet) {
+      Alert.alert(
+        'Wallet Required',
+        'The split wallet needs to be created first. Please contact support.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Get participants from wallet if available, otherwise from splitData
+    const allParticipants = wallet.participants || splitData.participants || [];
+    const userParticipant = allParticipants.find((p: any) => {
+      const participantId = p.userId || p.id || '';
+      return participantId === currentUser.id.toString();
+    });
+    
+    if (!userParticipant) {
+      Alert.alert('Error', 'You are not a participant in this split');
+      return;
+    }
+
+    const amountOwed = (userParticipant as any).amountOwed || 0;
+    const amountPaid = (userParticipant as any).amountPaid || 0;
+    const remainingAmount = amountOwed - amountPaid;
+
+    if (remainingAmount <= 0) {
+      Alert.alert('Already Paid', 'You have already paid your full share for this split');
+      return;
+    }
+
+    if (amountOwed <= 0) {
+      Alert.alert('Error', 'No amount to pay');
+      return;
+    }
+
+    const { roundUsdcAmount } = await import('../../utils/ui/format/formatUtils');
+    const roundedRemainingAmount = roundUsdcAmount(remainingAmount);
+    
+    // Show modal immediately
+    setBalanceCheckError(null);
+    setIsCheckingBalance(true);
+    setShowPaymentModal(true);
+
+    // Check balance in the background
+    checkUserBalance(roundedRemainingAmount).catch(error => {
+      logger.warn('Balance check failed, but allowing payment attempt', {
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SpendSplitScreen');
+    });
+  };
+
+  // Handle payment modal close
+  const handlePaymentModalClose = () => {
+    setShowPaymentModal(false);
+    setBalanceCheckError(null);
+    setIsCheckingBalance(false);
+  };
+
+  // Handle payment confirmation
+  const handlePaymentModalConfirm = async () => {
+    if (!currentUser || !splitData) {
+      Alert.alert('Error', 'Unable to process payment');
+      return;
+    }
+
+    // Ensure split wallet exists - create if needed
+    let wallet = splitWallet;
+    if (!wallet && splitData.walletId) {
+      const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
+      if (walletResult.success && walletResult.wallet) {
+        wallet = walletResult.wallet;
+        setSplitWallet(wallet);
+      }
+    }
+
+    // If still no wallet, we need to create one (this shouldn't happen for SPEND splits, but handle it)
+    if (!wallet) {
+      Alert.alert(
+        'Wallet Required',
+        'The split wallet needs to be created first. Please contact support.',
+        [{ text: 'OK' }]
+      );
+      setIsSendingPayment(false);
+      return;
+    }
+
+    // Get participants from wallet if available, otherwise from splitData
+    const allParticipants = wallet.participants || splitData.participants || [];
+    const userParticipant = allParticipants.find((p: any) => {
+      const participantId = p.userId || p.id || '';
+      return participantId === currentUser.id.toString();
+    });
+    
+    if (!userParticipant) {
+      Alert.alert('Error', 'You are not a participant in this split');
+      setIsSendingPayment(false);
+      return;
+    }
+
+    const amountOwed = (userParticipant as any).amountOwed || 0;
+    const amountPaid = (userParticipant as any).amountPaid || 0;
+    const remainingAmount = amountOwed - amountPaid;
+    
+    const { roundUsdcAmount } = await import('../../utils/ui/format/formatUtils');
+    const amount = roundUsdcAmount(remainingAmount);
+    
+    if (amount <= 0) {
+      Alert.alert('Invalid Amount', 'You have no remaining balance to pay');
+      setIsSendingPayment(false);
+      return;
+    }
+
+    setIsCheckingBalance(false);
+    setIsSendingPayment(true);
+    setShowPaymentModal(false);
+    
+    try {
+      // Ensure user has a wallet
+      const { walletService } = await import('../../services/blockchain/wallet');
+      const userWallet = await walletService.getWalletInfo(currentUser.id.toString());
+      if (!userWallet || !userWallet.secretKey) {
+        Alert.alert(
+          'Wallet Required',
+          'You need to set up a wallet before making payments. Would you like to create one now?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Create Wallet', 
+              onPress: async () => {
+                try {
+                  const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
+                  if (walletResult.success) {
+                    Alert.alert('Wallet Created', 'Your wallet has been created successfully. You can now make payments.');
+                  } else {
+                    Alert.alert('Error', walletResult.error || 'Failed to create wallet');
+                  }
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to create wallet. Please try again.');
+                }
+              }
+            }
+          ]
+        );
+        setIsSendingPayment(false);
+        return;
+      }
+      
+      // Process payment
+      const result = await SplitWalletService.payParticipantShare(
+        wallet.id,
+        currentUser.id.toString(),
+        amount
+      );
+      
+      if (result.success) {
+        logger.info('Payment sent successfully', {
+          splitWalletId: wallet.id,
+          amount,
+          transactionSignature: result.transactionSignature,
+        }, 'SpendSplitScreen');
+
+        Alert.alert(
+          'Payment Sent ✅',
+          `Your payment of ${amount.toFixed(2)} USDC has been sent successfully.`,
+          [{ text: 'OK' }]
+        );
+
+        // Reload split wallet to get updated participant status
+        const updatedWalletResult = await SplitWalletService.getSplitWallet(wallet.id);
+        if (updatedWalletResult.success && updatedWalletResult.wallet) {
+          setSplitWallet(updatedWalletResult.wallet);
+        }
+
+        // Trigger payment completion check
+        setTimeout(() => checkPaymentCompletion(), 2000);
+      } else {
+        logger.error('Payment failed', {
+          splitWalletId: wallet.id,
+          amount,
+          error: result.error,
+        }, 'SpendSplitScreen');
+
+        Alert.alert(
+          'Payment Failed',
+          result.error || 'Failed to send payment. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      logger.error('Error processing payment', {
+        error: error instanceof Error ? error.message : String(error),
+      }, 'SpendSplitScreen');
+
+      Alert.alert(
+        'Error',
+        'An unexpected error occurred while processing your payment. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsSendingPayment(false);
+    }
+  };
+
+  if (isInitializing) {
+    return (
+      <Container>
+        <ModernLoader text="Loading SPEND split..." />
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Header
+          title="SPEND Split"
+          onBackPress={() => navigation.navigate('SplitsList')}
+        />
+        <View style={{ padding: spacing.md, alignItems: 'center' }}>
+          <Text style={{ color: colors.error, fontSize: typography.fontSize.md }}>
+            {error}
+          </Text>
+          <Button
+            title="Go Back"
+            onPress={() => navigation.navigate('SplitsList')}
+            variant="primary"
+            style={{ marginTop: spacing.md }}
+          />
+        </View>
+      </Container>
+    );
+  }
+
+  if (!splitData) {
+    return (
+      <Container>
+        <ModernLoader text="Loading split data..." />
+      </Container>
+    );
+  }
+
+  const participants = splitWallet?.participants || splitData.participants || [];
+  const totalAmount = splitData.totalAmount || 0;
+  const totalPaid = participants.reduce((sum: number, p: any) => sum + (p.amountPaid || 0), 0);
+  const completionPercentage = totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
+
+  // Extract bill info for header
+  const billName = splitData.title || processedBillData?.title || billData?.title || 'SPEND Order';
+  const billDate = splitData.date || processedBillData?.date || billData?.date || new Date().toISOString();
+  const category = splitData.category || processedBillData?.category || billData?.category || 'food';
+  const orderId = splitData.externalMetadata?.orderId;
+  const paymentThreshold = splitData.externalMetadata?.paymentThreshold || 1.0;
+
+  return (
+    <Container>
+      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
+      
+      <ScrollView 
+        style={{ flex: 1 }} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: spacing.xl }}
+      >
+        {/* SPEND Order Header */}
+        <SpendSplitHeader
+          billName={billName}
+          billDate={billDate}
+          totalAmount={totalAmount}
+          category={category}
+          orderId={orderId}
+          onBackPress={() => navigation.navigate('SplitsList')}
+        />
+
+        {/* SPEND Payment Status Card */}
+        <View style={{
+          marginHorizontal: spacing.md,
+          marginBottom: spacing.md,
+          backgroundColor: colors.white10,
+          borderRadius: 16,
+          padding: spacing.lg,
+          borderWidth: 1,
+          borderColor: colors.white10,
+        }}>
+          <SpendPaymentStatus split={splitData} />
+        </View>
+
+        {/* Payment Progress */}
+        <SpendSplitProgress
+          totalAmount={totalAmount}
+          totalPaid={totalPaid}
+          completionPercentage={completionPercentage}
+          paymentThreshold={paymentThreshold}
+          orderId={orderId}
+        />
+
+        {/* Order Items */}
+        <SpendOrderItems split={splitData} />
+
+        {/* Participants */}
+        <View style={{ marginBottom: spacing.md }}>
+          <SpendSplitParticipants
+            participants={participants}
+            currentUserId={currentUser?.id?.toString()}
+          />
+          
+          {/* Add Participants Button - Only show for creator */}
+          {splitData.creatorId === currentUser?.id && (
+            <View style={{ marginHorizontal: spacing.md, marginTop: spacing.sm }}>
+              <Button
+                title={isInvitingUsers ? 'Inviting...' : 'Add Participants'}
+                onPress={handleAddParticipants}
+                variant="secondary"
+                disabled={isInvitingUsers}
+                loading={isInvitingUsers}
+                fullWidth={true}
+              />
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Payment Button - Show if user needs to pay */}
+      {(() => {
+        if (!currentUser || !splitData) return null;
+        
+        // Get participants from splitWallet if available, otherwise from splitData
+        const allParticipants = splitWallet?.participants || splitData.participants || [];
+        
+        // Find user participant - check both userId and id fields
+        const userParticipant = allParticipants.find((p: any) => {
+          const participantId = p.userId || p.id || '';
+          return participantId === currentUser.id.toString();
+        });
+        
+        if (!userParticipant) {
+          // If user is not a participant, don't show button
+          return null;
+        }
+        
+        const amountOwed = (userParticipant as any).amountOwed || 0;
+        const amountPaid = (userParticipant as any).amountPaid || 0;
+        const remainingAmount = amountOwed - amountPaid;
+        const isPaid = remainingAmount <= 0.01; // Use small threshold for floating point comparison
+        
+        // Don't show button if already paid or payment is being processed
+        if (isPaid || isSendingPayment) return null;
+        
+        // Show button even if wallet doesn't exist yet - it will be created when needed
+        return (
+          <View style={{
+            padding: spacing.md,
+            backgroundColor: colors.black,
+            borderTopWidth: 1,
+            borderTopColor: colors.white5,
+          }}>
+            <Button
+              title={isSendingPayment ? 'Sending...' : remainingAmount > 0 ? `Pay My Share (${remainingAmount.toFixed(2)} USDC)` : 'Pay My Share'}
+              onPress={handleSendMyShares}
+              variant="primary"
+              disabled={isSendingPayment}
+              loading={isSendingPayment}
+              fullWidth={true}
+            />
+          </View>
+        );
+      })()}
+
+      {/* Payment Modal */}
+      <Modal
+        visible={showPaymentModal}
+        onClose={handlePaymentModalClose}
+        title="Pay Your Share"
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        <View style={{ marginBottom: spacing.md }}>
+          <Text style={{
+            color: colors.textSecondary,
+            fontSize: typography.fontSize.sm,
+            textAlign: 'center',
+            marginBottom: spacing.md,
+          }}>
+            {(() => {
+              const userParticipant = participants.find((p: any) => 
+                (p.userId || p.id) === currentUser?.id?.toString()
+              );
+              if (!userParticipant) return 'Slide to pay 0.00 USDC';
+              
+              const totalOwed = (userParticipant as any).amountOwed || 0;
+              const amountPaid = (userParticipant as any).amountPaid || 0;
+              const remaining = totalOwed - amountPaid;
+              const billName = splitData?.title || 'this SPEND order';
+              
+              return `Slide to pay ${remaining.toFixed(2)} USDC for ${billName}`;
+            })()}
+          </Text>
+        </View>
+
+        <View style={{ gap: spacing.md }}>
+          {balanceCheckError && !isCheckingBalance ? (
+            <View style={{
+              padding: spacing.md,
+              backgroundColor: colors.error + '20',
+              borderRadius: spacing.sm,
+              borderWidth: 1,
+              borderColor: colors.error + '40',
+            }}>
+              <Text style={{
+                color: colors.error,
+                fontSize: typography.fontSize.sm,
+                marginBottom: spacing.xs / 2,
+              }}>
+                {balanceCheckError}
+              </Text>
+              <Text style={{
+                color: colors.textSecondary,
+                fontSize: typography.fontSize.xs,
+              }}>
+                You can still attempt to pay, but the transaction may fail.
+              </Text>
+            </View>
+          ) : null}
+          
+          <AppleSlider
+            onSlideComplete={handlePaymentModalConfirm}
+            disabled={isSendingPayment || isCheckingBalance}
+            loading={isSendingPayment || isCheckingBalance}
+            text={(() => {
+              if (isCheckingBalance && !isSendingPayment) {
+                return 'Checking balance...';
+              }
+              
+              if (isSendingPayment) {
+                return 'Processing payment...';
+              }
+              
+              const userParticipant = participants.find((p: any) => 
+                (p.userId || p.id) === currentUser?.id?.toString()
+              );
+              if (!userParticipant) return 'Slide to Pay';
+              
+              const totalOwed = (userParticipant as any).amountOwed || 0;
+              const amountPaid = (userParticipant as any).amountPaid || 0;
+              const remaining = totalOwed - amountPaid;
+              
+              return `Slide to Pay ${remaining.toFixed(2)} USDC`;
+            })()}
+            style={{ flex: 1 }}
+          />
+        </View>
+      </Modal>
+    </Container>
+  );
+};
+
+export default SpendSplitScreen;
+

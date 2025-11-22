@@ -53,6 +53,8 @@ import {
 import { generateBillId } from '../../utils/navigation/splitNavigationHelpers';
 import { Container, Header, Button, LoadingScreen } from '../../components/shared';
 import Modal from '../../components/shared/Modal';
+import { SpendPaymentStatus, SpendOrderBadge } from '../../components/spend';
+import { SpendPaymentModeService } from '../../services/integrations/spend';
 
 // Image mapping for category icons
 const CATEGORY_IMAGES: { [key: string]: any } = {
@@ -841,8 +843,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       const shouldRedirectFair = currentSplitData.splitType === 'fair' && (splitStatus === 'active' || splitStatus === 'locked');
       const degenStatuses = ['pending', 'active', 'locked', 'spinning', 'spinning_completed', 'completed'];
       const shouldRedirectDegen = currentSplitData.splitType === 'degen' && degenStatuses.includes(splitStatus as string);
+      const shouldRedirectSpend = currentSplitData.splitType === 'spend' && (splitStatus === 'active' || splitStatus === 'locked' || splitStatus === 'pending');
 
-      if (shouldRedirectFair || shouldRedirectDegen) {
+      if (shouldRedirectFair || shouldRedirectDegen || shouldRedirectSpend) {
         // Split is already active in a downstream flow, redirect accordingly
         setTimeout(() => {
           if (shouldRedirectFair) {
@@ -862,6 +865,15 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               splitWallet,
               participants: currentSplitData.participants,
               totalAmount: currentSplitData.totalAmount || parseFloat(totalAmount),
+              isFromNotification,
+              notificationId
+            });
+          } else if (shouldRedirectSpend) {
+            navigation.navigate('SpendSplit', {
+              splitData: currentSplitData,
+              billData,
+              processedBillData: currentProcessedBillData,
+              splitWallet,
               isFromNotification,
               notificationId
             });
@@ -1995,6 +2007,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   />
                 </View>
                 <View style={styles.billHeaderContent}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <Text
                     style={styles.billTitle}
                     numberOfLines={1}
@@ -2002,6 +2015,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   >
                     {billName}
                   </Text>
+                    {splitData && SpendPaymentModeService.requiresMerchantPayment(splitData) && (
+                      <SpendOrderBadge variant="compact" />
+                    )}
+                  </View>
 
                   <Text style={styles.billDate}>
                     {(() => {
@@ -2099,6 +2116,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             </View>
           </View>
         </LinearGradient>
+
+        {/* SPEND Payment Status - Show for merchant gateway splits */}
+        {splitData && SpendPaymentModeService.requiresMerchantPayment(splitData) && (
+          <View style={{ padding: spacing.md, backgroundColor: colors.white5, marginTop: spacing.sm, borderRadius: spacing.sm, marginHorizontal: spacing.md }}>
+            <SpendPaymentStatus split={splitData} />
+          </View>
+        )}
 
         {/* Split Wallet Section - MOVED TO FAIR/DEGEN SCREENS */}
         {/* Wallet creation and recap now happens in FairSplit/DegenLock screens */}

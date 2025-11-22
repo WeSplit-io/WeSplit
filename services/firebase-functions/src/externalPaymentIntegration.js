@@ -9,7 +9,38 @@ const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
 
 // Initialize Firestore
+// Note: This file is loaded after admin.initializeApp() in index.js
 const db = admin.firestore();
+
+// Helper function to get FieldValue (lazy-loaded)
+// This ensures FieldValue is accessed only when needed, after admin is fully initialized
+function getFieldValue() {
+  // Ensure admin is initialized
+  if (!admin.apps.length) {
+    admin.initializeApp();
+  }
+  
+  // FieldValue should be available as a static property
+  if (!admin.firestore || !admin.firestore.FieldValue) {
+    // Last resort: try to access it directly
+    const firestore = require('firebase-admin/firestore');
+    if (firestore && firestore.FieldValue) {
+      return firestore.FieldValue;
+    }
+    throw new Error('admin.firestore.FieldValue is not available. Please check Firebase Admin SDK initialization.');
+  }
+  
+  return admin.firestore.FieldValue;
+}
+
+// Create FieldValue object that lazily loads when methods are called
+const FieldValue = {
+  serverTimestamp: () => getFieldValue().serverTimestamp(),
+  increment: (n) => getFieldValue().increment(n),
+  delete: () => getFieldValue().delete(),
+  arrayUnion: (...elements) => getFieldValue().arrayUnion(...elements),
+  arrayRemove: (...elements) => getFieldValue().arrayRemove(...elements)
+};
 
 // Rate limiting storage (in-memory for Firebase Functions)
 // In production, consider using Redis or Firestore for distributed rate limiting
@@ -88,8 +119,8 @@ async function validateApiKey(apiKey) {
     
     // Update last used timestamp
     await keyDoc.ref.update({
-      lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
-      usageCount: admin.firestore.FieldValue.increment(1)
+      lastUsedAt: FieldValue.serverTimestamp(),
+      usageCount: FieldValue.increment(1)
     });
     
     return { 
@@ -196,6 +227,49 @@ function validatePaymentData(data) {
     });
   }
   
+  // Validate SPEND metadata if provided (for merchant gateway mode)
+  if (data.metadata && typeof data.metadata === 'object') {
+    const metadata = data.metadata;
+    
+    // If treasuryWallet is provided, validate SPEND-specific fields
+    if (metadata.treasuryWallet) {
+      // Validate treasury wallet is a valid Solana address
+      if (typeof metadata.treasuryWallet !== 'string' || 
+          metadata.treasuryWallet.length < 32 || 
+          metadata.treasuryWallet.length > 44) {
+        errors.push('metadata.treasuryWallet must be a valid Solana address (32-44 characters)');
+      }
+      
+      // Require orderId if treasuryWallet is provided
+      if (!metadata.orderId || typeof metadata.orderId !== 'string' || metadata.orderId.trim() === '') {
+        errors.push('metadata.orderId is required when metadata.treasuryWallet is provided');
+      }
+      
+      // If webhookUrl is provided, require webhookSecret
+      if (metadata.webhookUrl) {
+        if (!metadata.webhookSecret || typeof metadata.webhookSecret !== 'string' || metadata.webhookSecret.trim() === '') {
+          errors.push('metadata.webhookSecret is required when metadata.webhookUrl is provided');
+        }
+      }
+      
+      // Validate paymentThreshold if provided (must be between 0 and 1)
+      if (metadata.paymentThreshold !== undefined) {
+        if (typeof metadata.paymentThreshold !== 'number' || 
+            metadata.paymentThreshold < 0 || 
+            metadata.paymentThreshold > 1) {
+          errors.push('metadata.paymentThreshold must be a number between 0 and 1');
+        }
+      }
+      
+      // Validate paymentTimeout if provided (must be positive number)
+      if (metadata.paymentTimeout !== undefined) {
+        if (typeof metadata.paymentTimeout !== 'number' || metadata.paymentTimeout <= 0) {
+          errors.push('metadata.paymentTimeout must be a positive number');
+        }
+      }
+    }
+  }
+  
   return {
     isValid: errors.length === 0,
     errors
@@ -249,7 +323,7 @@ async function createOrGetUser(email, walletAddress) {
         await userDoc.ref.update({
           wallet_address: walletAddress,
           wallet_type: userData.wallet_type || 'external',
-          updated_at: admin.firestore.FieldValue.serverTimestamp()
+          updated_at: FieldValue.serverTimestamp()
         });
         
         // Also add to linked wallets collection if it exists
@@ -265,8 +339,8 @@ async function createOrGetUser(email, walletAddress) {
             status: 'active',
             currency: 'USDC',
             isActive: true,
-            created_at: admin.firestore.FieldValue.serverTimestamp(),
-            updated_at: admin.firestore.FieldValue.serverTimestamp()
+            created_at: FieldValue.serverTimestamp(),
+            updated_at: FieldValue.serverTimestamp()
           });
         } catch (linkError) {
           console.warn('Failed to add to linked wallets:', linkError);
@@ -286,7 +360,7 @@ async function createOrGetUser(email, walletAddress) {
       name: email.split('@')[0], // Default name from email
       wallet_address: walletAddress || '',
       wallet_public_key: '',
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      created_at: FieldValue.serverTimestamp(),
       avatar: '',
       hasCompletedOnboarding: false,
       email_verified: false,
@@ -317,6 +391,54 @@ async function createOrGetUser(email, walletAddress) {
     console.error('Error creating/getting user:', error);
     throw new functions.https.HttpsError('internal', 'Failed to create or get user', error);
   }
+}
+
+/**
+ * Remove undefined values from an object (Firestore doesn't allow undefined)
+ */
+function removeUndefinedValues(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedValues(item));
+  }
+  
+  const cleaned = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const value = obj[key];
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedValues(value);
+      }
+    }
+  }
+  return cleaned;
+}
+
+/**
+ * Remove undefined values from an object (Firestore doesn't allow undefined)
+ */
+function removeUndefinedValues(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedValues(item));
+  }
+  
+  const cleaned = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const value = obj[key];
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedValues(value);
+      }
+    }
+  }
+  return cleaned;
 }
 
 /**
@@ -351,7 +473,15 @@ async function createSplitFromPayment(user, paymentData) {
       description: `Split for ${paymentData.merchant.name}`,
       totalAmount: totalAmountUSDC,
       currency: 'USDC',
-      splitType: 'fair',
+      splitType: (() => {
+        // Determine split type based on SPEND metadata
+        const metadata = paymentData.metadata || {};
+        const hasTreasuryWallet = metadata.treasuryWallet && 
+                                  typeof metadata.treasuryWallet === 'string' && 
+                                  metadata.treasuryWallet.trim() !== '';
+        // Set to 'spend' if SPEND merchant gateway, otherwise 'fair'
+        return hasTreasuryWallet ? 'spend' : 'fair';
+      })(),
       status: 'pending', // User can invite others and create wallet when ready
       creatorId: user.id,
       creatorName: user.name || user.email.split('@')[0],
@@ -372,20 +502,78 @@ async function createSplitFromPayment(user, paymentData) {
         phone: paymentData.merchant.phone || ''
       },
       date: paymentData.transactionDate,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       subtotal: subtotalUSDC,
       tax: taxUSDC,
       receiptNumber: paymentData.receiptNumber || paymentData.invoiceNumber,
       // Metadata to track external payment source
       externalSource: paymentData.source, // Store source identifier
       externalInvoiceId: paymentData.invoiceId, // Store original invoice ID for reference
-      externalMetadata: paymentData.metadata || {} // Store any additional metadata
+      // Process SPEND metadata for merchant gateway mode
+      externalMetadata: (() => {
+        const metadata = paymentData.metadata || {};
+        
+        // Determine payment mode based on treasury wallet
+        const hasTreasuryWallet = metadata.treasuryWallet && 
+                                  typeof metadata.treasuryWallet === 'string' && 
+                                  metadata.treasuryWallet.trim() !== '';
+        
+        const paymentMode = hasTreasuryWallet ? 'merchant_gateway' : 'personal';
+        
+        // Build externalMetadata structure
+        const externalMetadata = {
+          paymentMode: paymentMode,
+          paymentStatus: 'pending',
+          paymentAttempts: 0,
+        };
+        
+        // Add SPEND-specific fields if merchant gateway mode
+        if (hasTreasuryWallet) {
+          externalMetadata.treasuryWallet = metadata.treasuryWallet.trim();
+          
+          if (metadata.orderId) {
+            externalMetadata.orderId = metadata.orderId.trim();
+          }
+          
+          if (metadata.webhookUrl) {
+            externalMetadata.webhookUrl = metadata.webhookUrl.trim();
+          }
+          
+          if (metadata.webhookSecret) {
+            externalMetadata.webhookSecret = metadata.webhookSecret.trim();
+          }
+          
+          if (metadata.paymentThreshold !== undefined) {
+            externalMetadata.paymentThreshold = metadata.paymentThreshold;
+          } else {
+            // Default to 100% (1.0) if not provided
+            externalMetadata.paymentThreshold = 1.0;
+          }
+          
+          if (metadata.paymentTimeout !== undefined) {
+            externalMetadata.paymentTimeout = metadata.paymentTimeout;
+          }
+        }
+        
+        // Preserve any other metadata fields
+        Object.keys(metadata).forEach(key => {
+          if (!['treasuryWallet', 'orderId', 'webhookUrl', 'webhookSecret', 'paymentThreshold', 'paymentTimeout'].includes(key)) {
+            externalMetadata[key] = metadata[key];
+          }
+        });
+        
+        return externalMetadata;
+      })()
     };
+    
+    // Remove undefined values before saving to Firestore
+    // Firestore doesn't allow undefined values in documents
+    const cleanedSplitData = removeUndefinedValues(splitData);
     
     // Save split to Firestore
     const splitsRef = db.collection('splits');
-    const splitDocRef = await splitsRef.add(splitData);
+    const splitDocRef = await splitsRef.add(cleanedSplitData);
     
     return {
       ...splitData,
@@ -414,6 +602,16 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
       
       // Extract API key from Authorization header
       const authHeader = req.headers.authorization;
+      
+      // Skip API key validation in emulator mode for easier testing
+      const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true' || 
+                         process.env.FIREBASE_EMULATOR_HUB || 
+                         req.headers.host?.includes('localhost');
+      
+      let apiKey = null;
+      
+      if (!isEmulator) {
+        // Production: Require API key
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({
           success: false,
@@ -421,7 +619,7 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
         });
       }
       
-      const apiKey = authHeader.replace('Bearer ', '').trim();
+        apiKey = authHeader.replace('Bearer ', '').trim();
       
       // Validate API key
       const keyValidation = await validateApiKey(apiKey);
@@ -431,8 +629,15 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
           error: keyValidation.error || 'Invalid API key'
         });
       }
+      } else {
+        // Emulator: Log that we're skipping auth (for debugging)
+        console.log('🔧 Emulator mode: Skipping API key validation');
+        // Use a dummy key for rate limiting in emulator (or skip rate limiting)
+        apiKey = 'emulator_test_key';
+      }
       
-      // Rate limiting
+      // Rate limiting (skip in emulator mode)
+      if (!isEmulator) {
       const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress || 'unknown';
       const rateLimit = checkRateLimit(apiKey, clientIp);
       
@@ -449,6 +654,7 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
       // Add rate limit headers
       res.setHeader('X-RateLimit-Limit', '100');
       res.setHeader('X-RateLimit-Remaining', rateLimit.remaining.toString());
+      }
       
       // Sanitize input
       const paymentData = sanitizeInput(req.body);

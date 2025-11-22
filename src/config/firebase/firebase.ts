@@ -17,6 +17,7 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, 
+  connectFirestoreEmulator,
   doc, 
   setDoc, 
   getDoc, 
@@ -128,6 +129,9 @@ export const auth = initializeFirebaseAuth(app);
 
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
+
+// Connect to Firestore emulator in development mode
+
 
 // Initialize Firebase Storage and get a reference to the service
 export const storage = getStorage(app);

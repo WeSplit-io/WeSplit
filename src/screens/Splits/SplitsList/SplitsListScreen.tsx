@@ -4,7 +4,7 @@
  * Renamed from GroupsListScreen to focus on bill splitting functionality
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -20,6 +20,7 @@ import {
   PanResponder,
   Dimensions,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';  
 import { colors } from '../../../theme/colors';
@@ -83,6 +84,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
   const [totalSplits, setTotalSplits] = useState(0); // Track total splits for page calculation
   const [lastDoc, setLastDoc] = useState<any>(null); // Store last document for pagination
   const [pageHistory, setPageHistory] = useState<Array<{ page: number; lastDoc: any }>>([]); // Track page history for navigation
+  const [maxKnownPage, setMaxKnownPage] = useState(1); // Track the highest page we've reached with hasMore = true
+  const [knownTotalPages, setKnownTotalPages] = useState<number | null>(null); // Track exact total pages when we reach the last page
+  const [isLoadingCount, setIsLoadingCount] = useState(false); // Track if we're loading the total count
+  const [hasLoadedCountOnce, setHasLoadedCountOnce] = useState(false); // Track if we've loaded count at least once
   const [activeTab, setActiveTab] = useState<'splits' | 'sharedWallets'>('splits'); // NEW: Top-level tab state
   const [sharedWallets, setSharedWallets] = useState<SharedWallet[]>([]);
   const [isLoadingSharedWallets, setIsLoadingSharedWallets] = useState(false);
@@ -94,8 +99,99 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
   const lastRouteParamsRef = useRef<string>(''); // Track last route params to detect changes
   const userHasManuallyChangedTabRef = useRef(false); // Track if user manually changed tab
   
-  // Calculate total pages
-  const totalPages = Math.ceil(totalSplits / SPLITS_PER_PAGE) || 1;
+  // Calculate total pages - for "All" filter, use actual pagination
+  // For other filters, calculate based on filtered results
+  const totalPages = useMemo(() => {
+    if (activeFilter === 'all') {
+      // If we have a known total pages (from count query or reaching last page), use it
+      if (knownTotalPages !== null) {
+        return knownTotalPages;
+      }
+      
+      // If we have totalSplits count, calculate from that
+      if (totalSplits > 0) {
+        return Math.ceil(totalSplits / SPLITS_PER_PAGE);
+      }
+      
+      // If we're still loading the count, don't show "1/1" - estimate or return 0
+      // This prevents showing incorrect "1/1" when we just haven't loaded the count yet
+      if (isLoadingCount) {
+        // While loading, if we have splits, estimate based on hasMore
+        if (splits.length > 0) {
+          if (hasMore) {
+            return Math.max(currentPage + 1, 2); // At least 2 pages
+          }
+          if (splits.length === SPLITS_PER_PAGE) {
+            return 2; // Likely at least 2 pages
+          }
+        }
+        // Return 0 to indicate we're loading (will show "loading..." in UI)
+        return 0;
+      }
+      
+      // If count hasn't loaded yet and we're not loading, estimate based on hasMore
+      if (hasMore) {
+        // We know there's at least one more page beyond current
+        const minFromCurrent = currentPage + 1;
+        const minFromMaxKnown = maxKnownPage + 1;
+        return Math.max(minFromCurrent, minFromMaxKnown, 2); // At least 2
+      } else {
+        // No more pages - we're on the last page
+        // But if we haven't loaded count yet and have exactly SPLITS_PER_PAGE splits, might be more
+        if (splits.length === SPLITS_PER_PAGE && totalSplits === 0) {
+          return 2; // Likely at least 2 pages
+        }
+        // If we have fewer than SPLITS_PER_PAGE and no hasMore, this is likely the only page
+        // But don't show "1/1" if we haven't loaded count - show at least 2 to be safe
+        if (splits.length < SPLITS_PER_PAGE && totalSplits === 0) {
+          return 1; // Only one page
+        }
+        return currentPage;
+      }
+    } else {
+      // For filtered views, calculate based on filtered splits
+      // Since filtering is client-side, we can't paginate filtered results
+      // Just show all filtered splits (no pagination for filters)
+      return 1;
+    }
+  }, [totalSplits, activeFilter, hasMore, currentPage, maxKnownPage, knownTotalPages, SPLITS_PER_PAGE, isLoadingCount, splits.length]);
+  
+  // Reset pagination when filter changes away from "All"
+  // Keep pagination state when "All" is selected
+  const prevFilterRef = useRef(activeFilter);
+  useEffect(() => {
+    const prevFilter = prevFilterRef.current;
+    prevFilterRef.current = activeFilter;
+    
+    // Only reset if switching away from "All" to a filtered view
+    if (prevFilter === 'all' && activeFilter !== 'all' && currentPage > 1) {
+      setCurrentPage(1);
+      setPageHistory([]);
+      setLastDoc(null);
+      setMaxKnownPage(1);
+      setKnownTotalPages(null);
+      // Reload splits for the new filter (will show filtered results)
+      if (currentUser?.id) {
+        loadSplits(1, undefined);
+      }
+    }
+    // If switching to "All" from a filter, reset pagination state
+    if (prevFilter !== 'all' && activeFilter === 'all') {
+      setCurrentPage(1);
+      setPageHistory([]);
+      setLastDoc(null);
+        setMaxKnownPage(1);
+        setKnownTotalPages(null);
+        setHasLoadedCountOnce(false);
+        // Reload to ensure we have the right data for "All" filter
+        if (currentUser?.id) {
+          // Reload count when switching to "All" filter
+          loadTotalCount().then((count) => {
+            loadSplits(1, undefined, count);
+          });
+        }
+    }
+  }, [activeFilter, currentUser?.id]); // Include currentUser?.id for loadSplits
 
   // Load participant avatars dynamically
   const loadParticipantAvatars = useCallback(async (splits: Split[]) => {
@@ -145,6 +241,42 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
 
   // Test pool for design (removed hardcoded data)
 
+  // Load total count on initial load
+  const loadTotalCount = useCallback(async (): Promise<number> => {
+    if (!currentUser?.id || isLoadingCount) {
+      logger.debug('Skipping loadTotalCount', { 
+        hasUser: !!currentUser?.id, 
+        isLoadingCount 
+      }, 'SplitsListScreen');
+      return 0;
+    }
+    
+    setIsLoadingCount(true);
+    try {
+      logger.info('Loading total splits count', { userId: currentUser.id }, 'SplitsListScreen');
+      const count = await SplitStorageService.getUserSplitsCount(String(currentUser.id));
+      setTotalSplits(count);
+      const totalPages = count > 0 ? Math.ceil(count / SPLITS_PER_PAGE) : 1;
+      setKnownTotalPages(totalPages);
+      setHasLoadedCountOnce(true);
+      logger.info('Total splits count loaded', { 
+        count, 
+        totalPages, 
+        splitsPerPage: SPLITS_PER_PAGE 
+      }, 'SplitsListScreen');
+      return count;
+    } catch (error) {
+      logger.error('Failed to load total count', { 
+        error: error instanceof Error ? error.message : String(error),
+        userId: currentUser.id
+      }, 'SplitsListScreen');
+      setHasLoadedCountOnce(true); // Mark as attempted even on error
+      return 0;
+    } finally {
+      setIsLoadingCount(false);
+    }
+  }, [currentUser?.id, SPLITS_PER_PAGE, isLoadingCount]);
+
   useEffect(() => {
     if (currentUser?.id) {
       // Check if user changed
@@ -153,13 +285,30 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         setCurrentPage(1);
         setPageHistory([]);
         setLastDoc(null);
+        setMaxKnownPage(1);
+        setKnownTotalPages(null);
+        setTotalSplits(0);
+        setHasLoadedCountOnce(false);
         hasLoadedOnFocusRef.current = false;
         lastUserIdRef.current = currentUser.id;
-        loadSplits(1, undefined);
+        
+        // Load total count first, then load splits with the count
+        // This ensures we have the count before showing pagination
+        (async () => {
+          const count = await loadTotalCount();
+          await loadSplits(1, undefined, count);
+        })();
+      } else if (!hasLoadedCountOnce && !isLoadingCount && splits.length === 0) {
+        // If count hasn't been loaded yet and we have no splits, load both
+        // This ensures count is always loaded on initial mount
+        (async () => {
+          const count = await loadTotalCount();
+          await loadSplits(1, undefined, count);
+        })();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    // loadSplits is stable and doesn't need to be in deps
+    // Only depend on currentUser?.id to prevent infinite loops
   }, [currentUser?.id]);
 
   // Load shared wallets
@@ -241,6 +390,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         setCurrentPage(1);
         setPageHistory([]);
         setLastDoc(null);
+        setMaxKnownPage(1);
+        setKnownTotalPages(null);
         // Reset manual tab change flag when user changes
         userHasManuallyChangedTabRef.current = false;
         lastRouteParamsRef.current = '';
@@ -254,16 +405,32 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
       
       // Load splits if on splits tab
       if (activeTab === 'splits') {
-        // Clear avatar cache to force reload
-        setParticipantAvatars({});
-        // Load page 1 on focus (user might have created a new split)
-        loadSplits(1, undefined);
-        hasLoadedOnFocusRef.current = true;
+        // Only reload if we haven't loaded yet (prevents infinite loops)
+        if (!hasLoadedOnFocusRef.current) {
+          // Clear avatar cache to force reload
+          setParticipantAvatars({});
+          // Always load total count first if not already loaded, then load page 1
+          // This ensures we have the count before showing pagination
+          if (totalSplits === 0 && !isLoadingCount) {
+            loadTotalCount().then((count) => {
+              loadSplits(1, undefined, count);
+              hasLoadedOnFocusRef.current = true;
+            });
+          } else {
+            loadSplits(1, undefined, totalSplits);
+            hasLoadedOnFocusRef.current = true;
+          }
+        } else {
+          // Already loaded, just ensure count is loaded if needed (don't reload splits to prevent loops)
+          if (totalSplits === 0 && !isLoadingCount && !hasLoadedCountOnce) {
+            loadTotalCount();
+          }
+        }
       } else if (activeTab === 'sharedWallets') {
         // Load shared wallets if on shared wallets tab
         loadSharedWallets();
       }
-    }, [currentUser?.id, activeTab, loadSharedWallets])
+    }, [currentUser?.id, activeTab])
   );
 
 
@@ -282,7 +449,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     }
   }, [splits, loadParticipantAvatars]);
 
-  const loadSplits = async (page: number = 1, lastDocument?: any) => {
+  const loadSplits = async (page: number = 1, lastDocument?: any, totalCount?: number) => {
     if (!currentUser?.id) {
       logger.debug('No current user, skipping load', null, 'SplitsListScreen');
       return;
@@ -292,14 +459,15 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
 
     try {
       if (__DEV__) {
-        logger.debug('Loading splits for user', { userId: currentUser.id, page }, 'SplitsListScreen');
+        logger.debug('Loading splits for user', { userId: currentUser.id, page, totalCount }, 'SplitsListScreen');
       }
 
       const result = await SplitStorageService.getUserSplits(
         String(currentUser.id),
         SPLITS_PER_PAGE,
         page,
-        lastDocument
+        lastDocument,
+        totalCount
       );
 
       if (result.success && result.splits) {
@@ -426,23 +594,52 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         setHasMore(calculatedHasMore);
         setCurrentPage(page);
         
+        // Update total splits count if provided in result
+        if (result.totalCount !== undefined) {
+          setTotalSplits(result.totalCount);
+          if (result.totalPages !== undefined) {
+            setKnownTotalPages(result.totalPages);
+          }
+        }
+        
+        // Track maximum known page when hasMore is true
+        if (calculatedHasMore && page > maxKnownPage) {
+          setMaxKnownPage(page);
+        }
+        
+        // If we've reached the last page (hasMore = false), we know the exact total
+        // This is the most accurate count - always use this once we know it
+        if (!calculatedHasMore && result.totalCount === undefined) {
+          const exactTotal = page;
+          setKnownTotalPages(exactTotal);
+          logger.info('Reached last page, setting known total pages', {
+            page,
+            exactTotal,
+          }, 'SplitsListScreen');
+        }
+        
         // Update total splits count for page calculation
-        // If we're on page 1, estimate total based on hasMore
+        // When "All" filter is active, we need accurate pagination
         if (page === 1) {
           if (calculatedHasMore) {
-            // We have at least SPLITS_PER_PAGE + 1 splits
-            setTotalSplits(updatedSplits.length + 1); // Minimum estimate
+            // We have at least SPLITS_PER_PAGE + 1 splits, but we don't know the exact total
+            // Don't set a specific total - let totalPages calculation handle it based on hasMore
+            // Keep totalSplits at 0 or minimum to indicate we don't know exact total yet
+            setTotalSplits(updatedSplits.length);
           } else {
-            // This is all the splits
+            // This is all the splits - we know the exact total
             setTotalSplits(updatedSplits.length);
           }
         } else {
-          // For subsequent pages, update estimate
+          // For subsequent pages, calculate based on current page and loaded splits
           const estimatedTotal = (page - 1) * SPLITS_PER_PAGE + updatedSplits.length;
           if (calculatedHasMore) {
-            setTotalSplits(estimatedTotal + 1); // At least one more
+            // At least one more page exists - we know minimum total but not exact
+            // Set to current known total, totalPages will calculate based on hasMore
+            setTotalSplits(estimatedTotal);
           } else {
-            setTotalSplits(estimatedTotal); // This is the total
+            // This is the last page - we know the exact total now
+            setTotalSplits(estimatedTotal);
           }
         }
         
@@ -484,13 +681,32 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
   };
 
   const goToNextPage = useCallback(() => {
-    if (!isLoading && hasMore && currentUser?.id) {
-      loadSplits(currentPage + 1, lastDoc);
+    if (!isLoading && hasMore && currentUser?.id && activeFilter === 'all') {
+      logger.info('Navigating to next page', {
+        currentPage,
+        nextPage: currentPage + 1,
+        hasMore,
+        totalSplits,
+        knownTotalPages,
+      }, 'SplitsListScreen');
+      // Prevent useFocusEffect from resetting by marking as loaded
+      hasLoadedOnFocusRef.current = true;
+      loadSplits(currentPage + 1, lastDoc, totalSplits);
+    } else if (!hasMore) {
+      logger.debug('Cannot go to next page: no more splits', {
+        currentPage,
+        hasMore,
+      }, 'SplitsListScreen');
     }
-  }, [isLoading, hasMore, currentUser?.id, currentPage, lastDoc]);
+  }, [isLoading, hasMore, currentUser?.id, currentPage, lastDoc, activeFilter, totalSplits, knownTotalPages]);
 
   const goToPreviousPage = useCallback(() => {
-    if (!isLoading && currentPage > 1 && currentUser?.id) {
+    if (!isLoading && currentPage > 1 && currentUser?.id && activeFilter === 'all') {
+      logger.info('Navigating to previous page', {
+        currentPage,
+        previousPage: currentPage - 1,
+      }, 'SplitsListScreen');
+      
       // Find the lastDoc for the previous page from history
       const prevPageHistory = pageHistory.find(h => h.page === currentPage - 1);
       const prevLastDoc = prevPageHistory?.lastDoc || null;
@@ -514,7 +730,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         }, 100);
       }
     }
-  }, [isLoading, currentPage, currentUser?.id, pageHistory]);
+  }, [isLoading, currentPage, currentUser?.id, pageHistory, activeFilter]);
 
   // Swipe gesture handler - created after navigation functions are defined
   // Use refs to access latest values
@@ -561,12 +777,16 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     setCurrentPage(1);
     setPageHistory([]);
     setLastDoc(null);
-    await loadSplits(1, undefined);
+    setMaxKnownPage(1);
+    setKnownTotalPages(null);
+    // Reload total count on refresh
+    const count = await loadTotalCount();
+    await loadSplits(1, undefined, count);
     } else if (activeTab === 'sharedWallets') {
       await loadSharedWallets();
     }
     setRefreshing(false);
-  }, [activeTab, loadSharedWallets]);
+  }, [activeTab, loadSharedWallets, loadTotalCount]);
 
 
   const handleCreateSplit = useCallback(() => {
@@ -606,6 +826,76 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
   }, [navigation]);
 
 
+
+  // Handle split deletion
+  const handleDeleteSplit = useCallback(async (split: Split) => {
+    // Only allow deletion if user is the creator
+    if (split.creatorId !== currentUser?.id) {
+      Alert.alert(
+        'Cannot Delete',
+        'Only the split creator can delete this split.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Check if split has active payments or is locked
+    if (split.status === 'locked' || split.status === 'active') {
+      Alert.alert(
+        'Cannot Delete',
+        'This split is active and cannot be deleted. Please complete or cancel it first.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Delete Split',
+      `Are you sure you want to delete "${split.title}"? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              const result = await SplitStorageService.deleteSplit(split.id);
+              
+              if (result.success) {
+                logger.info('Split deleted successfully', { splitId: split.id }, 'SplitsListScreen');
+                
+                // Remove from local state
+                setSplits(prevSplits => prevSplits.filter(s => s.id !== split.id));
+                
+                // Recalculate total splits
+                setTotalSplits(prev => Math.max(0, prev - 1));
+                
+                Alert.alert('Success', 'Split deleted successfully.');
+              } else {
+                logger.error('Failed to delete split', { 
+                  splitId: split.id, 
+                  error: result.error 
+                }, 'SplitsListScreen');
+                Alert.alert('Error', result.error || 'Failed to delete split. Please try again.');
+              }
+            } catch (error) {
+              logger.error('Error deleting split', {
+                splitId: split.id,
+                error: error instanceof Error ? error.message : String(error),
+              }, 'SplitsListScreen');
+              Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [currentUser?.id]);
 
   const handleSplitPress = useCallback(async (split: Split) => {
     try {
@@ -704,13 +994,36 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     const splitAmount = split.totalAmount;
     const splitTitle = split.title;
 
+    // Render delete action (right swipe) - available for all splits
+    // Validation will happen in handleDeleteSplit
+    const renderRightActions = () => {
+      return (
+        <TouchableOpacity
+          style={styles.deleteAction}
+          onPress={() => handleDeleteSplit(split)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.deleteActionContent}>
+            <Icon name="trash" size={24} color={colors.white} />
+            <Text style={styles.deleteText}>Delete</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    };
+
     return (
-      <TouchableOpacity
+      <Swipeable
         key={split.id}
-        style={styles.splitCard}
-        onPress={() => handleSplitPress(split)}
-        activeOpacity={0.7}
+        renderRightActions={renderRightActions}
+        enabled={true}
+        overshootRight={false}
+        friction={2}
       >
+        <TouchableOpacity
+          style={styles.splitCard}
+          onPress={() => handleSplitPress(split)}
+          activeOpacity={0.7}
+        >
         <View style={styles.splitHeader}>
           <View style={styles.splitHeaderLeft}>
             {/* Category Icon */}
@@ -821,14 +1134,17 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
             </Text>
           </View>
         )}*/}
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Swipeable>
     );
   };
 
   const getFilteredSplits = useCallback(() => {
+    // For "All" filter, return all loaded splits (pagination handles loading more)
     if (activeFilter === 'all') {
       return splits;
     }
+    // For other filters, filter the loaded splits client-side
     return splits.filter(split => {
       if (activeFilter === 'active') {
         // Include active, pending, draft, locked, and spinning_completed splits in "active" filter
@@ -987,12 +1303,58 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         </View>
         )}
 
-        {/* Page Indicator - Below filter tabs */}
-        {activeTab === 'splits' && (hasMore || currentPage > 1) && displaySplits.length > 0 && (
-          <View style={styles.pageIndicatorContainer}>
-            <Text style={styles.pageIndicatorText}>
-              Page {currentPage} of {totalPages}
-            </Text>
+        {/* Pagination Buttons - Only show for "All" filter when there are multiple pages or loading count */}
+        {activeTab === 'splits' && activeFilter === 'all' && splits.length > 0 && (hasMore || currentPage > 1 || totalPages > 1 || (isLoadingCount && totalSplits === 0)) && (
+          <View style={styles.paginationContainer}>
+            <Button
+              title=""
+              onPress={goToPreviousPage}
+              variant="secondary"
+              size="small"
+              disabled={isLoading || currentPage <= 1}
+              icon="CaretLeft"
+              iconPosition="left"
+              style={styles.paginationButton}
+            />
+            <View style={styles.pageInfo}>
+              <Text style={styles.pageText}>
+                {(() => {
+                  // If we're loading the count and don't have it yet, show loading
+                  if (isLoadingCount && totalSplits === 0 && knownTotalPages === null) {
+                    return `Page ${currentPage} (loading...)`;
+                  }
+                  // If we have known total pages, use it
+                  if (knownTotalPages !== null) {
+                    return `Page ${currentPage} of ${knownTotalPages}`;
+                  }
+                  // If we have totalSplits count, calculate and show
+                  if (totalSplits > 0) {
+                    const calculated = Math.ceil(totalSplits / SPLITS_PER_PAGE);
+                    return `Page ${currentPage} of ${calculated}`;
+                  }
+                  // If totalPages is 0 (loading), show loading
+                  if (totalPages === 0) {
+                    return `Page ${currentPage} (loading...)`;
+                  }
+                  // If we have hasMore, show estimate
+                  if (hasMore) {
+                    return `Page ${currentPage} (more available)`;
+                  }
+                  // Fallback: show current calculation
+                  return `Page ${currentPage} of ${totalPages}`;
+                })()}
+              </Text>
+            </View>
+            <Button
+              title=""
+              onPress={goToNextPage}
+              variant="secondary"
+              size="small"
+              disabled={isLoading || !hasMore}
+              icon="CaretRight"
+              iconPosition="right"
+              style={styles.paginationButton}
+            />
           </View>
         )}
 

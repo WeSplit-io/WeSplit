@@ -81,7 +81,7 @@ const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
         <View style={styles.billAmountContainer}>
           <Text style={styles.billAmountLabel}>Total Bill</Text>
           <Text style={styles.billAmountUSDC}>
-            {totalAmount.toFixed(2)} USDC
+            {(totalAmount || 0).toFixed(2)} USDC
           </Text>
         </View>
   

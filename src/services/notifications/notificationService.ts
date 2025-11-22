@@ -967,6 +967,12 @@ class NotificationServiceClass {
                 isFromNotification: true,
                 notificationId: notification.id
               });
+            } else if (notification.data.splitType === 'spend') {
+              navigation.navigate('SpendSplit', {
+                splitData: { id: notification.data.splitId, splitType: 'spend' },
+                isFromNotification: true,
+                notificationId: notification.id
+              });
             } else {
               navigation.navigate('SplitDetails', {
                 splitId: notification.data.splitId,
