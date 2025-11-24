@@ -84,6 +84,8 @@ export const firebaseDataTransformers = {
     active_badge: doc.data().active_badge || undefined,
     profile_assets: doc.data().profile_assets || [],
     active_profile_asset: doc.data().active_profile_asset || undefined,
+    profile_borders: doc.data().profile_borders || [],
+    active_profile_border: doc.data().active_profile_border || undefined,
     wallet_backgrounds: doc.data().wallet_backgrounds || [],
     active_wallet_background: doc.data().active_wallet_background || undefined,
     referral_code: doc.data().referral_code || undefined
@@ -126,6 +128,8 @@ export const firebaseDataTransformers = {
     if (user.active_badge !== undefined) {data.active_badge = user.active_badge;}
     if (user.profile_assets !== undefined) {data.profile_assets = user.profile_assets;}
     if (user.active_profile_asset !== undefined) {data.active_profile_asset = user.active_profile_asset;}
+    if (user.profile_borders !== undefined) {data.profile_borders = user.profile_borders;}
+    if (user.active_profile_border !== undefined) {data.active_profile_border = user.active_profile_border;}
     if (user.wallet_backgrounds !== undefined) {data.wallet_backgrounds = user.wallet_backgrounds;}
     if (user.active_wallet_background !== undefined) {data.active_wallet_background = user.active_wallet_background;}
     if (user.referral_code !== undefined) {data.referral_code = user.referral_code;}
@@ -157,6 +161,12 @@ export const firebaseDataTransformers = {
     email_verified: doc.data().email_verified || false,
     migration_completed: doc.data().migration_completed ? firebaseDataTransformers.timestampToISO(doc.data().migration_completed) : undefined,
     migration_version: doc.data().migration_version || '',
+    profile_assets: doc.data().profile_assets || [],
+    active_profile_asset: doc.data().active_profile_asset || undefined,
+    profile_borders: doc.data().profile_borders || [],
+    active_profile_border: doc.data().active_profile_border || undefined,
+    wallet_backgrounds: doc.data().wallet_backgrounds || [],
+    active_wallet_background: doc.data().active_wallet_background || undefined,
     first_met_at: firebaseDataTransformers.timestampToISO(doc.data().first_met_at),
     isFavorite: doc.data().isFavorite || false
   }),

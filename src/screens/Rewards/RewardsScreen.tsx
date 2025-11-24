@@ -19,7 +19,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import NavBar from '../../components/shared/NavBar';
-import { Container, Header, LoadingScreen, Button } from '../../components/shared';
+import { Container, Header, LoadingScreen } from '../../components/shared';
 import PhosphorIcon, { PhosphorIconName } from '../../components/shared/PhosphorIcon';
 import { useApp } from '../../context/AppContext';
 import { pointsService } from '../../services/rewards/pointsService';
@@ -28,7 +28,7 @@ import { PointsTransaction } from '../../types/rewards';
 import { logger } from '../../services/analytics/loggingService';
 import { userActionSyncService } from '../../services/rewards/userActionSyncService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
-import { seasonService } from '../../services/rewards/seasonService';
+import { christmasCalendarService } from '../../services/rewards/christmasCalendarService';
 
 const RewardsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
@@ -40,6 +40,7 @@ const RewardsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const isLoadingRef = useRef(false);
+  const isDevEnvironment = __DEV__ || process.env.EXPO_PUBLIC_ENV === 'development';
 
   const loadData = useCallback(async () => {
     if (!currentUser?.id) {
@@ -56,14 +57,11 @@ const RewardsScreen: React.FC = () => {
       isLoadingRef.current = true;
       setLoading(true);
       
-      // Get current season (Season 1 starts today and lasts 6 months)
-      const currentSeason = seasonService.getCurrentSeason();
-      
       // Load data in parallel for better performance
-      // Filter to only show current season transactions
+      // Show most recent transactions across all seasons to match total points display
       const [points, history] = await Promise.all([
         pointsService.getUserPoints(currentUser.id),
-        pointsService.getPointsHistory(currentUser.id, 4, currentSeason) // Only show last 4 transactions from current season
+        pointsService.getPointsHistory(currentUser.id, 4) // Show last 4 transactions from all seasons
       ]);
 
       setUserPoints(points);
@@ -109,6 +107,13 @@ const RewardsScreen: React.FC = () => {
     await loadData();
     setRefreshing(false);
   }, [loadData]);
+
+  const openDevCalendar = useCallback(() => {
+    if (!christmasCalendarService.isBypassModeEnabled()) {
+      christmasCalendarService.setBypassMode(true);
+    }
+    rewardNav.goToChristmasCalendar();
+  }, [rewardNav]);
 
   // Memoized formatting functions to prevent recreation on every render
   const formatPoints = useCallback((points: number) => {
@@ -210,6 +215,31 @@ const RewardsScreen: React.FC = () => {
           />
         }
       >
+        {isDevEnvironment && currentUser?.id && (
+          <View style={styles.devToolsContainer}>
+            <Text style={styles.devToolsLabel}>Dev Tools</Text>
+            <Text style={styles.devToolsHelper}>
+              Development tools for testing rewards features.
+            </Text>
+            <TouchableOpacity
+              style={styles.devLaunchButton}
+              onPress={openDevCalendar}
+              activeOpacity={0.85}
+            >
+              <PhosphorIcon name="Calendar" size={16} color={colors.black} weight="fill" />
+              <Text style={styles.devLaunchButtonText}>Open Christmas Calendar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.devLaunchButton}
+              onPress={() => rewardNav.goToDevAssetPreview()}
+              activeOpacity={0.85}
+            >
+              <PhosphorIcon name="Image" size={16} color={colors.black} weight="fill" />
+              <Text style={styles.devLaunchButtonText}>Preview Assets & Badges</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Points Display */}
         <View style={styles.pointsContainer}>
           <Text style={styles.pointsValue}>
@@ -380,6 +410,42 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: spacing.md,
     paddingBottom: 120, // Space for NavBar
+  },
+  devToolsContainer: {
+    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    backgroundColor: colors.black,
+    gap: spacing.sm,
+  },
+  devToolsLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLightSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  devToolsHelper: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textLightSecondary,
+    marginBottom: spacing.sm,
+  },
+  devLaunchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.brandGreen,
+    borderRadius: 999,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  devLaunchButtonText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.black,
   },
   loadingContainer: {
     flex: 1,

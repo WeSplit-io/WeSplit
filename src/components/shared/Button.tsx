@@ -14,6 +14,7 @@ import {
   TextStyle,
   View,
   Animated,
+  StyleProp,
 } from 'react-native';
 import PhosphorIcon, { PhosphorIconName } from './PhosphorIcon';
 import { colors } from '../../theme/colors';
@@ -29,8 +30,8 @@ interface ButtonProps {
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   icon?: PhosphorIconName;
   iconPosition?: 'left' | 'right';
 }

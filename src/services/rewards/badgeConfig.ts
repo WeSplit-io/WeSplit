@@ -38,6 +38,12 @@ export interface BadgeInfo {
  * Badge Definitions
  * All badges available in the app
  */
+const FIREBASE_STORAGE_BUCKET = 'gs://wesplit-35186.firebasestorage.app';
+const BADGE_BASE_PATH = 'visuals-app/rewards/badges/christmas';
+
+const buildBadgeIconUrl = (fileName: string) =>
+  `${FIREBASE_STORAGE_BUCKET}/${BADGE_BASE_PATH}/${fileName}`;
+
 export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
   // Christmas Calendar 2024 Badges
   'early_bird_2024': {
@@ -45,6 +51,7 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     title: 'Early Bird',
     description: 'Started the Christmas calendar early',
     icon: '🐦',
+    iconUrl: buildBadgeIconUrl('early_bird_2024.png'),
     category: 'christmas',
     rarity: 'common'
   },
@@ -53,6 +60,7 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     title: "Santa's Helper",
     description: 'Active participant in the Christmas calendar',
     icon: '🎅',
+    iconUrl: buildBadgeIconUrl('santas_helper_2024.png'),
     category: 'christmas',
     rarity: 'common'
   },
@@ -61,6 +69,7 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     title: 'Gingerbread',
     description: 'Sweet holiday spirit',
     icon: '🍪',
+    iconUrl: buildBadgeIconUrl('gingerbread_2024.png'),
     category: 'christmas',
     rarity: 'common'
   },
@@ -69,6 +78,7 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     title: 'Elf',
     description: 'Hardworking holiday helper',
     icon: '🧝',
+    iconUrl: buildBadgeIconUrl('elf_2024.png'),
     category: 'christmas',
     rarity: 'rare'
   },
@@ -77,6 +87,7 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     title: 'Snowflake',
     description: 'One of a kind',
     icon: '❄️',
+    iconUrl: buildBadgeIconUrl('snowflake_2024.png'),
     category: 'christmas',
     rarity: 'rare'
   },
@@ -85,6 +96,7 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     title: 'Holiday Champion',
     description: 'Dedicated calendar participant',
     icon: '🏆',
+    iconUrl: buildBadgeIconUrl('champion_2024.png'),
     category: 'christmas',
     rarity: 'epic'
   },
@@ -93,8 +105,27 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     title: 'Christmas Eve Eve',
     description: 'Almost there!',
     icon: '🎁',
+    iconUrl: buildBadgeIconUrl('eve_eve_2024.png'),
     category: 'christmas',
     rarity: 'rare'
+  },
+  'aurora_spirit_2024': {
+    badgeId: 'aurora_spirit_2024',
+    title: 'Aurora Spirit',
+    description: 'Unlocked the aurora profile border',
+    icon: '🌌',
+    iconUrl: buildBadgeIconUrl('aurora_spirit_2024.png'),
+    category: 'christmas',
+    rarity: 'epic'
+  },
+  'north_star_2024': {
+    badgeId: 'north_star_2024',
+    title: 'North Star',
+    description: 'Guiding light of the Christmas calendar',
+    icon: '⭐',
+    iconUrl: buildBadgeIconUrl('north_star_2024.png'),
+    category: 'christmas',
+    rarity: 'legendary'
   },
   // Achievement Badges - Splits Withdrawn (Bronze, Silver, Gold, Emerald)
   'splits_withdrawn_50': {

@@ -12,6 +12,7 @@ import {
   ViewStyle,
   TextStyle,
   ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { logger } from '../../services/analytics/loggingService';
@@ -28,6 +29,7 @@ interface AvatarProps {
   borderColor?: string;
   // Direct avatar URL if available (for backward compatibility)
   avatarUrl?: string;
+  borderImageUrl?: string;
   // Loading timeout in milliseconds (default: 5000)
   loadingTimeout?: number;
   // Whether to show loading indicator
@@ -45,6 +47,7 @@ const Avatar: React.FC<AvatarProps> = ({
   showBorder = false,
   borderColor = colors.green,
   avatarUrl,
+  borderImageUrl,
   loadingTimeout: _loadingTimeout = 5000,
   showLoading = true,
   dynamicSize = false,
@@ -224,9 +227,25 @@ const Avatar: React.FC<AvatarProps> = ({
     borderRadius: size / 2,
   };
 
+  const borderScale = dynamicSize || hasCustomDimensions ? 1.08 : 1.15;
+
   return (
     <View style={[avatarStyle, { justifyContent: 'center', alignItems: 'center' }]}>
       {getDisplayContent()}
+      {borderImageUrl && (
+        <Image
+          source={{ uri: borderImageUrl }}
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              transform: [{ scale: borderScale }],
+              zIndex: 2,
+            },
+          ]}
+          resizeMode="contain"
+          pointerEvents="none"
+        />
+      )}
     </View>
   );
 };

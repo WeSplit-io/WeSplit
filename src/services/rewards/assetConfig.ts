@@ -10,7 +10,7 @@
  * - name: Display name for the asset
  * - description: Description of the asset
  * - url: URL to the asset image
- * - assetType: Type of asset ('profile_image' or 'wallet_background')
+ * - assetType: Type of asset ('profile_image', 'wallet_background', or 'profile_border')
  * - category: Category of the asset (e.g., 'christmas', 'seasonal', 'special')
  * - rarity: Rarity level (e.g., 'common', 'rare', 'epic', 'legendary')
  */
@@ -30,7 +30,7 @@ export interface AssetInfo {
   // Support both image URLs and NFTs
   url?: string; // For image URLs (HTTP/HTTPS)
   nftMetadata?: NFTMetadata; // For NFTs
-  assetType: 'profile_image' | 'wallet_background';
+  assetType: 'profile_image' | 'wallet_background' | 'profile_border';
   category?: string;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
 }
@@ -39,13 +39,19 @@ export interface AssetInfo {
  * Asset Definitions
  * All assets available in the app
  */
+const FIREBASE_STORAGE_BUCKET = 'gs://wesplit-35186.firebasestorage.app';
+const CHRISTMAS_ASSET_BASE_PATH = 'visuals-app/rewards/christmas';
+
+const buildAssetUrl = (fileName: string) =>
+  `${FIREBASE_STORAGE_BUCKET}/${CHRISTMAS_ASSET_BASE_PATH}/${fileName}`;
+
 export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
   // Christmas Calendar 2024 Profile Images
   'profile_snowflake_2024': {
     assetId: 'profile_snowflake_2024',
     name: 'Snowflake Profile',
     description: 'A festive snowflake profile image',
-    url: 'https://example.com/assets/profile_snowflake.png', // TODO: Replace with actual asset URL
+    url: buildAssetUrl('profile_snowflake_2024.png'),
     assetType: 'profile_image',
     category: 'christmas',
     rarity: 'common'
@@ -54,7 +60,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'profile_reindeer_2024',
     name: 'Reindeer Profile',
     description: 'A cute reindeer profile image',
-    url: 'https://example.com/assets/profile_reindeer.png', // TODO: Replace with actual asset URL
+    url: buildAssetUrl('profile_reindeer_2024.png'),
     assetType: 'profile_image',
     category: 'christmas',
     rarity: 'common'
@@ -63,10 +69,39 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'profile_ornament_2024',
     name: 'Ornament Profile',
     description: 'A festive ornament profile image',
-    url: 'https://example.com/assets/profile_ornament.png', // TODO: Replace with actual asset URL
+    url: buildAssetUrl('profile_ornament_2024.png'),
     assetType: 'profile_image',
     category: 'christmas',
     rarity: 'rare'
+  },
+  
+  // Christmas 2024 Profile Borders
+  'profile_border_candycane_2024': {
+    assetId: 'profile_border_candycane_2024',
+    name: 'Candy Cane Border',
+    description: 'Striped candy cane ring for your avatar',
+    url: buildAssetUrl('profile_border_candycane_2024.png'),
+    assetType: 'profile_border',
+    category: 'christmas',
+    rarity: 'rare'
+  },
+  'profile_border_aurora_2024': {
+    assetId: 'profile_border_aurora_2024',
+    name: 'Aurora Border',
+    description: 'A glowing aurora halo for your profile picture',
+    url: buildAssetUrl('profile_border_aurora_2024.png'),
+    assetType: 'profile_border',
+    category: 'christmas',
+    rarity: 'epic'
+  },
+  'profile_border_midnight_2024': {
+    assetId: 'profile_border_midnight_2024',
+    name: 'Midnight Frost Border',
+    description: 'Frosted midnight rim for a premium look',
+    url: buildAssetUrl('profile_border_midnight_2024.png'),
+    assetType: 'profile_border',
+    category: 'christmas',
+    rarity: 'legendary'
   },
   
   // Christmas Calendar 2024 Wallet Backgrounds
@@ -74,7 +109,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'wallet_winter_2024',
     name: 'Winter Wonderland',
     description: 'A beautiful winter scene for your wallet',
-    url: 'https://example.com/assets/wallet_winter.png', // TODO: Replace with actual asset URL
+    url: buildAssetUrl('wallet_winter_2024.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'common'
@@ -83,7 +118,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'wallet_christmas_2024',
     name: 'Christmas Magic',
     description: 'A magical Christmas scene',
-    url: 'https://example.com/assets/wallet_christmas.png', // TODO: Replace with actual asset URL
+    url: buildAssetUrl('wallet_christmas_2024.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'rare'
@@ -92,7 +127,16 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'wallet_solstice_2024',
     name: 'Winter Solstice',
     description: 'Celebrate the longest night',
-    url: 'https://example.com/assets/wallet_solstice.png', // TODO: Replace with actual asset URL
+    url: buildAssetUrl('wallet_solstice_2024.png'),
+    assetType: 'wallet_background',
+    category: 'christmas',
+    rarity: 'epic'
+  },
+  'wallet_northpole_2024': {
+    assetId: 'wallet_northpole_2024',
+    name: 'North Pole Lights',
+    description: 'Neon aurora gradient for your wallet card',
+    url: buildAssetUrl('wallet_northpole_2024.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'epic'

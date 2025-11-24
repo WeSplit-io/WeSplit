@@ -12,15 +12,17 @@ import BadgeDisplay from '../../../components/profile/BadgeDisplay';
 import ProfileAssetDisplay from '../../../components/profile/ProfileAssetDisplay';
 import { colors } from '../../../theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserAssetMetadata } from '../../../services/rewards/assetService';
 
 // Avatar component wrapper for backward compatibility
-const AvatarComponent = ({ avatar, displayName, style, userId }: { avatar?: string, displayName: string, style: any, userId?: string }) => {
+const AvatarComponent = ({ avatar, displayName, style, userId, borderImageUrl }: { avatar?: string, displayName: string, style: any, userId?: string, borderImageUrl?: string }) => {
   return (
     <Avatar
       avatarUrl={avatar}
       userName={displayName}
       userId={userId}
       style={style}
+      borderImageUrl={borderImageUrl}
     />
   );
 };
@@ -36,6 +38,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   // Phone reminder badge state
   const [needsPhoneReminder, setNeedsPhoneReminder] = useState(false);
+  const [profileBorderUrl, setProfileBorderUrl] = useState<string | null>(null);
 
   // Check phone prompt status
   useEffect(() => {
@@ -70,6 +73,36 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
     checkPhonePromptStatus();
   }, [currentUser?.id, currentUser?.email, currentUser?.phone, isAuthenticated]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfileBorder = async () => {
+      if (!currentUser?.id || !currentUser.active_profile_border) {
+        if (isMounted) {
+          setProfileBorderUrl(null);
+        }
+        return;
+      }
+
+      try {
+        const metadata = await getUserAssetMetadata(currentUser.id, currentUser.active_profile_border);
+        const url = metadata?.url || metadata?.nftMetadata?.imageUrl || null;
+        if (isMounted) {
+          setProfileBorderUrl(url);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setProfileBorderUrl(null);
+        }
+      }
+    };
+
+    loadProfileBorder();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id, currentUser?.active_profile_border]);
 
   // Early return if no current user
   if (!currentUser) {
@@ -234,6 +267,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               displayName={displayName}
               userId={currentUser?.id}
               style={{ width: '100%', height: '100%' }}
+              borderImageUrl={profileBorderUrl || undefined}
             />
           </View>
           <View style={styles.profileInfo}>
@@ -258,6 +292,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 profileAssets={currentUser.profile_assets}
                 activeProfileAsset={currentUser.active_profile_asset}
                 showProfileAsset={true}
+              />
+            )}
+            {currentUser?.active_profile_border && (
+              <ProfileAssetDisplay
+                userId={currentUser.id}
+                profileBorders={currentUser.profile_borders}
+                activeProfileBorder={currentUser.active_profile_border}
+                showProfileAsset={false}
+                showProfileBorder={true}
               />
             )}
           </View>

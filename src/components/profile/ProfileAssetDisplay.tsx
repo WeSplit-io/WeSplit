@@ -15,9 +15,12 @@ interface ProfileAssetDisplayProps {
   userId?: string;
   profileAssets?: string[];
   activeProfileAsset?: string;
+  profileBorders?: string[];
+  activeProfileBorder?: string;
   walletBackgrounds?: string[];
   activeWalletBackground?: string;
   showProfileAsset?: boolean;
+  showProfileBorder?: boolean;
   showWalletBackground?: boolean;
 }
 
@@ -25,12 +28,16 @@ const ProfileAssetDisplay: React.FC<ProfileAssetDisplayProps> = ({
   userId,
   profileAssets = [],
   activeProfileAsset,
+  profileBorders = [],
+  activeProfileBorder,
   walletBackgrounds = [],
   activeWalletBackground,
   showProfileAsset = true,
+  showProfileBorder = false,
   showWalletBackground = false,
 }) => {
   const [profileAssetInfo, setProfileAssetInfo] = useState<AssetInfo | null>(null);
+  const [profileBorderInfo, setProfileBorderInfo] = useState<AssetInfo | null>(null);
   const [walletAssetInfo, setWalletAssetInfo] = useState<AssetInfo | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -41,6 +48,9 @@ const ProfileAssetDisplay: React.FC<ProfileAssetDisplayProps> = ({
         // Fallback to config if no userId
         if (activeProfileAsset) {
           setProfileAssetInfo(getAssetInfo(activeProfileAsset));
+        }
+        if (activeProfileBorder) {
+          setProfileBorderInfo(getAssetInfo(activeProfileBorder));
         }
         if (activeWalletBackground) {
           setWalletAssetInfo(getAssetInfo(activeWalletBackground));
@@ -54,6 +64,10 @@ const ProfileAssetDisplay: React.FC<ProfileAssetDisplayProps> = ({
           const metadata = await getUserAssetMetadata(userId, activeProfileAsset);
           setProfileAssetInfo(metadata);
         }
+        if (activeProfileBorder) {
+          const metadata = await getUserAssetMetadata(userId, activeProfileBorder);
+          setProfileBorderInfo(metadata);
+        }
         if (activeWalletBackground) {
           const metadata = await getUserAssetMetadata(userId, activeWalletBackground);
           setWalletAssetInfo(metadata);
@@ -64,6 +78,9 @@ const ProfileAssetDisplay: React.FC<ProfileAssetDisplayProps> = ({
         if (activeProfileAsset) {
           setProfileAssetInfo(getAssetInfo(activeProfileAsset));
         }
+        if (activeProfileBorder) {
+          setProfileBorderInfo(getAssetInfo(activeProfileBorder));
+        }
         if (activeWalletBackground) {
           setWalletAssetInfo(getAssetInfo(activeWalletBackground));
         }
@@ -73,7 +90,7 @@ const ProfileAssetDisplay: React.FC<ProfileAssetDisplayProps> = ({
     };
 
     loadAssetMetadata();
-  }, [userId, activeProfileAsset, activeWalletBackground]);
+  }, [userId, activeProfileAsset, activeProfileBorder, activeWalletBackground]);
 
   if (showProfileAsset && activeProfileAsset) {
     const assetInfo = profileAssetInfo || getAssetInfo(activeProfileAsset);
@@ -127,6 +144,37 @@ const ProfileAssetDisplay: React.FC<ProfileAssetDisplayProps> = ({
             <PhosphorIcon name="ImageSquare" size={16} color={colors.green} weight="regular" />
           )}
           <Text style={styles.assetText}>{assetInfo.name || activeWalletBackground}</Text>
+          {assetInfo.nftMetadata && (
+            <View style={styles.nftIndicator}>
+              <PhosphorIcon name="Cube" size={10} color={colors.green} weight="fill" />
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  if (showProfileBorder && activeProfileBorder) {
+    const assetInfo = profileBorderInfo || getAssetInfo(activeProfileBorder);
+    if (!assetInfo || assetInfo.assetType !== 'profile_border') {
+      return null;
+    }
+    
+    const imageUrl = assetInfo.url || assetInfo.nftMetadata?.imageUrl;
+    
+    return (
+      <View style={styles.container}>
+        <View style={styles.assetBadge}>
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.assetImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <PhosphorIcon name="CircleHalf" size={16} color={colors.green} weight="regular" />
+          )}
+          <Text style={styles.assetText}>{assetInfo.name || activeProfileBorder}</Text>
           {assetInfo.nftMetadata && (
             <View style={styles.nftIndicator}>
               <PhosphorIcon name="Cube" size={10} color={colors.green} weight="fill" />

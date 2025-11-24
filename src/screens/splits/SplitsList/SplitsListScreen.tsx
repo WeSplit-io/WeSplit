@@ -610,38 +610,30 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         // If we've reached the last page (hasMore = false), we know the exact total
         // This is the most accurate count - always use this once we know it
         if (!calculatedHasMore && result.totalCount === undefined) {
-          const exactTotal = page;
-          setKnownTotalPages(exactTotal);
-          logger.info('Reached last page, setting known total pages', {
+          // Calculate exact total: (previous pages * items per page) + current page items
+          const exactTotal = (page - 1) * SPLITS_PER_PAGE + updatedSplits.length;
+          setTotalSplits(exactTotal);
+          const exactTotalPages = page;
+          setKnownTotalPages(exactTotalPages);
+          logger.info('Reached last page, setting known total', {
             page,
             exactTotal,
+            exactTotalPages,
           }, 'SplitsListScreen');
         }
         
         // Update total splits count for page calculation
-        // When "All" filter is active, we need accurate pagination
-        if (page === 1) {
-          if (calculatedHasMore) {
-            // We have at least SPLITS_PER_PAGE + 1 splits, but we don't know the exact total
-            // Don't set a specific total - let totalPages calculation handle it based on hasMore
-            // Keep totalSplits at 0 or minimum to indicate we don't know exact total yet
-            setTotalSplits(updatedSplits.length);
-          } else {
-            // This is all the splits - we know the exact total
-            setTotalSplits(updatedSplits.length);
-          }
-        } else {
-          // For subsequent pages, calculate based on current page and loaded splits
-          const estimatedTotal = (page - 1) * SPLITS_PER_PAGE + updatedSplits.length;
-          if (calculatedHasMore) {
-            // At least one more page exists - we know minimum total but not exact
-            // Set to current known total, totalPages will calculate based on hasMore
-            setTotalSplits(estimatedTotal);
-          } else {
-            // This is the last page - we know the exact total now
-            setTotalSplits(estimatedTotal);
-          }
+        // Only update totalSplits when we have definitive information:
+        // 1. From result.totalCount (most accurate)
+        // 2. On page 1 when we know it's all splits (no hasMore)
+        // 3. When we reach the last page (handled above)
+        // DO NOT recalculate on subsequent pages as it causes the count to change
+        if (page === 1 && !calculatedHasMore) {
+          // This is all the splits - we know the exact total
+          setTotalSplits(updatedSplits.length);
         }
+        // Note: We don't update totalSplits for subsequent pages unless we have result.totalCount
+        // or we've reached the last page, to prevent the count from changing when navigating
         
         if (__DEV__) {
           console.log('🔍 SplitsListScreen: Pagination state', {

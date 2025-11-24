@@ -9,10 +9,11 @@ import { doc, getDoc } from 'firebase/firestore';
 import { logger } from '../analytics/loggingService';
 import { getAssetInfo, AssetInfo } from './assetConfig';
 import { NFTMetadata } from './assetConfig';
+import { resolveStorageUrl } from '../shared/storageUrlService';
 
 export interface UserAssetMetadata {
   assetId: string;
-  assetType: 'profile_image' | 'wallet_background';
+  assetType: 'profile_image' | 'wallet_background' | 'profile_border';
   name: string;
   description: string;
   assetUrl?: string | null;
@@ -41,7 +42,7 @@ export async function getUserAssetMetadata(
       // Merge database data with config data (database has priority)
       const configAsset = getAssetInfo(assetId);
       
-      return {
+      const metadata: AssetInfo = {
         assetId: data.assetId || assetId,
         name: data.name || configAsset?.name || assetId,
         description: data.description || configAsset?.description || '',
@@ -51,14 +52,18 @@ export async function getUserAssetMetadata(
         category: configAsset?.category,
         rarity: configAsset?.rarity
       };
+
+      return await withResolvedAssetUrl(assetId, metadata, { userId, source: 'userAssetDoc' });
     }
 
     // Fallback to config file if not in database
-    return getAssetInfo(assetId);
+    const configAsset = getAssetInfo(assetId);
+    return await withResolvedAssetUrl(assetId, configAsset, { userId, source: 'assetConfig' });
   } catch (error) {
     logger.error('Failed to get user asset metadata', error, 'AssetService');
     // Fallback to config file on error
-    return getAssetInfo(assetId);
+    const configAsset = getAssetInfo(assetId);
+    return await withResolvedAssetUrl(assetId, configAsset, { userId, source: 'assetConfig', fallback: true });
   }
 }
 
@@ -106,5 +111,29 @@ export async function getAssetImageUrl(
     logger.error('Failed to get asset image URL', error, 'AssetService');
     return null;
   }
+}
+
+async function withResolvedAssetUrl(
+  assetId: string,
+  metadata: AssetInfo | null,
+  context: Record<string, unknown>
+): Promise<AssetInfo | null> {
+  if (!metadata) {
+    return null;
+  }
+
+  if (!metadata.url) {
+    return metadata;
+  }
+
+  const resolvedUrl = await resolveStorageUrl(metadata.url, { assetId, ...context });
+  if (!resolvedUrl) {
+    return metadata;
+  }
+
+  return {
+    ...metadata,
+    url: resolvedUrl
+  };
 }
 

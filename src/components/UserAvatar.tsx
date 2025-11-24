@@ -10,6 +10,7 @@ import {
   Image,
   ViewStyle,
   TextStyle,
+  StyleSheet,
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { logger } from '../services/core';
@@ -33,6 +34,7 @@ interface UserAvatarProps {
   displayName?: string;
   // Loading timeout in milliseconds (default: 5000)
   loadingTimeout?: number;
+  borderImageUrl?: string;
 }
 
 const UserAvatar: React.FC<UserAvatarProps> = ({
@@ -47,6 +49,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   avatarUrl,
   displayName,
   loadingTimeout = 5000,
+  borderImageUrl,
 }) => {
   const [imageInfo, setImageInfo] = useState<UserImageInfo | null>(userImageInfo || null);
   const [imageError, setImageError] = useState(false);
@@ -175,6 +178,8 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     ? imageInfo.imageUrl 
     : DEFAULT_AVATAR_URL;
 
+  const borderScale = 1.15;
+
   return (
     <View style={[avatarStyle, { overflow: 'hidden', position: 'relative' }]}>
       {isLoading && (
@@ -196,6 +201,20 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
         onError={handleImageError}
         resizeMode="cover"
       />
+      {borderImageUrl && (
+        <Image
+          source={{ uri: borderImageUrl }}
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              transform: [{ scale: borderScale }],
+              zIndex: 2,
+            },
+          ]}
+          resizeMode="contain"
+          pointerEvents="none"
+        />
+      )}
     </View>
   );
 };

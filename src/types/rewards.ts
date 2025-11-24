@@ -86,7 +86,7 @@ export interface NFTMetadata {
 export interface AssetGift {
   type: 'asset';
   assetId: string;
-  assetType: 'profile_image' | 'wallet_background';
+  assetType: 'profile_image' | 'wallet_background' | 'profile_border';
   // Support both image URLs and NFTs
   assetUrl?: string; // For image URLs (HTTP/HTTPS)
   nftMetadata?: NFTMetadata; // For NFTs

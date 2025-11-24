@@ -3,14 +3,14 @@
  * Manages badge progress tracking and claims
  */
 
-import { db, storage } from '../../config/firebase/firebase';
+import { db } from '../../config/firebase/firebase';
 import { doc, getDoc, setDoc, collection, getDocs, serverTimestamp, query, where, runTransaction, QueryDocumentSnapshot } from 'firebase/firestore';
-import { ref, getDownloadURL } from 'firebase/storage';
 import { logger } from '../analytics/loggingService';
 import priceManagementService from '../core/priceManagementService';
 import { BADGE_DEFINITIONS, BadgeInfo } from './badgeConfig';
 import { pointsService } from './pointsService';
 import { seasonService } from './seasonService';
+import { resolveStorageUrl } from '../shared/storageUrlService';
 
 export interface BadgeProgress {
   badgeId: string;
@@ -472,56 +472,6 @@ class BadgeService {
   }
 
   /**
-   * Convert gs:// URL to Firebase Storage download URL
-   */
-  private async convertGsUrlToDownloadUrl(gsUrl: string): Promise<string | undefined> {
-    try {
-      // Extract path from gs:// URL
-      // Format: gs://bucket/path/to/file.png or gs://bucket.firebasestorage.app/path/to/file.png
-      // We need to extract: path/to/file.png
-      
-      // Try different patterns to handle various gs:// URL formats
-      let storagePath: string | null = null;
-      
-      // Pattern 1: gs://bucket/path/to/file.png
-      let urlMatch = gsUrl.match(/^gs:\/\/[^/]+\/(.+)$/);
-      if (urlMatch && urlMatch[1]) {
-        storagePath = urlMatch[1];
-      } else {
-        // Pattern 2: gs://bucket.firebasestorage.app/path/to/file.png
-        // Extract everything after the domain
-        urlMatch = gsUrl.match(/^gs:\/\/[^/]+\.firebasestorage\.app\/(.+)$/);
-        if (urlMatch && urlMatch[1]) {
-          storagePath = urlMatch[1];
-        }
-      }
-      
-      if (!storagePath) {
-        logger.warn('Invalid gs:// URL format - could not extract path', { gsUrl }, 'BadgeService');
-        return undefined;
-      }
-
-      logger.debug('Converting gs:// URL to download URL', { gsUrl, storagePath }, 'BadgeService');
-      
-      const storageRef = ref(storage, storagePath);
-      const downloadUrl = await getDownloadURL(storageRef);
-      
-      logger.debug('Successfully converted gs:// URL', { gsUrl, downloadUrl }, 'BadgeService');
-      return downloadUrl;
-    } catch (error: any) {
-      // Handle specific Firebase Storage errors
-      if (error?.code === 'storage/object-not-found') {
-        logger.warn('Badge image not found in Firebase Storage', { gsUrl, error: error.message }, 'BadgeService');
-      } else if (error?.code === 'storage/unauthorized') {
-        logger.warn('Unauthorized access to badge image', { gsUrl, error: error.message }, 'BadgeService');
-      } else {
-        logger.error('Failed to convert gs:// URL to download URL', { error, gsUrl, errorCode: error?.code, errorMessage: error?.message }, 'BadgeService');
-      }
-      return undefined;
-    }
-  }
-
-  /**
    * Get badge image URL from Firebase Storage or badge configuration
    * Priority: 1. Provided URL (converted if gs://), 2. Firebase Storage badge images collection, 3. Badge config iconUrl
    */
@@ -540,7 +490,7 @@ class BadgeService {
         // If it's a gs:// URL, convert it to download URL
         if (fallbackUrl.startsWith('gs://')) {
           logger.debug('Converting gs:// URL', { badgeId, gsUrl: fallbackUrl }, 'BadgeService');
-          const downloadUrl = await this.convertGsUrlToDownloadUrl(fallbackUrl);
+          const downloadUrl = await resolveStorageUrl(fallbackUrl, { badgeId, source: 'badgeConfig' });
           if (downloadUrl) {
             logger.debug('Successfully converted gs:// URL', { badgeId, downloadUrl }, 'BadgeService');
             return downloadUrl;
@@ -561,7 +511,7 @@ class BadgeService {
             // Check if it's a gs:// URL and convert it
             if (data.imageUrl.startsWith('gs://')) {
               logger.debug('Found gs:// URL in badge_images collection', { badgeId, gsUrl: data.imageUrl }, 'BadgeService');
-              const downloadUrl = await this.convertGsUrlToDownloadUrl(data.imageUrl);
+              const downloadUrl = await resolveStorageUrl(data.imageUrl, { badgeId, source: 'badge_images' });
               if (downloadUrl) {
                 return downloadUrl;
               }

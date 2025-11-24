@@ -34,6 +34,7 @@ import {
   getGiftForDay, 
   CHRISTMAS_CALENDAR_CONFIG 
 } from './christmasCalendarConfig';
+import { resolveStorageUrl } from '../shared/storageUrlService';
 
 interface ClaimGiftResult {
   success: boolean;
@@ -272,6 +273,23 @@ class ChristmasCalendarService {
         };
       }
 
+      const giftDefinition = giftConfig.gift;
+
+      // Resolve asset URLs ahead of the transaction to avoid non-Firestore calls inside
+      let normalizedGift: Gift = giftDefinition;
+      if (giftDefinition.type === 'asset') {
+        const assetGift = giftDefinition as AssetGift;
+        const resolvedUrl = await resolveStorageUrl(assetGift.assetUrl, {
+          userId,
+          day,
+          source: 'christmasCalendar'
+        });
+        normalizedGift = {
+          ...assetGift,
+          assetUrl: resolvedUrl ?? assetGift.assetUrl ?? undefined
+        };
+      }
+
       // Use transaction to ensure atomicity
       const result = await runTransaction(db, async (transaction) => {
         // Double-check claim status within transaction
@@ -300,7 +318,7 @@ class ChristmasCalendarService {
           claimed: true,
           claimed_at: now,
           gift_id: `${this.YEAR}_day_${day}`,
-          gift_data: giftConfig.gift,
+          gift_data: normalizedGift,
           year: this.YEAR
         }, { merge: true });
 
@@ -318,8 +336,8 @@ class ChristmasCalendarService {
         // Distribute the gift based on type
         let totalPoints = userData.points || 0;
 
-        if (giftConfig.gift.type === 'points') {
-          const pointsGift = giftConfig.gift as PointsGift;
+        if (normalizedGift.type === 'points') {
+          const pointsGift = normalizedGift as PointsGift;
           const newPoints = (userData.points || 0) + pointsGift.amount;
           const newTotalEarned = (userData.total_points_earned || 0) + pointsGift.amount;
 
@@ -333,8 +351,8 @@ class ChristmasCalendarService {
 
           // Note: Points transaction will be recorded after transaction completes
           // We'll handle this outside the transaction to avoid nested operations
-        } else if (giftConfig.gift.type === 'badge') {
-          const badgeGift = giftConfig.gift as BadgeGift;
+        } else if (normalizedGift.type === 'badge') {
+          const badgeGift = normalizedGift as BadgeGift;
           const badges = userData.badges || [];
           
           // Add badge if not already present
@@ -345,8 +363,8 @@ class ChristmasCalendarService {
               active_badge: userData.active_badge || badgeGift.badgeId
             });
           }
-        } else if (giftConfig.gift.type === 'asset') {
-          const assetGift = giftConfig.gift as AssetGift;
+        } else if (normalizedGift.type === 'asset') {
+          const assetGift = normalizedGift as AssetGift;
           
           // Store asset metadata in subcollection for easy retrieval
           const assetRef = doc(db, 'users', userId, 'assets', assetGift.assetId);
@@ -379,22 +397,30 @@ class ChristmasCalendarService {
                 active_wallet_background: userData.active_wallet_background || assetGift.assetId
               });
             }
+          } else if (assetGift.assetType === 'profile_border') {
+            const profileBorders = userData.profile_borders || [];
+            if (!profileBorders.includes(assetGift.assetId)) {
+              transaction.update(userRef, {
+                profile_borders: [...profileBorders, assetGift.assetId],
+                active_profile_border: userData.active_profile_border || assetGift.assetId
+              });
+            }
           }
         }
 
         return {
           success: true,
           day,
-          gift: giftConfig.gift,
-          totalPoints: giftConfig.gift.type === 'points' ? totalPoints : undefined
+          gift: normalizedGift,
+          totalPoints: normalizedGift.type === 'points' ? totalPoints : undefined
         };
       });
 
       // Record points transaction if points were awarded (outside transaction)
       // NOTE: We only record the transaction here, NOT award points again
       // Points were already added in the Firestore transaction above (line 323-330)
-      if (result.success && giftConfig.gift.type === 'points') {
-        const pointsGift = giftConfig.gift as PointsGift;
+      if (result.success && normalizedGift.type === 'points') {
+        const pointsGift = normalizedGift as PointsGift;
         try {
           // Only record the transaction, don't award points again (they're already added)
           await pointsService.recordPointsTransaction(
@@ -413,7 +439,7 @@ class ChristmasCalendarService {
       logger.info('Gift claimed successfully', {
         userId,
         day,
-        giftType: giftConfig.gift.type,
+        giftType: normalizedGift.type,
         year: this.YEAR
       }, 'ChristmasCalendarService');
 

@@ -46,6 +46,8 @@ export interface User {
   active_badge?: string; // Currently active badge ID
   profile_assets?: string[]; // Array of profile asset IDs owned
   active_profile_asset?: string; // Currently active profile asset ID
+  profile_borders?: string[]; // Array of profile border asset IDs owned
+  active_profile_border?: string; // Currently active profile border asset ID
   wallet_backgrounds?: string[]; // Array of wallet background asset IDs owned
   active_wallet_background?: string; // Currently active wallet background asset ID
   show_badges_on_profile?: boolean; // Whether to show badges on profile (default: true)

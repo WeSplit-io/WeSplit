@@ -24,7 +24,7 @@ const ChristmasCalendarScreen: React.FC = () => {
   }
 
   return (
-    <Container style={{ backgroundColor: colors.black }}>
+    <Container style={{ backgroundColor: colors.black }} paddingHorizontal={0}>
       <Header
         title="Christmas Calendar"
         showBackButton={true}
@@ -48,8 +48,8 @@ const ChristmasCalendarScreen: React.FC = () => {
 const styles = StyleSheet.create({
   content: {
     flex: 1,
-    paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
+    paddingHorizontal: 0,
   },
 });
 

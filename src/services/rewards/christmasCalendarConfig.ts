@@ -12,6 +12,16 @@
  */
 
 import { ChristmasCalendarGift } from '../../types/rewards';
+import { getAssetInfo } from './assetConfig';
+import { getBadgeInfo } from './badgeConfig';
+
+const getAssetPreviewUrl = (assetId: string): string | undefined => {
+  return getAssetInfo(assetId)?.url || undefined;
+};
+
+const getBadgeIconUrl = (badgeId: string): string | undefined => {
+  return getBadgeInfo(badgeId)?.iconUrl || undefined;
+};
 
 /**
  * Christmas Calendar Gift Definitions for 2024
@@ -21,7 +31,7 @@ import { ChristmasCalendarGift } from '../../types/rewards';
  * The structure supports:
  * - Points: { type: 'points', amount: number }
  * - Badges: { type: 'badge', badgeId: string, title: string, description: string, icon?: string }
- * - Assets: { type: 'asset', assetId: string, assetType: 'profile_image' | 'wallet_background', assetUrl: string, name: string }
+ * - Assets: { type: 'asset', assetId: string, assetType: 'profile_image' | 'wallet_background' | 'profile_border', assetUrl: string, name: string }
  */
 export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 1 - December 1st
@@ -45,7 +55,8 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       badgeId: 'early_bird_2024',
       title: 'Early Bird',
       description: 'Started the Christmas calendar early',
-      icon: '🐦'
+      icon: '🐦',
+      iconUrl: getBadgeIconUrl('early_bird_2024')
     }
   },
   
@@ -69,7 +80,7 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       type: 'asset',
       assetId: 'profile_snowflake_2024',
       assetType: 'profile_image',
-      assetUrl: 'https://example.com/assets/profile_snowflake.png', // TODO: Replace with actual asset URL
+      assetUrl: getAssetPreviewUrl('profile_snowflake_2024'),
       name: 'Snowflake Profile',
       description: 'A festive snowflake profile image'
     }
@@ -96,7 +107,8 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       badgeId: 'santas_helper_2024',
       title: 'Santa\'s Helper',
       description: 'Active participant in the Christmas calendar',
-      icon: '🎅'
+      icon: '🎅',
+      iconUrl: getBadgeIconUrl('santas_helper_2024')
     }
   },
   
@@ -109,7 +121,7 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       type: 'asset',
       assetId: 'wallet_winter_2024',
       assetType: 'wallet_background',
-      assetUrl: 'https://example.com/assets/wallet_winter.png', // TODO: Replace with actual asset URL
+      assetUrl: getAssetPreviewUrl('wallet_winter_2024'),
       name: 'Winter Wonderland',
       description: 'A beautiful winter scene for your wallet'
     }
@@ -136,7 +148,8 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       badgeId: 'gingerbread_2024',
       title: 'Gingerbread',
       description: 'Sweet holiday spirit',
-      icon: '🍪'
+      icon: '🍪',
+      iconUrl: getBadgeIconUrl('gingerbread_2024')
     }
   },
   
@@ -160,7 +173,7 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       type: 'asset',
       assetId: 'profile_reindeer_2024',
       assetType: 'profile_image',
-      assetUrl: 'https://example.com/assets/profile_reindeer.png', // TODO: Replace with actual asset URL
+      assetUrl: getAssetPreviewUrl('profile_reindeer_2024'),
       name: 'Reindeer Profile',
       description: 'A cute reindeer profile image'
     }
@@ -169,11 +182,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 12 - December 12th
   {
     day: 12,
-    title: 'Points Surprise',
-    description: 'More points coming your way',
+    title: 'Midnight Frost Border',
+    description: 'Unlock a frosted midnight profile frame',
     gift: {
-      type: 'points',
-      amount: 125
+      type: 'asset',
+      assetId: 'profile_border_midnight_2024',
+      assetType: 'profile_border',
+      assetUrl: getAssetPreviewUrl('profile_border_midnight_2024'),
+      name: 'Midnight Frost Border',
+      description: 'Icy accents for the perfect midnight look'
     }
   },
   
@@ -187,7 +204,8 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       badgeId: 'elf_2024',
       title: 'Elf',
       description: 'Hardworking holiday helper',
-      icon: '🧝'
+      icon: '🧝',
+      iconUrl: getBadgeIconUrl('elf_2024')
     }
   },
   
@@ -200,7 +218,7 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       type: 'asset',
       assetId: 'wallet_christmas_2024',
       assetType: 'wallet_background',
-      assetUrl: 'https://example.com/assets/wallet_christmas.png', // TODO: Replace with actual asset URL
+      assetUrl: getAssetPreviewUrl('wallet_christmas_2024'),
       name: 'Christmas Magic',
       description: 'A magical Christmas scene'
     }
@@ -209,11 +227,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 15 - December 15th
   {
     day: 15,
-    title: 'Big Points Day',
-    description: 'A substantial points reward!',
+    title: 'Aurora Profile Border',
+    description: 'Glow with a premium aurora frame',
     gift: {
-      type: 'points',
-      amount: 250
+      type: 'asset',
+      assetId: 'profile_border_aurora_2024',
+      assetType: 'profile_border',
+      assetUrl: getAssetPreviewUrl('profile_border_aurora_2024'),
+      name: 'Aurora Border',
+      description: 'A glowing aurora halo for your profile picture'
     }
   },
   
@@ -227,18 +249,23 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       badgeId: 'snowflake_2024',
       title: 'Snowflake',
       description: 'One of a kind',
-      icon: '❄️'
+      icon: '❄️',
+      iconUrl: getBadgeIconUrl('snowflake_2024')
     }
   },
   
   // Day 17 - December 17th
   {
     day: 17,
-    title: 'Points Boost',
-    description: 'Keep climbing the leaderboard!',
+    title: 'Candy Cane Border',
+    description: 'Wrap your avatar in holiday stripes',
     gift: {
-      type: 'points',
-      amount: 175
+      type: 'asset',
+      assetId: 'profile_border_candycane_2024',
+      assetType: 'profile_border',
+      assetUrl: getAssetPreviewUrl('profile_border_candycane_2024'),
+      name: 'Candy Cane Border',
+      description: 'Striped candy cane ring for your avatar'
     }
   },
   
@@ -251,7 +278,7 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       type: 'asset',
       assetId: 'profile_ornament_2024',
       assetType: 'profile_image',
-      assetUrl: 'https://example.com/assets/profile_ornament.png', // TODO: Replace with actual asset URL
+      assetUrl: getAssetPreviewUrl('profile_ornament_2024'),
       name: 'Ornament Profile',
       description: 'A festive ornament profile image'
     }
@@ -260,11 +287,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 19 - December 19th
   {
     day: 19,
-    title: 'Final Week Points',
-    description: 'We\'re in the final stretch!',
+    title: 'North Pole Wallet',
+    description: 'A vibrant aurora backdrop for your balance card',
     gift: {
-      type: 'points',
-      amount: 300
+      type: 'asset',
+      assetId: 'wallet_northpole_2024',
+      assetType: 'wallet_background',
+      assetUrl: getAssetPreviewUrl('wallet_northpole_2024'),
+      name: 'North Pole Lights',
+      description: 'Neon aurora gradient for your wallet card'
     }
   },
   
@@ -278,7 +309,8 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       badgeId: 'champion_2024',
       title: 'Holiday Champion',
       description: 'Dedicated calendar participant',
-      icon: '🏆'
+      icon: '🏆',
+      iconUrl: getBadgeIconUrl('champion_2024')
     }
   },
   
@@ -291,7 +323,7 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       type: 'asset',
       assetId: 'wallet_solstice_2024',
       assetType: 'wallet_background',
-      assetUrl: 'https://example.com/assets/wallet_solstice.png', // TODO: Replace with actual asset URL
+      assetUrl: getAssetPreviewUrl('wallet_solstice_2024'),
       name: 'Winter Solstice',
       description: 'Celebrate the longest night'
     }
@@ -300,11 +332,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 22 - December 22nd
   {
     day: 22,
-    title: 'Mega Points',
-    description: 'Almost there!',
+    title: 'Aurora Spirit Badge',
+    description: 'Glow like the northern lights',
     gift: {
-      type: 'points',
-      amount: 400
+      type: 'badge',
+      badgeId: 'aurora_spirit_2024',
+      title: 'Aurora Spirit',
+      description: 'Unlocked the aurora profile border',
+      icon: '🌌',
+      iconUrl: getBadgeIconUrl('aurora_spirit_2024')
     }
   },
   
@@ -318,7 +354,8 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
       badgeId: 'eve_eve_2024',
       title: 'Christmas Eve Eve',
       description: 'Almost there!',
-      icon: '🎁'
+      icon: '🎁',
+      iconUrl: getBadgeIconUrl('eve_eve_2024')
     }
   },
   

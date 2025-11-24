@@ -23,45 +23,6 @@ import { PointsTransaction } from '../../types/rewards';
 import { logger } from '../../services/analytics/loggingService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 
-const MOCK_TRANSACTIONS: PointsTransaction[] = [
-  {
-    id: 'mock-quest-1',
-    user_id: 'mock-user',
-    amount: 150,
-    source: 'quest_completion',
-    description: 'Completed onboarding quest',
-    created_at: new Date().toISOString(),
-    season: 1,
-  },
-  {
-    id: 'mock-transaction-1',
-    user_id: 'mock-user',
-    amount: 320,
-    source: 'transaction_reward',
-    description: 'Paid dinner with friends',
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    season: 1,
-  },
-  {
-    id: 'mock-referral-1',
-    user_id: 'mock-user',
-    amount: 500,
-    source: 'referral_reward',
-    description: 'Invited Sofia to WeSplit',
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    season: 1,
-  },
-  {
-    id: 'mock-season-1',
-    user_id: 'mock-user',
-    amount: 1000,
-    source: 'season_reward',
-    description: 'Season 1 leaderboard reward',
-    created_at: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
-    season: 1,
-  },
-];
-
 const PointsHistoryScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
@@ -91,12 +52,6 @@ const PointsHistoryScreen: React.FC = () => {
   useEffect(() => {
     loadHistory();
   }, [loadHistory]);
-
-  useEffect(() => {
-    if (__DEV__ && !loading && transactions.length === 0) {
-      setTransactions(MOCK_TRANSACTIONS);
-    }
-  }, [loading, transactions.length]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -137,14 +92,27 @@ const PointsHistoryScreen: React.FC = () => {
     try {
       const date = new Date(dateString);
       const now = new Date();
-      const diffTime = Math.abs(now.getTime() - date.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Check if date is invalid
+      if (isNaN(date.getTime())) {
+        return dateString;
+      }
+      
+      // Normalize dates to start of day for comparison
+      const dateStart = new Date(date);
+      dateStart.setHours(0, 0, 0, 0);
+      const nowStart = new Date(now);
+      nowStart.setHours(0, 0, 0, 0);
+      
+      // Calculate difference in days
+      const diffTime = nowStart.getTime() - dateStart.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       
       if (diffDays === 0) {
         return 'Today';
       } else if (diffDays === 1) {
         return 'Yesterday';
-      } else if (diffDays < 7) {
+      } else if (diffDays > 1 && diffDays < 7) {
         return `${diffDays} days ago`;
       } else {
         return date.toLocaleDateString('en-US', {

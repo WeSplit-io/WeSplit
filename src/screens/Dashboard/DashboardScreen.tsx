@@ -52,6 +52,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import PhonePromptModal from '../../components/auth/PhonePromptModal';
 import { authService } from '../../services/auth/AuthService';
 import { normalizePhoneNumber } from '../../utils/validation/phone';
+import { getUserAssetMetadata } from '../../services/rewards/assetService';
+import { getAssetInfo } from '../../services/rewards/assetConfig';
 
 
 
@@ -64,6 +66,8 @@ const vaultAuthSession = {
   hasAuthenticated: false,
   lastUserId: null as string | null,
 };
+
+const DEFAULT_WALLET_BACKGROUND = 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-bg-linear.png?alt=media&token=4347e0cd-056e-4681-a066-0fd74a563013';
 
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) => {
   const { state, notifications, loadNotifications, refreshNotifications, updateUser } = useApp();
@@ -121,6 +125,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [realTransactions, setRealTransactions] = useState<Transaction[]>([]);
   const [userNames, setUserNames] = useState<Map<string, string>>(new Map());
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
+  const [walletBackgroundUrl, setWalletBackgroundUrl] = useState<string | null>(null);
   
   // Loading States
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -261,6 +266,45 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
     checkPhonePromptStatus();
   }, [currentUser?.id, currentUser?.email, currentUser?.phone, isAuthenticated]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadWalletBackground = async () => {
+      if (!currentUser?.active_wallet_background) {
+        if (isMounted) {
+          setWalletBackgroundUrl(null);
+        }
+        return;
+      }
+
+      try {
+        let metadata = null;
+        if (currentUser?.id) {
+          metadata = await getUserAssetMetadata(currentUser.id, currentUser.active_wallet_background);
+        }
+
+        if (!metadata) {
+          metadata = getAssetInfo(currentUser.active_wallet_background);
+        }
+
+        const url = metadata?.url || metadata?.nftMetadata?.imageUrl || null;
+        if (isMounted) {
+          setWalletBackgroundUrl(url);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setWalletBackgroundUrl(null);
+        }
+      }
+    };
+
+    loadWalletBackground();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id, currentUser?.active_wallet_background]);
 
   // Handle phone prompt actions
   const handleAddPhone = async (phone: string) => {
@@ -1204,7 +1248,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
         {/* Balance Card */}
         <ImageBackground
-          source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-bg-linear.png?alt=media&token=4347e0cd-056e-4681-a066-0fd74a563013'}}
+          source={{ uri: walletBackgroundUrl || DEFAULT_WALLET_BACKGROUND }}
           style={[styles.balanceCard, { alignItems: 'flex-start' }]}
           resizeMode="cover"
         >
