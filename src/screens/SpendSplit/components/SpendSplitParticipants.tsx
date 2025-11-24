@@ -88,7 +88,7 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
                       : ('wallet_address' in participant ? (participant as any).wallet_address : '');
                     return wallet ? formatWalletAddress(wallet) : 'No wallet address';
                   })()}
-                </Text>
+                    </Text>
               </View>
             </View>
             <View style={styles.participantAmountContainer}>

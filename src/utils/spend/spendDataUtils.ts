@@ -51,11 +51,19 @@ export function extractOrderData(split: Split | null | undefined): ExtractedOrde
   const orderData = (externalMetadata.orderData || {}) as Partial<SpendOrderData>;
 
   // Extract items - prioritize orderData.items, fallback to split.items
-  const items: SpendOrderItem[] = Array.isArray(orderData.items)
+  // Validate and normalize items to ensure they match SpendOrderItem interface
+  const rawItems = Array.isArray(orderData.items)
     ? orderData.items
     : Array.isArray(split.items)
-    ? (split.items as SpendOrderItem[])
+    ? split.items
     : [];
+
+  // Normalize items to ensure they have required fields (price, quantity)
+  const items: SpendOrderItem[] = rawItems.map((item: any) => ({
+    ...item,
+    price: typeof item.price === 'number' ? item.price : 0,
+    quantity: typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1,
+  }));
 
   // Extract order identification (id takes precedence over order_number for orderId)
   const orderId = orderData.id || orderData.order_number || externalMetadata.orderId || null;

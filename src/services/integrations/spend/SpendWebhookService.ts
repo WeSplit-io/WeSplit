@@ -4,6 +4,7 @@
  */
 
 import { SpendWebhookPayload, SpendWebhookResponse, SPEND_CONFIG } from './SpendTypes';
+import { SpendPaymentModeService } from './SpendPaymentModeService';
 import { logger } from '../../analytics/loggingService';
 
 export class SpendWebhookService {
@@ -137,24 +138,55 @@ export class SpendWebhookService {
     amount: number,
     currency: 'SOL' | 'USDC' | 'BONK'
   ): SpendWebhookPayload {
-    const participants = split.participants
-      ?.map((p: any) => p.walletAddress)
-      .filter((addr: string) => addr && addr.trim() !== '') || [];
+    // Validate inputs
+    if (!split || !split.id) {
+      throw new Error('Split is required and must have an id');
+    }
+    
+    if (!transactionSignature || typeof transactionSignature !== 'string') {
+      throw new Error('Transaction signature is required and must be a string');
+    }
+    
+    if (typeof amount !== 'number' || amount <= 0) {
+      throw new Error('Amount must be a positive number');
+    }
+    
+    if (!['SOL', 'USDC', 'BONK'].includes(currency)) {
+      throw new Error('Currency must be SOL, USDC, or BONK');
+    }
 
-    // Extract orderId from orderData first, then fallback to externalMetadata
-    const orderData = split.externalMetadata?.orderData || {};
-    const orderId = orderData.id || orderData.order_number || split.externalMetadata?.orderId || split.externalMetadata?.orderNumber || '';
+    // Extract participant wallet addresses (sanitized)
+    const participants = (split.participants || [])
+      .map((p: any) => p.walletAddress || p.wallet_address)
+      .filter((addr: string | undefined) => addr && typeof addr === 'string' && addr.trim() !== '')
+      .map((addr: string) => addr.trim()) || [];
 
-    return {
-      order_id: orderId,
-      split_id: split.id,
-      transaction_signature: transactionSignature,
-      amount,
+    // Use centralized utility to extract orderId
+    const orderId = SpendPaymentModeService.getOrderId(split) || '';
+    
+    if (!orderId) {
+      logger.warn('No order ID found in split for webhook payload', {
+        splitId: split.id,
+      }, 'SpendWebhookService');
+    }
+
+    const payload: SpendWebhookPayload = {
+      order_id: String(orderId),
+      split_id: String(split.id),
+      transaction_signature: String(transactionSignature),
+      amount: Number(amount),
       currency,
       participants,
       status: 'completed',
       timestamp: new Date().toISOString(),
     };
+    
+    // Validate payload matches SP3ND expected format
+    if (!payload.order_id || payload.order_id.trim() === '') {
+      throw new Error('Order ID is required in webhook payload');
+    }
+    
+    return payload;
   }
 }
 

@@ -4,7 +4,7 @@
  * Handles automatic payment to SPEND when threshold is met
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,7 @@ import { SplitStorageService } from '../../services/splits';
 import { SplitParticipantInvitationService } from '../../services/splits/SplitParticipantInvitationService';
 import { extractOrderData, findUserParticipant, calculatePaymentTotals } from '../../utils/spend/spendDataUtils';
 import { createSpendSplitWallet } from '../../utils/spend/spendWalletUtils';
+import { createMockSpendOrderData } from '../../services/integrations/spend/SpendMockData';
 
 interface SpendSplitScreenProps {
   navigation: any;
@@ -37,10 +38,48 @@ interface SpendSplitScreenProps {
 }
 
 const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }) => {
-  const { billData, processedBillData, splitWallet: existingSplitWallet, splitData } = route.params || {};
+  const { billData, processedBillData, splitWallet: existingSplitWallet, splitData: routeSplitData } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
   const walletContext = useWallet();
+
+  // Inject mock order data if missing (development only)
+  const splitData = useMemo(() => {
+    if (!routeSplitData) return routeSplitData;
+    
+    // Only inject mock data in development and if orderData is missing or has no items
+    if (__DEV__ && (!routeSplitData.externalMetadata?.orderData || !routeSplitData.externalMetadata?.orderData?.items || routeSplitData.externalMetadata.orderData.items.length === 0)) {
+      const mockOrderData = createMockSpendOrderData({
+        order_number: routeSplitData.externalMetadata?.orderNumber || 'ORD-1234567890',
+        id: routeSplitData.externalMetadata?.orderId || 'ord_1234567890',
+        status: routeSplitData.externalMetadata?.orderStatus || 'Payment_Pending',
+        store: routeSplitData.externalMetadata?.store || 'amazon',
+        total_amount: routeSplitData.totalAmount || 100.0,
+      });
+      
+      return {
+        ...routeSplitData,
+        externalMetadata: {
+          ...routeSplitData.externalMetadata,
+          orderData: {
+            ...mockOrderData,
+            ...routeSplitData.externalMetadata?.orderData,
+            // Ensure items are present
+            items: routeSplitData.externalMetadata?.orderData?.items?.length > 0 
+              ? routeSplitData.externalMetadata.orderData.items 
+              : mockOrderData.items,
+          },
+          // Update metadata fields if missing
+          orderId: routeSplitData.externalMetadata?.orderId || mockOrderData.id,
+          orderNumber: routeSplitData.externalMetadata?.orderNumber || mockOrderData.order_number,
+          orderStatus: routeSplitData.externalMetadata?.orderStatus || mockOrderData.status,
+          store: routeSplitData.externalMetadata?.store || mockOrderData.store,
+        },
+      };
+    }
+    
+    return routeSplitData;
+  }, [routeSplitData]);
 
   const [splitWallet, setSplitWallet] = useState<SplitWallet | null>((existingSplitWallet as SplitWallet) || null);
   const [isSplitConfirmed, setIsSplitConfirmed] = useState(false);
@@ -456,12 +495,12 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
           walletId: wallet?.id,
         }, 'SpendSplitScreen');
       } else {
-        Alert.alert(
+      Alert.alert(
           'Error',
           walletResult.error || 'Failed to create split wallet. Please try again.',
-          [{ text: 'OK' }]
-        );
-        return;
+        [{ text: 'OK' }]
+      );
+      return;
       }
     }
 
@@ -701,8 +740,52 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   }
 
   // Extract participants and calculate totals
-  const participants = splitWallet?.participants || splitData.participants || [];
-  const totalAmount = splitData.totalAmount || 0;
+  let participants = splitWallet?.participants || splitData.participants || [];
+  let totalAmount = splitData.totalAmount || 0;
+  
+  // Calculate initial totals to check if we need mock data
+  const initialTotals = calculatePaymentTotals(participants, totalAmount);
+  
+  // Inject mock progress data in development mode (33% progress for visualization)
+  // This ensures the arc progress bar shows a partial-filled state matching the mockup
+  if (__DEV__ && (participants.length === 0 || totalAmount === 0 || initialTotals.totalPaid === 0)) {
+    const mockTotalAmount = totalAmount > 0 ? totalAmount : 100.0;
+    const mockTotalPaid = mockTotalAmount * 0.33; // 33% progress (21.87 USDC for 66.21 total, or 33 USDC for 100 total)
+    
+    // Create mock participants with partial payment if no participants exist
+    if (participants.length === 0) {
+      participants = [
+        {
+          userId: currentUser?.id?.toString() || 'mock_user_1',
+          id: currentUser?.id?.toString() || 'mock_user_1',
+          name: currentUser?.name || 'You',
+          email: currentUser?.email || 'user@example.com',
+          amountOwed: mockTotalAmount,
+          amountPaid: mockTotalPaid,
+          status: 'partial',
+          isPaid: false,
+        },
+      ];
+    } else {
+      // Update existing participants to show 33% progress if they haven't paid
+      participants = participants.map((p: any) => {
+        const participantOwed = p.amountOwed || (mockTotalAmount / participants.length);
+        const participantPaid = p.amountPaid > 0 ? p.amountPaid : participantOwed * 0.33;
+        return {
+          ...p,
+          amountOwed: participantOwed,
+          amountPaid: participantPaid,
+          status: participantPaid >= participantOwed ? 'paid' : participantPaid > 0 ? 'partial' : 'pending',
+        };
+      });
+    }
+    
+    // Update totalAmount if it's 0
+    if (totalAmount === 0) {
+      totalAmount = mockTotalAmount;
+    }
+  }
+  
   const { totalPaid, completionPercentage } = calculatePaymentTotals(
     participants,
     totalAmount
@@ -749,12 +832,12 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
           const shouldShow = paymentStatus === 'processing' || paymentStatus === 'paid' || paymentStatus === 'failed';
           if (!shouldShow) return null;
           return (
-            <View style={{
+        <View style={{
               marginHorizontal: spacing.sm,
-              marginBottom: spacing.md,
-            }}>
-              <SpendPaymentStatus split={splitData} />
-            </View>
+          marginBottom: spacing.md,
+        }}>
+          <SpendPaymentStatus split={splitData} />
+        </View>
           );
         })()}
 

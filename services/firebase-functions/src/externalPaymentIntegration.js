@@ -394,31 +394,57 @@ async function createOrGetUser(email, walletAddress) {
 }
 
 /**
- * Remove undefined values from an object (Firestore doesn't allow undefined)
+ * Parse timestamp from SP3ND order data
+ * Supports multiple formats: Firebase Timestamp, ISO 8601 string, Unix timestamp (ms), Date object
+ * @param {any} timestamp - Timestamp in any supported format
+ * @returns {string} ISO 8601 string or null if invalid
  */
-function removeUndefinedValues(obj) {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
+function parseSp3ndTimestamp(timestamp) {
+  if (!timestamp) {
+    return null;
   }
   
-  if (Array.isArray(obj)) {
-    return obj.map(item => removeUndefinedValues(item));
+  try {
+    // ISO 8601 string
+    if (typeof timestamp === 'string') {
+      const date = new Date(timestamp);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString();
   }
-  
-  const cleaned = {};
-  for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      const value = obj[key];
-      if (value !== undefined) {
-        cleaned[key] = removeUndefinedValues(value);
-      }
+      return null;
     }
+    
+    // Firebase Timestamp
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      return timestamp.toDate().toISOString();
+    }
+    
+    // Unix timestamp (milliseconds)
+    if (typeof timestamp === 'number') {
+      // Check if it's in seconds (10 digits) or milliseconds (13 digits)
+      const timestampMs = timestamp.toString().length === 10 ? timestamp * 1000 : timestamp;
+      const date = new Date(timestampMs);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString();
+      }
+      return null;
+    }
+    
+    // Date object
+    if (timestamp instanceof Date) {
+      return timestamp.toISOString();
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('[SP3ND] Failed to parse timestamp:', error);
+    return null;
   }
-  return cleaned;
 }
 
 /**
  * Remove undefined values from an object (Firestore doesn't allow undefined)
+ * Also sanitizes sensitive data to prevent leaks in logs
  */
 function removeUndefinedValues(obj) {
   if (obj === null || typeof obj !== 'object') {
@@ -465,6 +491,7 @@ async function createSplitFromPayment(user, paymentData) {
       orderExtractionPath = 'metadata.order';
     }
     
+    // Log order extraction (sanitized - no sensitive data)
     console.log('[SP3ND] Order extraction:', {
       path: orderExtractionPath,
       hasOrder: !!sp3ndOrder,
@@ -473,6 +500,7 @@ async function createSplitFromPayment(user, paymentData) {
       store: sp3ndOrder?.store || 'N/A',
       totalAmount: sp3ndOrder?.total_amount || 'N/A',
       itemsCount: sp3ndOrder?.items?.length || 0,
+      // Never log: webhookSecret, user_wallet, customer_email, transaction_signature
     });
     
     // Use SP3ND order total_amount if available, otherwise use paymentData.amount
@@ -565,21 +593,9 @@ async function createSplitFromPayment(user, paymentData) {
         phone: paymentData.merchant.phone || ''
       },
       date: (() => {
-        if (sp3ndOrder?.created_at) {
-          // Handle different timestamp formats
-          if (typeof sp3ndOrder.created_at === 'string') {
-            return sp3ndOrder.created_at;
-          } else if (sp3ndOrder.created_at.toDate && typeof sp3ndOrder.created_at.toDate === 'function') {
-            // Firebase Timestamp
-            return sp3ndOrder.created_at.toDate().toISOString();
-          } else if (typeof sp3ndOrder.created_at === 'number') {
-            // Unix timestamp (milliseconds)
-            return new Date(sp3ndOrder.created_at).toISOString();
-          } else if (sp3ndOrder.created_at instanceof Date) {
-            return sp3ndOrder.created_at.toISOString();
-          }
-        }
-        return paymentData.transactionDate || new Date().toISOString();
+        // Use SP3ND order created_at if available, otherwise fallback to transactionDate
+        const orderDate = sp3ndOrder?.created_at ? parseSp3ndTimestamp(sp3ndOrder.created_at) : null;
+        return orderDate || paymentData.transactionDate || new Date().toISOString();
       })(),
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -628,7 +644,13 @@ async function createSplitFromPayment(user, paymentData) {
           }
           
           if (metadata.webhookSecret) {
-            externalMetadata.webhookSecret = metadata.webhookSecret.trim();
+            // Sanitize and validate webhook secret (never log this value)
+            const webhookSecret = String(metadata.webhookSecret).trim();
+            if (webhookSecret.length < 8) {
+              throw new functions.https.HttpsError('invalid-argument', 
+                'Webhook secret must be at least 8 characters');
+            }
+            externalMetadata.webhookSecret = webhookSecret;
           }
           
           if (metadata.paymentThreshold !== undefined) {
@@ -644,13 +666,16 @@ async function createSplitFromPayment(user, paymentData) {
           
           // Store full SP3ND order data for reference
           if (sp3ndOrder) {
+            // Log order storage (sanitized - no sensitive data)
             console.log('[SP3ND] Storing complete order data in externalMetadata.orderData:', {
               orderId: sp3ndOrder.id || sp3ndOrder.order_number,
               itemsCount: sp3ndOrder.items?.length || 0,
               hasAllFields: !!(sp3ndOrder.id && sp3ndOrder.order_number && sp3ndOrder.status && sp3ndOrder.store),
+              // Never log: webhookSecret, user_wallet, customer_email, transaction_signature
             });
             
             // Store all relevant SP3ND order fields
+            // Parse timestamps to ensure consistent format (ISO 8601 strings)
             externalMetadata.orderData = {
               id: sp3ndOrder.id,
               order_number: sp3ndOrder.order_number,
@@ -659,8 +684,8 @@ async function createSplitFromPayment(user, paymentData) {
               user_id: sp3ndOrder.user_id,
               user_wallet: sp3ndOrder.user_wallet,
               customer_email: sp3ndOrder.customer_email,
-              created_at: sp3ndOrder.created_at,
-              updated_at: sp3ndOrder.updated_at,
+              created_at: parseSp3ndTimestamp(sp3ndOrder.created_at) || sp3ndOrder.created_at,
+              updated_at: parseSp3ndTimestamp(sp3ndOrder.updated_at) || sp3ndOrder.updated_at,
               shipping_address: sp3ndOrder.shipping_address,
               shipping_country: sp3ndOrder.shipping_country,
               shipping_option: sp3ndOrder.shipping_option,
@@ -669,9 +694,9 @@ async function createSplitFromPayment(user, paymentData) {
               payment_method: sp3ndOrder.payment_method,
               transaction_signature: sp3ndOrder.transaction_signature,
               transaction_state: sp3ndOrder.transaction_state,
-              payment_initiated_at: sp3ndOrder.payment_initiated_at,
-              payment_confirmed_at: sp3ndOrder.payment_confirmed_at,
-              payment_verified_at: sp3ndOrder.payment_verified_at,
+              payment_initiated_at: parseSp3ndTimestamp(sp3ndOrder.payment_initiated_at) || sp3ndOrder.payment_initiated_at,
+              payment_confirmed_at: parseSp3ndTimestamp(sp3ndOrder.payment_confirmed_at) || sp3ndOrder.payment_confirmed_at,
+              payment_verified_at: parseSp3ndTimestamp(sp3ndOrder.payment_verified_at) || sp3ndOrder.payment_verified_at,
               reference_number: sp3ndOrder.reference_number,
               tracking_number: sp3ndOrder.tracking_number,
               tracking_url: sp3ndOrder.tracking_url,
@@ -679,13 +704,13 @@ async function createSplitFromPayment(user, paymentData) {
               amazonOrderIds: sp3ndOrder.amazonOrderIds,
               shippedAmazonOrderIds: sp3ndOrder.shippedAmazonOrderIds,
               deliveredAmazonOrderIds: sp3ndOrder.deliveredAmazonOrderIds,
-              deliveredAt: sp3ndOrder.deliveredAt,
-              lastStatusChangeAt: sp3ndOrder.lastStatusChangeAt,
-              nextPollAt: sp3ndOrder.nextPollAt,
+              deliveredAt: parseSp3ndTimestamp(sp3ndOrder.deliveredAt) || sp3ndOrder.deliveredAt,
+              lastStatusChangeAt: parseSp3ndTimestamp(sp3ndOrder.lastStatusChangeAt) || sp3ndOrder.lastStatusChangeAt,
+              nextPollAt: parseSp3ndTimestamp(sp3ndOrder.nextPollAt) || sp3ndOrder.nextPollAt,
               international_processing: sp3ndOrder.international_processing,
-              international_submitted_at: sp3ndOrder.international_submitted_at,
-              international_ready_at: sp3ndOrder.international_ready_at,
-              international_payment_completed_at: sp3ndOrder.international_payment_completed_at,
+              international_submitted_at: parseSp3ndTimestamp(sp3ndOrder.international_submitted_at) || sp3ndOrder.international_submitted_at,
+              international_ready_at: parseSp3ndTimestamp(sp3ndOrder.international_ready_at) || sp3ndOrder.international_ready_at,
+              international_payment_completed_at: parseSp3ndTimestamp(sp3ndOrder.international_payment_completed_at) || sp3ndOrder.international_payment_completed_at,
               // Store financial fields
               subtotal: sp3ndOrder.subtotal,
               discount: sp3ndOrder.discount,

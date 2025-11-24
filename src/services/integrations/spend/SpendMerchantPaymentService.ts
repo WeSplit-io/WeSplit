@@ -184,11 +184,10 @@ export class SpendMerchantPaymentService {
     splitWalletId: string,
     creatorId: string
   ): Promise<PaymentResult> {
-    const treasuryWallet = split.externalMetadata?.treasuryWallet;
+    const treasuryWallet = SpendPaymentModeService.getTreasuryWallet(split);
     
-    // Extract orderId from orderData first, then fallback to externalMetadata
-    const orderData = split.externalMetadata?.orderData || {};
-    const orderId = orderData.id || orderData.order_number || split.externalMetadata?.orderId || split.externalMetadata?.orderNumber;
+    // Use centralized utility to extract orderId
+    const orderId = SpendPaymentModeService.getOrderId(split);
 
     if (!treasuryWallet) {
       return {
@@ -206,7 +205,8 @@ export class SpendMerchantPaymentService {
 
     // Format memo: "SP3ND Order: {orderId}"
     // Use order_number if available (more readable), otherwise use id
-    const memoOrderId = orderData.order_number || orderId;
+    const orderNumber = SpendPaymentModeService.getOrderNumber(split);
+    const memoOrderId = orderNumber || orderId || '';
     const memo = SPEND_CONFIG.memoFormat.replace('{orderId}', String(memoOrderId));
 
     logger.info('Sending payment to SPEND treasury', {

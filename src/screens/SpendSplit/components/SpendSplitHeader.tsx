@@ -176,10 +176,10 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
             <Text style={styles.orderTitle} numberOfLines={1}>
               Order #{displayOrderNumber}
             </Text>
-            <Text style={styles.orderDate}>
+              <Text style={styles.orderDate}>
               {formattedDate}
-            </Text>
-          </View>
+                  </Text>
+                </View>
           {statusDisplay && (
             <View style={styles.statusBadgeContainer}>
               <View style={styles.statusBadge}>
@@ -231,8 +231,9 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
               </View>
               {items.map((item: any, index: number) => {
                 // Extract item data according to SP3ND OrderItem schema
-                const itemPrice = item.price || 0;
-                const itemQuantity = item.quantity || 1;
+                // Price and quantity are required fields with defaults
+                const itemPrice = typeof item.price === 'number' ? item.price : 0;
+                const itemQuantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
                 const itemTotal = itemPrice * itemQuantity;
                 
                 // Use product_title as primary (per SP3ND schema), fallback to name
@@ -241,24 +242,42 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
                 // Store name comes from order level, not item level (per SP3ND schema)
                 const storeName = store || '';
                 
+                // Category (optional field)
+                const itemCategory = item.category || null;
+                
                 // Format variants if available (per SP3ND ProductVariant schema)
-                const variantsText = item.variants && Array.isArray(item.variants) && item.variants.length > 0
-                  ? item.variants.map((v: any) => `${v.type}: ${v.value}`).join(', ')
-                  : null;
+                // Handle both array and null/undefined cases
+                const variantsText = 
+                  item.variants && 
+                  Array.isArray(item.variants) && 
+                  item.variants.length > 0 &&
+                  item.variants.every((v: any) => v && typeof v === 'object' && v.type && v.value)
+                    ? item.variants.map((v: any) => `${v.type}: ${v.value}`).join(', ')
+                    : null;
                 
                 // Image URL (per SP3ND schema: image_url or image)
-                const imageUrl = item.image_url || item.image;
+                // Both fields are supported for compatibility
+                const imageUrl = item.image_url || item.image || null;
                 
-                // Prime eligibility (per SP3ND schema)
+                // Prime eligibility (per SP3ND schema) - boolean field
                 const isPrime = item.isPrimeEligible === true;
                 
+                // Product URL (optional, for linking to product page)
+                const productUrl = item.product_url || item.url || null;
+                
+                // Generate unique key for item
+                const itemKey = item.product_id || item.id || `item-${index}`;
+                
                 return (
-                  <View key={item.product_id || item.id || `item-${index}`} style={styles.orderItem}>
+                  <View key={itemKey} style={styles.orderItem}>
                     {imageUrl ? (
                       <Image
                         source={{ uri: imageUrl }}
                         style={styles.orderItemImage}
                         resizeMode="cover"
+                        onError={() => {
+                          // Image failed to load - fallback handled by conditional rendering
+                        }}
                       />
                     ) : (
                       <View style={styles.orderItemIcon}>
@@ -274,24 +293,36 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
                           {variantsText}
                         </Text>
                       )}
+                      {itemCategory && (
+                        <Text style={styles.orderItemCategory} numberOfLines={1}>
+                          {itemCategory}
+                        </Text>
+                      )}
                       {storeName && (
                         <Text style={styles.orderItemStore} numberOfLines={1}>
                           {storeName}
                         </Text>
                       )}
-                      {isPrime && (
-                        <View style={styles.primeBadge}>
-                          <Text style={styles.primeBadgeText}>Prime</Text>
-                        </View>
-                      )}
+                      <View style={styles.orderItemBadges}>
+                        {isPrime && (
+                          <View style={styles.primeBadge}>
+                            <Text style={styles.primeBadgeText}>Prime</Text>
+                          </View>
+                        )}
+                        {itemQuantity > 1 && (
+                          <View style={styles.quantityBadge}>
+                            <Text style={styles.quantityBadgeText}>×{itemQuantity}</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                     <View style={styles.orderItemPriceContainer}>
                       <Text style={styles.orderItemPrice}>
                         ${formatAmountWithComma(itemTotal)}
                       </Text>
                       {itemQuantity > 1 && (
-                        <Text style={styles.orderItemQuantity}>
-                          Qty: {itemQuantity}
+                        <Text style={styles.orderItemUnitPrice}>
+                          ${formatAmountWithComma(itemPrice)} each
                         </Text>
                       )}
                     </View>
@@ -489,12 +520,25 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
     marginTop: spacing.xs / 4,
   },
+  orderItemCategory: {
+    fontSize: typography.fontSize.xs,
+    color: colors.black + 'AA',
+    fontWeight: typography.fontWeight.regular,
+    textTransform: 'capitalize',
+    marginTop: spacing.xs / 4,
+  },
   orderItemVariants: {
     fontSize: typography.fontSize.xs,
     color: colors.black + 'AA',
     fontWeight: typography.fontWeight.regular,
     fontStyle: 'italic',
     marginTop: spacing.xs / 4,
+  },
+  orderItemBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs / 2,
+    marginTop: spacing.xs / 2,
   },
   orderItemPriceContainer: {
     alignItems: 'flex-end',
@@ -506,10 +550,22 @@ const styles = StyleSheet.create({
     color: colors.black,
     marginBottom: spacing.xs / 4,
   },
-  orderItemQuantity: {
+  orderItemUnitPrice: {
     fontSize: typography.fontSize.xs,
     color: colors.black + 'CC',
     fontWeight: typography.fontWeight.medium,
+  },
+  quantityBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.info + '20',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  quantityBadgeText: {
+    fontSize: typography.fontSize.xs - 2,
+    color: colors.info,
+    fontWeight: typography.fontWeight.bold,
   },
   primeBadge: {
     alignSelf: 'flex-start',

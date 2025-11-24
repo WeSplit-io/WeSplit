@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
@@ -33,46 +33,100 @@ const SpendSplitProgress: React.FC<SpendSplitProgressProps> = ({
   // Use shared formatting utility
   const formatAmount = formatAmountWithComma;
 
-  // SVG circle calculations
-  const size = 180;
-  const strokeWidth = 12;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
+  // SVG semi-circular arc calculations (180-degree arc at the top)
+  const width = 200;
+  const height = 100; // Semi-circle height
+  const strokeWidth = 20; // Increased thickness
+  const radius = 80; // Arc radius
+  const centerX = width / 2; // 100
+  const centerY = height; // 100 - center at bottom for semi-circle at top
+  
+  // Arc configuration: 180-degree semi-circle at the top
+  // For a semi-circle at the top, the center is at the bottom of the viewBox
+  // We need to go from left (180°) to right (0°) but curve upward
+  // In SVG: 0° = right, 90° = bottom, 180° = left, 270° = top
+  // To curve upward, we go clockwise from 180° to 0° (sweep=1)
+  // This goes: 180° -> 270° -> 0° (curves upward through the top)
+  const arcStartAngle = 180; // Start from left
+  const arcEndAngle = 0; // End at right
+  const arcSweepAngle = 180; // Total arc span (semi-circle)
+  
+  // Helper function to convert angle to coordinates
+  // SVG uses standard math: 0° = right, positive = counterclockwise
+  const angleToCoord = (angleDeg: number) => {
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const x = centerX + radius * Math.cos(angleRad);
+    const y = centerY + radius * Math.sin(angleRad);
+    return { x, y };
+  };
+  
+  // Calculate start and end points of the full arc
+  const startPoint = angleToCoord(arcStartAngle); // Left point: (20, 100)
+  const endPoint = angleToCoord(arcEndAngle); // Right point: (180, 100)
+  
+  // Large arc flag: 0 for semi-circle (exactly 180 degrees)
+  const largeArcFlag = 0;
+  // Sweep flag: 1 for clockwise (curves upward from left to right through top)
+  const sweepFlag = 1;
+  
+  // Create arc path for background (full semi-circle - always visible)
+  // SVG arc format: M x y A rx ry x-axis-rotation large-arc-flag sweep-flag x y
+  const backgroundArcPath = `M ${startPoint.x} ${startPoint.y} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${endPoint.x} ${endPoint.y}`;
+  
+  // Progress: 0 to 1 (0% to 100%)
   const progress = Math.min(completionPercentage, 100) / 100;
-  const strokeDashoffset = circumference * (1 - progress);
+  
+  // Calculate progress end point based on current progress
+  // Progress goes from start (180°) clockwise to end (0°)
+  // For clockwise: startAngle + (sweepAngle * progress)
+  const progressAngle = arcStartAngle + (arcSweepAngle * progress);
+  // Normalize to 0-360 range
+  const normalizedProgressAngle = progressAngle > 360 ? progressAngle - 360 : progressAngle;
+  const progressPoint = angleToCoord(normalizedProgressAngle);
+  
+  // Determine if progress arc is large (> 180 degrees) - but for semi-circle, max is 180
+  const progressArcAngle = arcSweepAngle * progress;
+  const progressLargeArcFlag = progressArcAngle > 180 ? 1 : 0;
+  
+  // Create arc path for progress (partial arc based on progress)
+  const progressArcPath = progress > 0 
+    ? `M ${startPoint.x} ${startPoint.y} A ${radius} ${radius} 0 ${progressLargeArcFlag} ${sweepFlag} ${progressPoint.x} ${progressPoint.y}`
+    : '';
 
   return (
     <View style={styles.container}>
-      {/* Progress Circle */}
-      <View style={styles.progressCircleWrapper}>
-        <View style={styles.progressCircle}>
-          <Svg width={size} height={size} style={styles.svg}>
-            {/* Background circle */}
-            <Circle
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
+      {/* Progress Ring - Semi-circular arc at top */}
+      <View style={styles.progressRingWrapper}>
+        <View style={styles.progressRing}>
+          <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={styles.svg}>
+            <Defs>
+              {/* Green gradient for progress bar */}
+              <LinearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <Stop offset="0%" stopColor="#AAFFAA" stopOpacity="1" />
+                <Stop offset="100%" stopColor={colors.green} stopOpacity="1" />
+              </LinearGradient>
+            </Defs>
+            
+            {/* Background arc (unfilled portion) - always shows full semi-circle */}
+            <Path
+              d={backgroundArcPath}
               stroke={colors.white20}
               strokeWidth={strokeWidth}
               fill="transparent"
             />
-            {/* Progress arc */}
+            
+            {/* Progress arc (filled portion) - shows progress from left to right */}
             {progress > 0 && (
-              <Circle
-                cx={size / 2}
-                cy={size / 2}
-                r={radius}
-                stroke={colors.green}
+              <Path
+                d={progressArcPath}
+                stroke="url(#progressGradient)"
                 strokeWidth={strokeWidth}
                 fill="transparent"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            />
-          )}
+              />
+            )}
           </Svg>
           
+          {/* Text content centered inside the semi-circle */}
           <View style={styles.progressInner}>
             <Text style={styles.progressPercentage}>
               ({Math.min(completionPercentage, 100).toFixed(0)}%)
@@ -103,14 +157,14 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
     marginVertical: spacing.md,
   },
-  progressCircleWrapper: {
+  progressRingWrapper: {
     alignItems: 'center',
     marginBottom: spacing.lg,
     position: 'relative',
   },
-  progressCircle: {
-    width: 180,
-    height: 180,
+  progressRing: {
+    width: 200,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -119,6 +173,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   progressInner: {
+    position: 'absolute',
+    top: 50, // More space between percentage and arc
+    left: 0,
+    right: 0,
     alignItems: 'center',
     zIndex: 1,
   },
