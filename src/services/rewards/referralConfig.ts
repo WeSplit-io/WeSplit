@@ -144,3 +144,82 @@ export function referralRewardExists(rewardId: string): boolean {
   return REFERRAL_REWARDS.some(r => r.rewardId === rewardId && r.enabled);
 }
 
+/**
+ * Validate referral configuration
+ * Ensures all referral rewards have valid required fields and consistent data
+ * 
+ * @returns Array of validation errors (empty if valid)
+ */
+export function validateReferralConfig(): string[] {
+  const errors: string[] = [];
+  const validTriggers: ReferralTrigger[] = ['account_created', 'first_split', 'first_transaction', 'milestone_reached', 'custom'];
+  const rewardIds = new Set<string>();
+  
+  REFERRAL_REWARDS.forEach((reward, index) => {
+    // Required fields
+    if (!reward.rewardId || reward.rewardId.trim() === '') {
+      errors.push(`Referral reward at index ${index} has empty or missing rewardId`);
+    } else {
+      // Check for duplicate reward IDs
+      if (rewardIds.has(reward.rewardId)) {
+        errors.push(`Duplicate referral rewardId: '${reward.rewardId}'`);
+      }
+      rewardIds.add(reward.rewardId);
+    }
+    
+    if (!reward.taskType || reward.taskType.trim() === '') {
+      errors.push(`Referral reward '${reward.rewardId}' has empty or missing taskType`);
+    }
+    
+    if (!reward.trigger) {
+      errors.push(`Referral reward '${reward.rewardId}' has missing trigger`);
+    } else if (!validTriggers.includes(reward.trigger)) {
+      errors.push(`Referral reward '${reward.rewardId}' has invalid trigger: '${reward.trigger}'`);
+    }
+    
+    if (!reward.description || reward.description.trim() === '') {
+      errors.push(`Referral reward '${reward.rewardId}' has empty or missing description`);
+    }
+    
+    if (typeof reward.enabled !== 'boolean') {
+      errors.push(`Referral reward '${reward.rewardId}' has invalid enabled value: ${reward.enabled}`);
+    }
+    
+    // Priority validation
+    if (reward.priority !== undefined) {
+      if (typeof reward.priority !== 'number' || reward.priority < 0) {
+        errors.push(`Referral reward '${reward.rewardId}' has invalid priority: ${reward.priority}`);
+      }
+    }
+    
+    // Condition validation
+    if (reward.condition) {
+      if (reward.condition.minSplitAmount !== undefined) {
+        if (typeof reward.condition.minSplitAmount !== 'number' || reward.condition.minSplitAmount < 0) {
+          errors.push(`Referral reward '${reward.rewardId}' has invalid minSplitAmount: ${reward.condition.minSplitAmount}`);
+        }
+      }
+      if (reward.condition.minTransactionAmount !== undefined) {
+        if (typeof reward.condition.minTransactionAmount !== 'number' || reward.condition.minTransactionAmount < 0) {
+          errors.push(`Referral reward '${reward.rewardId}' has invalid minTransactionAmount: ${reward.condition.minTransactionAmount}`);
+        }
+      }
+      if (reward.condition.minPointsEarned !== undefined) {
+        if (typeof reward.condition.minPointsEarned !== 'number' || reward.condition.minPointsEarned < 0) {
+          errors.push(`Referral reward '${reward.rewardId}' has invalid minPointsEarned: ${reward.condition.minPointsEarned}`);
+        }
+      }
+    }
+    
+    // Trigger-specific validation
+    if (reward.trigger === 'first_split' && reward.condition?.minSplitAmount === undefined) {
+      errors.push(`Referral reward '${reward.rewardId}' with trigger 'first_split' should have minSplitAmount condition`);
+    }
+    if (reward.trigger === 'first_transaction' && reward.condition?.minTransactionAmount === undefined) {
+      errors.push(`Referral reward '${reward.rewardId}' with trigger 'first_transaction' should have minTransactionAmount condition`);
+    }
+  });
+  
+  return errors;
+}
+

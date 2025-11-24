@@ -116,7 +116,19 @@ class PointsService {
   }
 
   /**
-   * Award season-based points to a user
+   * Award points to a user (season-based or legacy)
+   * 
+   * This is the unified method for awarding points. If season is not provided,
+   * it defaults to the current season. This consolidates the previous
+   * awardPoints() and awardSeasonPoints() methods.
+   * 
+   * @param userId - User ID
+   * @param amount - Points amount to award
+   * @param source - Source of the points
+   * @param sourceId - Optional source ID (transaction ID, quest ID, etc.)
+   * @param description - Optional description
+   * @param season - Optional season number (defaults to current season)
+   * @param taskType - Optional task type for tracking
    */
   async awardSeasonPoints(
     userId: string,
@@ -163,6 +175,9 @@ class PointsService {
         points_last_updated: serverTimestamp()
       });
 
+      // Use current season if not provided (for backward compatibility)
+      const effectiveSeason = season !== undefined ? season : seasonService.getCurrentSeason();
+
       // Record points transaction with season info
       await this.recordPointsTransaction(
         userId,
@@ -170,17 +185,17 @@ class PointsService {
         source,
         sourceId || '',
         description || `Awarded ${amount} points`,
-        season,
+        effectiveSeason,
         taskType
       );
 
-      logger.info('Season points awarded successfully', {
+      logger.info('Points awarded successfully', {
         userId,
         amount,
         currentPoints,
         newPoints,
         source,
-        season,
+        season: effectiveSeason,
         taskType
       }, 'PointsService');
 
@@ -201,7 +216,10 @@ class PointsService {
   }
 
   /**
-   * Award points to a user (legacy method, now uses season-based)
+   * Award points to a user (legacy method - now redirects to awardSeasonPoints)
+   * 
+   * @deprecated Use awardSeasonPoints() instead. This method is kept for backward compatibility
+   * and will be removed in a future version.
    */
   async awardPoints(
     userId: string,
@@ -210,73 +228,15 @@ class PointsService {
     sourceId?: string,
     description?: string
   ): Promise<PointsAwardResult> {
-    try {
-      if (amount <= 0) {
-        return {
-          success: false,
-          pointsAwarded: 0,
-          totalPoints: await this.getUserPoints(userId),
-          error: 'Points amount must be greater than 0'
-        };
-      }
-
-      // Get current user points
-      const currentPoints = await this.getUserPoints(userId);
-
-      // Update user document with new points
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
-
-      if (!userDoc.exists()) {
-        return {
-          success: false,
-          pointsAwarded: 0,
-          totalPoints: 0,
-          error: 'User not found'
-        };
-      }
-
-      const newPoints = (userDoc.data().points || 0) + amount;
-      const totalEarned = (userDoc.data().total_points_earned || 0) + amount;
-
-      // Update user points atomically
-      await updateDoc(userRef, {
-        points: newPoints,
-        total_points_earned: totalEarned,
-        points_last_updated: serverTimestamp()
-      });
-
-      // Record points transaction (without season info for legacy compatibility)
-      await this.recordPointsTransaction(
-        userId,
-        amount,
-        source,
-        sourceId || '',
-        description || `Awarded ${amount} points`
-      );
-
-      logger.info('Points awarded successfully', {
-        userId,
-        amount,
-        currentPoints,
-        newPoints,
-        source
-      }, 'PointsService');
-
-      return {
-        success: true,
-        pointsAwarded: amount,
-        totalPoints: newPoints
-      };
-    } catch (error) {
-      logger.error('Failed to award points', error, 'PointsService');
-      return {
-        success: false,
-        pointsAwarded: 0,
-        totalPoints: await this.getUserPoints(userId),
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
+    // Redirect to awardSeasonPoints (season will default to current season)
+    return this.awardSeasonPoints(
+      userId,
+      amount,
+      source,
+      sourceId,
+      description
+      // season and taskType are optional - will default to current season
+    );
   }
 
   /**

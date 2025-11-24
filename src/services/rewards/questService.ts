@@ -250,14 +250,19 @@ class QuestService {
         );
       } else {
         // Use legacy fixed points for old quest types
+        // Note: Legacy quests are disabled, but keeping this code path for backward compatibility
         actualPointsAwarded = questDef.points;
-        pointsResult = await pointsService.awardPoints(
-        userId,
-        questDef.points,
-        'quest_completion',
-        questType,
-        `Quest completed: ${questDef.title}`
-      );
+        // Use awardSeasonPoints (awardPoints now redirects to it, but using awardSeasonPoints directly is clearer)
+        const currentSeason = seasonService.getCurrentSeason();
+        pointsResult = await pointsService.awardSeasonPoints(
+          userId,
+          questDef.points,
+          'quest_completion',
+          questType,
+          `Quest completed: ${questDef.title}`,
+          currentSeason,
+          questType
+        );
       }
 
       if (!pointsResult.success) {

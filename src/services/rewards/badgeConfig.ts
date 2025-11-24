@@ -400,3 +400,84 @@ export function badgeExists(badgeId: string): boolean {
   return badgeId in BADGE_DEFINITIONS;
 }
 
+/**
+ * Validate badge configuration
+ * Ensures all badges have valid required fields and consistent data
+ * 
+ * @returns Array of validation errors (empty if valid)
+ */
+export function validateBadgeConfig(): string[] {
+  const errors: string[] = [];
+  const validRarities: Array<BadgeInfo['rarity']> = ['common', 'rare', 'epic', 'legendary'];
+  const validProgressMetrics: BadgeProgressMetric[] = ['split_withdrawals', 'transaction_count', 'transaction_volume'];
+  
+  Object.entries(BADGE_DEFINITIONS).forEach(([badgeId, badge]) => {
+    // Required fields
+    if (!badge.badgeId || badge.badgeId.trim() === '') {
+      errors.push(`Badge '${badgeId}' has empty or missing badgeId`);
+    }
+    if (badge.badgeId !== badgeId) {
+      errors.push(`Badge '${badgeId}' has mismatched badgeId: '${badge.badgeId}'`);
+    }
+    if (!badge.title || badge.title.trim() === '') {
+      errors.push(`Badge '${badgeId}' has empty or missing title`);
+    }
+    if (!badge.description || badge.description.trim() === '') {
+      errors.push(`Badge '${badgeId}' has empty or missing description`);
+    }
+    if (!badge.icon || badge.icon.trim() === '') {
+      errors.push(`Badge '${badgeId}' has empty or missing icon`);
+    }
+    
+    // Rarity validation
+    if (badge.rarity && !validRarities.includes(badge.rarity)) {
+      errors.push(`Badge '${badgeId}' has invalid rarity: '${badge.rarity}'`);
+    }
+    
+    // Points validation
+    if (badge.points !== undefined) {
+      if (typeof badge.points !== 'number' || badge.points < 0) {
+        errors.push(`Badge '${badgeId}' has invalid points value: ${badge.points}`);
+      }
+    }
+    
+    // Target validation (for achievement badges)
+    if (badge.target !== undefined) {
+      if (typeof badge.target !== 'number' || badge.target <= 0) {
+        errors.push(`Badge '${badgeId}' has invalid target value: ${badge.target}`);
+      }
+    }
+    
+    // Progress metric validation
+    if (badge.progressMetric && !validProgressMetrics.includes(badge.progressMetric)) {
+      errors.push(`Badge '${badgeId}' has invalid progressMetric: '${badge.progressMetric}'`);
+    }
+    
+    // Achievement badges must have target and progressMetric
+    if (badge.category === 'achievement') {
+      if (!badge.target || badge.target <= 0) {
+        errors.push(`Achievement badge '${badgeId}' must have a valid target value`);
+      }
+      if (!badge.progressMetric) {
+        errors.push(`Achievement badge '${badgeId}' must have a progressMetric`);
+      }
+    }
+    
+    // Event badges must have redeemCode
+    if (badge.isEventBadge || badge.category === 'event' || badge.category === 'community') {
+      if (!badge.redeemCode || badge.redeemCode.trim() === '') {
+        errors.push(`Event/community badge '${badgeId}' must have a redeemCode`);
+      }
+    }
+    
+    // Community badges must have showNextToName
+    if (badge.isCommunityBadge || badge.category === 'community') {
+      if (badge.showNextToName !== true) {
+        errors.push(`Community badge '${badgeId}' should have showNextToName set to true`);
+      }
+    }
+  });
+  
+  return errors;
+}
+

@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { logger } from '../analytics/loggingService';
 import { pointsService } from './pointsService';
+import { seasonService } from './seasonService';
 import { firebaseDataService } from '../data/firebaseDataService';
 import {
   ChristmasCalendarDay,
@@ -423,12 +424,16 @@ class ChristmasCalendarService {
         const pointsGift = normalizedGift as PointsGift;
         try {
           // Only record the transaction, don't award points again (they're already added)
+          // Use current season for tracking
+          const currentSeason = seasonService.getCurrentSeason();
           await pointsService.recordPointsTransaction(
             userId,
             pointsGift.amount,
             'quest_completion',
             `christmas_calendar_${this.YEAR}_day_${day}`,
-            `Christmas Calendar Day ${day} - ${giftConfig.title}`
+            `Christmas Calendar Day ${day} - ${giftConfig.title}`,
+            currentSeason,
+            'christmas_calendar'
           );
         } catch (pointsError) {
           // Log error but don't fail the claim since points were already added

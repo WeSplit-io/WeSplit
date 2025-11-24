@@ -214,3 +214,83 @@ export function assetExists(assetId: string): boolean {
   return assetId in ASSET_DEFINITIONS;
 }
 
+/**
+ * Validate asset configuration
+ * Ensures all assets have valid required fields and consistent data
+ * 
+ * @returns Array of validation errors (empty if valid)
+ */
+export function validateAssetConfig(): string[] {
+  const errors: string[] = [];
+  const validRarities: Array<AssetInfo['rarity']> = ['common', 'rare', 'epic', 'legendary'];
+  const validAssetTypes: AssetInfo['assetType'][] = ['profile_image', 'wallet_background', 'profile_border'];
+  const validChains = ['ethereum', 'polygon', 'arbitrum', 'optimism', 'base'];
+  
+  Object.entries(ASSET_DEFINITIONS).forEach(([assetId, asset]) => {
+    // Required fields
+    if (!asset.assetId || asset.assetId.trim() === '') {
+      errors.push(`Asset '${assetId}' has empty or missing assetId`);
+    }
+    if (asset.assetId !== assetId) {
+      errors.push(`Asset '${assetId}' has mismatched assetId: '${asset.assetId}'`);
+    }
+    if (!asset.name || asset.name.trim() === '') {
+      errors.push(`Asset '${assetId}' has empty or missing name`);
+    }
+    if (!asset.description || asset.description.trim() === '') {
+      errors.push(`Asset '${assetId}' has empty or missing description`);
+    }
+    if (!asset.assetType) {
+      errors.push(`Asset '${assetId}' has missing assetType`);
+    } else if (!validAssetTypes.includes(asset.assetType)) {
+      errors.push(`Asset '${assetId}' has invalid assetType: '${asset.assetType}'`);
+    }
+    
+    // Rarity validation
+    if (asset.rarity && !validRarities.includes(asset.rarity)) {
+      errors.push(`Asset '${assetId}' has invalid rarity: '${asset.rarity}'`);
+    }
+    
+    // URL or NFT validation - must have at least one
+    if (!asset.url && !asset.nftMetadata) {
+      errors.push(`Asset '${assetId}' must have either url or nftMetadata`);
+    }
+    
+    // URL validation
+    if (asset.url) {
+      if (typeof asset.url !== 'string' || asset.url.trim() === '') {
+        errors.push(`Asset '${assetId}' has invalid url`);
+      } else if (!asset.url.startsWith('http://') && 
+                 !asset.url.startsWith('https://') && 
+                 !asset.url.startsWith('gs://')) {
+        errors.push(`Asset '${assetId}' has url that doesn't start with http://, https://, or gs://: '${asset.url}'`);
+      }
+    }
+    
+    // NFT metadata validation
+    if (asset.nftMetadata) {
+      if (!asset.nftMetadata.contractAddress || asset.nftMetadata.contractAddress.trim() === '') {
+        errors.push(`Asset '${assetId}' NFT metadata has empty or missing contractAddress`);
+      }
+      if (!asset.nftMetadata.tokenId || asset.nftMetadata.tokenId.trim() === '') {
+        errors.push(`Asset '${assetId}' NFT metadata has empty or missing tokenId`);
+      }
+      if (asset.nftMetadata.chain && !validChains.includes(asset.nftMetadata.chain)) {
+        // Allow other chains as strings, but warn about common ones
+        if (typeof asset.nftMetadata.chain === 'string' && asset.nftMetadata.chain.length > 0) {
+          // Valid custom chain
+        } else {
+          errors.push(`Asset '${assetId}' NFT metadata has invalid chain: '${asset.nftMetadata.chain}'`);
+        }
+      }
+      if (asset.nftMetadata.imageUrl) {
+        if (typeof asset.nftMetadata.imageUrl !== 'string' || asset.nftMetadata.imageUrl.trim() === '') {
+          errors.push(`Asset '${assetId}' NFT metadata has invalid imageUrl`);
+        }
+      }
+    }
+  });
+  
+  return errors;
+}
+
