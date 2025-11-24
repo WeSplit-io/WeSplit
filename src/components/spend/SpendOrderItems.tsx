@@ -4,12 +4,13 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { Split } from '../../services/splits/splitStorageService';
 import PhosphorIcon from '../shared/PhosphorIcon';
+import { formatAmountWithComma } from '../../utils/spend/formatUtils';
 
 interface SpendOrderItemsProps {
   split: Split;
@@ -22,8 +23,13 @@ const SpendOrderItems: React.FC<SpendOrderItemsProps> = ({ split }) => {
   // Also check externalMetadata for items if available
   const externalItems = (split.externalMetadata as any)?.items || [];
 
-  // Combine both sources
-  const allItems = items.length > 0 ? items : externalItems;
+  // Check orderData for items (from SP3ND order schema)
+  const orderDataItems = (split.externalMetadata as any)?.orderData?.items || [];
+
+  // Combine all sources - prefer orderData items, then externalMetadata, then split items
+  const allItems = orderDataItems.length > 0 
+    ? orderDataItems 
+    : (externalItems.length > 0 ? externalItems : items);
 
   if (!allItems || allItems.length === 0) {
     return (
@@ -58,29 +64,55 @@ const SpendOrderItems: React.FC<SpendOrderItemsProps> = ({ split }) => {
           const itemPrice = item.price || 0;
           const itemQuantity = item.quantity || 1;
           const itemTotal = itemPrice * itemQuantity;
+          
+          // Use product_title if available, otherwise name
+          const itemName = item.product_title || item.name || `Item ${index + 1}`;
+          
+          // Format variants if available
+          const variantsText = item.variants && item.variants.length > 0
+            ? item.variants.map((v: any) => `${v.type}: ${v.value}`).join(', ')
+            : null;
 
           return (
-            <View key={item.id || `item-${index}`} style={styles.itemCard}>
+            <View key={item.product_id || item.id || `item-${index}`} style={styles.itemCard}>
+              {item.image_url || item.image ? (
+                <Image
+                  source={{ uri: item.image_url || item.image }}
+                  style={styles.itemImage}
+                  resizeMode="cover"
+                />
+              ) : (
               <View style={styles.itemIcon}>
                 <PhosphorIcon name="Package" size={20} color={colors.green} weight="regular" />
               </View>
+              )}
               <View style={styles.itemDetails}>
                 <Text style={styles.itemName} numberOfLines={2}>
-                  {item.name || `Item ${index + 1}`}
+                  {itemName}
                 </Text>
+                {variantsText && (
+                  <Text style={styles.itemVariants} numberOfLines={1}>
+                    {variantsText}
+                  </Text>
+                )}
                 {itemQuantity > 1 && (
                   <Text style={styles.itemQuantity}>
                     Quantity: {itemQuantity}
                   </Text>
                 )}
+                {item.isPrimeEligible && (
+                  <View style={styles.primeBadge}>
+                    <Text style={styles.primeBadgeText}>Prime</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.itemPriceContainer}>
                 <Text style={styles.itemPrice}>
-                  ${itemTotal.toFixed(2)}
+                  ${formatAmountWithComma(itemTotal)}
                 </Text>
                 {itemQuantity > 1 && (
                   <Text style={styles.itemUnitPrice}>
-                    ${itemPrice.toFixed(2)} each
+                    ${formatAmountWithComma(itemPrice)} each
                   </Text>
                 )}
               </View>
@@ -155,13 +187,20 @@ const styles = StyleSheet.create({
     borderColor: colors.white5,
   },
   itemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 8,
     backgroundColor: colors.green + '20',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
+  },
+  itemImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: spacing.md,
+    backgroundColor: colors.white10,
   },
   itemDetails: {
     flex: 1,
@@ -175,6 +214,26 @@ const styles = StyleSheet.create({
   itemQuantity: {
     fontSize: typography.fontSize.xs,
     color: colors.textSecondary,
+    marginTop: spacing.xs / 4,
+  },
+  itemVariants: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.xs / 4,
+    fontStyle: 'italic',
+  },
+  primeBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.info + '20',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: spacing.xs / 4,
+  },
+  primeBadgeText: {
+    fontSize: typography.fontSize.xs - 2,
+    color: colors.info,
+    fontWeight: typography.fontWeight.bold,
   },
   itemPriceContainer: {
     alignItems: 'flex-end',

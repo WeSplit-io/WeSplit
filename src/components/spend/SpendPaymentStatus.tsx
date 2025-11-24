@@ -12,6 +12,7 @@ import PhosphorIcon from '../shared/PhosphorIcon';
 import { Split } from '../../services/splits/splitStorageService';
 import { SpendPaymentModeService } from '../../services/integrations/spend';
 import { SpendMerchantPaymentService } from '../../services/integrations/spend';
+import { extractOrderData } from '../../utils/spend/spendDataUtils';
 
 interface SpendPaymentStatusProps {
   split: Split;
@@ -30,7 +31,9 @@ export const SpendPaymentStatus: React.FC<SpendPaymentStatusProps> = ({
 
   const paymentStatus = SpendPaymentModeService.getPaymentStatus(split);
   const transactionSig = split.externalMetadata?.paymentTransactionSig;
-  const orderId = split.externalMetadata?.orderId;
+  
+  // Extract orderId using centralized utility
+  const { orderId } = extractOrderData(split);
 
   const handleRetry = async () => {
     Alert.alert(
@@ -139,15 +142,12 @@ export const SpendPaymentStatus: React.FC<SpendPaymentStatusProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={[styles.statusBadge, {
-        backgroundColor: statusConfig.backgroundColor,
-        borderColor: statusConfig.borderColor,
-      }]}>
+      <View style={styles.statusRow}>
         <PhosphorIcon
           name={statusConfig.icon}
-          size={16}
+          size={18}
           color={statusConfig.iconColor}
-          weight="fill"
+          weight="regular"
         />
         <Text style={[styles.statusText, { color: statusConfig.textColor }]}>
           {statusConfig.text}
@@ -200,27 +200,25 @@ export const SpendPaymentStatus: React.FC<SpendPaymentStatusProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.sm,
-    marginVertical: spacing.sm,
+    backgroundColor: colors.white10,
+    borderRadius: 12,
+    padding: spacing.lg,
+    gap: spacing.xs,
   },
-  statusBadge: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: spacing.xs,
-    gap: spacing.xs / 2,
-    borderWidth: 1,
+    gap: spacing.sm,
   },
   statusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    letterSpacing: 0.2,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textLight,
   },
   orderIdText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white70,
-    fontFamily: typography.fontFamily.mono,
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   transactionLink: {
     flexDirection: 'row',

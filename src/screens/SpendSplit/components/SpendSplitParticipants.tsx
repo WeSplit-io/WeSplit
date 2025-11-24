@@ -4,14 +4,16 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import PhosphorIcon from '../../../components/shared/PhosphorIcon';
 import Avatar from '../../../components/shared/Avatar';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 import { SplitParticipant } from '../../../services/splits/splitStorageService';
 import { SplitWalletParticipant } from '../../../services/split/types';
-import UserNameWithBadges from '../../../components/profile/UserNameWithBadges';
+import { formatAmountWithComma } from '../../../utils/spend/formatUtils';
+import { formatWalletAddress } from '../../../utils/spend/spendDataUtils';
 
 // Union type for participants from either Split or SplitWallet
 type Participant = SplitParticipant | SplitWalletParticipant | { id: string; userId?: string; name: string; amountOwed: number; amountPaid: number; avatar?: string };
@@ -19,12 +21,16 @@ type Participant = SplitParticipant | SplitWalletParticipant | { id: string; use
 interface SpendSplitParticipantsProps {
   participants: Participant[];
   currentUserId?: string;
+  onAddPress?: () => void; // Callback for "Add" button
 }
 
 const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
   participants,
   currentUserId,
+  onAddPress,
 }) => {
+  // Use shared formatting utility
+  const formatAmount = formatAmountWithComma;
   if (participants.length === 0) {
     return (
       <View style={styles.container}>
@@ -39,8 +45,13 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Participants</Text>
-        <Text style={styles.participantCount}>{participants.length}</Text>
+        <Text style={styles.sectionTitle}>Participants ({participants.length})</Text>
+        {onAddPress && (
+          <TouchableOpacity style={styles.addButton} onPress={onAddPress}>
+            <PhosphorIcon name="Plus" size={16} color={colors.green} weight="bold" />
+            <Text style={styles.addButtonText}>Add</Text>
+          </TouchableOpacity>
+        )}
       </View>
       {participants.map((participant, index) => {
         // Handle different participant structures
@@ -67,45 +78,23 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
                 )}
               </View>
               <View style={styles.participantDetails}>
-                <View style={styles.participantNameRow}>
-                  <UserNameWithBadges
-                    userId={participantId}
-                    userName={participant.name}
-                    showBadges={true}
-                  />
-                  {isCurrentUser && (
-                    <View style={styles.youBadge}>
-                      <Text style={styles.youBadgeText}>You</Text>
-                    </View>
-                  )}
-                </View>
-                {/* Payment Status */}
-                {isPaid && (
-                  <View style={styles.paymentStatusContainer}>
-                    <Text style={styles.paymentStatusPaid}>✅ Fully Paid</Text>
-                  </View>
-                )}
-                {hasPartialPayment && (
-                  <View style={styles.paymentStatusContainer}>
-                    <Text style={styles.paymentStatusPartial}>
-                      💰 ${participant.amountPaid.toFixed(2)} / ${participant.amountOwed.toFixed(2)}
-                    </Text>
-                  </View>
-                )}
-                {!isPaid && !hasPartialPayment && (
-                  <View style={styles.paymentStatusContainer}>
-                    <Text style={styles.paymentStatusPending}>⏳ Awaiting Payment</Text>
-                  </View>
-                )}
+                <Text style={styles.participantName} numberOfLines={1}>
+                  {participant.name}
+                </Text>
+                <Text style={styles.participantWallet} numberOfLines={1}>
+                  {(() => {
+                    const wallet = 'walletAddress' in participant 
+                      ? participant.walletAddress 
+                      : ('wallet_address' in participant ? (participant as any).wallet_address : '');
+                    return wallet ? formatWalletAddress(wallet) : 'No wallet address';
+                  })()}
+                </Text>
               </View>
             </View>
             <View style={styles.participantAmountContainer}>
-              <Text style={[styles.amountText, isPaid && styles.amountTextPaid]}>
-                ${participant.amountOwed.toFixed(2)}
+              <Text style={styles.amountText}>
+                {formatAmount(participant.amountOwed)} USDC
               </Text>
-              {isPaid && (
-                <Text style={styles.amountLabel}>Paid</Text>
-              )}
             </View>
           </View>
         );
@@ -125,6 +114,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.md,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.green + '20',
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.green + '40',
+    gap: spacing.xs / 2,
+  },
+  addButtonText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.green,
+    fontWeight: typography.fontWeight.bold,
   },
   sectionTitle: {
     fontSize: typography.fontSize.xl,
@@ -155,15 +160,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.white10,
-    borderRadius: 16,
+    borderRadius: 12,
     padding: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.white20,
   },
   participantCardPaid: {
-    backgroundColor: colors.green + '10',
-    borderColor: colors.green + '30',
+    backgroundColor: colors.white10,
+    borderColor: colors.white20,
   },
   participantInfo: {
     flexDirection: 'row',
@@ -175,86 +180,32 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   avatarContainerPaid: {
-    opacity: 0.9,
+    opacity: 1,
   },
   avatar: {
-    borderWidth: 2,
-    borderColor: colors.white20,
-  },
-  paidCheckmark: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.green,
-    borderWidth: 2,
-    borderColor: colors.black,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  paidCheckmarkText: {
-    color: colors.black,
-    fontSize: 10,
-    fontWeight: typography.fontWeight.bold,
+    borderWidth: 0,
   },
   participantDetails: {
     flex: 1,
   },
-  participantNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xs / 2,
-  },
-  youBadge: {
-    backgroundColor: colors.green + '20',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.green + '40',
-  },
-  youBadgeText: {
-    fontSize: typography.fontSize.xs - 2,
-    color: colors.green,
-    fontWeight: typography.fontWeight.bold,
-  },
-  paymentStatusContainer: {
-    marginTop: spacing.xs / 2,
-  },
-  paymentStatusPaid: {
-    fontSize: typography.fontSize.xs,
-    color: colors.green,
+  participantName: {
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+    marginBottom: spacing.xs / 4,
   },
-  paymentStatusPartial: {
-    fontSize: typography.fontSize.xs,
-    color: colors.yellow,
-    fontWeight: typography.fontWeight.medium,
-  },
-  paymentStatusPending: {
+  participantWallet: {
     fontSize: typography.fontSize.xs,
     color: colors.textSecondary,
-    fontWeight: typography.fontWeight.medium,
+    fontFamily: typography.fontFamily.mono,
   },
   participantAmountContainer: {
     alignItems: 'flex-end',
   },
   amountText: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
     color: colors.textLight,
-    marginBottom: spacing.xs / 4,
-  },
-  amountTextPaid: {
-    color: colors.green,
-  },
-  amountLabel: {
-    fontSize: typography.fontSize.xs,
-    color: colors.green,
-    fontWeight: typography.fontWeight.medium,
   },
 });
 

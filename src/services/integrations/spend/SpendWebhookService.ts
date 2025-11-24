@@ -141,8 +141,12 @@ export class SpendWebhookService {
       ?.map((p: any) => p.walletAddress)
       .filter((addr: string) => addr && addr.trim() !== '') || [];
 
+    // Extract orderId from orderData first, then fallback to externalMetadata
+    const orderData = split.externalMetadata?.orderData || {};
+    const orderId = orderData.id || orderData.order_number || split.externalMetadata?.orderId || split.externalMetadata?.orderNumber || '';
+
     return {
-      order_id: split.externalMetadata?.orderId || '',
+      order_id: orderId,
       split_id: split.id,
       transaction_signature: transactionSignature,
       amount,

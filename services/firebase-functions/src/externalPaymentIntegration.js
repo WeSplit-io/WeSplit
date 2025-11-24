@@ -446,42 +446,103 @@ function removeUndefinedValues(obj) {
  */
 async function createSplitFromPayment(user, paymentData) {
   try {
+    // Extract SP3ND order data if provided (check early for amount extraction)
+    // SP3ND may send order at root level (paymentData.order) or in metadata (metadata.order or metadata.orderData)
+    const metadata = paymentData.metadata || {};
+    
+    // Log order extraction path for debugging
+    let orderExtractionPath = 'none';
+    let sp3ndOrder = null;
+    
+    if (paymentData.order) {
+      sp3ndOrder = paymentData.order;
+      orderExtractionPath = 'paymentData.order (root level)';
+    } else if (metadata.orderData) {
+      sp3ndOrder = metadata.orderData;
+      orderExtractionPath = 'metadata.orderData';
+    } else if (metadata.order) {
+      sp3ndOrder = metadata.order;
+      orderExtractionPath = 'metadata.order';
+    }
+    
+    console.log('[SP3ND] Order extraction:', {
+      path: orderExtractionPath,
+      hasOrder: !!sp3ndOrder,
+      orderId: sp3ndOrder?.id || sp3ndOrder?.order_number || 'N/A',
+      orderNumber: sp3ndOrder?.order_number || 'N/A',
+      store: sp3ndOrder?.store || 'N/A',
+      totalAmount: sp3ndOrder?.total_amount || 'N/A',
+      itemsCount: sp3ndOrder?.items?.length || 0,
+    });
+    
+    // Use SP3ND order total_amount if available, otherwise use paymentData.amount
+    const sourceAmount = sp3ndOrder?.total_amount || paymentData.amount;
+    const sourceCurrency = sp3ndOrder?.payment_method || paymentData.currency || 'USDC';
+    
     // Convert amounts to USDC
-    const totalAmountUSDC = convertToUSDC(paymentData.amount, paymentData.currency);
-    const subtotalUSDC = paymentData.subtotal ? convertToUSDC(paymentData.subtotal, paymentData.currency) : undefined;
-    const taxUSDC = paymentData.tax ? convertToUSDC(paymentData.tax, paymentData.currency) : undefined;
+    const totalAmountUSDC = convertToUSDC(sourceAmount, sourceCurrency);
+    const subtotalUSDC = sp3ndOrder?.subtotal 
+      ? convertToUSDC(sp3ndOrder.subtotal, sourceCurrency)
+      : (paymentData.subtotal ? convertToUSDC(paymentData.subtotal, paymentData.currency) : undefined);
+    const taxUSDC = sp3ndOrder?.tax_amount 
+      ? convertToUSDC(sp3ndOrder.tax_amount, sourceCurrency)
+      : (paymentData.tax ? convertToUSDC(paymentData.tax, paymentData.currency) : undefined);
     
     // Generate bill ID
     const billId = generateBillId();
     
-    // Transform items
-    const items = (paymentData.items || []).map((item, index) => ({
-      id: `item_${index}`,
-      name: item.name,
-      price: convertToUSDC(item.price, paymentData.currency),
-      quantity: item.quantity || 1,
-      category: item.category || 'Other',
-      total: convertToUSDC(item.price * (item.quantity || 1), paymentData.currency),
+    // Get items from SP3ND order if available, otherwise from paymentData.items
+    const sourceItems = sp3ndOrder?.items || paymentData.items || [];
+    
+    // Transform items - support both simple format and full SP3ND order item format
+    const items = sourceItems.map((item, index) => {
+      // Support full SP3ND order item structure
+      const itemName = item.name || item.product_title || `Item ${index + 1}`;
+      const itemPrice = item.price || 0;
+      const itemQuantity = item.quantity || 1;
+      const itemCategory = item.category || 'general';
+      
+      return {
+        id: item.product_id || `item_${index}`,
+        name: itemName,
+        product_title: item.product_title,
+        product_id: item.product_id,
+        product_url: item.product_url || item.url,
+        url: item.url || item.product_url,
+        price: convertToUSDC(itemPrice, sourceCurrency),
+        quantity: itemQuantity,
+        category: itemCategory,
+        total: convertToUSDC(itemPrice * itemQuantity, sourceCurrency),
+        image: item.image || item.image_url,
+        image_url: item.image_url || item.image,
+        isPrimeEligible: item.isPrimeEligible,
+        variants: item.variants || [],
       participants: []
-    }));
+      };
+    });
+    
+    // Determine split title from SP3ND order or fallback
+    const splitTitle = sp3ndOrder?.order_number 
+      ? `Order ${sp3ndOrder.order_number}`
+      : `Invoice ${paymentData.invoiceNumber || paymentData.invoiceId}`;
+    
+    // Determine split type based on SPEND metadata
+    const hasTreasuryWallet = metadata.treasuryWallet && 
+                              typeof metadata.treasuryWallet === 'string' && 
+                              metadata.treasuryWallet.trim() !== '';
+    const splitType = hasTreasuryWallet ? 'spend' : 'fair';
     
     // Create split data
     const splitData = {
       id: `split_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       billId: billId,
-      title: `Invoice ${paymentData.invoiceNumber || paymentData.invoiceId}`,
-      description: `Split for ${paymentData.merchant.name}`,
+      title: splitTitle,
+      description: sp3ndOrder?.store 
+        ? `Split for ${sp3ndOrder.store.charAt(0).toUpperCase() + sp3ndOrder.store.slice(1)} order`
+        : `Split for ${paymentData.merchant.name}`,
       totalAmount: totalAmountUSDC,
       currency: 'USDC',
-      splitType: (() => {
-        // Determine split type based on SPEND metadata
-        const metadata = paymentData.metadata || {};
-        const hasTreasuryWallet = metadata.treasuryWallet && 
-                                  typeof metadata.treasuryWallet === 'string' && 
-                                  metadata.treasuryWallet.trim() !== '';
-        // Set to 'spend' if SPEND merchant gateway, otherwise 'fair'
-        return hasTreasuryWallet ? 'spend' : 'fair';
-      })(),
+      splitType: splitType,
       status: 'pending', // User can invite others and create wallet when ready
       creatorId: user.id,
       creatorName: user.name || user.email.split('@')[0],
@@ -497,28 +558,39 @@ async function createSplitFromPayment(user, paymentData) {
       }],
       items: items,
       merchant: {
-        name: paymentData.merchant.name,
+        name: sp3ndOrder?.store 
+          ? sp3ndOrder.store.charAt(0).toUpperCase() + sp3ndOrder.store.slice(1)
+          : paymentData.merchant.name,
         address: paymentData.merchant.address || '',
         phone: paymentData.merchant.phone || ''
       },
-      date: paymentData.transactionDate,
+      date: (() => {
+        if (sp3ndOrder?.created_at) {
+          // Handle different timestamp formats
+          if (typeof sp3ndOrder.created_at === 'string') {
+            return sp3ndOrder.created_at;
+          } else if (sp3ndOrder.created_at.toDate && typeof sp3ndOrder.created_at.toDate === 'function') {
+            // Firebase Timestamp
+            return sp3ndOrder.created_at.toDate().toISOString();
+          } else if (typeof sp3ndOrder.created_at === 'number') {
+            // Unix timestamp (milliseconds)
+            return new Date(sp3ndOrder.created_at).toISOString();
+          } else if (sp3ndOrder.created_at instanceof Date) {
+            return sp3ndOrder.created_at.toISOString();
+          }
+        }
+        return paymentData.transactionDate || new Date().toISOString();
+      })(),
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
       subtotal: subtotalUSDC,
       tax: taxUSDC,
-      receiptNumber: paymentData.receiptNumber || paymentData.invoiceNumber,
+      receiptNumber: sp3ndOrder?.order_number || paymentData.receiptNumber || paymentData.invoiceNumber,
       // Metadata to track external payment source
-      externalSource: paymentData.source, // Store source identifier
-      externalInvoiceId: paymentData.invoiceId, // Store original invoice ID for reference
+      externalSource: paymentData.source || (sp3ndOrder ? 'spend' : undefined), // Store source identifier
+      externalInvoiceId: sp3ndOrder?.id || sp3ndOrder?.order_number || paymentData.invoiceId, // Store original invoice ID for reference
       // Process SPEND metadata for merchant gateway mode
       externalMetadata: (() => {
-        const metadata = paymentData.metadata || {};
-        
-        // Determine payment mode based on treasury wallet
-        const hasTreasuryWallet = metadata.treasuryWallet && 
-                                  typeof metadata.treasuryWallet === 'string' && 
-                                  metadata.treasuryWallet.trim() !== '';
-        
         const paymentMode = hasTreasuryWallet ? 'merchant_gateway' : 'personal';
         
         // Build externalMetadata structure
@@ -532,8 +604,23 @@ async function createSplitFromPayment(user, paymentData) {
         if (hasTreasuryWallet) {
           externalMetadata.treasuryWallet = metadata.treasuryWallet.trim();
           
-          if (metadata.orderId) {
-            externalMetadata.orderId = metadata.orderId.trim();
+          // Extract order ID from SP3ND order or metadata
+          const orderId = sp3ndOrder?.id || sp3ndOrder?.order_number || metadata.orderId;
+          if (orderId) {
+            externalMetadata.orderId = String(orderId).trim();
+          }
+          
+          // Extract order number and status from SP3ND order
+          if (sp3ndOrder?.order_number) {
+            externalMetadata.orderNumber = String(sp3ndOrder.order_number).trim();
+          }
+          
+          if (sp3ndOrder?.status) {
+            externalMetadata.orderStatus = String(sp3ndOrder.status).trim();
+          }
+          
+          if (sp3ndOrder?.store) {
+            externalMetadata.store = String(sp3ndOrder.store).trim();
           }
           
           if (metadata.webhookUrl) {
@@ -554,11 +641,71 @@ async function createSplitFromPayment(user, paymentData) {
           if (metadata.paymentTimeout !== undefined) {
             externalMetadata.paymentTimeout = metadata.paymentTimeout;
           }
+          
+          // Store full SP3ND order data for reference
+          if (sp3ndOrder) {
+            console.log('[SP3ND] Storing complete order data in externalMetadata.orderData:', {
+              orderId: sp3ndOrder.id || sp3ndOrder.order_number,
+              itemsCount: sp3ndOrder.items?.length || 0,
+              hasAllFields: !!(sp3ndOrder.id && sp3ndOrder.order_number && sp3ndOrder.status && sp3ndOrder.store),
+            });
+            
+            // Store all relevant SP3ND order fields
+            externalMetadata.orderData = {
+              id: sp3ndOrder.id,
+              order_number: sp3ndOrder.order_number,
+              status: sp3ndOrder.status,
+              store: sp3ndOrder.store,
+              user_id: sp3ndOrder.user_id,
+              user_wallet: sp3ndOrder.user_wallet,
+              customer_email: sp3ndOrder.customer_email,
+              created_at: sp3ndOrder.created_at,
+              updated_at: sp3ndOrder.updated_at,
+              shipping_address: sp3ndOrder.shipping_address,
+              shipping_country: sp3ndOrder.shipping_country,
+              shipping_option: sp3ndOrder.shipping_option,
+              is_international_shipping: sp3ndOrder.is_international_shipping,
+              selected_shipping_method: sp3ndOrder.selected_shipping_method,
+              payment_method: sp3ndOrder.payment_method,
+              transaction_signature: sp3ndOrder.transaction_signature,
+              transaction_state: sp3ndOrder.transaction_state,
+              payment_initiated_at: sp3ndOrder.payment_initiated_at,
+              payment_confirmed_at: sp3ndOrder.payment_confirmed_at,
+              payment_verified_at: sp3ndOrder.payment_verified_at,
+              reference_number: sp3ndOrder.reference_number,
+              tracking_number: sp3ndOrder.tracking_number,
+              tracking_url: sp3ndOrder.tracking_url,
+              additional_notes: sp3ndOrder.additional_notes,
+              amazonOrderIds: sp3ndOrder.amazonOrderIds,
+              shippedAmazonOrderIds: sp3ndOrder.shippedAmazonOrderIds,
+              deliveredAmazonOrderIds: sp3ndOrder.deliveredAmazonOrderIds,
+              deliveredAt: sp3ndOrder.deliveredAt,
+              lastStatusChangeAt: sp3ndOrder.lastStatusChangeAt,
+              nextPollAt: sp3ndOrder.nextPollAt,
+              international_processing: sp3ndOrder.international_processing,
+              international_submitted_at: sp3ndOrder.international_submitted_at,
+              international_ready_at: sp3ndOrder.international_ready_at,
+              international_payment_completed_at: sp3ndOrder.international_payment_completed_at,
+              // Store financial fields
+              subtotal: sp3ndOrder.subtotal,
+              discount: sp3ndOrder.discount,
+              voucher_code: sp3ndOrder.voucher_code,
+              voucher_id: sp3ndOrder.voucher_id,
+              fx_conversion_fee: sp3ndOrder.fx_conversion_fee,
+              tax_amount: sp3ndOrder.tax_amount,
+              shipping_amount: sp3ndOrder.shipping_amount,
+              no_kyc_fee: sp3ndOrder.no_kyc_fee,
+              total_amount: sp3ndOrder.total_amount,
+              usd_total_at_payment: sp3ndOrder.usd_total_at_payment,
+              // Store items array for reference
+              items: sp3ndOrder.items,
+            };
+          }
         }
         
         // Preserve any other metadata fields
         Object.keys(metadata).forEach(key => {
-          if (!['treasuryWallet', 'orderId', 'webhookUrl', 'webhookSecret', 'paymentThreshold', 'paymentTimeout'].includes(key)) {
+          if (!['treasuryWallet', 'orderId', 'orderData', 'order', 'webhookUrl', 'webhookSecret', 'paymentThreshold', 'paymentTimeout'].includes(key)) {
             externalMetadata[key] = metadata[key];
           }
         });

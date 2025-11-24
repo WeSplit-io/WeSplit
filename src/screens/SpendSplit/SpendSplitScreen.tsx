@@ -11,6 +11,7 @@ import {
   ScrollView,
   Alert,
   StatusBar,
+  TouchableOpacity,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing, typography } from '../../theme';
@@ -18,13 +19,17 @@ import { SplitWalletService, SplitWallet } from '../../services/split';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import { SpendPaymentModeService, SpendMerchantPaymentService } from '../../services/integrations/spend';
-import { SpendPaymentStatus, SpendOrderItems } from '../../components/spend';
-import { Container, Header, Button, ModernLoader, AppleSlider } from '../../components/shared';
+import { SpendPaymentStatus, SpendPaymentModal, SpendPaymentConfirmationModal, SpendPaymentSuccessModal } from '../../components/spend';
+import { WalletSelectorModal } from '../../components/wallet';
+import { useWallet } from '../../context/WalletContext';
+import { Container, Header, Button, ModernLoader } from '../../components/shared';
 import Modal from '../../components/shared/Modal';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { SpendSplitHeader, SpendSplitProgress, SpendSplitParticipants } from './components';
 import { SplitStorageService } from '../../services/splits';
 import { SplitParticipantInvitationService } from '../../services/splits/SplitParticipantInvitationService';
+import { extractOrderData, findUserParticipant, calculatePaymentTotals } from '../../utils/spend/spendDataUtils';
+import { createSpendSplitWallet } from '../../utils/spend/spendWalletUtils';
 
 interface SpendSplitScreenProps {
   navigation: any;
@@ -35,6 +40,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   const { billData, processedBillData, splitWallet: existingSplitWallet, splitData } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
+  const walletContext = useWallet();
 
   const [splitWallet, setSplitWallet] = useState<SplitWallet | null>((existingSplitWallet as SplitWallet) || null);
   const [isSplitConfirmed, setIsSplitConfirmed] = useState(false);
@@ -47,9 +53,13 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [balanceCheckError, setBalanceCheckError] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successPaymentAmount, setSuccessPaymentAmount] = useState(0);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [showWalletSelector, setShowWalletSelector] = useState(false);
   
-  // Participant invitation state
-  const [isInvitingUsers, setIsInvitingUsers] = useState(false);
+  // Participant invitation state (removed unused variable)
   
   // Subscribe to live balance updates
   const { balance: liveBalance } = useLiveBalance(
@@ -78,8 +88,10 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   // Initialize split wallet
   useEffect(() => {
     const initializeSplit = async () => {
+      if (!splitData || !currentUser) {
       if (!splitData) {
         setError('Split data not found');
+        }
         setIsInitializing(false);
         return;
       }
@@ -91,7 +103,37 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
           if (walletResult.success && walletResult.wallet) {
             setSplitWallet(walletResult.wallet);
             setIsSplitConfirmed(walletResult.wallet.status === 'active' || walletResult.wallet.status === 'locked');
+            setIsInitializing(false);
+            return;
           }
+        }
+
+        // Auto-create wallet for SPEND splits if it doesn't exist
+        logger.info('No wallet found for SPEND split, auto-creating wallet', {
+          splitId: splitData.id,
+          billId: splitData.billId,
+        }, 'SpendSplitScreen');
+
+        const walletResult = await createSpendSplitWallet(
+          splitData,
+          currentUser.id.toString()
+        );
+
+        if (walletResult.success && walletResult.wallet) {
+          setSplitWallet(walletResult.wallet);
+          setIsSplitConfirmed(true);
+          
+          logger.info('SPEND split wallet auto-created successfully', {
+            splitId: splitData.id,
+            walletId: walletResult.wallet.id,
+            walletAddress: walletResult.wallet.walletAddress,
+          }, 'SpendSplitScreen');
+        } else {
+          logger.error('Failed to auto-create wallet for SPEND split', {
+            splitId: splitData.id,
+            error: walletResult.error,
+          }, 'SpendSplitScreen');
+          setError(walletResult.error || 'Failed to create split wallet');
         }
       } catch (err) {
         logger.error('Error initializing SPEND split', {
@@ -104,7 +146,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     };
 
     initializeSplit();
-  }, [splitData]);
+  }, [splitData, currentUser]);
 
   // Handle selected contacts from Contacts screen
   useEffect(() => {
@@ -118,7 +160,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         return;
       }
 
-      setIsInvitingUsers(true);
+      // Start inviting users
       try {
         // Filter out existing participants
         const newContacts = SplitParticipantInvitationService.filterExistingParticipants(
@@ -129,7 +171,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         if (newContacts.length === 0) {
           Alert.alert('Info', 'All selected contacts are already participants in this split.');
           navigation.setParams({ selectedContacts: undefined });
-          setIsInvitingUsers(false);
           return;
         }
 
@@ -167,7 +208,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         }, 'SpendSplitScreen');
         Alert.alert('Error', 'An error occurred while inviting participants.');
       } finally {
-        setIsInvitingUsers(false);
         navigation.setParams({ selectedContacts: undefined });
       }
     };
@@ -395,22 +435,39 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       }
     }
 
-    // If still no wallet, we need to create one (this shouldn't happen for SPEND splits, but handle it)
+    // If still no wallet, create one for SPEND split
     if (!wallet) {
-      Alert.alert(
-        'Wallet Required',
-        'The split wallet needs to be created first. Please contact support.',
-        [{ text: 'OK' }]
+      logger.info('Creating wallet for SPEND split in payment flow', {
+        splitId: splitData.id,
+        billId: splitData.billId,
+      }, 'SpendSplitScreen');
+
+      const walletResult = await createSpendSplitWallet(
+        splitData,
+        currentUser.id.toString()
       );
-      return;
+
+      if (walletResult.success && walletResult.wallet) {
+        wallet = walletResult.wallet;
+        setSplitWallet(wallet);
+        
+        logger.info('SPEND split wallet created successfully in payment flow', {
+          splitId: splitData.id,
+          walletId: wallet?.id,
+        }, 'SpendSplitScreen');
+      } else {
+        Alert.alert(
+          'Error',
+          walletResult.error || 'Failed to create split wallet. Please try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
     }
 
     // Get participants from wallet if available, otherwise from splitData
-    const allParticipants = wallet.participants || splitData.participants || [];
-    const userParticipant = allParticipants.find((p: any) => {
-      const participantId = p.userId || p.id || '';
-      return participantId === currentUser.id.toString();
-    });
+    const allParticipants = wallet?.participants || splitData.participants || [];
+    const userParticipant = findUserParticipant(allParticipants, currentUser.id.toString());
     
     if (!userParticipant) {
       Alert.alert('Error', 'You are not a participant in this split');
@@ -433,6 +490,9 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
 
     const { roundUsdcAmount } = await import('../../utils/ui/format/formatUtils');
     const roundedRemainingAmount = roundUsdcAmount(remainingAmount);
+    
+    // Set initial payment amount
+    setPaymentAmount(roundedRemainingAmount);
     
     // Show modal immediately
     setBalanceCheckError(null);
@@ -462,7 +522,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     }
 
     // Ensure split wallet exists - create if needed
-    let wallet = splitWallet;
+    let wallet: SplitWallet | null = splitWallet;
     if (!wallet && splitData.walletId) {
       const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
       if (walletResult.success && walletResult.wallet) {
@@ -484,10 +544,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
 
     // Get participants from wallet if available, otherwise from splitData
     const allParticipants = wallet.participants || splitData.participants || [];
-    const userParticipant = allParticipants.find((p: any) => {
-      const participantId = p.userId || p.id || '';
-      return participantId === currentUser.id.toString();
-    });
+    const userParticipant = findUserParticipant(allParticipants, currentUser.id.toString());
     
     if (!userParticipant) {
       Alert.alert('Error', 'You are not a participant in this split');
@@ -500,7 +557,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     const remainingAmount = amountOwed - amountPaid;
     
     const { roundUsdcAmount } = await import('../../utils/ui/format/formatUtils');
-    const amount = roundUsdcAmount(remainingAmount);
+    // Use paymentAmount from modal if set, otherwise use remainingAmount
+    const amount = paymentAmount > 0 ? roundUsdcAmount(paymentAmount) : roundUsdcAmount(remainingAmount);
     
     if (amount <= 0) {
       Alert.alert('Invalid Amount', 'You have no remaining balance to pay');
@@ -543,7 +601,13 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         return;
       }
       
-      // Process payment
+      // Process payment (wallet is guaranteed to exist at this point)
+      if (!wallet) {
+        Alert.alert('Error', 'Wallet not available');
+        setIsSendingPayment(false);
+        return;
+      }
+      
       const result = await SplitWalletService.payParticipantShare(
         wallet.id,
         currentUser.id.toString(),
@@ -557,11 +621,10 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
           transactionSignature: result.transactionSignature,
         }, 'SpendSplitScreen');
 
-        Alert.alert(
-          'Payment Sent ✅',
-          `Your payment of ${amount.toFixed(2)} USDC has been sent successfully.`,
-          [{ text: 'OK' }]
-        );
+        // Close confirmation modal and show success modal
+        setShowConfirmationModal(false);
+        setSuccessPaymentAmount(amount);
+        setShowSuccessModal(true);
 
         // Reload split wallet to get updated participant status
         const updatedWalletResult = await SplitWalletService.getSplitWallet(wallet.id);
@@ -637,16 +700,19 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     );
   }
 
+  // Extract participants and calculate totals
   const participants = splitWallet?.participants || splitData.participants || [];
   const totalAmount = splitData.totalAmount || 0;
-  const totalPaid = participants.reduce((sum: number, p: any) => sum + (p.amountPaid || 0), 0);
-  const completionPercentage = totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
+  const { totalPaid, completionPercentage } = calculatePaymentTotals(
+    participants,
+    totalAmount
+  );
 
   // Extract bill info for header
-  const billName = splitData.title || processedBillData?.title || billData?.title || 'SPEND Order';
   const billDate = splitData.date || processedBillData?.date || billData?.date || new Date().toISOString();
-  const category = splitData.category || processedBillData?.category || billData?.category || 'food';
-  const orderId = splitData.externalMetadata?.orderId;
+  
+  // Extract SP3ND order data using centralized utility
+  const { orderId, orderNumber, orderStatus, store } = extractOrderData(splitData);
   const paymentThreshold = splitData.externalMetadata?.paymentThreshold || 1.0;
 
   return (
@@ -660,26 +726,37 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       >
         {/* SPEND Order Header */}
         <SpendSplitHeader
-          billName={billName}
+          billName={splitData.title || 'SPEND Order'}
           billDate={billDate}
           totalAmount={totalAmount}
-          category={category}
-          orderId={orderId}
+          orderId={orderId || undefined}
+          orderNumber={orderNumber || undefined}
+          orderStatus={orderStatus || undefined}
+          store={store || undefined}
+          split={splitData}
           onBackPress={() => navigation.navigate('SplitsList')}
+          onSettingsPress={() => {
+            navigation.navigate('SpendOrderSettings', {
+              splitData,
+              orderData: splitData.externalMetadata?.orderData,
+            });
+          }}
         />
 
-        {/* SPEND Payment Status Card */}
-        <View style={{
-          marginHorizontal: spacing.md,
-          marginBottom: spacing.md,
-          backgroundColor: colors.white10,
-          borderRadius: 16,
-          padding: spacing.lg,
-          borderWidth: 1,
-          borderColor: colors.white10,
-        }}>
-          <SpendPaymentStatus split={splitData} />
-        </View>
+        {/* SPEND Payment Status Card - Only show if payment is processing or paid */}
+        {(() => {
+          const paymentStatus = splitData.externalMetadata?.paymentStatus;
+          const shouldShow = paymentStatus === 'processing' || paymentStatus === 'paid' || paymentStatus === 'failed';
+          if (!shouldShow) return null;
+          return (
+            <View style={{
+              marginHorizontal: spacing.sm,
+              marginBottom: spacing.md,
+            }}>
+              <SpendPaymentStatus split={splitData} />
+            </View>
+          );
+        })()}
 
         {/* Payment Progress */}
         <SpendSplitProgress
@@ -687,32 +764,19 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
           totalPaid={totalPaid}
           completionPercentage={completionPercentage}
           paymentThreshold={paymentThreshold}
-          orderId={orderId}
+          orderId={orderId || undefined}
         />
 
-        {/* Order Items */}
-        <SpendOrderItems split={splitData} />
+        {/* Order Items - Only show if not expanded in header */}
+        {/* Items are now shown in the expandable header card */}
 
         {/* Participants */}
         <View style={{ marginBottom: spacing.md }}>
           <SpendSplitParticipants
             participants={participants}
             currentUserId={currentUser?.id?.toString()}
-          />
-          
-          {/* Add Participants Button - Only show for creator */}
-          {splitData.creatorId === currentUser?.id && (
-            <View style={{ marginHorizontal: spacing.md, marginTop: spacing.sm }}>
-              <Button
-                title={isInvitingUsers ? 'Inviting...' : 'Add Participants'}
-                onPress={handleAddParticipants}
-                variant="secondary"
-                disabled={isInvitingUsers}
-                loading={isInvitingUsers}
-                fullWidth={true}
+            onAddPress={splitData.creatorId === currentUser?.id ? handleAddParticipants : undefined}
               />
-            </View>
-          )}
         </View>
       </ScrollView>
 
@@ -723,11 +787,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         // Get participants from splitWallet if available, otherwise from splitData
         const allParticipants = splitWallet?.participants || splitData.participants || [];
         
-        // Find user participant - check both userId and id fields
-        const userParticipant = allParticipants.find((p: any) => {
-          const participantId = p.userId || p.id || '';
-          return participantId === currentUser.id.toString();
-        });
+        // Find user participant using centralized utility
+        const userParticipant = findUserParticipant(allParticipants, currentUser.id.toString());
         
         if (!userParticipant) {
           // If user is not a participant, don't show button
@@ -750,102 +811,100 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             borderTopWidth: 1,
             borderTopColor: colors.white5,
           }}>
-            <Button
-              title={isSendingPayment ? 'Sending...' : remainingAmount > 0 ? `Pay My Share (${remainingAmount.toFixed(2)} USDC)` : 'Pay My Share'}
+            <TouchableOpacity
+              style={{
+                backgroundColor: colors.green,
+                borderRadius: 12,
+                paddingVertical: spacing.md,
+                paddingHorizontal: spacing.xl,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
               onPress={handleSendMyShares}
-              variant="primary"
               disabled={isSendingPayment}
-              loading={isSendingPayment}
-              fullWidth={true}
-            />
+            >
+              <Text style={{
+                fontSize: typography.fontSize.lg,
+                fontWeight: typography.fontWeight.bold,
+                color: colors.black,
+              }}>
+                {isSendingPayment ? 'Sending...' : 'Send my share'}
+              </Text>
+            </TouchableOpacity>
           </View>
         );
       })()}
 
-      {/* Payment Modal */}
+      {/* Payment Modal - "Send to" Screen */}
       <Modal
         visible={showPaymentModal}
         onClose={handlePaymentModalClose}
-        title="Pay Your Share"
+        title="Send to"
         showHandle={true}
         closeOnBackdrop={true}
       >
-        <View style={{ marginBottom: spacing.md }}>
-          <Text style={{
-            color: colors.textSecondary,
-            fontSize: typography.fontSize.sm,
-            textAlign: 'center',
-            marginBottom: spacing.md,
-          }}>
-            {(() => {
-              const userParticipant = participants.find((p: any) => 
-                (p.userId || p.id) === currentUser?.id?.toString()
-              );
-              if (!userParticipant) return 'Slide to pay 0.00 USDC';
-              
-              const totalOwed = (userParticipant as any).amountOwed || 0;
-              const amountPaid = (userParticipant as any).amountPaid || 0;
-              const remaining = totalOwed - amountPaid;
-              const billName = splitData?.title || 'this SPEND order';
-              
-              return `Slide to pay ${remaining.toFixed(2)} USDC for ${billName}`;
-            })()}
-          </Text>
-        </View>
+        <SpendPaymentModal
+          orderNumber={orderNumber || undefined}
+          orderId={orderId || undefined}
+          walletAddress={splitWallet?.walletAddress || splitData?.externalMetadata?.orderData?.user_wallet || currentUser?.wallet_address || undefined}
+          amount={paymentAmount}
+          onAmountChange={(newAmount) => {
+            setPaymentAmount(newAmount);
+            // Re-check balance when amount changes
+            if (newAmount > 0) {
+              checkUserBalance(newAmount).catch(() => {});
+            }
+          }}
+          onSendPress={() => {
+            setShowPaymentModal(false);
+            setShowConfirmationModal(true);
+          }}
+          onWalletChange={() => setShowWalletSelector(true)}
+          disabled={isSendingPayment || isCheckingBalance}
+          loading={isSendingPayment || isCheckingBalance}
+          balance={liveBalance?.usdcBalance}
+          balanceError={balanceCheckError}
+          walletName={walletContext.walletName || 'WeSplit Wallet'}
+        />
+      </Modal>
 
-        <View style={{ gap: spacing.md }}>
-          {balanceCheckError && !isCheckingBalance ? (
-            <View style={{
-              padding: spacing.md,
-              backgroundColor: colors.error + '20',
-              borderRadius: spacing.sm,
-              borderWidth: 1,
-              borderColor: colors.error + '40',
-            }}>
-              <Text style={{
-                color: colors.error,
-                fontSize: typography.fontSize.sm,
-                marginBottom: spacing.xs / 2,
-              }}>
-                {balanceCheckError}
-              </Text>
-              <Text style={{
-                color: colors.textSecondary,
-                fontSize: typography.fontSize.xs,
-              }}>
-                You can still attempt to pay, but the transaction may fail.
-              </Text>
-            </View>
-          ) : null}
-          
-          <AppleSlider
+      {/* Payment Confirmation Modal */}
+      <Modal
+        visible={showConfirmationModal}
+        onClose={() => setShowConfirmationModal(false)}
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        <SpendPaymentConfirmationModal
+          orderNumber={orderNumber || undefined}
+          orderId={orderId || undefined}
+          amount={paymentAmount}
             onSlideComplete={handlePaymentModalConfirm}
             disabled={isSendingPayment || isCheckingBalance}
             loading={isSendingPayment || isCheckingBalance}
-            text={(() => {
-              if (isCheckingBalance && !isSendingPayment) {
-                return 'Checking balance...';
-              }
-              
-              if (isSendingPayment) {
-                return 'Processing payment...';
-              }
-              
-              const userParticipant = participants.find((p: any) => 
-                (p.userId || p.id) === currentUser?.id?.toString()
-              );
-              if (!userParticipant) return 'Slide to Pay';
-              
-              const totalOwed = (userParticipant as any).amountOwed || 0;
-              const amountPaid = (userParticipant as any).amountPaid || 0;
-              const remaining = totalOwed - amountPaid;
-              
-              return `Slide to Pay ${remaining.toFixed(2)} USDC`;
-            })()}
-            style={{ flex: 1 }}
-          />
-        </View>
+        />
       </Modal>
+
+      {/* Payment Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        <SpendPaymentSuccessModal
+          amount={successPaymentAmount}
+          orderNumber={orderNumber || undefined}
+          orderId={orderId || undefined}
+          onClose={() => setShowSuccessModal(false)}
+          />
+      </Modal>
+
+      {/* Wallet Selector Modal */}
+      <WalletSelectorModal
+        visible={showWalletSelector}
+        onClose={() => setShowWalletSelector(false)}
+      />
     </Container>
   );
 };

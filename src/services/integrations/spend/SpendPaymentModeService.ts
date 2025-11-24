@@ -90,11 +90,23 @@ export class SpendPaymentModeService {
 
   /**
    * Get order ID from split
+   * Extracts from orderData first, then falls back to externalMetadata
    * @param split - The split to check
    * @returns Order ID or undefined
    */
   static getOrderId(split: Split): string | undefined {
-    return split.externalMetadata?.orderId;
+    const orderData = split.externalMetadata?.orderData || {};
+    return orderData.id || orderData.order_number || split.externalMetadata?.orderId || split.externalMetadata?.orderNumber;
+  }
+  
+  /**
+   * Get order number from split (human-readable)
+   * @param split - The split to check
+   * @returns Order number or undefined
+   */
+  static getOrderNumber(split: Split): string | undefined {
+    const orderData = split.externalMetadata?.orderData || {};
+    return orderData.order_number || split.externalMetadata?.orderNumber;
   }
 
   /**

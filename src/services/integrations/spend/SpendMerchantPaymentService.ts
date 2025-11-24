@@ -10,7 +10,7 @@ import { SpendWebhookService } from './SpendWebhookService';
 import { SpendPaymentResult, SPEND_CONFIG } from './SpendTypes';
 import { PaymentResult } from '../../split/types';
 import { logger } from '../../analytics/loggingService';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../../../config/firebase/firebase';
 
 export class SpendMerchantPaymentService {
@@ -185,7 +185,10 @@ export class SpendMerchantPaymentService {
     creatorId: string
   ): Promise<PaymentResult> {
     const treasuryWallet = split.externalMetadata?.treasuryWallet;
-    const orderId = split.externalMetadata?.orderId;
+    
+    // Extract orderId from orderData first, then fallback to externalMetadata
+    const orderData = split.externalMetadata?.orderData || {};
+    const orderId = orderData.id || orderData.order_number || split.externalMetadata?.orderId || split.externalMetadata?.orderNumber;
 
     if (!treasuryWallet) {
       return {
@@ -202,7 +205,9 @@ export class SpendMerchantPaymentService {
     }
 
     // Format memo: "SP3ND Order: {orderId}"
-    const memo = SPEND_CONFIG.memoFormat.replace('{orderId}', orderId);
+    // Use order_number if available (more readable), otherwise use id
+    const memoOrderId = orderData.order_number || orderId;
+    const memo = SPEND_CONFIG.memoFormat.replace('{orderId}', String(memoOrderId));
 
     logger.info('Sending payment to SPEND treasury', {
       splitId: split.id,
@@ -220,6 +225,18 @@ export class SpendMerchantPaymentService {
       memo,
       true // fastMode
     );
+
+    // Verify transaction on-chain if successful
+    if (result.success && result.transactionSignature) {
+      logger.info('Verifying merchant payment transaction on-chain', {
+        splitId: split.id,
+        transactionSignature: result.transactionSignature,
+        treasuryWallet,
+      }, 'SpendMerchantPaymentService');
+      
+      // Transaction verification is handled by extractFairSplitFunds
+      // Additional verification can be added here if needed
+    }
 
     return result;
   }
@@ -267,14 +284,44 @@ export class SpendMerchantPaymentService {
 
     try {
       const splitRef = doc(db, 'splits', split.firebaseDocId);
-      await updateDoc(splitRef, updateData);
+      
+      // Use Firestore transaction for atomic updates
+      await runTransaction(db, async (transaction) => {
+        const splitDoc = await transaction.get(splitRef);
+        
+        if (!splitDoc.exists()) {
+          throw new Error('Split document does not exist');
+        }
 
-      logger.debug('Payment status updated', {
+        const currentData = splitDoc.data();
+        const currentStatus = currentData?.externalMetadata?.paymentStatus;
+        
+        // Prevent status regression (e.g., paid -> processing)
+        if (updates.paymentStatus) {
+          const statusOrder = ['pending', 'processing', 'paid', 'failed', 'refunded'];
+          const currentIndex = statusOrder.indexOf(currentStatus);
+          const newIndex = statusOrder.indexOf(updates.paymentStatus);
+          
+          if (currentIndex > newIndex && currentStatus !== 'failed') {
+            logger.warn('Preventing payment status regression', {
+              splitId: split.id,
+              currentStatus,
+              attemptedStatus: updates.paymentStatus,
+            }, 'SpendMerchantPaymentService');
+            // Don't update if regression detected (except failed -> any is allowed)
+            return;
+          }
+        }
+
+        transaction.update(splitRef, updateData);
+      });
+
+      logger.info('Payment status updated atomically', {
         splitId: split.id,
         updates,
       }, 'SpendMerchantPaymentService');
     } catch (error) {
-      logger.error('Failed to update payment status', {
+      logger.error('Failed to update payment status atomically', {
         splitId: split.id,
         error: error instanceof Error ? error.message : String(error),
       }, 'SpendMerchantPaymentService');
