@@ -15,6 +15,8 @@ interface HeaderProps {
   backButtonColor?: string;
   customStyle?: StyleProp<ViewStyle>;
   variant?: HeaderVariant;
+  logoUri?: string; // Custom logo URI for partner logos
+  logoHeight?: number; // Custom logo height (default: 40)
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -27,6 +29,8 @@ const Header: React.FC<HeaderProps> = ({
   backButtonColor = colors.white,
   customStyle,
   variant = 'default',
+  logoUri,
+  logoHeight = 40,
 }) => {
   const handleBackPress = () => {
     if (onBackPress) {
@@ -37,6 +41,31 @@ const Header: React.FC<HeaderProps> = ({
   const effectiveShowBackButton = variant === 'titleOnly' || variant === 'logoOnly' ? false : showBackButton;
 
   const renderCenterContent = () => {
+    // If custom logoUri is provided, use it
+    if (logoUri) {
+      return (
+        <View style={styles.logoSection}>
+          <Image 
+            source={{ uri: logoUri }} 
+            style={{ 
+              height: logoHeight, 
+              maxHeight: logoHeight,
+              width: 200, // Large width to allow proper scaling
+              maxWidth: '100%',
+              alignSelf: 'center',
+            }} 
+            resizeMode="contain"
+            onError={(error) => {
+              console.warn('Header logo failed to load:', logoUri, error);
+            }}
+            onLoad={() => {
+              console.log('Header logo loaded successfully:', logoUri);
+            }}
+          />
+        </View>
+      );
+    }
+    
     if (variant === 'logoOnly' || variant === 'logoWithBack') {
       return (
         <View style={styles.logoSection}>
@@ -109,10 +138,18 @@ const styles = {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     flex: 1,
+    minHeight: 40,
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    zIndex: 0,
   },
   logo: {
     height: 40,
     width: 120,
+    resizeMode: 'contain' as const,
+  },
+  customLogo: {
     resizeMode: 'contain' as const,
   },
 };

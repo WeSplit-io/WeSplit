@@ -11,6 +11,7 @@ export const colors = {
     // Black colors
     blackOverlay: 'rgba(0, 0, 0, 0.65)',
     black: '#061113',
+    black80: 'rgba(6, 17, 19, 0.80)',
     blackWhite5: '#121D1F',
     blackGreen: '#363F2C',
 

@@ -34,12 +34,12 @@ const SpendSplitProgress: React.FC<SpendSplitProgressProps> = ({
   const formatAmount = formatAmountWithComma;
 
   // SVG semi-circular arc calculations (180-degree arc at the top)
-  const width = 200;
-  const height = 100; // Semi-circle height
-  const strokeWidth = 20; // Increased thickness
-  const radius = 80; // Arc radius
-  const centerX = width / 2; // 100
-  const centerY = height; // 100 - center at bottom for semi-circle at top
+  const width = 360; // Even bigger
+  const height = 180; // Even bigger
+  const strokeWidth = 42; // Much fatter/thicker
+  const radius = 140; // Increased proportionally
+  const centerX = width / 2; // 180
+  const centerY = height; // 180 - center at bottom for semi-circle at top
   
   // Arc configuration: 180-degree semi-circle at the top
   // For a semi-circle at the top, the center is at the bottom of the viewBox
@@ -100,19 +100,20 @@ const SpendSplitProgress: React.FC<SpendSplitProgressProps> = ({
         <View style={styles.progressRing}>
           <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={styles.svg}>
             <Defs>
-              {/* Green gradient for progress bar */}
+              {/* Spend gradient for progress bar */}
               <LinearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <Stop offset="0%" stopColor="#AAFFAA" stopOpacity="1" />
-                <Stop offset="100%" stopColor={colors.green} stopOpacity="1" />
+                <Stop offset="0%" stopColor={colors.spendGradientStart} stopOpacity="1" />
+                <Stop offset="100%" stopColor={colors.spendGradientEnd} stopOpacity="1" />
               </LinearGradient>
             </Defs>
             
-            {/* Background arc (unfilled portion) - always shows full semi-circle */}
+            {/* Background arc (unfilled portion) - always shows full semi-circle with better visibility */}
             <Path
               d={backgroundArcPath}
-              stroke={colors.white20}
+              stroke={colors.white10}
               strokeWidth={strokeWidth}
               fill="transparent"
+              strokeLinecap="butt"
             />
             
             {/* Progress arc (filled portion) - shows progress from left to right */}
@@ -122,6 +123,7 @@ const SpendSplitProgress: React.FC<SpendSplitProgressProps> = ({
                 stroke="url(#progressGradient)"
                 strokeWidth={strokeWidth}
                 fill="transparent"
+                strokeLinecap="butt"
               />
             )}
           </Svg>
@@ -154,17 +156,15 @@ const SpendSplitProgress: React.FC<SpendSplitProgressProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: spacing.md,
-    marginVertical: spacing.md,
+    marginBottom: spacing.md,
   },
   progressRingWrapper: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
     position: 'relative',
   },
   progressRing: {
-    width: 200,
-    height: 100,
+    width: 360,
+    height: 180,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   progressInner: {
     position: 'absolute',
-    top: 50, // More space between percentage and arc
+    top: 100, // Adjusted for larger SVG
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -182,31 +182,30 @@ const styles = StyleSheet.create({
   },
   progressPercentage: {
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
     color: colors.white,
     marginBottom: spacing.xs,
   },
   progressAmount: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: typography.fontSize.xl + 2,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.white,
     marginBottom: spacing.xs / 4,
   },
   progressLabel: {
     fontSize: typography.fontSize.sm,
     color: colors.white70,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
   },
   remainingContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.md,
+    paddingVertical: spacing.lg,
     marginTop: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.white20,
   },
   remainingLabel: {
     fontSize: typography.fontSize.md,
@@ -214,9 +213,9 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   remainingAmount: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     color: colors.white,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.medium,
   },
 });
 

@@ -17,11 +17,10 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { Container, Header } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
-import { Split } from '../../services/splits/splitStorageService';
 import { SplitWalletService } from '../../services/split';
 import { useApp } from '../../context/AppContext';
-import { SplitStorageService } from '../../services/splits';
 import { logger } from '../../services/analytics/loggingService';
+import { createSpendSplitWallet } from '../../utils/spend/spendWalletUtils';
 
 interface SpendOrderSettingsScreenProps {
   navigation: any;
@@ -195,7 +194,27 @@ const SpendOrderSettingsScreen: React.FC<SpendOrderSettingsScreenProps> = ({
       Alert.alert('Error', 'Private key not available');
       return;
     }
-    setShowPrivateKey(!showPrivateKey);
+    
+    if (!showPrivateKey) {
+      // Ask for confirmation before showing private key
+      Alert.alert(
+        'Show Private Key',
+        'Are you sure you want to reveal your private key? Keep it secure and never share it with anyone.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Show',
+            onPress: () => setShowPrivateKey(true),
+            style: 'default',
+          },
+        ]
+      );
+    } else {
+      setShowPrivateKey(false);
+    }
   };
 
   if (isLoading) {
@@ -239,22 +258,29 @@ const SpendOrderSettingsScreen: React.FC<SpendOrderSettingsScreenProps> = ({
       <View style={styles.content}>
         {/* Wallet Address Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Wallet adress</Text>
-          <View style={styles.valueContainer}>
-            <Text style={styles.valueText}>
-              {splitWallet?.address || splitWallet?.walletAddress
-                ? formatWalletAddress(splitWallet.address || splitWallet.walletAddress)
-                : 'No wallet address'}
-            </Text>
-            <TouchableOpacity
-              style={styles.copyButton}
-              onPress={handleCopyAddress}
-            >
-              <PhosphorIcon name="Copy" size={18} color={colors.white} weight="regular" />
-            </TouchableOpacity>
+          <View style={styles.walletRow}>
+            {/* Right side: Label + Wallet Address + Copy */}
+            <View style={styles.walletInfo}>
+              <Text style={styles.sectionLabel}>Wallet address</Text>
+              <TouchableOpacity
+                style={styles.walletAddressContainer}
+                onPress={handleCopyAddress}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.valueText}>
+                  {splitWallet?.address || splitWallet?.walletAddress
+                    ? formatWalletAddress(splitWallet.address || splitWallet.walletAddress)
+                    : 'No wallet address'}
+                </Text>
+                <PhosphorIcon name="Copy" size={18} color={colors.white} weight="regular" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Left side: Private Key Button */}
             <TouchableOpacity
               style={styles.privateKeyButton}
               onPress={handleTogglePrivateKey}
+              activeOpacity={0.7}
             >
               <PhosphorIcon name={showPrivateKey ? "EyeSlash" : "Eye"} size={18} color={colors.white} weight="regular" />
               <Text style={styles.privateKeyButtonText}>Private key</Text>
@@ -262,25 +288,25 @@ const SpendOrderSettingsScreen: React.FC<SpendOrderSettingsScreenProps> = ({
           </View>
         </View>
 
-        {/* Private Key Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>Private key</Text>
-            <TouchableOpacity
-              style={styles.copyButton}
-              onPress={handleCopyPrivateKey}
-            >
-              <PhosphorIcon name="Copy" size={18} color={colors.white} weight="regular" />
-            </TouchableOpacity>
+        {/* Private Key Section - Only show when revealed */}
+        {showPrivateKey && splitWallet?.privateKey && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>Private key</Text>
+              <TouchableOpacity
+                style={styles.copyButton}
+                onPress={handleCopyPrivateKey}
+              >
+                <PhosphorIcon name="Copy" size={18} color={colors.white} weight="regular" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.privateKeyContainer}>
+              <Text style={styles.privateKeyText}>
+                {splitWallet.privateKey}
+              </Text>
+            </View>
           </View>
-          <View style={styles.privateKeyContainer}>
-            <Text style={[styles.privateKeyText, !showPrivateKey && styles.privateKeyPlaceholder]}>
-              {showPrivateKey && splitWallet?.privateKey
-                ? splitWallet.privateKey
-                : 'Private key'}
-            </Text>
-          </View>
-        </View>
+        )}
       </View>
     </Container>
   );
@@ -288,7 +314,6 @@ const SpendOrderSettingsScreen: React.FC<SpendOrderSettingsScreenProps> = ({
 
 const styles = StyleSheet.create({
   content: {
-    padding: spacing.md,
     gap: spacing.md,
   },
   loadingContainer: {
@@ -301,7 +326,7 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
   },
   section: {
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.lg,
   },
@@ -311,35 +336,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  sectionLabel: {
-    fontSize: typography.fontSize.md,
-    color: colors.white,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.md,
-  },
-  valueContainer: {
+  walletRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.md,
   },
-  valueText: {
+  walletInfo: {
     flex: 1,
+    flexDirection: 'column',
+  },
+  sectionLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+    fontWeight: typography.fontWeight.regular,
+    marginBottom: spacing.xs,
+  },
+  walletAddressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  valueText: {
     fontSize: typography.fontSize.md,
     color: colors.white,
     fontWeight: typography.fontWeight.medium,
     fontFamily: typography.fontFamily.mono,
   },
   copyButton: {
-    padding: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   privateKeyButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white5,
     borderRadius: 8,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    gap: spacing.xs / 2,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
   },
   privateKeyButtonText: {
     fontSize: typography.fontSize.xs,

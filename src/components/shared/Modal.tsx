@@ -35,6 +35,7 @@ interface ModalProps {
   showHandle?: boolean;
   title?: string;
   description?: string;
+  maxHeight?: string | number;
 }
 
 const ModalComponent: React.FC<ModalProps> = ({
@@ -50,6 +51,7 @@ const ModalComponent: React.FC<ModalProps> = ({
   showHandle = true,
   title,
   description,
+  maxHeight,
 }) => {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -176,7 +178,8 @@ const ModalComponent: React.FC<ModalProps> = ({
                 styles.modalContent,
                 { 
                   transform: [{ translateY }],
-                  height: keyboardHeight > 0 ? '100%' : undefined,
+                  height: keyboardHeight > 0 ? '100%' : (maxHeight || SCREEN_HEIGHT * 0.8),
+                  maxHeight: maxHeight || SCREEN_HEIGHT * 0.8,
                 },
                 style,
               ]}
@@ -200,21 +203,14 @@ const ModalComponent: React.FC<ModalProps> = ({
               )}
               
               {/* Contenu principal */}
-              <ScrollView 
+              <View 
                 style={[
                   styles.modalBody,
                   keyboardHeight > 0 && styles.modalBodyKeyboardVisible
                 ]}
-                contentContainerStyle={[
-                  styles.modalBodyContent,
-                  keyboardHeight > 0 && styles.modalBodyContentKeyboardVisible
-                ]}
-                showsVerticalScrollIndicator={false}
-                bounces={false}
-                nestedScrollEnabled={true}
               >
                 {children}
-              </ScrollView>
+              </View>
             </Animated.View>
           </PanGestureHandler>
         </View>
@@ -243,17 +239,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.blackWhite5,
     borderTopLeftRadius: spacing.lg,
     borderTopRightRadius: spacing.lg,
-    paddingTop: spacing.lg, // Réduit pour laisser place à la handle
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-    maxHeight: SCREEN_HEIGHT * 0.8, // Limité à 70% de la hauteur d'écran
+    paddingTop: spacing.md, // Réduit pour laisser place à la handle
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.md,
     minHeight: 300,
     alignSelf: 'stretch', // S'étend sur toute la largeur
-    // Supprimer flex pour permettre l'adaptation au contenu
   },
   handleContainer: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
   handle: {
     width: 50,
@@ -277,13 +271,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   modalBody: {
-    // Supprimer flex: 1 et maxHeight pour permettre l'adaptation au contenu
-    // Le ScrollView s'adaptera automatiquement au contenu
-  },
-  modalBodyContent: {
-    flexGrow: 1, // Permet au contenu de grandir selon ses besoins
-    paddingBottom: 10, // Petit padding en bas
-    
+    flex: 1,
   },
   modalBodyKeyboardVisible: {
     flex: 1,

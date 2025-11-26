@@ -58,12 +58,12 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
     };
     return formatOrderNumber(orderNumber) || formatOrderNumber(orderId) || 'N/A';
   }, [orderNumber, orderId]);
-  
+
   // Memoize status display
   const statusDisplay = useMemo(() => {
     if (!orderStatus) return null;
     const statusLower = orderStatus.toLowerCase();
-    
+
     const statusMap: Record<string, string> = {
       'created': 'Pending',
       'payment_pending': 'Pending',
@@ -83,10 +83,10 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
       'ready_for_payment': 'Ready',
       'international_paid': 'Paid',
     };
-    
+
     return statusMap[statusLower] || orderStatus.charAt(0).toUpperCase() + orderStatus.slice(1).toLowerCase();
   }, [orderStatus]);
-  
+
   // Memoize date formatting
   const formattedDate = useMemo(() => {
     try {
@@ -103,39 +103,40 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
       return `${day} ${month}. ${year}`;
     }
   }, [billDate]);
-  
+
   // Extract order data using centralized utility
   const { items } = useMemo(() => extractOrderData(split), [split]);
-  
+
   // Use shared formatting utility
   const formatAmount = formatAmountWithComma;
-  
+
   // Memoize animation calculations
-  const itemHeight = 80;
+  const itemHeight = 100; // Increased to accommodate larger images and content
   const headerHeight = 30;
+  const separatorHeight = 20; // Space for separator
   const emptyStateHeight = 40;
   const maxItemsHeight = useMemo(() => {
     if (items.length > 0) {
-      return headerHeight + (items.length * itemHeight);
+      return headerHeight + separatorHeight + (items.length * itemHeight) + spacing.md; // Extra spacing
     }
     return emptyStateHeight; // Show empty state when expanded
   }, [items.length]);
-  
+
   const itemsHeight = animation.interpolate({
     inputRange: [0, 1],
     outputRange: [0, maxItemsHeight],
   });
-  
+
   const chevronRotation = animation.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '180deg'],
   });
-  
+
   // Toggle expansion with useCallback
   const toggleExpanded = useCallback(() => {
     const toValue = isExpanded ? 0 : 1;
     setIsExpanded(!isExpanded);
-    
+
     Animated.timing(animation, {
       toValue,
       duration: 300,
@@ -145,14 +146,15 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
   return (
     <>
       {/* Navigation Header */}
-      <Header 
-        title="SP3ND"
+      <Header
+        logoUri="https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fpartners%2Fsp3nd-logo.png?alt=media&token=e93baa6a-caed-4695-8e48-08333424ddaa"
+        logoHeight={16}
         onBackPress={onBackPress}
         showBackButton={true}
         rightElement={
           onSettingsPress ? (
             <TouchableOpacity onPress={onSettingsPress} style={styles.settingsButton}>
-              <PhosphorIcon name="Gear" size={24} color={colors.white} weight="regular" />
+              <PhosphorIcon name="SlidersHorizontal" size={24} color={colors.white} weight="regular" />
             </TouchableOpacity>
           ) : (
             <SpendOrderBadge variant="compact" />
@@ -161,35 +163,52 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
       />
 
       {/* Order Summary Card - Full structure matching Figma mockup */}
-      <LinearGradient
-        colors={[colors.green, colors.greenBlue]}
-        style={styles.orderCard}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-      >
+      <View style={styles.orderCardWrapper}>
+        <LinearGradient
+          colors={[colors.spendGradientStart, colors.spendGradientEnd]}
+          style={styles.orderCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
         {/* Order Header with Icon, Order Number, Date, and Status Badge */}
         <View style={styles.orderHeader}>
-          <View style={styles.iconContainer}>
-            <PhosphorIcon name="CurrencyDollar" size={24} color={colors.black} weight="fill" />
-          </View>
-          <View style={styles.orderTitleContainer}>
-            <Text style={styles.orderTitle} numberOfLines={1}>
-              Order #{displayOrderNumber}
-            </Text>
+          <View style={styles.orderHeaderLeft}>
+            <View style={styles.iconContainer}>
+              <Image
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fpartners%2Fsp3nd-icon.png?alt=media&token=3b2603eb-57cb-4dc6-aafd-0fff463f1579' }}
+                style={styles.spendIcon}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.orderTitleContainer}>
+              <Text style={styles.orderTitle} numberOfLines={1}>
+                Order #{displayOrderNumber}
+              </Text>
               <Text style={styles.orderDate}>
-              {formattedDate}
-                  </Text>
-                </View>
+                {formattedDate}
+              </Text>
+            </View>
+          </View>
+
           {statusDisplay && (
             <View style={styles.statusBadgeContainer}>
-              <View style={styles.statusBadge}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusText}>{statusDisplay}</Text>
+              <View style={[
+                styles.statusBadge,
+                statusDisplay === 'Pending' && styles.statusBadgePending
+              ]}>
+                <View style={[
+                  styles.statusDot,
+                  statusDisplay === 'Pending' && styles.statusDotPending
+                ]} />
+                <Text style={[
+                  styles.statusText,
+                  statusDisplay === 'Pending' && styles.statusTextPending
+                ]}>{statusDisplay}</Text>
               </View>
             </View>
           )}
         </View>
-        
+
         {/* Total Amount Section */}
         <View style={styles.orderAmountContainer}>
           <Text style={styles.orderAmountLabel}>Total</Text>
@@ -197,28 +216,34 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
             {formatAmount(totalAmount || 0)} USDC
           </Text>
         </View>
-        
+
         {/* Dashed separator line - Only show when items exist and expanded */}
-        {items.length > 0 && isExpanded && (
+        {items.length > 0 && (
           <Animated.View
             style={{
               opacity: animation,
-              height: isExpanded ? 1 : 0,
-              overflow: 'hidden',
+              marginVertical: spacing.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            <View style={styles.separator} />
+            <View style={styles.separator}>
+              {Array.from({ length: 40 }).map((_, index) => (
+                <View key={index} style={styles.separatorDot} />
+              ))}
+            </View>
           </Animated.View>
         )}
-        
+
         {/* Order Items Section - Expandable */}
-        <Animated.View 
+        <Animated.View
           style={[
             styles.itemsContainer,
-            { 
+            {
               height: itemsHeight,
               opacity: animation,
-              overflow: 'hidden',
+              overflow: 'visible', // Changed to visible to show all content
             }
           ]}
         >
@@ -235,39 +260,39 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
                 const itemPrice = typeof item.price === 'number' ? item.price : 0;
                 const itemQuantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
                 const itemTotal = itemPrice * itemQuantity;
-                
+
                 // Use product_title as primary (per SP3ND schema), fallback to name
                 const itemName = item.product_title || item.name || `Item ${index + 1}`;
-                
+
                 // Store name comes from order level, not item level (per SP3ND schema)
                 const storeName = store || '';
-                
+
                 // Category (optional field)
                 const itemCategory = item.category || null;
-                
+
                 // Format variants if available (per SP3ND ProductVariant schema)
                 // Handle both array and null/undefined cases
-                const variantsText = 
-                  item.variants && 
-                  Array.isArray(item.variants) && 
-                  item.variants.length > 0 &&
-                  item.variants.every((v: any) => v && typeof v === 'object' && v.type && v.value)
+                const variantsText =
+                  item.variants &&
+                    Array.isArray(item.variants) &&
+                    item.variants.length > 0 &&
+                    item.variants.every((v: any) => v && typeof v === 'object' && v.type && v.value)
                     ? item.variants.map((v: any) => `${v.type}: ${v.value}`).join(', ')
                     : null;
-                
+
                 // Image URL (per SP3ND schema: image_url or image)
                 // Both fields are supported for compatibility
                 const imageUrl = item.image_url || item.image || null;
-                
+
                 // Prime eligibility (per SP3ND schema) - boolean field
                 const isPrime = item.isPrimeEligible === true;
-                
+
                 // Product URL (optional, for linking to product page)
                 const productUrl = item.product_url || item.url || null;
-                
+
                 // Generate unique key for item
                 const itemKey = item.product_id || item.id || `item-${index}`;
-                
+
                 return (
                   <View key={itemKey} style={styles.orderItem}>
                     {imageUrl ? (
@@ -293,25 +318,25 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
                           {variantsText}
                         </Text>
                       )}
-                      {itemCategory && (
+                      {/*{itemCategory && (
                         <Text style={styles.orderItemCategory} numberOfLines={1}>
                           {itemCategory}
                         </Text>
-                      )}
+                      )} */}
                       {storeName && (
                         <Text style={styles.orderItemStore} numberOfLines={1}>
                           {storeName}
                         </Text>
                       )}
-                      <View style={styles.orderItemBadges}>
-                        {isPrime && (
+                     <View style={styles.orderItemBadges}>
+                         {/*{isPrime && (
                           <View style={styles.primeBadge}>
                             <Text style={styles.primeBadgeText}>Prime</Text>
                           </View>
-                        )}
+                        )} */}
                         {itemQuantity > 1 && (
                           <View style={styles.quantityBadge}>
-                            <Text style={styles.quantityBadgeText}>×{itemQuantity}</Text>
+                            <Text style={styles.quantityBadgeText}>Quantity:{itemQuantity}</Text>
                           </View>
                         )}
                       </View>
@@ -338,65 +363,91 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
             </View>
           )}
         </Animated.View>
+
+        </LinearGradient>
         
-        {/* Order Details Button - Centered at bottom of card */}
-        <TouchableOpacity 
-          style={styles.orderDetailsButton}
-          onPress={toggleExpanded}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.orderDetailsText}>Order details</Text>
-          {items.length > 0 ? (
-            <Animated.View style={{ transform: [{ rotate: chevronRotation }] }}>
-              <PhosphorIcon name="CaretDown" size={16} color={colors.white} weight="regular" />
-            </Animated.View>
-          ) : (
-            <PhosphorIcon name="CaretDown" size={16} color={colors.white + '60'} weight="regular" />
-          )}
-        </TouchableOpacity>
-      </LinearGradient>
+        {/* Order Details Button - Outside the card with gradient border */}
+        <View style={styles.orderDetailsButtonContainer}>
+          {/* Gradient border background */}
+          <LinearGradient
+            colors={[colors.spendGradientStart, colors.spendGradientEnd]}
+            style={styles.orderDetailsButtonGradientBorder}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {/* Black button on top */}
+            <TouchableOpacity
+              style={styles.orderDetailsButton}
+              onPress={toggleExpanded}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.orderDetailsText}>Order details</Text>
+              {items.length > 0 ? (
+                <Animated.View style={[styles.doubleChevronContainer, { transform: [{ rotate: chevronRotation }] }]}>
+                  <PhosphorIcon name="CaretDown" size={14} color={colors.white} weight="regular" style={styles.chevronTop} />
+                  <PhosphorIcon name="CaretDown" size={14} color={colors.white} weight="regular" style={styles.chevronBottom} />
+                </Animated.View>
+              ) : (
+                <View style={styles.doubleChevronContainer}>
+                  <PhosphorIcon name="CaretDown" size={12} color={colors.white + '60'} weight="regular" style={styles.chevronTop} />
+                  <PhosphorIcon name="CaretDown" size={12} color={colors.white + '60'} weight="regular" style={styles.chevronBottom} />
+                </View>
+              )}
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+      </View>
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  orderCard: {
-    marginHorizontal: spacing.sm,
+  orderCardWrapper: {
     marginTop: spacing.md,
-    marginBottom: spacing.md,
-    borderRadius: 20,
-    padding: spacing.lg,
+    marginBottom: spacing.xl, 
     position: 'relative',
-    overflow: 'hidden', // Changed to hidden to properly contain animated content
+  },
+  orderCard: {
+    borderRadius: 20,
+    padding: spacing.md,
+    paddingVertical: spacing.lg,
+    position: 'relative',
   },
   orderHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: spacing.md,
   },
+  orderHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   iconContainer: {
-    width: 48,
-    height: 48,
+    width: 36,
+    height: 36,
     borderRadius: 24,
-    backgroundColor: colors.blue + '40', // Slightly more opaque to match mockup
+    backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+  },
+  spendIcon: {
+    width: 36,
+    height: 36,
   },
   orderTitleContainer: {
-    flex: 1,
   },
   orderTitle: {
-    fontSize: typography.fontSize.xxl,
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
     color: colors.black,
     marginBottom: spacing.xs / 2,
-    lineHeight: typography.fontSize.xxl * 1.2,
+    lineHeight: typography.fontSize.xxl,
   },
   orderDate: {
     fontSize: typography.fontSize.sm,
-    color: colors.black + 'CC',
+    color: colors.black80,
     fontWeight: typography.fontWeight.medium,
   },
   statusBadgeContainer: {
@@ -405,13 +456,17 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.green + '40',
+    backgroundColor: colors.green + '20',
     borderRadius: 12,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs / 2,
     borderWidth: 1,
-    borderColor: colors.green + '60',
+    borderColor: colors.green,
     gap: spacing.xs / 2,
+  },
+  statusBadgePending: {
+    backgroundColor: colors.red20,
+    borderColor: colors.red,
   },
   statusDot: {
     width: 6,
@@ -419,21 +474,26 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: colors.red,
   },
+  statusDotPending: {
+    backgroundColor: colors.red,
+  },
   statusText: {
     fontSize: typography.fontSize.xs,
     color: colors.black,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.medium,
+  },
+  statusTextPending: {
+    color: colors.red,
   },
   orderAmountContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+    marginVertical: spacing.sm,
   },
   orderAmountLabel: {
     fontSize: typography.fontSize.md,
-    color: colors.black + 'CC',
+    color: colors.black80,
     fontWeight: typography.fontWeight.medium,
   },
   orderAmountUSDC: {
@@ -441,47 +501,78 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     color: colors.black,
   },
+  orderDetailsButtonContainer: {
+    position: 'absolute',
+    bottom: -spacing.md, // Position outside the card
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 100,
+    elevation: 10, // Android
+    pointerEvents: 'box-none', // Allow touches to pass through to children
+  },
+  orderDetailsButtonGradientBorder: {
+    borderRadius: 16,
+    padding: 2.5, // Border width - visible gradient border
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   orderDetailsButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.blackGreen, // Dark green background matching mockup
-    borderRadius: 12,
+    backgroundColor: colors.black,
+    borderRadius: 14,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
-    borderWidth: 0,
     gap: spacing.xs,
-    alignSelf: 'center', // Center the button
-    zIndex: 10,
-    elevation: 10, // Android
+    minWidth: 140,
+    width: 'auto',
   },
   orderDetailsText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white, // White text on dark green background
+    fontSize: typography.fontSize.md,
+    color: colors.white,
     fontWeight: typography.fontWeight.semibold,
+  },
+  doubleChevronContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 16,
+    marginLeft: spacing.xs / 2,
+  },
+  chevronTop: {
+    marginBottom: -4, // Overlap the chevrons slightly
+  },
+  chevronBottom: {
+    marginTop: -4, // Overlap the chevrons slightly
   },
   settingsButton: {
     padding: spacing.xs,
   },
   separator: {
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+  },
+  separatorDot: {
+    width: 4,
     height: 1,
-    borderTopWidth: 1,
-    borderTopColor: colors.black + '20',
-    borderStyle: 'dashed',
+    backgroundColor: colors.black,
+    borderRadius: 0.5,
   },
   itemsHeader: {
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   itemsHeaderTitle: {
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.medium,
     color: colors.black,
   },
   itemsContainer: {
-    marginBottom: spacing.sm,
     marginTop: spacing.sm,
   },
   orderItem: {
@@ -490,20 +581,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   orderItemImage: {
-    width: 48,
-    height: 48,
+    width: 56,
+    minHeight: 56,
+    height: '80%',
     borderRadius: 8,
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
     backgroundColor: colors.black + '10',
   },
   orderItemIcon: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
     borderRadius: 8,
     backgroundColor: colors.black + '10',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
   },
   orderItemDetails: {
     flex: 1,
@@ -516,20 +608,20 @@ const styles = StyleSheet.create({
   },
   orderItemStore: {
     fontSize: typography.fontSize.xs,
-    color: colors.black + 'CC',
+    color: colors.black80,
     fontWeight: typography.fontWeight.medium,
     marginTop: spacing.xs / 4,
   },
   orderItemCategory: {
     fontSize: typography.fontSize.xs,
-    color: colors.black + 'AA',
+    color: colors.black80,
     fontWeight: typography.fontWeight.regular,
     textTransform: 'capitalize',
     marginTop: spacing.xs / 4,
   },
   orderItemVariants: {
     fontSize: typography.fontSize.xs,
-    color: colors.black + 'AA',
+    color: colors.black80,
     fontWeight: typography.fontWeight.regular,
     fontStyle: 'italic',
     marginTop: spacing.xs / 4,
@@ -543,41 +635,38 @@ const styles = StyleSheet.create({
   orderItemPriceContainer: {
     alignItems: 'flex-end',
     justifyContent: 'center',
+    marginLeft: spacing.sm,
   },
   orderItemPrice: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     color: colors.black,
     marginBottom: spacing.xs / 4,
   },
   orderItemUnitPrice: {
     fontSize: typography.fontSize.xs,
-    color: colors.black + 'CC',
+    color: colors.black80,
     fontWeight: typography.fontWeight.medium,
   },
   quantityBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.blue + '20',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: 4,
   },
   quantityBadgeText: {
-    fontSize: typography.fontSize.xs - 2,
-    color: colors.blue,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: typography.fontSize.xs,
+    color: colors.black80,
+    fontWeight: typography.fontWeight.medium,
   },
   primeBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.blue + '30',
+    backgroundColor: colors.white10,
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: 4,
     marginTop: spacing.xs / 4,
   },
   primeBadgeText: {
-    fontSize: typography.fontSize.xs - 2,
-    color: colors.blue,
+    fontSize: typography.fontSize.xs,
+    color: colors.white,
     fontWeight: typography.fontWeight.bold,
   },
 });

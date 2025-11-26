@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import PhosphorIcon from '../../../components/shared/PhosphorIcon';
 import Avatar from '../../../components/shared/Avatar';
 import { colors } from '../../../theme/colors';
@@ -47,9 +48,16 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Participants ({participants.length})</Text>
         {onAddPress && (
-          <TouchableOpacity style={styles.addButton} onPress={onAddPress}>
-            <PhosphorIcon name="Plus" size={16} color={colors.green} weight="bold" />
-            <Text style={styles.addButtonText}>Add</Text>
+          <TouchableOpacity onPress={onAddPress} activeOpacity={0.8}>
+            <LinearGradient
+              colors={[colors.spendGradientStart, colors.spendGradientEnd]}
+              style={styles.addButton}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <PhosphorIcon name="Plus" size={16} color={colors.black} weight="bold" />
+              <Text style={styles.addButtonText}>Add</Text>
+            </LinearGradient>
           </TouchableOpacity>
         )}
       </View>
@@ -73,7 +81,7 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
                 />
                 {isPaid && (
                   <View style={styles.paidCheckmark}>
-                    <Text style={styles.paidCheckmarkText}>✓</Text>
+                    <PhosphorIcon name="Check" size={12} color={colors.white} weight="bold" />
                   </View>
                 )}
               </View>
@@ -105,7 +113,6 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: spacing.md,
     marginVertical: spacing.md,
     marginBottom: spacing.xl,
   },
@@ -118,22 +125,19 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.green + '20',
-    borderRadius: 12,
+    borderRadius: 16,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.green + '40',
-    gap: spacing.xs / 2,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
   },
   addButtonText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.green,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: typography.fontSize.md,
+    color: colors.black,
+    fontWeight: typography.fontWeight.medium,
   },
   sectionTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.medium,
     color: colors.white,
   },
   participantCount: {
@@ -159,16 +163,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.white20,
   },
   participantCardPaid: {
     backgroundColor: colors.white10,
-    borderColor: colors.white20,
   },
   participantInfo: {
     flexDirection: 'row',
@@ -177,7 +178,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     position: 'relative',
-    marginRight: spacing.md,
+    marginRight: spacing.sm + 2,
   },
   avatarContainerPaid: {
     opacity: 1,
@@ -189,13 +190,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   participantName: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
-    marginBottom: spacing.xs / 4,
+    marginBottom: spacing.xs,
   },
   participantWallet: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     color: colors.white70,
     fontFamily: typography.fontFamily.mono,
   },
@@ -203,9 +204,22 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   amountText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.medium,
     color: colors.white,
+  },
+  paidCheckmark: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.green,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.black,
   },
 });
 

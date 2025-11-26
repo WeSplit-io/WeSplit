@@ -18,3 +18,5 @@ export { default as Tabs } from './Tabs';
 export type { Tab } from './Tabs';
 export { default as Avatar } from './Avatar';
 export { ParticipationCircle } from './ParticipationCircle';
+export { default as SendComponent } from './SendComponent';
+export type { RecipientInfo, WalletInfo } from './SendComponent';

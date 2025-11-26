@@ -12,6 +12,7 @@ import {
   Alert,
   StatusBar,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing, typography } from '../../theme';
@@ -19,11 +20,13 @@ import { SplitWalletService, SplitWallet } from '../../services/split';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import { SpendPaymentModeService, SpendMerchantPaymentService } from '../../services/integrations/spend';
-import { SpendPaymentStatus, SpendPaymentModal, SpendPaymentConfirmationModal, SpendPaymentSuccessModal } from '../../components/spend';
+import { SpendPaymentStatus, SpendPaymentConfirmationModal, SpendPaymentSuccessModal } from '../../components/spend';
+import { SendComponent } from '../../components/shared';
 import { WalletSelectorModal } from '../../components/wallet';
 import { useWallet } from '../../context/WalletContext';
 import { Container, Header, Button, ModernLoader } from '../../components/shared';
 import Modal from '../../components/shared/Modal';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { SpendSplitHeader, SpendSplitProgress, SpendSplitParticipants } from './components';
 import { SplitStorageService } from '../../services/splits';
@@ -31,6 +34,9 @@ import { SplitParticipantInvitationService } from '../../services/splits/SplitPa
 import { extractOrderData, findUserParticipant, calculatePaymentTotals } from '../../utils/spend/spendDataUtils';
 import { createSpendSplitWallet } from '../../utils/spend/spendWalletUtils';
 import { createMockSpendOrderData } from '../../services/integrations/spend/SpendMockData';
+import { formatAmountWithComma } from '../../utils/spend/formatUtils';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface SpendSplitScreenProps {
   navigation: any;
@@ -93,6 +99,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [balanceCheckError, setBalanceCheckError] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
+  const [paymentAmountString, setPaymentAmountString] = useState('0');
+  const [paymentNote, setPaymentNote] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successPaymentAmount, setSuccessPaymentAmount] = useState(0);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
@@ -532,6 +540,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     
     // Set initial payment amount
     setPaymentAmount(roundedRemainingAmount);
+    setPaymentAmountString(formatAmountWithComma(roundedRemainingAmount));
+    setPaymentNote('');
     
     // Show modal immediately
     setBalanceCheckError(null);
@@ -805,7 +815,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       <ScrollView 
         style={{ flex: 1 }} 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: spacing.xl }}
+        contentContainerStyle={{ paddingBottom: spacing.xl + spacing.xxl }}
+        nestedScrollEnabled={true}
       >
         {/* SPEND Order Header */}
         <SpendSplitHeader
@@ -889,30 +900,34 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         // Show button even if wallet doesn't exist yet - it will be created when needed
         return (
           <View style={{
-            padding: spacing.md,
+            paddingVertical: spacing.md,
             backgroundColor: colors.black,
-            borderTopWidth: 1,
-            borderTopColor: colors.white5,
           }}>
             <TouchableOpacity
-              style={{
-                backgroundColor: colors.green,
-                borderRadius: 12,
-                paddingVertical: spacing.md,
-                paddingHorizontal: spacing.xl,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
               onPress={handleSendMyShares}
               disabled={isSendingPayment}
+              activeOpacity={0.8}
             >
-              <Text style={{
-                fontSize: typography.fontSize.lg,
-                fontWeight: typography.fontWeight.bold,
-                color: colors.black,
-              }}>
-                {isSendingPayment ? 'Sending...' : 'Send my share'}
-              </Text>
+              <LinearGradient
+                colors={[colors.spendGradientStart, colors.spendGradientEnd]}
+                style={{
+                  borderRadius: 16,
+                  paddingVertical: spacing.md,
+                  paddingHorizontal: spacing.xl,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={{
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: colors.black,
+                }}>
+                  {isSendingPayment ? 'Sending...' : 'Send my share'}
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         );
@@ -922,33 +937,72 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       <Modal
         visible={showPaymentModal}
         onClose={handlePaymentModalClose}
-        title="Send to"
         showHandle={true}
         closeOnBackdrop={true}
+        maxHeight={SCREEN_HEIGHT * 0.9}
       >
-        <SpendPaymentModal
-          orderNumber={orderNumber || undefined}
-          orderId={orderId || undefined}
-          walletAddress={splitWallet?.walletAddress || splitData?.externalMetadata?.orderData?.user_wallet || currentUser?.wallet_address || undefined}
-          amount={paymentAmount}
-          onAmountChange={(newAmount) => {
-            setPaymentAmount(newAmount);
-            // Re-check balance when amount changes
-            if (newAmount > 0) {
-              checkUserBalance(newAmount).catch(() => {});
-            }
-          }}
-          onSendPress={() => {
-            setShowPaymentModal(false);
-            setShowConfirmationModal(true);
-          }}
-          onWalletChange={() => setShowWalletSelector(true)}
-          disabled={isSendingPayment || isCheckingBalance}
-          loading={isSendingPayment || isCheckingBalance}
-          balance={liveBalance?.usdcBalance}
-          balanceError={balanceCheckError}
-          walletName={walletContext.walletName || 'WeSplit Wallet'}
-        />
+        <View style={{ flex: 1, paddingBottom: spacing.md }}>
+          <SendComponent
+            recipient={{
+              name: `Order #${orderNumber || orderId || 'N/A'}`,
+              address: splitWallet?.walletAddress || splitData?.externalMetadata?.orderData?.user_wallet || currentUser?.wallet_address || undefined,
+              icon: 'CurrencyDollar',
+              iconColor: colors.blue,
+            }}
+            onRecipientChange={undefined}
+            showRecipientChange={false}
+            amount={paymentAmountString}
+            onAmountChange={(newAmountString) => {
+              setPaymentAmountString(newAmountString);
+              // Convert string to number (handle comma as decimal separator)
+              const numAmount = parseFloat(newAmountString.replace(',', '.')) || 0;
+              setPaymentAmount(numAmount);
+              // Re-check balance when amount changes
+              if (numAmount > 0) {
+                checkUserBalance(numAmount).catch(() => {});
+              }
+            }}
+            currency="USDC"
+            note={paymentNote}
+            onNoteChange={setPaymentNote}
+            showAddNote={false}
+            wallet={{
+              name: walletContext.walletName || 'WeSplit Wallet',
+              balance: liveBalance?.usdcBalance || 0,
+              balanceFormatted: liveBalance?.usdcBalance !== undefined ? formatAmountWithComma(liveBalance.usdcBalance) : undefined,
+              icon: 'Wallet',
+              iconColor: colors.green,
+            }}
+            onWalletChange={() => setShowWalletSelector(true)}
+            showWalletChange={true}
+            onSendPress={() => {
+              setShowPaymentModal(false);
+              setShowConfirmationModal(true);
+            }}
+            sendButtonDisabled={isSendingPayment || isCheckingBalance || paymentAmount <= 0}
+            sendButtonLoading={isSendingPayment || isCheckingBalance}
+            sendButtonTitle={isSendingPayment || isCheckingBalance ? 'Processing...' : 'Send'}
+          />
+          
+          {/* Balance Error Display */}
+          {balanceCheckError && (
+            <View style={{
+              marginTop: spacing.sm,
+              backgroundColor: colors.red + '20',
+              borderRadius: spacing.radiusMd,
+              padding: spacing.sm,
+              borderWidth: 1,
+              borderColor: colors.red + '40',
+            }}>
+              <Text style={{
+                fontSize: typography.fontSize.xs,
+                color: colors.red,
+              }}>
+                {balanceCheckError}
+              </Text>
+            </View>
+          )}
+        </View>
       </Modal>
 
       {/* Payment Confirmation Modal */}
