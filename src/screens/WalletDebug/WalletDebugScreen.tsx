@@ -173,7 +173,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
               <Text style={styles.providerName}>{result.provider.displayName}</Text>
               <View style={[
                 styles.statusBadge,
-                { backgroundColor: result.isAvailable ? colors.primaryGreen : colors.error }
+                { backgroundColor: result.isAvailable ? colors.green : colors.red }
               ]}>
                 <Text style={styles.statusText}>
                   {result.isAvailable ? 'Available' : 'Not Available'}
@@ -223,7 +223,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
                 style={styles.removeButton}
                 onPress={() => removeLinkedWallet(wallet.id)}
               >
-                <Icon name="trash" size={16} color={colors.error} />
+                <Icon name="trash" size={16} color={colors.red} />
               </TouchableOpacity>
             </View>
             
@@ -292,7 +292,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
             <Switch
               value={useCache}
               onValueChange={setUseCache}
-              trackColor={{ false: colors.border, true: colors.primaryGreen }}
+              trackColor={{ false: colors.white10, true: colors.green }}
               thumbColor={colors.white}
             />
           </View>
@@ -302,7 +302,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
             <Switch
               value={includeUnsupported}
               onValueChange={setIncludeUnsupported}
-              trackColor={{ false: colors.border, true: colors.primaryGreen }}
+              trackColor={{ false: colors.white10, true: colors.green }}
               thumbColor={colors.white}
             />
           </View>
@@ -339,7 +339,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
             value={testUserId}
             onChangeText={setTestUserId}
             placeholder="User ID"
-            placeholderTextColor={colors.textLightSecondary}
+            placeholderTextColor={colors.whiteSecondary}
           />
           
           <View style={styles.providerSelector}>
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.white10,
   },
   backButton: {
     padding: spacing.sm,
@@ -442,10 +442,10 @@ const styles = StyleSheet.create({
   },
   controlLabel: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
   },
   actionButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: 8,
@@ -461,16 +461,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white10,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   secondaryButtonText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -487,29 +487,29 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: colors.primaryGreen,
+    color: colors.green,
   },
   statLabel: {
     fontSize: 12,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginTop: spacing.xs,
   },
   statsText: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.md,
   },
   platformText: {
     fontSize: 12,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
   },
   resultItem: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white10,
     padding: spacing.md,
     borderRadius: 8,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   resultHeader: {
     flexDirection: 'row',
@@ -534,16 +534,16 @@ const styles = StyleSheet.create({
   },
   resultDetails: {
     fontSize: 12,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginBottom: spacing.xs,
   },
   errorText: {
     fontSize: 12,
-    color: colors.error,
+    color: colors.red,
     marginBottom: spacing.sm,
   },
   testButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: 4,
@@ -555,9 +555,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   input: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white10,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
     borderRadius: 8,
     padding: spacing.md,
     color: colors.white,
@@ -567,20 +567,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   providerChip: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white10,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 16,
     marginRight: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   providerChipSelected: {
-    backgroundColor: colors.primaryGreen,
-    borderColor: colors.primaryGreen,
+    backgroundColor: colors.green,
+    borderColor: colors.green,
   },
   providerChipText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -588,12 +588,12 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   linkedWalletItem: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white10,
     padding: spacing.md,
     borderRadius: 8,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   walletHeader: {
     flexDirection: 'row',
@@ -611,18 +611,18 @@ const styles = StyleSheet.create({
   },
   walletDetails: {
     fontSize: 12,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginBottom: spacing.xs,
   },
   emptyText: {
     fontSize: 14,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     textAlign: 'center',
     paddingVertical: spacing.lg,
   },
   infoText: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
 });

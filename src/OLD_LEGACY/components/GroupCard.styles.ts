@@ -20,7 +20,7 @@ import { colors, spacing, typography } from '../theme';
 export const styles = StyleSheet.create({
   // === MAIN CARD CONTAINER ===
   card: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.md,
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.white,
@@ -57,7 +57,7 @@ export const styles = StyleSheet.create({
   },
   memberCount: {
     fontSize: typography.fontSize.sm,
-    color: colors.textGray,
+    color: colors.black,
   },
 
   // === MENU BUTTON ===
@@ -77,7 +77,7 @@ export const styles = StyleSheet.create({
   },
   amountLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textGray,
+    color: colors.black,
     fontWeight: typography.fontWeight.medium,
   },
   totalAmount: {
@@ -94,7 +94,7 @@ export const styles = StyleSheet.create({
   },
   balanceLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textGray,
+    color: colors.black,
     fontWeight: typography.fontWeight.medium,
   },
   userBalance: {
@@ -113,7 +113,7 @@ export const styles = StyleSheet.create({
   },
   lastActivity: {
     fontSize: typography.fontSize.xs,
-    color: colors.textGray,
+    color: colors.black,
   },
 
   // === STATUS INDICATOR ===
@@ -129,7 +129,7 @@ export const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: typography.fontSize.xs,
-    color: colors.textGray,
+    color: colors.black,
     fontWeight: typography.fontWeight.medium,
   },
 }); 

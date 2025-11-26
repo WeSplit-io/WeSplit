@@ -4,7 +4,7 @@ import { typography, spacing, colors } from '../../theme';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#212121',
+    backgroundColor: colors.black,
   },
   headerContainer: {
     flexDirection: 'row',

@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.green10,
+    backgroundColor: colors.greenBlue20,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,

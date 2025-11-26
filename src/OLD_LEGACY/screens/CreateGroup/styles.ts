@@ -68,12 +68,12 @@ export const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     marginTop: spacing.xs,
     textAlign: 'center',
   },
   categoryTextSelected: {
-    color: colors.textDark,
+    color: colors.black,
     fontWeight: typography.fontWeight.medium,
   },
   categoryImage: {
@@ -146,7 +146,7 @@ export const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.darkBorder,
+    backgroundColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -166,7 +166,7 @@ export const styles = StyleSheet.create({
   },
   memberSubtext: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.white70,
   },
   addMembersLink: {
     flexDirection: 'row',
@@ -261,30 +261,30 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md,
     padding: spacing.sm,
     borderRadius: spacing.sm + spacing.xs / 2,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.textLight,
     width: '30%',
   },
   catIconSelected: {
     borderWidth: spacing.xs / 2,
-    borderColor: colors.brandGreen,
-    backgroundColor: colors.darkBackground,
+    borderColor: colors.green,
+    backgroundColor: colors.black,
   },
   catIconLabel: {
     fontSize: typography.fontSize.xs,
-    color: colors.darkGray,
+    color: colors.white70,
     marginTop: spacing.xs / 2,
   },
   addMembersButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.darkBorder,
+    borderColor: colors.white10,
   },
   addMembersText: {
     fontSize: typography.fontSize.md,
@@ -300,17 +300,17 @@ export const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   createButtonDisabled: {
-    backgroundColor: colors.buttonDisabled,
+    backgroundColor: colors.white10,
   },
   createButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textDark,
+    color: colors.black,
   },
   selectInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     borderRadius: spacing.lg,
     padding: spacing.md,
     borderWidth: spacing.borderWidthThin,
@@ -323,7 +323,7 @@ export const styles = StyleSheet.create({
     color: colors.textLight,
   },
   currencyPicker: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     borderRadius: spacing.lg,
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.textLight,
@@ -336,20 +336,20 @@ export const styles = StyleSheet.create({
     borderBottomColor: colors.textLight,
   },
   currencyOptionSelected: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
   },
   currencyOptionText: {
     fontSize: typography.fontSize.md,
     color: colors.textLight,
   },
   currencyOptionTextSelected: {
-    color: colors.darkBackground,
+    color: colors.black,
     fontWeight: typography.fontWeight.semibold,
   },
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     borderRadius: spacing.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -362,7 +362,7 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.md,
   },
   doneBtn: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: spacing.lg,
     padding: spacing.md,
     alignItems: 'center',
@@ -371,13 +371,13 @@ export const styles = StyleSheet.create({
   doneBtnText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.darkBackground,
+    color: colors.black,
   },
   inviteOptions: {
     marginBottom: spacing.md,
   },
   addPhoneBtn: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: spacing.lg,
     padding: spacing.sm,
     alignItems: 'center',
@@ -386,6 +386,6 @@ export const styles = StyleSheet.create({
   addPhoneBtnText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.darkBackground,
+    color: colors.black,
   },
 }); 

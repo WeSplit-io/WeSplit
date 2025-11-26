@@ -46,7 +46,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   lockedIndicator: {
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 8,

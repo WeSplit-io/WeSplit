@@ -84,7 +84,7 @@ const ModernLoader: React.FC<ModernLoaderProps> = ({
       case 'secondary':
         return {
           gradient: [colors.white50, colors.white10] as const,
-          text: colors.darkGray,
+          text: colors.white70,
         };
       case 'white':
         return {

@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   instructionsText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     lineHeight: 24,
   },
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: 2,
   },
   currentWordContainer: {
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   currentWordLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.sm,
   },
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     width: '48%',
   },
   enteredWordNumber: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginRight: spacing.sm,
   },
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   wordSelectionButtonSelected: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
   },
   wordSelectionButtonText: {
     color: colors.white,
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   confirmButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.lg,

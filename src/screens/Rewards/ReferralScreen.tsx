@@ -191,11 +191,11 @@ const ReferralScreen: React.FC = () => {
 
           <View style={styles.referralActions}>
             <TouchableOpacity style={styles.actionButton} onPress={handleCopyCode}>
-              <PhosphorIcon name="CopySimple" size={20} color={colors.textLight} weight="regular" />
+              <PhosphorIcon name="CopySimple" size={20} color={colors.white} weight="regular" />
               <Text style={styles.actionButtonText}>Copy</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-              <PhosphorIcon name="ShareNetwork" size={20} color={colors.textLight} weight="regular" />
+              <PhosphorIcon name="ShareNetwork" size={20} color={colors.white} weight="regular" />
               <Text style={styles.actionButtonText}>Share</Text>
             </TouchableOpacity>
           </View>
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     marginTop: spacing.md,
   },
@@ -274,17 +274,17 @@ const styles = StyleSheet.create({
   },
   scoreLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginBottom: spacing.xs,
   },
   scoreValue: {
     fontSize: typography.fontSize.hero,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
   },
   scoreCaption: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginTop: spacing.xs,
   },
   referralCodeSection: {
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   referralCodeLabel: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginBottom: spacing.sm,
   },
   referralCodeCard: {
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
   },
   rewardsSection: {
     marginBottom: spacing.xl,
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   rewardsTitle: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
 
   },
   stepsContainer: {
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
   },
   stepDescription: {
     fontSize: typography.fontSize.xs,

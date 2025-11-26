@@ -182,11 +182,11 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
                 value={amount}
                 onChangeText={handleAmountChange}
                 placeholder="0"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.white70}
                 keyboardType="decimal-pad"
                 autoFocus={true}
                 textAlign="center"
-                selectionColor={colors.brandGreen}
+                selectionColor={colors.green}
                 maxLength={12}
                 returnKeyType="done"
                 blurOnSubmit={true}

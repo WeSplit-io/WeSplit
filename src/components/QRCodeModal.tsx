@@ -48,7 +48,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
   title,
   displayName,
   displayIcon = 'trip',
-  displayColor = colors.primaryGreen,
+  displayColor = colors.green,
   isGroup = false,
   rawAddress,
 }) => {
@@ -195,7 +195,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
                       <Text style={styles.qrUserName}>{displayName}</Text>
                       {/* Show raw address if provided (for group) */}
                       {rawAddress && (
-                        <Text style={[styles.qrWalletAddress, { fontSize: 13, color: colors.textLightSecondary, marginTop: 4 }]}>
+                        <Text style={[styles.qrWalletAddress, { fontSize: 13, color: colors.whiteSecondary, marginTop: 4 }]}>
                           {rawAddress}
                         </Text>
                       )}
@@ -206,7 +206,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
                       <Text style={styles.qrUserName}>{displayName}</Text>
                       {/* Show raw address if provided (for user) */}
                       {rawAddress && (
-                        <Text style={[styles.qrWalletAddress, { fontSize: 13, color: colors.textLightSecondary, marginTop: 4 }]}>
+                        <Text style={[styles.qrWalletAddress, { fontSize: 13, color: colors.whiteSecondary, marginTop: 4 }]}>
                           {rawAddress}
                         </Text>
                       )}

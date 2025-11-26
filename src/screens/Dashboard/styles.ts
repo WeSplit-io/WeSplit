@@ -19,9 +19,9 @@ import { colors, spacing, typography } from '../../theme';
  */
 
 // Legacy color constants for compatibility - will be deprecated
-export const BG_COLOR = colors.darkBackground;
+export const BG_COLOR = colors.black;
 export const GREEN = colors.green;
-export const GRAY = colors.darkGray;
+export const GRAY = colors.white70;
 
 export const styles = StyleSheet.create({
   
@@ -101,7 +101,7 @@ export const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderWidth: 2,
-    borderColor: colors.darkBackground,
+    borderColor: colors.black,
   },
 
   // === BALANCE CARD (MAIN FOCAL POINT) ===
@@ -158,7 +158,7 @@ export const styles = StyleSheet.create({
   },
   
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     marginTop: spacing.md,
     fontSize: typography.fontSize.md,
   },
@@ -313,7 +313,7 @@ export const styles = StyleSheet.create({
   
   // Empty requests text
   emptyRequestsText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.normal,
   },
@@ -357,7 +357,7 @@ export const styles = StyleSheet.create({
   
   // Request message with amount
   requestMessageWithAmount: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.normal,
     marginBottom: spacing.xs / 2,
@@ -469,7 +469,7 @@ export const styles = StyleSheet.create({
     padding: spacing.md,
   },
   
-  // Transaction avatar with green10 background
+  // Transaction avatar with background
   transactionAvatarNew: {
     width: 40,
     height: 40,
@@ -498,7 +498,7 @@ export const styles = StyleSheet.create({
   transactionSenderName: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: 10,
   },
   

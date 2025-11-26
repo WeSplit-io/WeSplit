@@ -79,12 +79,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
   },
   message: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
     lineHeight: typography.fontSize.md * 1.5,
   },

@@ -157,7 +157,7 @@ const Avatar: React.FC<AvatarProps> = ({
     // If loading and showLoading is true
     if (isLoading && showLoading) {
       return (
-        <ActivityIndicator size="small" color={colors.textSecondary} />
+        <ActivityIndicator size="small" color={colors.white70} />
       );
     }
 

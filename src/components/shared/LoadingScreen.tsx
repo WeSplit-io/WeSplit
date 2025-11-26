@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   },
   message: {
     ...typography.textStyles.body,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
   },
 });

@@ -4,7 +4,7 @@ import { colors, spacing, typography } from '../../theme';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   header: {
     flexDirection: 'row',
@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     padding: spacing.xl,
     backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.white10,
   },
   backButton: {
     padding: spacing.sm,
@@ -48,7 +48,7 @@ export const styles = StyleSheet.create({
   },
   groupDescription: {
     fontSize: typography.fontSize.md,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textAlign: 'center',
   },
   title: {
@@ -70,7 +70,7 @@ export const styles = StyleSheet.create({
   },
   emptyBalancesSubtext: {
     fontSize: typography.fontSize.md,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textAlign: 'center',
   },
   backToGroupButton: {
@@ -85,7 +85,7 @@ export const styles = StyleSheet.create({
   backToGroupButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold as any,
-    color: colors.darkBackground,
+    color: colors.black,
     marginLeft: spacing.sm,
   },
   emptyState: {
@@ -103,7 +103,7 @@ export const styles = StyleSheet.create({
   },
   emptyStateSubtext: {
     fontSize: typography.fontSize.md,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
@@ -114,12 +114,12 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
   },
   emptyStateButtonText: {
-    color: colors.darkBackground,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold as any,
   },
   backToDashboardButton: {
-    backgroundColor: colors.textLightSecondary,
+    backgroundColor: colors.white70,
     borderRadius: 12,
     padding: spacing.md,
     alignItems: 'center',
@@ -130,7 +130,7 @@ export const styles = StyleSheet.create({
   backToDashboardButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold as any,
-    color: colors.darkBackground,
+    color: colors.black,
     marginLeft: spacing.sm,
   },
 }); 

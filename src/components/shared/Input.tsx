@@ -117,7 +117,7 @@ const Input: React.FC<InputProps> = ({
       flex: 1,
       fontSize: typography.fontSize.md,
       fontWeight: typography.fontWeight.regular,
-      color: colors.textLight,
+      color: colors.white,
       paddingVertical: 0,
       marginHorizontal: spacing.sm,
       

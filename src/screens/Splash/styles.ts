@@ -6,7 +6,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     // backgroundColor removed - using gradient instead
   },
   logoContainer: {
@@ -30,7 +30,7 @@ export const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.greenLight,
+    backgroundColor: colors.greenBlue,
     borderRadius: 3,
   },
   debugText: {
@@ -46,13 +46,13 @@ export const styles = StyleSheet.create({
   tagline: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
     opacity: 0.8,
   },

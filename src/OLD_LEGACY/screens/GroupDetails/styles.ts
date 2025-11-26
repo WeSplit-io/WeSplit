@@ -4,7 +4,7 @@ import { colors, spacing, typography } from '../../theme';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   content: {
     flex: 1,
@@ -27,7 +27,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenPadding,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   backButton: {
     padding: spacing.sm,
@@ -205,7 +205,7 @@ export const styles = StyleSheet.create({
     marginHorizontal: spacing.screenPadding,
     marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   balanceCards: {
     flexDirection: 'row',
@@ -369,7 +369,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xs,
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     marginHorizontal: spacing.screenPadding,
     borderWidth: 1,
@@ -428,7 +428,7 @@ export const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.darkGray,
+    backgroundColor: colors.white70,
     marginRight: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -539,12 +539,12 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   settledButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   settledState: {
     alignItems: 'center',
@@ -553,7 +553,7 @@ export const styles = StyleSheet.create({
   settledText: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
 
   // Add Expense Button
@@ -579,7 +579,7 @@ export const styles = StyleSheet.create({
   },
   emptyExpensesText: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
 
   // Settleup specific styles
@@ -660,7 +660,7 @@ export const styles = StyleSheet.create({
     color: '#FF4D4F',
   },
   memberBalanceAmountNeutral: {
-    color: colors.textSecondary,
+    color: colors.white70,
   },
 
   // Error and Empty States
@@ -680,7 +680,7 @@ export const styles = StyleSheet.create({
   },
   emptyStateSubtext: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
@@ -711,7 +711,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   errorMessage: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     marginBottom: spacing.lg,

@@ -130,7 +130,7 @@ export const styles = StyleSheet.create({
   },
   splitCardSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   splitCardRole: {
     flexDirection: 'row',
@@ -140,7 +140,7 @@ export const styles = StyleSheet.create({
   splitCardRoleIcon: {
     width: 16,
     height: 16,
-    tintColor: colors.textSecondary,
+    tintColor: colors.white70,
   },
   splitCardMembers: {
     flexDirection: 'row',
@@ -216,7 +216,7 @@ export const styles = StyleSheet.create({
   },
   splitDate: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
@@ -246,7 +246,7 @@ export const styles = StyleSheet.create({
   },
   amountLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginBottom: spacing.xs,
   },
   amountValue: {
@@ -259,7 +259,7 @@ export const styles = StyleSheet.create({
   },
   participantsLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginBottom: spacing.xs,
   },
   participantsValue: {
@@ -273,7 +273,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.white10,
   },
   roleContainer: {
     flexDirection: 'row',
@@ -283,15 +283,15 @@ export const styles = StyleSheet.create({
   roleIcon: {
     width: 12,
     height: 12,
-    tintColor: colors.textSecondary,
+    tintColor: colors.white70,
   },
   createdBy: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   createdAt: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   emptyState: {
     alignItems: 'center',
@@ -343,7 +343,7 @@ export const styles = StyleSheet.create({
   },
   emptyTabText: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
   },
   createFirstButtonText: {
@@ -384,7 +384,7 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
   loadingText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     marginTop: spacing.md,
   },
@@ -392,10 +392,10 @@ export const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.white10,
   },
   walletLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.xs,
     marginBottom: spacing.xs,
   },
@@ -408,10 +408,10 @@ export const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.white10,
   },
   participantAvatarsLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.xs,
     marginBottom: spacing.xs,
   },
@@ -483,7 +483,7 @@ export const styles = StyleSheet.create({
   },
   // Swipe-to-delete styles
   deleteAction: {
-    backgroundColor: colors.error,
+    backgroundColor: colors.red,
     justifyContent: 'center',
     alignItems: 'center',
     width: 100,

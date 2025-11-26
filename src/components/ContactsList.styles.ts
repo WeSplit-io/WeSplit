@@ -70,7 +70,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   sectionTitle: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.md,
@@ -158,7 +158,7 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
   },
   emptyContainer: {
@@ -173,7 +173,7 @@ export const styles = StyleSheet.create({
     objectFit: 'contain',
   },
   emptyText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     marginTop: spacing.md,
@@ -194,7 +194,7 @@ export const styles = StyleSheet.create({
   toggleText: {
     fontSize: 18,
     fontWeight: 'normal',
-    color: colors.textSecondary,
+    color: colors.white70,
     paddingBottom: 10,
     marginBottom: -2,
     width: '100%',
@@ -207,7 +207,7 @@ export const styles = StyleSheet.create({
   },
   toggleUnderline: {
     height: 3,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     marginTop: 4,
     borderRadius: 2,
     width: '60%',
@@ -226,18 +226,18 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     height: 300,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     borderRadius: 16,
     margin: spacing.screenPaddingHorizontal,
   },
   qrScannerPlaceholderText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: 18,
   },
   // QR Scanner Styles
   qrScannerContainer: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   permissionButton: {
     backgroundColor: colors.greenBlue,
@@ -309,9 +309,9 @@ export const styles = StyleSheet.create({
     padding: spacing.md,
     margin: spacing.md,
     fontSize: typography.fontSize.md,
-    color: colors.textDark,
+    color: colors.black,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   scanButton: {
     backgroundColor: colors.greenBlue,
@@ -327,7 +327,7 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   openCameraButton: {
-    backgroundColor: colors.textSecondary,
+    backgroundColor: colors.white70,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.sm,
@@ -346,7 +346,7 @@ export const styles = StyleSheet.create({
   },
   cameraWebView: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     height: 400,
   },
   closeCameraButton: {
@@ -371,7 +371,7 @@ export const styles = StyleSheet.create({
   cameraButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.sm,
@@ -384,12 +384,12 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   scannerDivider: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginVertical: spacing.md,
   },
   manualInputLabel: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.sm,
@@ -400,7 +400,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   scannerIconContainer: {
     marginBottom: spacing.xl,
@@ -416,7 +416,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   scannerWelcomeText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -457,8 +457,8 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxSelected: {
-    backgroundColor: colors.brandGreen,
-    borderColor: colors.brandGreen,
+    backgroundColor: colors.green,
+    borderColor: colors.green,
   },
   statusContainer: {
     padding: spacing.xs,
@@ -482,7 +482,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   quickAccessName: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.medium,
     textAlign: 'center',

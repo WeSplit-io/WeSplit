@@ -2,9 +2,9 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 // Legacy color constants for compatibility - now using theme colors
-export const BG_COLOR = colors.darkBackground;
-export const GREEN = colors.brandGreen;
-export const GRAY = colors.darkGray;
+export const BG_COLOR = colors.black;
+export const GREEN = colors.green;
+export const GRAY = colors.white70;
 
 export const styles = StyleSheet.create({
   mainContainer: {
@@ -55,13 +55,13 @@ export const styles = StyleSheet.create({
   title: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xxl,
     textAlign: 'center',
     opacity: 0.8,
@@ -131,7 +131,7 @@ export const styles = StyleSheet.create({
     opacity: 0.5,
   },
   errorText: {
-    color: colors.error,
+    color: colors.red,
     marginBottom: spacing.sm,
     fontSize: typography.fontSize.sm,
     textAlign: 'center',

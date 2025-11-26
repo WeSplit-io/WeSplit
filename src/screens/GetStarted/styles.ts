@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
   logoText: {
     fontSize: typography.fontSize.gigantic,
     fontWeight: typography.fontWeight.extrabold,
-    color: colors.textLight,
+    color: colors.white,
     letterSpacing: 0.5,
   },
   logoSplit: {
@@ -36,7 +36,7 @@ export const styles = StyleSheet.create({
   headline: {
     fontSize: typography.fontSize.title,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     lineHeight: 52,
   },
   subtitle: {

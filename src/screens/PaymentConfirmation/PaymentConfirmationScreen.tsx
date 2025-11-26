@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   progressLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   progressCircle: {
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 4,
-    borderColor: colors.surface,
+    borderColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     borderRightColor: 'transparent',
   },
   transferSection: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white10,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: spacing.md,
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: colors.textSecondary,
+    backgroundColor: colors.white70,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: spacing.xl,
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   transferSubtitle: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -344,11 +344,11 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 12,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   transferIconText: {
     color: colors.white,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.sm,
   },
   transferButtonDisabled: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white10,
   },
   transferButtonText: {
     color: colors.white,
@@ -388,13 +388,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   kastAddressContainer: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white10,
     borderRadius: 8,
     padding: spacing.md,
     marginVertical: spacing.md,
   },
   kastAddressLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.xs,
   },

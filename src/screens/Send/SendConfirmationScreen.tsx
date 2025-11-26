@@ -851,7 +851,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
                   <Text style={styles.mockupFeeLabel}>
                     {destinationType === 'external' ? 'Total you\'ll pay' : 'Total you\'ll pay'}
                   </Text>
-                  <Text style={[styles.mockupFeeValue, { color: colors.brandGreen, fontWeight: 'bold' }]}>{totalAmount.toFixed(2)} USDC</Text>
+                  <Text style={[styles.mockupFeeValue, { color: colors.green, fontWeight: 'bold' }]}>{totalAmount.toFixed(2)} USDC</Text>
                 </View>
                 <View style={styles.mockupFeeRow}>
                   <Text style={styles.mockupFeeLabel}>

@@ -196,14 +196,14 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.md,
   },
   rouletteButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     borderRadius: 16,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
-    shadowColor: colors.primaryGreen,
+    shadowColor: colors.green,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -233,14 +233,14 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   rouletteButtonTextDisabled: {
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   rouletteStatusContainer: {
     alignItems: 'center',
     paddingVertical: spacing.sm,
   },
   rouletteStatusText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
   },
@@ -286,7 +286,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   participantWallet: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   participantAmountContainer: {
@@ -319,7 +319,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white10,
   },
   unlockedIndicatorText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.xs,
     fontWeight: '600',
   },
@@ -434,7 +434,7 @@ export const styles = StyleSheet.create({
   },
   walletRecapSubtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: spacing.xl,
     lineHeight: 22,
@@ -450,7 +450,7 @@ export const styles = StyleSheet.create({
   },
   walletInfoLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginBottom: spacing.sm,
   },
   walletAddressContainer: {
@@ -514,7 +514,7 @@ export const styles = StyleSheet.create({
   },
   privateKeyModalSubtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: spacing.lg,
     lineHeight: 22,
@@ -572,7 +572,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   closePrivateKeyButtonText: {
     color: colors.white,
@@ -603,7 +603,7 @@ export const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   splitWalletLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.xs,
   },
@@ -647,7 +647,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sharedAccessSubtitle: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.lg,
     lineHeight: 20,

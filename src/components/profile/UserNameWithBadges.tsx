@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
   },
 });
 

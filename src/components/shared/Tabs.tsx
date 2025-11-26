@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   tabTextActive: {
-    color: colors.textDark,
+    color: colors.black,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.sm,
   },

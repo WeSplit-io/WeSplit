@@ -365,11 +365,11 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
         rightComponent={
           isCurrentUser ? (
             <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-              <PhosphorIcon name="Gear" size={24} color={colors.textLight} />
+              <PhosphorIcon name="Gear" size={24} color={colors.white} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity>
-              <PhosphorIcon name="DotsThreeVertical" size={24} color={colors.textLight} />
+              <PhosphorIcon name="DotsThreeVertical" size={24} color={colors.white} />
             </TouchableOpacity>
           )
         }
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: 2,
   },
   userId: {
@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
   interactionTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 2,
   },
   interactionDescription: {
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
   interactionAmount: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
   },
   interactionFooter: {
     flexDirection: 'row',
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statusBadgePaid: {
-    backgroundColor: colors.green10,
+    backgroundColor: colors.greenBlue20,
   },
   statusBadgeText: {
     fontSize: typography.fontSize.xs,

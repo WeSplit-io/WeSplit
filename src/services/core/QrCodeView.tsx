@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   },
   subtext: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   addressLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: 4,
   },
   addressValue: {
@@ -264,10 +264,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   copyButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
   },
   shareButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
   },
   buttonText: {
     color: colors.white,

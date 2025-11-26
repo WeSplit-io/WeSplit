@@ -138,7 +138,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
   if (!permission) {
     return (
       <Container>
-        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>Requesting camera permission...</Text>
         </View>
@@ -149,7 +149,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
   if (!permission.granted) {
     return (
       <Container>
-        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>Camera access is required to capture bills</Text>
           <Button

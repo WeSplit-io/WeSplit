@@ -259,7 +259,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
                   {formatWalletAddress(destination.address || '')}
                 </Text>
                 {isKastCard && (
-                  <Text style={{ color: colors.primaryGreen, fontSize: 12, fontWeight: '500' }}>KAST Card</Text>
+                  <Text style={{ color: colors.green, fontSize: 12, fontWeight: '500' }}>KAST Card</Text>
                 )}
               </View>
             </TouchableOpacity>

@@ -315,36 +315,36 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <TouchableOpacity style={styles.menuItem} onPress={handleWalletManagement}>
             <PhosphorIcon name="Wallet" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>Wallet</Text>
-            <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={handleAccountInfo}>
             <PhosphorIcon name="UserCircle" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>Account info</Text>
-            <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={handleSeedPhrase}>
             <PhosphorIcon name="Eye" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>Seed phrase</Text>
-            <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={handleTransactionHistory}>
             <PhosphorIcon name="Receipt" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>Transaction History</Text>
-            <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={handleVerifyAccount}>
             <PhosphorIcon name="ShieldCheck" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>Verify account</Text>
-            <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={handleReferralFriend}>
             <PhosphorIcon name="UserPlus" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>Referral Friend</Text>
-            <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
         </View>
 
@@ -358,13 +358,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <TouchableOpacity style={styles.menuItem} onPress={handleHelpCenter}>
             <PhosphorIcon name="Question" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>Help Center</Text>
-            <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={handleFAQ}>
             <PhosphorIcon name="QuestionMark" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>FAQ</Text>
-            <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
 
           {/* <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('AuthDebug')}>
@@ -384,7 +384,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <TouchableOpacity style={[styles.menuItem, { marginBottom: 0 }]} onPress={handleLogout}>
             <PhosphorIcon name="SignOut" size={20} color={colors.white} weight="regular" />
             <Text style={[styles.menuItemText, styles.logoutText]}>Log Out</Text>
-            <PhosphorIcon name="CaretRight" size={16} color={colors.textLightSecondary} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
         </View>
 

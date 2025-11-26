@@ -173,7 +173,7 @@ const SpendPaymentModal: React.FC<SpendPaymentModalProps> = ({
           keyboardType="decimal-pad"
           returnKeyType="done"
           placeholder="0"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.white70}
           selectTextOnFocus
           editable={!disabled && !loading}
         />
@@ -189,7 +189,7 @@ const SpendPaymentModal: React.FC<SpendPaymentModalProps> = ({
             value={note}
             onChangeText={setNote}
             placeholder="Add note"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.white70}
             autoFocus
           />
         )}
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   sendToLabel: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
   },
   recipientCard: {
     flexDirection: 'row',
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.info + '30',
+    backgroundColor: colors.blue + '30',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -293,12 +293,12 @@ const styles = StyleSheet.create({
   recipientOrder: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 2,
   },
   recipientAddress: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     fontFamily: typography.fontFamily.mono,
   },
   amountSection: {
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   amountInput: {
     fontSize: typography.fontSize.xxxl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
     minWidth: 100,
     padding: 0,
@@ -318,20 +318,20 @@ const styles = StyleSheet.create({
   },
   amountCurrency: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   addNoteButton: {
     marginTop: spacing.sm,
   },
   addNoteText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
+    color: colors.white,
     textDecorationLine: 'underline',
   },
   noteInput: {
     marginTop: spacing.sm,
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
     borderBottomWidth: 1,
     borderBottomColor: colors.white20,
@@ -360,12 +360,12 @@ const styles = StyleSheet.create({
   walletName: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 2,
   },
   walletBalance: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   changeButton: {
     backgroundColor: colors.white5,
@@ -378,22 +378,22 @@ const styles = StyleSheet.create({
   },
   changeButtonText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.medium,
   },
   changeButtonTextDisabled: {
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   errorCard: {
-    backgroundColor: colors.error + '20',
+    backgroundColor: colors.red + '20',
     borderRadius: 12,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.error + '40',
+    borderColor: colors.red + '40',
   },
   errorText: {
     fontSize: typography.fontSize.sm,
-    color: colors.error,
+    color: colors.red,
   },
   feeSection: {
     gap: spacing.sm,
@@ -405,16 +405,16 @@ const styles = StyleSheet.create({
   },
   feeLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   feeAmount: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.medium,
   },
   feeTotal: {
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.bold,
   },
   keypad: {
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   keypadKeyText: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
   },
   sendButton: {
     width: '100%',

@@ -24,7 +24,7 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
   },
   section: {
@@ -37,7 +37,7 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.md,
   },
   destinationItem: {
@@ -63,13 +63,13 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   destinationLabel: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.xs / 2,
   },
   destinationAddress: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   destinationActions: {
@@ -81,7 +81,7 @@ export const styles = StyleSheet.create({
     borderRadius: spacing.sm,
   },
   actionButtonText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.sm,
   },
   emptyState: {
@@ -102,20 +102,20 @@ export const styles = StyleSheet.create({
     fontSize: 32,
   },
   emptyStateTitle: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   emptyStateSubtitle: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     lineHeight: spacing.lg,
   },
   emptyCategoryText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     paddingVertical: spacing.lg,
@@ -156,7 +156,7 @@ export const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   dropdownItemText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
   },
   globalEmptyState: {
@@ -179,21 +179,21 @@ export const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   globalEmptyStateTitle: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     textAlign: 'center',
     marginBottom: spacing.md,
   },
   globalEmptyStateSubtitle: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     lineHeight: spacing.lg,
     marginBottom: spacing.xl,
   },
   globalEmptyStateButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: spacing.md,
@@ -211,7 +211,7 @@ export const styles = StyleSheet.create({
     borderRadius: spacing.lg,
   },
   selectionHint: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.md,
     fontStyle: 'italic',

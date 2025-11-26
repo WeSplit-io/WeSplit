@@ -212,7 +212,7 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
                 value={amount}
                 onChangeText={setAmount}
                 placeholder="Enter amount in SOL"
-                placeholderTextColor={colors.textLightSecondary}
+                placeholderTextColor={colors.whiteSecondary}
                 keyboardType="numeric"
               />
               <Text style={styles.currencyLabel}>SOL</Text>
@@ -252,22 +252,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: colors.textLight,
+    color: colors.white,
   },
   header: {
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: colors.darkBorder,
+    borderBottomColor: colors.white10,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
   },
   scrollView: {
     flex: 1,
@@ -278,19 +278,19 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: 12,
   },
   walletCard: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.darkBorder,
+    borderColor: colors.white10,
     marginBottom: 12,
   },
   selectedWalletCard: {
-    borderColor: colors.primaryGreen,
+    borderColor: colors.green,
     borderWidth: 2,
   },
   walletHeader: {
@@ -302,10 +302,10 @@ const styles = StyleSheet.create({
   walletName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
   },
   walletTypeBadge: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -317,23 +317,23 @@ const styles = StyleSheet.create({
   },
   walletAddress: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
     fontFamily: 'monospace',
     marginBottom: 4,
   },
   walletType: {
     fontSize: 14,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginBottom: 4,
   },
   walletLinkedDate: {
     fontSize: 14,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginBottom: 4,
   },
   walletBalance: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -343,17 +343,17 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 16,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     textAlign: 'center',
     marginBottom: 24,
   },
   linkWalletButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -365,31 +365,31 @@ const styles = StyleSheet.create({
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.darkBorder,
+    borderColor: colors.white10,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   amountInput: {
     flex: 1,
     fontSize: 18,
-    color: colors.textLight,
+    color: colors.white,
   },
   currencyLabel: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
     marginLeft: 8,
   },
   amountHint: {
     fontSize: 14,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginTop: 8,
   },
   transferButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

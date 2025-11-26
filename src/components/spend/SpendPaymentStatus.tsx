@@ -102,29 +102,29 @@ export const SpendPaymentStatus: React.FC<SpendPaymentStatusProps> = ({
       case 'processing':
         return {
           icon: 'CircleDashed' as const,
-          iconColor: colors.info,
-          backgroundColor: colors.infoBackground,
-          borderColor: colors.info + '40',
+          iconColor: colors.blue,
+          backgroundColor: colors.blue20,
+          borderColor: colors.blue + '40',
           text: 'Processing...',
-          textColor: colors.info,
+          textColor: colors.blue,
         };
       case 'failed':
         return {
           icon: 'XCircle' as const,
-          iconColor: colors.error,
-          backgroundColor: colors.errorBackground,
-          borderColor: colors.error + '40',
+          iconColor: colors.red,
+          backgroundColor: colors.red20,
+          borderColor: colors.red + '40',
           text: 'Payment Failed',
-          textColor: colors.error,
+          textColor: colors.red,
         };
       case 'refunded':
         return {
           icon: 'ArrowCounterClockwise' as const,
-          iconColor: colors.warning,
-          backgroundColor: colors.warningBackground,
-          borderColor: colors.warning + '40',
+          iconColor: colors.yellow,
+          backgroundColor: colors.yellow20,
+          borderColor: colors.yellow + '40',
           text: 'Refunded',
-          textColor: colors.warning,
+          textColor: colors.yellow,
         };
       default: // pending
         return {
@@ -168,7 +168,7 @@ export const SpendPaymentStatus: React.FC<SpendPaymentStatusProps> = ({
           <PhosphorIcon
             name="ArrowSquareOut"
             size={14}
-            color={colors.info}
+            color={colors.blue}
             weight="regular"
           />
           <Text style={styles.transactionLinkText}>
@@ -213,11 +213,11 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
   },
   orderIdText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginTop: spacing.xs,
   },
   transactionLink: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   transactionLinkText: {
     fontSize: typography.fontSize.xs,
-    color: colors.info,
+    color: colors.blue,
     fontWeight: typography.fontWeight.medium,
   },
   retryButton: {
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: spacing.xs,
-    backgroundColor: colors.error,
+    backgroundColor: colors.red,
     marginTop: spacing.xs,
   },
   retryButtonDisabled: {

@@ -40,7 +40,7 @@ export default StyleSheet.create({
   
   // Request message with amount
   requestMessageWithAmount: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.normal,
     marginBottom: spacing.xs / 2,

@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   paragraph: {
     fontSize: typography.fontSize.md,
     lineHeight: 24,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   highlight: {
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.md,
   },
 });

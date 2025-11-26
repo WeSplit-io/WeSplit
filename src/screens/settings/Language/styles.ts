@@ -11,7 +11,7 @@ export default StyleSheet.create({
   saveButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.brandGreen,
+    color: colors.green,
   },
   content: {
     flex: 1,
@@ -22,7 +22,7 @@ export default StyleSheet.create({
   },
   description: {
     fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
+    color: colors.white70,
     textAlign: 'center',
     lineHeight: spacing.screenPadding,
   },
@@ -32,23 +32,23 @@ export default StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.lg,
   },
   languageItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.itemSpacing,
     padding: spacing.lg,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   selectedLanguageItem: {
-    borderColor: colors.brandGreen,
-    backgroundColor: colors.brandGreen + '11',
+    borderColor: colors.green,
+    backgroundColor: colors.green + '11',
   },
   languageInfo: {
     flexDirection: 'row',
@@ -65,12 +65,12 @@ export default StyleSheet.create({
   languageName: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   languageNativeName: {
     fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
+    color: colors.white70,
   },
   languageAction: {
     marginLeft: spacing.md,
@@ -84,13 +84,13 @@ export default StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   currentLanguageSection: {
     marginBottom: spacing.xl,
   },
   currentLanguageCard: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.itemSpacing,
     padding: spacing.lg,
     flexDirection: 'row',
@@ -99,12 +99,12 @@ export default StyleSheet.create({
   },
   currentLanguageLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
+    color: colors.white70,
   },
   currentLanguageValue: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.brandGreen,
+    color: colors.green,
   },
   helpSection: {
     marginBottom: spacing.xl,
@@ -112,28 +112,28 @@ export default StyleSheet.create({
   helpTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.md,
   },
   helpText: {
     fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
+    color: colors.white70,
     lineHeight: spacing.screenPadding,
     marginBottom: spacing.lg,
   },
   helpButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.sm,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
   },
   helpButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.brandGreen,
+    color: colors.green,
     marginLeft: spacing.sm,
   },
   infoSection: {
@@ -141,16 +141,16 @@ export default StyleSheet.create({
   },
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: colors.brandGreen + '22',
+    backgroundColor: colors.green + '22',
     borderRadius: spacing.sm,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.brandGreen + '44',
+    borderColor: colors.green + '44',
   },
   infoText: {
     flex: 1,
     fontSize: typography.fontSize.xs,
-    color: colors.textLight,
+    color: colors.white,
     lineHeight: spacing.lg,
     marginLeft: spacing.sm,
   },

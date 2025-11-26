@@ -11,13 +11,13 @@ export const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: typography.fontSize.md,
-    color: colors.error,
+    color: colors.red,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   errorSubtext: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
   },
 }); 

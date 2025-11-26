@@ -18,7 +18,7 @@ export default StyleSheet.create({
     right: 0,
     padding: spacing.lg,
     paddingBottom: spacing.xl + spacing.md,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   
   // Profile Picture
@@ -78,7 +78,7 @@ export default StyleSheet.create({
   label: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   input: {
@@ -86,9 +86,9 @@ export default StyleSheet.create({
     borderRadius: spacing.md,
     paddingVertical: spacing.md,
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   inputError: {
     borderColor: '#FF6B6B',

@@ -134,11 +134,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
   },
   participantCount: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     backgroundColor: colors.white10,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs / 2,
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   participantCard: {
     flexDirection: 'row',
@@ -191,12 +191,12 @@ const styles = StyleSheet.create({
   participantName: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 4,
   },
   participantWallet: {
     fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    color: colors.white70,
     fontFamily: typography.fontFamily.mono,
   },
   participantAmountContainer: {
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   amountText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
   },
 });
 

@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     marginTop: 50,
   },
   button: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 25,
     height: 25,
-    borderColor: colors.primaryGreen,
+    borderColor: colors.green,
     borderWidth: 3,
   },
   cornerTopLeft: {
@@ -397,12 +397,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   instructionsSubtext: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: 12,
     textAlign: 'center',
   },
   resetButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     margin: 20,
     paddingVertical: 12,
     borderRadius: 8,

@@ -102,18 +102,18 @@ const styles = StyleSheet.create({
   },
   sendingToText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     fontWeight: typography.fontWeight.medium,
   },
   orderNumberText: {
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.semibold,
   },
   amountDisplay: {
     fontSize: typography.fontSize.xxxl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginVertical: spacing.md,
   },
   feeSection: {
@@ -129,16 +129,16 @@ const styles = StyleSheet.create({
   },
   feeLabel: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   feeAmount: {
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.medium,
   },
   feeTotal: {
     fontSize: typography.fontSize.lg,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.bold,
   },
   slideButton: {

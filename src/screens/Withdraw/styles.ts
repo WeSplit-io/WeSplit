@@ -28,13 +28,13 @@ export const styles = StyleSheet.create({
   alertContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FF6B6B',
+    backgroundColor: colors.red,
     padding: 12,
     borderRadius: 8,
-    marginBottom: 16,
+    marginBottom: 16, 
   },
   alertText: {
-    color: '#FFF',
+    color: colors.white,
     marginLeft: 8,
     fontSize: 14,
     fontWeight: '500',
@@ -42,7 +42,7 @@ export const styles = StyleSheet.create({
   devAlertContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
@@ -65,7 +65,7 @@ export const styles = StyleSheet.create({
     color: colors.white,
   },
   amountInput: {
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.green,
@@ -127,7 +127,7 @@ export const styles = StyleSheet.create({
     padding: 0,
   },
   sendToConnectedWalletButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: 16,
     padding: 16,
     marginTop: 15,
@@ -165,11 +165,11 @@ export const styles = StyleSheet.create({
   },
   summaryValue: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
   },
   summaryValueBold: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: 'bold',
   },
 
@@ -200,7 +200,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.white10,
   },
 
   // ===== SEND CONFIRMATION SCREEN STYLES =====
@@ -211,7 +211,7 @@ export const styles = StyleSheet.create({
     borderRadius: spacing.lg,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.textLight,
+    borderColor: colors.white,
     width: '100%',
   },
   sentAmountValueContainer: {
@@ -265,15 +265,15 @@ export const styles = StyleSheet.create({
     textAlign: 'left',
   },
   walletInfoContainer: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     borderRadius: spacing.md,
     padding: spacing.md,
     marginBottom: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.textLight,
+    borderColor: colors.white,
   },
   walletInfoText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: spacing.lg,
@@ -287,10 +287,10 @@ export const styles = StyleSheet.create({
   appleSliderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
     position: 'relative',
     overflow: 'hidden',
     minHeight: 70,
@@ -313,7 +313,7 @@ export const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 2,
@@ -375,13 +375,13 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   mockupSuccessDate: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: 14,
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
   mockupSuccessDateLarge: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 40,
@@ -392,7 +392,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   mockupBackHomeButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 48,
@@ -400,7 +400,7 @@ export const styles = StyleSheet.create({
     width: '100%',
   },
   mockupBackHomeButtonCustom: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 48,
@@ -420,7 +420,7 @@ export const styles = StyleSheet.create({
 
   // ===== OLD CONFIRMATION SCREEN STYLES (DEPRECATED) =====
   withdrawalAmountDisplay: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
@@ -428,16 +428,16 @@ export const styles = StyleSheet.create({
   },
   withdrawalAmountLabel: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginBottom: 8,
   },
   withdrawalAmountValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
   },
   transactionDetails: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
@@ -450,21 +450,21 @@ export const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   detailValue: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: '500',
   },
   warningMessage: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: 20,
   },
   signTransactionButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -474,7 +474,7 @@ export const styles = StyleSheet.create({
   signTransactionButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
     marginLeft: 8,
   },
 
@@ -489,7 +489,7 @@ export const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.brandGreen,
+      backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -497,16 +497,16 @@ export const styles = StyleSheet.create({
   successAmount: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: 8,
   },
   successLabel: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginBottom: 30,
   },
   goBackButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -515,23 +515,23 @@ export const styles = StyleSheet.create({
   goBackButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
   },
 
   // ===== DEV TESTING STYLES =====
   devTestingSection: {
     marginTop: 20,
     padding: 16,
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
     borderStyle: 'dashed',
   },
   devTestingTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: colors.brandGreen,
+    color: colors.green,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -541,16 +541,16 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   devTestingButton: {
-    backgroundColor: colors.darkCardSecondary,
+    backgroundColor: colors.white10,
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   devTestingButtonText: {
     fontSize: 11,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
   },
 }); 

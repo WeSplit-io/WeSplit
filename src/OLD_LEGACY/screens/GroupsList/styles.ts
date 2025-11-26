@@ -4,7 +4,7 @@ import { colors, spacing, typography } from '../../theme';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
 
   },
   loadingContainer: {
@@ -60,7 +60,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   stickyProminentContainer: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     zIndex: 1000,
     elevation: 5,
     shadowColor: '#000',
@@ -73,7 +73,7 @@ export const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     zIndex: 1001,
     elevation: 6,
     shadowColor: '#000',
@@ -94,7 +94,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xs,
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.white10,
@@ -291,7 +291,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xs,
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     marginHorizontal: spacing.screenPadding,
     borderWidth: 1,
@@ -333,7 +333,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: 16,
     marginBottom: spacing.md,
     borderWidth: 0.5,
@@ -531,7 +531,7 @@ export const styles = StyleSheet.create({
   },
   groupSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginLeft: spacing.sm,
   },
   groupAmount: {
@@ -541,7 +541,7 @@ export const styles = StyleSheet.create({
   },
   groupStatus: {
     fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginTop: spacing.xs,
   },
   emptyState: {
@@ -562,7 +562,7 @@ export const styles = StyleSheet.create({
   },
   emptyStateSubtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
@@ -594,7 +594,7 @@ export const styles = StyleSheet.create({
   },
   errorMessage: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginBottom: spacing.lg,
     textAlign: 'center',
     lineHeight: 20,

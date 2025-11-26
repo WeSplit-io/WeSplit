@@ -175,7 +175,7 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
     if (isIncomeTransaction(transaction.type)) {
       return colors.green;
     } else if (isExpenseTransaction(transaction.type)) {
-      return colors.error;
+      return colors.red;
     }
     return colors.white70;
   };
@@ -210,7 +210,7 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
     if (isIncomeTransaction(transaction.type)) {
       return colors.green;
     } else if (isExpenseTransaction(transaction.type)) {
-      return colors.error;
+      return colors.red;
     }
     return colors.white;
   }, [transaction.type]);
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white10,
   },
   transactionStatusFailed: {
-    backgroundColor: colors.error + '20',
+    backgroundColor: colors.red + '20',
   },
   transactionStatusText: {
     fontSize: typography.fontSize.xs,

@@ -103,10 +103,10 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
     
     switch (notification.type) {
       case 'payment_request':
-        return <HandCoins size={iconSize} color={colors.warning} weight="fill" />;
+        return <HandCoins size={iconSize} color={colors.yellow} weight="fill" />;
 
       case 'payment_reminder':
-        return <HandCoins size={iconSize} color={colors.warning} weight="fill" />;
+        return <HandCoins size={iconSize} color={colors.yellow} weight="fill" />;
       case 'payment_sent':
       case 'money_sent':
         return <CheckCircle size={iconSize} color={colors.green} weight="fill" />;
@@ -473,21 +473,21 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
                   ]}>
                     <Text style={[
                       styles.actionButtonText,
-                      { color: actionConfig.textColor }
+                      { color: colors.white }
                     ]}>
                       {actionConfig.text}
                     </Text>
                   </View>
                 ) : (
                   <LinearGradient
-                    colors={[colors.greenLight, colors.green]}
+                    colors={[colors.green, colors.greenBlue]}
                     style={styles.gradientButton}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                   >
                     <Text style={[
                       styles.actionButtonText,
-                      { color: actionConfig.textColor }
+                      { color: colors.white }
                     ]}>
                       {actionConfig.text}
                     </Text>

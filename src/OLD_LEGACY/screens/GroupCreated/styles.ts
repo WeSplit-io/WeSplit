@@ -4,7 +4,7 @@ import { colors, spacing, typography } from '../../theme';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
@@ -37,19 +37,19 @@ export const styles = StyleSheet.create({
   },
   successSubtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textAlign: 'center',
   },
   
   // Group Preview
   groupPreview: {
     alignItems: 'center',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.lg,
     padding: spacing.xl,
     marginBottom: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.darkBorder,
+    borderColor: colors.white10,
   },
   groupIcon: {
     width: 64,
@@ -68,7 +68,7 @@ export const styles = StyleSheet.create({
   },
   groupDescription: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: spacing.md,
@@ -81,7 +81,7 @@ export const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.darkBorder,
+    backgroundColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: spacing.xs,
@@ -110,16 +110,16 @@ export const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.darkBorder,
+    borderColor: colors.white10,
   },
   shareButtonText: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textAlign: 'center',
     lineHeight: 16,
   },
@@ -143,7 +143,7 @@ export const styles = StyleSheet.create({
   primaryButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textDark,
+    color: colors.black,
   },
   secondaryButton: {
     backgroundColor: 'transparent',
@@ -151,7 +151,7 @@ export const styles = StyleSheet.create({
     padding: spacing.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.darkBorder,
+    borderColor: colors.white10,
   },
   secondaryButtonText: {
     fontSize: typography.fontSize.md,

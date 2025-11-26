@@ -36,7 +36,7 @@ export default StyleSheet.create({
     marginLeft: spacing.md,
   },
   message: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.normal,
     marginBottom: spacing.xs / 2,
@@ -55,7 +55,7 @@ export default StyleSheet.create({
   },
   dateTime: {
     fontSize: 12,
-    color: '#A89B9B',
+    color: colors.white80,
     marginTop: 2,
   },
   actionWrapper: {

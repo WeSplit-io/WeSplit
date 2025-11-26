@@ -92,8 +92,8 @@ const queryClient = new QueryClient();
 export default function App() {
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.darkBackground }}>
-      <StatusBar backgroundColor={colors.darkBackground} barStyle="light-content" />
+    <View style={{ flex: 1, backgroundColor: colors.black }}>
+      <StatusBar backgroundColor={colors.black} barStyle="light-content" />
       <ErrorBoundary>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>

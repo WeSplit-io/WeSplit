@@ -27,7 +27,7 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   description: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: 16,
     lineHeight: 24,
     marginBottom: spacing.lg,
@@ -37,7 +37,7 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     marginTop: spacing.md,
   },
   providerButton: {
@@ -89,7 +89,7 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   detectedBadge: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     borderRadius: 8,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
@@ -101,23 +101,23 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   providerUnavailable: {
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     fontSize: 14,
     marginTop: spacing.xs,
   },
   footer: {
     padding: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.white10,
   },
   footerText: {
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     fontSize: 12,
     textAlign: 'center',
   },
   debugButton: {
     padding: 8,
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     borderRadius: 6,
     marginLeft: 8,
   },
@@ -128,21 +128,21 @@ export const styles = StyleSheet.create({
   },
   // Debug styles
   debugContainer: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white10,
     padding: spacing.md,
     borderRadius: 8,
     marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.primaryGreen,
+    borderColor: colors.green,
   },
   debugText: {
-    color: colors.primaryGreen,
+    color: colors.green,
     fontSize: 12,
     marginBottom: spacing.sm,
     fontFamily: 'monospace',
   },
   refreshButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 6,
@@ -156,7 +156,7 @@ export const styles = StyleSheet.create({
   sectionContainer: {
     marginVertical: spacing.lg,
     padding: spacing.lg,
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white10,
     borderRadius: 12,
   },
   sectionTitle: {
@@ -167,7 +167,7 @@ export const styles = StyleSheet.create({
   },
   sectionDescription: {
     fontSize: 14,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.md,
     lineHeight: 20,
   },
@@ -195,7 +195,7 @@ export const styles = StyleSheet.create({
     gap: 8,
   },
   fixButton: {
-    backgroundColor: colors.warning,
+    backgroundColor: colors.yellow,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
@@ -206,7 +206,7 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
   },
   importButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
@@ -235,12 +235,12 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   walletAddress: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: 12,
     marginTop: 2,
   },
   walletStatus: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
@@ -261,7 +261,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.darkBorder,
+    borderBottomColor: colors.white10,
   },
   modalTitle: {
     fontSize: 20,
@@ -277,7 +277,7 @@ export const styles = StyleSheet.create({
   },
   modalDescription: {
     fontSize: 16,
-    color: colors.textLight,
+    color: colors.white,
     lineHeight: 24,
     marginBottom: spacing.lg,
   },
@@ -296,10 +296,10 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   importTypeButtonActive: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
   },
   importTypeButtonText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: 14,
     fontWeight: typography.fontWeight.medium,
   },
@@ -339,19 +339,19 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   instructionsText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: 14,
     lineHeight: 20,
   },
   warningContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.warning + '20',
+    backgroundColor: colors.yellow + '20',
     padding: spacing.md,
     borderRadius: 8,
     marginBottom: spacing.lg,
   },
   warningText: {
-    color: colors.warning,
+    color: colors.yellow,
     fontSize: 14,
     lineHeight: 20,
     marginLeft: spacing.sm,
@@ -361,7 +361,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: colors.darkBorder,
+    borderTopColor: colors.white10,
     gap: spacing.md,
   },
   cancelButton: {
@@ -381,7 +381,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: spacing.md,
     borderRadius: 8,
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     alignItems: 'center',
   },
   importSubmitButtonDisabled: {
@@ -394,15 +394,15 @@ export const styles = StyleSheet.create({
   },
   // Error styles
   errorContainer: {
-    backgroundColor: colors.error + '20',
+    backgroundColor: colors.red + '20',
     padding: spacing.md,
     borderRadius: 8,
     marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.error,
+    borderColor: colors.red,
   },
   errorText: {
-    color: colors.error,
+    color: colors.red,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',

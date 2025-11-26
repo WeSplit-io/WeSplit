@@ -10,11 +10,11 @@ const AppLoadingScreen: React.FC = () => {
   return (
     <View style={{ 
       flex: 1, 
-      backgroundColor: colors.darkBackground,
+      backgroundColor: colors.black,
       justifyContent: 'center',
       alignItems: 'center'
     }}>
-      <StatusBar backgroundColor={colors.darkBackground} barStyle="light-content" />
+      <StatusBar backgroundColor={colors.black} barStyle="light-content" />
     </View>
   );
 };

@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   icon: {
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.semibold,
   },
 });

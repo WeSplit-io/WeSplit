@@ -873,7 +873,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
             <Icon
               name="star"
               size={16}
-              color={contact.isFavorite ? colors.brandGreen : colors.textSecondary}
+              color={contact.isFavorite ? colors.green : colors.white70}
             />
           </TouchableOpacity>
         )}
@@ -934,8 +934,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 <RefreshControl
                   refreshing={refreshing}
                   onRefresh={handleRefresh}
-                  tintColor={colors.brandGreen}
-                  colors={[colors.brandGreen]}
+                  tintColor={colors.green}
+                  colors={[colors.green]}
                 />
               }
             >
@@ -1025,7 +1025,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                             
                               {/* Show relationship context */}
                               {user.relationshipType && user.relationshipType !== 'none' && (
-                                <Text style={[styles.contactEmail, { fontSize: 11, marginTop: 2, color: colors.brandGreen }]}>
+                                <Text style={[styles.contactEmail, { fontSize: 11, marginTop: 2, color: colors.green }]}>
                                   {user.relationshipType === 'contact' ? '✓ Already a contact' :
                                    user.relationshipType === 'transaction_partner' ? '💸 Transaction partner' :
                                    user.relationshipType === 'split_participant' ? '👥 Split participant' : ''}
@@ -1068,7 +1068,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                                 <Icon
                                   name="check-circle-fill"
                                   size={16}
-                                  color={colors.brandGreen}
+                                  color={colors.green}
                                 />
                               </TouchableOpacity>
                             ) : showAddButton ? (
@@ -1081,7 +1081,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                                   <Icon
                                     name={isAddingContact === Number(user.id) ? "check" : "user-plus"}
                                     size={16}
-                                    color={isAddingContact === Number(user.id) ? colors.brandGreen : colors.brandGreen}
+                                    color={isAddingContact === Number(user.id) ? colors.green : colors.green}
                                   />
                                 </TouchableOpacity>
                             ) : null

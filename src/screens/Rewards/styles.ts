@@ -18,7 +18,7 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     marginTop: spacing.md,
   },
@@ -39,10 +39,10 @@ export const styles = StyleSheet.create({
   userSummaryTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
   },
   userRankBadge: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 12,
@@ -60,11 +60,11 @@ export const styles = StyleSheet.create({
   userPointsValue: {
     fontSize: 36,
     fontWeight: typography.fontWeight.bold,
-    color: colors.brandGreen,
+    color: colors.green,
   },
   userPointsLabel: {
     fontSize: typography.fontSize.md,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     marginLeft: spacing.xs,
   },
   
@@ -81,12 +81,12 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.md,
   },
   sectionSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
   },
   
   // Quest Cards
@@ -101,7 +101,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.white10,
   },
   questCardCompleted: {
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
     opacity: 0.7,
   },
   questHeader: {
@@ -127,16 +127,16 @@ export const styles = StyleSheet.create({
   questTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 2,
   },
   questTitleCompleted: {
     textDecorationLine: 'line-through',
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
   },
   questDescription: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     lineHeight: 18,
   },
   questPoints: {
@@ -145,10 +145,10 @@ export const styles = StyleSheet.create({
   questPointsValue: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.brandGreen,
+    color: colors.green,
   },
   questPointsValueCompleted: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
   },
   
   // Info Card
@@ -166,12 +166,12 @@ export const styles = StyleSheet.create({
   infoTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   infoText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     lineHeight: 18,
   },
   
@@ -188,9 +188,9 @@ export const styles = StyleSheet.create({
     gap: spacing.md,
   },
   leaderboardEntryCurrent: {
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderWidth: 1,
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
   },
   leaderboardRank: {
     width: 40,
@@ -219,15 +219,15 @@ export const styles = StyleSheet.create({
   leaderboardName: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
   },
   leaderboardNameCurrent: {
-    color: colors.brandGreen,
+    color: colors.green,
     fontWeight: typography.fontWeight.semibold,
   },
   leaderboardYouLabel: {
     fontSize: typography.fontSize.xs,
-    color: colors.brandGreen,
+    color: colors.green,
     marginTop: 2,
   },
   leaderboardPoints: {
@@ -236,11 +236,11 @@ export const styles = StyleSheet.create({
   leaderboardPointsValue: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.brandGreen,
+    color: colors.green,
   },
   leaderboardPointsLabel: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     marginTop: 2,
   },
   
@@ -252,12 +252,12 @@ export const styles = StyleSheet.create({
   emptyText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginTop: spacing.md,
   },
   emptySubtext: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     marginTop: spacing.xs,
   },
 });

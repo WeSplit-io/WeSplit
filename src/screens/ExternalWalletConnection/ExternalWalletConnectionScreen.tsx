@@ -159,8 +159,8 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            colors={[colors.primaryGreen]}
-            tintColor={colors.primaryGreen}
+            colors={[colors.green]}
+            tintColor={colors.green}
           />
         }
       >
@@ -232,7 +232,7 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
                           <Text style={styles.detectedText}>Available</Text>
                         </View>
                       ) : (
-                        <View style={[styles.detectedBadge, { backgroundColor: colors.warning }]}>
+                        <View style={[styles.detectedBadge, { backgroundColor: colors.yellow }]}>
                           <Text style={styles.detectedText}>Install</Text>
                         </View>
                       )}
@@ -240,7 +240,7 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
                   </View>
                 </View>
                 {isConnecting ? (
-                  <ActivityIndicator size="small" color={colors.primaryGreen} />
+                  <ActivityIndicator size="small" color={colors.green} />
                 ) : (
                   <Icon
                     name="chevron-right"

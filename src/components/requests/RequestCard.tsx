@@ -98,7 +98,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
           accessibilityHint="Opens the send payment screen"
         >
           <LinearGradient
-            colors={[colors.green, colors.greenLight]}
+            colors={[colors.green, colors.greenBlue]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.requestSendButtonGradient}

@@ -207,7 +207,7 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
                 value={amount}
                 onChangeText={setAmount}
                 placeholder="0"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.white70}
                 keyboardType="numeric"
                 autoFocus={false}
               />

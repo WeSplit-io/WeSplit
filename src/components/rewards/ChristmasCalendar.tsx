@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: spacing.md,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     fontSize: typography.fontSize.sm,
   },
   errorContainer: {
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     marginTop: spacing.md,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     fontSize: typography.fontSize.sm,
   },
   calendarCardWrapper: {
@@ -714,17 +714,17 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   heroSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginBottom: spacing.xs,
   },
   heroMeta: {
     fontSize: typography.fontSize.sm,
-    color: colors.brandGreen,
+    color: colors.green,
     fontWeight: typography.fontWeight.semibold,
   },
   countdownCard: {
@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
   },
   countdownLabel: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginBottom: spacing.xs,
     letterSpacing: 1,
     textTransform: 'uppercase',
@@ -745,11 +745,11 @@ const styles = StyleSheet.create({
   countdownValue: {
     fontSize: 28,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     fontVariant: ['tabular-nums'],
   },
   countdownValueLocked: {
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
   },
   secondaryButton: {
     alignSelf: 'flex-start',
@@ -761,12 +761,12 @@ const styles = StyleSheet.create({
   secondaryButtonActive: {
     alignSelf: 'flex-start',
     marginBottom: spacing.md,
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
     borderWidth: 1,
   },
   secondaryButtonActiveText: {
     fontSize: typography.fontSize.xs,
-    color: colors.brandGreen,
+    color: colors.green,
   },
   calendarGrid: {
     position: 'relative',
@@ -781,7 +781,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dayTileToday: {
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
     borderWidth: 2,
   },
   dayTileContent: {
@@ -801,7 +801,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: spacing.sm,
     bottom: spacing.sm,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: 999,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
@@ -882,7 +882,7 @@ const styles = StyleSheet.create({
     width: '140%',
     height: '140%',
     borderRadius: 200,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     opacity: 0.15,
     transform: [{ scale: 1.1 }],
   },
@@ -892,13 +892,13 @@ const styles = StyleSheet.create({
   unwrapTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   unwrapSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     textAlign: 'center',
   },
   // Claiming modal styles
@@ -946,29 +946,29 @@ const styles = StyleSheet.create({
   rewardAmount: {
     fontSize: 48,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   rewardTitleText: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 2,
   },
   rewardLabel: {
     fontSize: typography.fontSize.md,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
   },
   unlockedTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   unlockedSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
@@ -992,10 +992,10 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.brandGreen,
+    shadowColor: colors.green,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -1004,13 +1004,13 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.md,
   },
   successMessage: {
     fontSize: typography.fontSize.md,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
   },
@@ -1026,7 +1026,7 @@ const styles = StyleSheet.create({
   },
   cannotClaimText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     textAlign: 'center',
   },
 });

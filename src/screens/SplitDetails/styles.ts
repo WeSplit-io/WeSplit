@@ -244,7 +244,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   participantWallet: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   participantStatus: {
@@ -262,7 +262,7 @@ export const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   statusPending: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   bottomContainer: {
@@ -299,7 +299,7 @@ export const styles = StyleSheet.create({
     opacity: 0.6,
   },
   splitButtonTextDisabled: {
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   // Modal Styles
   modalOverlay: {
@@ -433,7 +433,7 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   continueButtonTextDisabled: {
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   // Add Friends Modal Styles
   addFriendsModalContainer: {
@@ -497,7 +497,7 @@ export const styles = StyleSheet.create({
   },
   qrCodeSubtext: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginTop: spacing.xs,
   },
   splitContext: {
@@ -599,7 +599,7 @@ export const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   splitWalletLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.xs,
   },

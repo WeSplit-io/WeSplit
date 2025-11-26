@@ -339,7 +339,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor={colors.darkBackground} barStyle="light-content" />
+      <StatusBar backgroundColor={colors.black} barStyle="light-content" />
 
       <Animated.View style={[styles.logoContainer, { opacity: logoOpacity }]}>
         <Image

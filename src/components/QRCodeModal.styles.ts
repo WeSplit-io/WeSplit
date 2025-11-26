@@ -59,7 +59,7 @@ export const styles = StyleSheet.create({
   qrUserInfo: {
     alignItems: 'center',
     marginBottom: 32,
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     width: '100%',
     padding: 16,
     borderBottomLeftRadius: 16,

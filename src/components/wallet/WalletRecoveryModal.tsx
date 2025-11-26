@@ -202,7 +202,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
 
         <View style={[
           styles.statusIndicator,
-          { backgroundColor: recoveryReport.criticalIssue ? colors.error : colors.warning }
+          { backgroundColor: recoveryReport.criticalIssue ? colors.red : colors.yellow }
         ]}>
           <Text style={styles.statusText}>
             {recoveryReport.criticalIssue ? 'Critical Issue Detected' : 'Recovery Possible'}
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.white10,
   },
   title: {
     fontSize: typography.fontSize.lg,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.textSecondary,
+    backgroundColor: colors.white70,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -324,22 +324,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   warningContainer: {
-    backgroundColor: colors.warning + '20',
+    backgroundColor: colors.yellow + '20',
     borderRadius: spacing.radiusMd,
     padding: spacing.lg,
     marginVertical: spacing.lg,
     borderLeftWidth: 4,
-    borderLeftColor: colors.warning,
+    borderLeftColor: colors.yellow,
   },
   warningTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.warning,
+    color: colors.yellow,
     marginBottom: spacing.sm,
   },
   warningText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     lineHeight: 20,
   },
   loadingContainer: {
@@ -348,19 +348,19 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginTop: spacing.md,
   },
   recoveryContainer: {
     alignItems: 'center',
     paddingVertical: spacing.xl,
-    backgroundColor: colors.primaryGreen + '20',
+    backgroundColor: colors.green + '20',
     borderRadius: spacing.radiusMd,
     marginVertical: spacing.lg,
   },
   recoveryText: {
     fontSize: typography.fontSize.md,
-    color: colors.primaryGreen,
+    color: colors.green,
     marginTop: spacing.md,
     textAlign: 'center',
   },
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   reportLabel: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   reportValue: {
     fontSize: typography.fontSize.sm,
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   primaryButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
   },
   secondaryButton: {
     backgroundColor: colors.white10,
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
   },
   helpText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     lineHeight: 20,
     marginBottom: spacing.xs,
   },

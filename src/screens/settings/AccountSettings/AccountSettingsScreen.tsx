@@ -446,7 +446,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
 
   return (
     <Container>
-      <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       {/* Header */}
       <Header 
         title="Account info"
@@ -632,10 +632,10 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
               padding: spacing.md,
               marginBottom: spacing.lg,
               borderWidth: 1,
-              borderColor: colors.border,
+              borderColor: colors.white10,
             }}>
               <Text style={{
-                color: colors.textLight,
+                color: colors.white,
                 fontSize: 14,
                 fontWeight: '500',
                 marginBottom: spacing.sm,

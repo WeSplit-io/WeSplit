@@ -330,7 +330,7 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionButtonTextDisabled: {
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   // Settle button styles
   settleButton: {
@@ -533,7 +533,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   paymentOptionDescription: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   paymentOptionText: {
@@ -586,7 +586,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   transferIconText: {
     fontSize: 24,
@@ -601,7 +601,7 @@ export const styles = StyleSheet.create({
   },
   // Transfer button styles
   transferButton: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white10,
     borderRadius: 12,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.xl,
@@ -718,7 +718,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   privateKeyModalSubtitle: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
     marginBottom: spacing.lg,

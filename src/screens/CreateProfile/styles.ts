@@ -110,7 +110,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.white50,
   },
   errorText: {
-    color: colors.error,
+    color: colors.red,
     fontSize: 15,
     marginTop: spacing.sm,
   },

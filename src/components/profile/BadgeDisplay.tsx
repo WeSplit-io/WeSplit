@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     borderColor: colors.white10,
   },
   badgeActive: {
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white10,
     borderColor: colors.green,
   },
   badgeContent: {
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   badgeTitle: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
   },
   badgeTitleActive: {
     color: colors.green,

@@ -222,7 +222,7 @@ const SpendOrderSettingsScreen: React.FC<SpendOrderSettingsScreenProps> = ({
           showBackButton={true}
         />
         <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: colors.error }]}>{error}</Text>
+          <Text style={[styles.loadingText, { color: colors.red }]}>{error}</Text>
         </View>
       </Container>
     );
@@ -250,13 +250,13 @@ const SpendOrderSettingsScreen: React.FC<SpendOrderSettingsScreenProps> = ({
               style={styles.copyButton}
               onPress={handleCopyAddress}
             >
-              <PhosphorIcon name="Copy" size={18} color={colors.textLight} weight="regular" />
+              <PhosphorIcon name="Copy" size={18} color={colors.white} weight="regular" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.privateKeyButton}
               onPress={handleTogglePrivateKey}
             >
-              <PhosphorIcon name={showPrivateKey ? "EyeSlash" : "Eye"} size={18} color={colors.textLight} weight="regular" />
+              <PhosphorIcon name={showPrivateKey ? "EyeSlash" : "Eye"} size={18} color={colors.white} weight="regular" />
               <Text style={styles.privateKeyButtonText}>Private key</Text>
             </TouchableOpacity>
           </View>
@@ -270,7 +270,7 @@ const SpendOrderSettingsScreen: React.FC<SpendOrderSettingsScreenProps> = ({
               style={styles.copyButton}
               onPress={handleCopyPrivateKey}
             >
-              <PhosphorIcon name="Copy" size={18} color={colors.textLight} weight="regular" />
+              <PhosphorIcon name="Copy" size={18} color={colors.white} weight="regular" />
             </TouchableOpacity>
           </View>
           <View style={styles.privateKeyContainer}>
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
   },
   section: {
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.md,
   },
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   valueText: {
     flex: 1,
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.medium,
     fontFamily: typography.fontFamily.mono,
   },
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   },
   privateKeyButtonText: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.medium,
   },
   privateKeyContainer: {
@@ -355,11 +355,11 @@ const styles = StyleSheet.create({
   },
   privateKeyText: {
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     fontFamily: typography.fontFamily.mono,
   },
   privateKeyPlaceholder: {
-    color: colors.textSecondary,
+    color: colors.white70,
   },
 });
 

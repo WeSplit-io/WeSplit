@@ -189,7 +189,7 @@ export const ManualSignatureInputScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.black,
   },
   scrollView: {
     flex: 1,
@@ -203,12 +203,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     lineHeight: 22,
   },
   challengeSection: {
@@ -217,19 +217,19 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   messageContainer: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white10,
     padding: spacing.md,
     borderRadius: spacing.radiusMd,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   messageText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
+    color: colors.white,
     fontFamily: 'monospace',
     lineHeight: 20,
   },
@@ -239,37 +239,37 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   textInput: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white10,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
     borderRadius: spacing.radiusMd,
     padding: spacing.md,
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     minHeight: 80,
     textAlignVertical: 'top',
   },
   instructionsSection: {
     marginBottom: spacing.xl,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white10,
     padding: spacing.md,
     borderRadius: spacing.radiusMd,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   instructionsTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   instructionsText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     lineHeight: 20,
   },
   buttonContainer: {
@@ -284,17 +284,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white10,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   cancelButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
   },
   submitButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
   },
   submitButtonText: {
     fontSize: typography.fontSize.md,

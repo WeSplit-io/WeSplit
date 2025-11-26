@@ -50,7 +50,7 @@ export default StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     marginBottom: spacing.md,
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.lg,
     padding: spacing.md,
     borderWidth: 1,
@@ -60,7 +60,7 @@ export default StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.primaryGreen + '10',
+    backgroundColor: colors.green + '10',
     marginRight: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
@@ -81,13 +81,13 @@ export default StyleSheet.create({
     marginBottom: spacing.xs / 2,
   },
   requestMessageWithAmount: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.normal,
     marginBottom: spacing.xs / 2,
   },
   requestAmountGreen: {
-    color: colors.primaryGreen,
+    color: colors.green,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
   },
@@ -123,7 +123,7 @@ export default StyleSheet.create({
     height: 24,
   },
   transactionIconIncome: {
-    tintColor: colors.darkBackground,
+    tintColor: colors.black,
   },
   transactionContent: {
     flex: 1,
@@ -132,7 +132,7 @@ export default StyleSheet.create({
   transactionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: 10,
   },
   transactionSource: {
@@ -148,14 +148,14 @@ export default StyleSheet.create({
     marginBottom: 4,
   },
   transactionAmountIncome: {
-    color: colors.primaryGreen,
+    color: colors.green,
   },
   transactionAmountExpense: {
-    color: colors.textLight,
+    color: colors.white,
   },
   transactionTime: {
     fontSize: 12,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -165,7 +165,7 @@ export default StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginTop: 16,
   },
   emptyState: {
@@ -186,7 +186,7 @@ export default StyleSheet.create({
   emptyStateCard1: {
     width: 120,
     height: 80,
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     opacity: 0.3,
     borderRadius: 8,
     transform: [{ rotate: '-15deg' }],
@@ -197,7 +197,7 @@ export default StyleSheet.create({
     left: 10,
     width: 120,
     height: 80,
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     opacity: 0.2,
     borderRadius: 8,
     transform: [{ rotate: '15deg' }],
@@ -205,12 +205,12 @@ export default StyleSheet.create({
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: 8,
   },
   emptyStateSubtitle: {
     fontSize: 16,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textAlign: 'center',
     paddingHorizontal: 40,
   },

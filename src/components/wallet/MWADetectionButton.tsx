@@ -364,7 +364,7 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
         </View>
         
         {isConnecting === wallet.name && (
-          <ActivityIndicator size="small" color={colors.primaryGreen} />
+          <ActivityIndicator size="small" color={colors.green} />
         )}
       </View>
     </TouchableOpacity>
@@ -445,10 +445,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   detectButtonDisabled: {
-    backgroundColor: colors.textSecondary,
+    backgroundColor: colors.white70,
     opacity: 0.7,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   detectButtonContent: {
     flexDirection: 'row',
@@ -468,11 +468,11 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.sm,
   },
   detectButtonTextDisabled: {
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.black,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -481,24 +481,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.white10,
   },
   modalTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.text,
+    color: colors.white,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.textSecondary,
+    backgroundColor: colors.white70,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonText: {
     fontSize: typography.fontSize.md,
-    color: colors.text,
+    color: colors.white,
   },
   modalContent: {
     flex: 1,
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -547,11 +547,11 @@ const styles = StyleSheet.create({
   walletName: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text,
+    color: colors.white,
   },
   walletStatus: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginTop: 2,
   },
   emptyState: {
@@ -561,25 +561,25 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   emptyStateSubtext: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
   },
   mockNotice: {
-    backgroundColor: colors.warning + '20',
+    backgroundColor: colors.red + '20',
     borderRadius: 8,
     padding: spacing.md,
     marginVertical: spacing.sm,
     borderLeftWidth: 4,
-    borderLeftColor: colors.warning,
+    borderLeftColor: colors.red,
   },
   mockNoticeText: {
     fontSize: typography.fontSize.sm,
-    color: colors.warning,
+    color: colors.red,
     fontWeight: typography.fontWeight.medium,
   },
 });

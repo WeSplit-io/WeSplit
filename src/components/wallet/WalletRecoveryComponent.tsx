@@ -161,12 +161,12 @@ export const WalletRecoveryComponent: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recovery Status</Text>
         {isLoading ? (
-          <ActivityIndicator size="small" color={colors.primaryGreen} />
+          <ActivityIndicator size="small" color={colors.green} />
         ) : recoveryStatus ? (
           <View>
             <Text style={[
               styles.statusText,
-              { color: recoveryStatus.hasBackup ? colors.success : colors.error }
+              { color: recoveryStatus.hasBackup ? colors.green : colors.red }
             ]}>
               {recoveryStatus.hasBackup ? '✅ Backup Available' : '❌ No Backup Found'}
             </Text>
@@ -210,7 +210,7 @@ export const WalletRecoveryComponent: React.FC = () => {
           onPress={checkRecoveryStatus}
           disabled={isLoading}
         >
-          <Text style={[styles.buttonText, { color: colors.primaryGreen }]}>
+          <Text style={[styles.buttonText, { color: colors.green }]}>
             Refresh Status
           </Text>
         </TouchableOpacity>
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginBottom: spacing.lg,
   },
   section: {
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   },
   walletAddress: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.white70,
     fontFamily: 'monospace',
   },
   statusText: {
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   },
   backupMethods: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   buttonContainer: {
     marginBottom: spacing.lg,
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
   },
   secondaryButton: {
     backgroundColor: colors.green,
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   tertiaryButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.primaryGreen,
+    borderColor: colors.green,
   },
   buttonText: {
     fontSize: 16,
@@ -314,12 +314,12 @@ const styles = StyleSheet.create({
   },
   helpText: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginBottom: spacing.xs,
   },
   errorText: {
     fontSize: 16,
-    color: colors.error,
+    color: colors.red,
     textAlign: 'center',
     marginTop: spacing.lg,
   },

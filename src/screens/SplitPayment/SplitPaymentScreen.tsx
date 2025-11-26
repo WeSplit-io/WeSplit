@@ -446,7 +446,7 @@ const SplitPaymentScreen: React.FC = () => {
               <Text style={styles.statusLabel}>Status:</Text>
               <Text style={[
                 styles.statusValue,
-                { color: isFullyPaid ? colors.green : colors.warning }
+                { color: isFullyPaid ? colors.green : colors.yellow }
               ]}>
                 {isFullyPaid ? 'Paid' : 'Pending'}
               </Text>
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     marginTop: spacing.md,
   },
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   errorMessage: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 8,
-    backgroundColor: colors.border,
+    backgroundColor: colors.white10,
     borderRadius: 4,
     marginBottom: spacing.sm,
   },
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   progressText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
   },
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   statusLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
   },
   statusValue: {
@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
   payPartialButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   payButtonText: {
     color: colors.white,
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   completedSubtext: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
   },

@@ -317,7 +317,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
     if (!transaction || transaction.amount === undefined || transaction.amount === null) {
       return {
         amount: '0.00',
-        color: colors.textLight
+        color: colors.white
       };
     }
     
@@ -326,7 +326,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
     
     return {
       amount: amount.toFixed(2),
-      color: isIncome ? colors.primaryGreen : colors.textLight
+      color: isIncome ? colors.green : colors.white
     };
   };
 
@@ -386,7 +386,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primaryGreen}
+            tintColor={colors.green}
           />
         }
         showsVerticalScrollIndicator={false}

@@ -230,7 +230,7 @@ const PointsHistoryScreen: React.FC = () => {
               onPress={() => rewardNav.goToHowItWorks()}
               activeOpacity={0.7}
             >
-              <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+              <PhosphorIcon name="Info" size={24} color={colors.white} weight="regular" />
             </TouchableOpacity>
           }
         />
@@ -254,7 +254,7 @@ const PointsHistoryScreen: React.FC = () => {
             onPress={() => rewardNav.goToHowItWorks()}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+            <PhosphorIcon name="Info" size={24} color={colors.white} weight="regular" />
           </TouchableOpacity>
         }
       />
@@ -273,7 +273,7 @@ const PointsHistoryScreen: React.FC = () => {
       >
         {groupedTransactions.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <PhosphorIcon name="Receipt" size={48} color={colors.textLightSecondary} />
+            <PhosphorIcon name="Receipt" size={48} color={colors.whiteSecondary} />
             <Text style={styles.emptyText}>No points history yet</Text>
             <Text style={styles.emptySubtext}>
               Start earning points by completing quests and making transactions!
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     marginTop: spacing.md,
   },

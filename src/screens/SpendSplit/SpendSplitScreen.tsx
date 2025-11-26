@@ -717,7 +717,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
           onBackPress={() => navigation.navigate('SplitsList')}
         />
         <View style={{ padding: spacing.md, alignItems: 'center' }}>
-          <Text style={{ color: colors.error, fontSize: typography.fontSize.md }}>
+          <Text style={{ color: colors.red, fontSize: typography.fontSize.md }}>
             {error}
           </Text>
           <Button

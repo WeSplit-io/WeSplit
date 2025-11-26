@@ -13,13 +13,13 @@ export default StyleSheet.create({
   heroTitle: {
     fontSize: spacing.iconSize,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
     marginTop: spacing.lg,
   },
   heroSubtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.darkGray,
+    color: colors.white70,
     textAlign: 'center',
     marginTop: spacing.sm,
     lineHeight: spacing.iconSize,
@@ -30,12 +30,12 @@ export default StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.lg,
   },
   featureCard: {
     flexDirection: 'row',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.itemSpacing,
     padding: spacing.lg,
     marginBottom: spacing.itemSpacing,
@@ -45,7 +45,7 @@ export default StyleSheet.create({
     width: spacing.xxl + spacing.screenPadding,
     height: spacing.xxl + spacing.screenPadding,
     borderRadius: spacing.iconSize,
-    backgroundColor: colors.border,
+    backgroundColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.lg,
@@ -56,12 +56,12 @@ export default StyleSheet.create({
   featureTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   featureDescription: {
     fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
+    color: colors.white70,
     lineHeight: spacing.screenPadding,
   },
   featureStatus: {
@@ -70,8 +70,8 @@ export default StyleSheet.create({
   comingSoon: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.brandGreen,
-    backgroundColor: colors.brandGreen + '22',
+    color: colors.green,
+    backgroundColor: colors.green + '22',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: spacing.xs + spacing.xs / 2,
@@ -80,7 +80,7 @@ export default StyleSheet.create({
     marginTop: spacing.xxl + spacing.xl,
   },
   pricingCard: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.itemSpacing,
     padding: spacing.iconSize,
     alignItems: 'center',
@@ -88,18 +88,18 @@ export default StyleSheet.create({
   priceTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   price: {
     fontSize: spacing.xxl + spacing.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.brandGreen,
+    color: colors.green,
     marginBottom: spacing.sm,
   },
   priceDescription: {
     fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
+    color: colors.white70,
     textAlign: 'center',
     lineHeight: spacing.screenPadding,
     marginBottom: spacing.iconSize,
@@ -108,7 +108,7 @@ export default StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: spacing.sm,
     padding: spacing.lg,
     opacity: 0.5,
@@ -116,7 +116,7 @@ export default StyleSheet.create({
   upgradeButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.darkBackground,
+    color: colors.black,
     marginLeft: spacing.sm,
   },
   // Additional comprehensive styles
@@ -132,7 +132,7 @@ export default StyleSheet.create({
     width: spacing.iconSize,
     height: spacing.iconSize,
     borderRadius: spacing.itemSpacing,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -140,7 +140,7 @@ export default StyleSheet.create({
   benefitText: {
     flex: 1,
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
+    color: colors.white,
     lineHeight: spacing.screenPadding,
   },
   ctaSection: {
@@ -148,7 +148,7 @@ export default StyleSheet.create({
     paddingHorizontal: spacing.iconSize,
   },
   ctaButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: spacing.lg,
     paddingVertical: spacing.lg,
     alignItems: 'center',
@@ -157,22 +157,22 @@ export default StyleSheet.create({
   ctaButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
-    color: colors.darkBackground,
+    color: colors.black,
   },
   disclaimerText: {
     fontSize: typography.fontSize.xs,
-    color: colors.darkGray,
+    color: colors.white70,
     textAlign: 'center',
     lineHeight: spacing.lg,
   },
   // Subscription status styles
   subscriptionStatus: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.itemSpacing,
     padding: spacing.lg,
     marginBottom: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
   },
   subscriptionHeader: {
     flexDirection: 'row',
@@ -182,22 +182,22 @@ export default StyleSheet.create({
   subscriptionTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.brandGreen,
+    color: colors.green,
     marginLeft: spacing.sm,
   },
   subscriptionText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   cancellationNotice: {
     fontSize: typography.fontSize.xs,
-    color: colors.darkGray,
+    color: colors.white70,
     fontStyle: 'italic',
     marginBottom: spacing.md,
   },
   cancelButton: {
-    backgroundColor: colors.darkGray + '33',
+    backgroundColor: colors.white70 + '33',
     borderRadius: spacing.sm,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
@@ -205,24 +205,24 @@ export default StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
+    color: colors.white70,
     fontWeight: typography.fontWeight.medium,
   },
   // Plan selection styles
   selectedPricingCard: {
     borderWidth: 2,
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
   },
   popularPricingCard: {
     borderWidth: 1,
-    borderColor: colors.brandGreen,
+    borderColor: colors.green,
     position: 'relative',
   },
   popularBadge: {
     position: 'absolute',
     top: -8,
     left: spacing.lg,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: spacing.xs,
@@ -230,11 +230,11 @@ export default StyleSheet.create({
   popularBadgeText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold,
-    color: colors.darkBackground,
+    color: colors.black,
   },
   savings: {
     fontSize: typography.fontSize.xs,
-    color: colors.brandGreen,
+    color: colors.green,
     fontWeight: typography.fontWeight.medium,
     marginTop: spacing.xs,
   },
@@ -245,21 +245,21 @@ export default StyleSheet.create({
   paymentMethod: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.sm,
     padding: spacing.lg,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   selectedPaymentMethod: {
-    borderColor: colors.brandGreen,
-    backgroundColor: colors.brandGreen + '11',
+    borderColor: colors.green,
+    backgroundColor: colors.green + '11',
   },
   paymentMethodText: {
     flex: 1,
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     marginLeft: spacing.md,
   },
   // Subscribe section styles
@@ -272,7 +272,7 @@ export default StyleSheet.create({
   },
   warningText: {
     fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
+    color: colors.white70,
     textAlign: 'center',
     marginTop: spacing.sm,
   },
@@ -284,7 +284,7 @@ export default StyleSheet.create({
   },
   restoreButtonText: {
     fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
+    color: colors.white70,
     textDecorationLine: 'underline',
   },
 }); 

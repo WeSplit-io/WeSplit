@@ -6,17 +6,17 @@ import { spacing } from '../../theme/spacing';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#212121',
+    backgroundColor: colors.black,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#212121',
+    backgroundColor: colors.black,
   },
   loadingText: {
     fontSize: 16,
-    color: '#FFF',
+    color: colors.white,
     marginTop: 16,
     fontWeight: '500',
   },
@@ -29,7 +29,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 16,
-    backgroundColor: '#212121',
+    backgroundColor: colors.black,
   },
   backButton: {
     padding: 8,
@@ -37,7 +37,7 @@ export const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFF',
+    color: colors.white,
   },
   headerIcon: {
     padding: 8,
@@ -195,7 +195,7 @@ export const styles = StyleSheet.create({
   },
   splitToggle: {
     flexDirection: 'row',
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     padding: 4,
   },

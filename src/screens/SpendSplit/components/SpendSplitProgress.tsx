@@ -183,18 +183,18 @@ const styles = StyleSheet.create({
   progressPercentage: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   progressAmount: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 4,
   },
   progressLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     fontWeight: typography.fontWeight.medium,
   },
   remainingContainer: {
@@ -210,12 +210,12 @@ const styles = StyleSheet.create({
   },
   remainingLabel: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     fontWeight: typography.fontWeight.medium,
   },
   remainingAmount: {
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.bold,
   },
 });

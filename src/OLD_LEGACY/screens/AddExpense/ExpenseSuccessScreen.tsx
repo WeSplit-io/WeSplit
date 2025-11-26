@@ -71,7 +71,7 @@ const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: colors.darkBackground}}>
+    <SafeAreaView style={{flex: 1, backgroundColor: colors.black}}>
       <View style={[styles.mockupSuccessContainer, {flex: 1, justifyContent: 'space-between', paddingBottom: 0}]}>  
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
           {/* Success Icon */}

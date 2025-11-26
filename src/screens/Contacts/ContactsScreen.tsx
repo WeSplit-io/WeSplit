@@ -183,8 +183,8 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
               />
             ) : (
               <View style={styles.content}>
-                <Text style={{ color: colors.textLight, textAlign: 'center', marginBottom: 10 }}>No wallet address available</Text>
-                <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>Please connect a wallet to generate QR code</Text>
+                <Text style={{ color: colors.white, textAlign: 'center', marginBottom: 10 }}>No wallet address available</Text>
+                <Text style={{ color: colors.white70, textAlign: 'center' }}>Please connect a wallet to generate QR code</Text>
               </View>
             )}
           </View>

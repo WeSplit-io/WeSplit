@@ -61,7 +61,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
     // formatBalance already includes currency, so we just add the sign
     return {
       amount: `${isIncome ? '+' : '-'}${formattedAmount}`,
-      color: isIncome ? colors.primaryGreen : colors.text
+      color: isIncome ? colors.green : colors.text
     };
   };
 

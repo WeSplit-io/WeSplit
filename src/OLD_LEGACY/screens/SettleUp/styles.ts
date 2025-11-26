@@ -74,7 +74,7 @@ export const styles = StyleSheet.create({
     marginBottom: 32,
   },
   settlementCard: {
-    backgroundColor: colors.darkCard || '#363636',
+    backgroundColor: colors.white70 || '#363636',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -96,7 +96,7 @@ export const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.brandGreen || '#99FF00',
+    backgroundColor: colors.green || '#99FF00',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -144,7 +144,7 @@ export const styles = StyleSheet.create({
     marginRight: 4,
   },
   settlementCardButton: {
-    backgroundColor: colors.brandGreen || '#99FF00',
+    backgroundColor: colors.green || '#99FF00',
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -159,7 +159,7 @@ export const styles = StyleSheet.create({
   
   // Bottom Action Button - fixed at bottom of screen
   bottomActionButton: {
-    backgroundColor: colors.brandGreen || '#99FF00',
+    backgroundColor: colors.green || '#99FF00',
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 24,
@@ -193,7 +193,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    color: colors.error,
+    color: colors.red,
     fontSize: 16,
     textAlign: 'center',
   },
@@ -212,19 +212,19 @@ export const styles = StyleSheet.create({
   
   // Debug styles (kept for development)
   debugText: {
-    color: colors.textGray,
+    color: colors.black,
     fontSize: 12,
     marginTop: spacing.sm,
     textAlign: 'center',
   },
   debugTextSmall: {
-    color: colors.textGray,
+    color: colors.black,
     fontSize: 10,
     marginTop: spacing.sm,
     textAlign: 'center',
   },
   debugTextTiny: {
-    color: colors.textGray,
+    color: colors.black,
     fontSize: 8,
     marginTop: spacing.xs,
     textAlign: 'center',
@@ -261,7 +261,7 @@ export const styles = StyleSheet.create({
   },
   leaveGroupSubtitle: {
     fontSize: 14,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textAlign: 'center',
     lineHeight: 20,
   },

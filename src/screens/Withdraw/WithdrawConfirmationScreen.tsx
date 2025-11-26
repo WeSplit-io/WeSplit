@@ -66,7 +66,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           {
             backgroundColor: sliderValue.interpolate({
               inputRange: [0, maxSlideDistance],
-              outputRange: [colors.green10, colors.brandGreen],
+              outputRange: [colors.white5, colors.green],
             }),
           },
         ]}

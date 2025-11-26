@@ -43,7 +43,7 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({
           <PhosphorIcon 
             name="XCircle" 
             size={64} 
-            color={colors.error} 
+            color={colors.red} 
             weight="fill"
             style={styles.icon}
           />

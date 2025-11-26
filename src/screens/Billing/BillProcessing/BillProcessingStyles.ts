@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
   },
   processingSubtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
@@ -73,7 +73,7 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: colors.white,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   dateContainer: {
     flexDirection: 'row',
@@ -81,7 +81,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   dateInput: {
     flex: 1,
@@ -103,7 +103,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
     marginBottom: spacing.md,
   },
   amountInput: {
@@ -119,7 +119,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,
     borderLeftWidth: 1,
-    borderLeftColor: colors.border,
+    borderLeftColor: colors.white10,
   },
   currencyText: {
     fontSize: typography.fontSize.md,
@@ -128,7 +128,7 @@ export const styles = StyleSheet.create({
   },
   dropdownIcon: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   totalDisplay: {
     flexDirection: 'row',
@@ -161,6 +161,6 @@ export const styles = StyleSheet.create({
   totalLabel: {
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
-    color: colors.textLight,
+    color: colors.white,
   },
 });

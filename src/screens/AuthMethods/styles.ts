@@ -22,7 +22,7 @@ export const styles = StyleSheet.create({
   socialButtonLight: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.textLight,
+    backgroundColor: colors.white,
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
@@ -38,7 +38,7 @@ export const styles = StyleSheet.create({
   socialButtonTextDark: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.darkBackground,
+    color: colors.black,
   },
   socialButtonLightDisabled: {
     opacity: 0.6,
@@ -49,12 +49,12 @@ export const styles = StyleSheet.create({
   socialButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.darkBorder,
+    borderColor: colors.white10,
   },
   socialButtonDisabled: {
     opacity: 0.6,
@@ -68,7 +68,7 @@ export const styles = StyleSheet.create({
   socialButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
   },
   separator: {
     flexDirection: 'row',
@@ -78,11 +78,11 @@ export const styles = StyleSheet.create({
   separatorLine: {
     flex: 1,
     height: 1,
-    backgroundColor: colors.darkBorder,
+    backgroundColor: colors.white10,
   },
   separatorText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginHorizontal: spacing.md,
   },
 
@@ -93,11 +93,11 @@ export const styles = StyleSheet.create({
   emailLabel: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
   },
   emailInput: {
-    backgroundColor: colors.textLight,
+    backgroundColor: colors.white,
     borderRadius: spacing.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -144,7 +144,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   modalContent: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     borderRadius: spacing.lg,
     padding: spacing.xl,
     width: '100%',
@@ -154,13 +154,13 @@ export const styles = StyleSheet.create({
   modalTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.lg,
     textAlign: 'center',
   },
   modalText: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: spacing.md,
     lineHeight: 22,
@@ -212,7 +212,7 @@ export const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginTop: spacing.md,
     textAlign: 'center',
   },

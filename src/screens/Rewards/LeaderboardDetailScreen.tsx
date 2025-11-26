@@ -163,7 +163,7 @@ const LeaderboardDetailScreen: React.FC = () => {
 
   const getRankBadgeColor = useCallback((rank: number) => {
     if (rank === 1) return colors.green;
-    if (rank === 2) return colors.textLightSecondary;
+    if (rank === 2) return colors.whiteSecondary;
     if (rank === 3) return '#CD7F32'; // Bronze
     return colors.white10;
   }, []);
@@ -524,7 +524,7 @@ const LeaderboardDetailScreen: React.FC = () => {
             onPress={() => rewardNav.goToHowItWorks()}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+            <PhosphorIcon name="Info" size={24} color={colors.white} weight="regular" />
           </TouchableOpacity>
         }
       />
@@ -578,7 +578,7 @@ const LeaderboardDetailScreen: React.FC = () => {
             {/* Empty State */}
             {leaderboard.length === 0 && (
               <View style={styles.emptyContainer}>
-                <PhosphorIcon name="Medal" size={48} color={colors.textLightSecondary} />
+                <PhosphorIcon name="Medal" size={48} color={colors.whiteSecondary} />
                 <Text style={styles.emptyText}>
                   {filter === 'friends' ? 'No friends with points yet' : 'No users with points yet'}
                 </Text>
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     minHeight: 300,
   },
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     marginTop: spacing.md,
   },
@@ -789,12 +789,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginTop: spacing.md,
   },
   emptySubtext: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     marginTop: spacing.xs,
   },
 });

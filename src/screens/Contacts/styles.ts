@@ -10,12 +10,12 @@ export const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white10,
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   tab: {
     flex: 1,
@@ -25,15 +25,15 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabActive: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
   },
   tabText: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   tabTextActive: {
-    color: colors.darkBackground,
+    color: colors.black,
   },
   inviteButtonContainer: {
     position: 'absolute',

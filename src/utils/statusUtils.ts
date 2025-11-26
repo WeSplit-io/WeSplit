@@ -71,21 +71,21 @@ export const getSplitStatusBadgeStyle = (status: string) => {
     case 'active':
       return { backgroundColor: colors.green + '20' };
     case 'completed':
-      return { backgroundColor: colors.success + '20' };
+      return { backgroundColor: colors.green + '20' };
     case 'pending':
-      return { backgroundColor: colors.warning + '20' };
+      return { backgroundColor: colors.yellow + '20' };
     case 'draft':
-      return { backgroundColor: colors.textSecondary + '20' };
+      return { backgroundColor: colors.white70 + '20' };
     case 'locked':
       return { backgroundColor: colors.blue + '20' };
     case 'cancelled':
-      return { backgroundColor: colors.error + '20' };
+      return { backgroundColor: colors.red + '20' };
     case 'spinning_completed':
-      return { backgroundColor: colors.success + '20' };
+      return { backgroundColor: colors.green + '20' };
     case 'spinning':
       return { backgroundColor: colors.purple + '20' };
     case 'closed':
-      return { backgroundColor: colors.textSecondary + '20' };
+      return { backgroundColor: colors.white70 + '20' };
     default:
       return { backgroundColor: colors.surface };
   }
@@ -99,21 +99,21 @@ export const getSplitStatusTextStyle = (status: string) => {
     case 'active':
       return { color: colors.green };
     case 'completed':
-      return { color: colors.success };
+      return { color: colors.green };
     case 'pending':
-      return { color: colors.warning };
+      return { color: colors.yellow };
     case 'draft':
-      return { color: colors.textSecondary };
+      return { color: colors.white70 };
     case 'locked':
       return { color: colors.blue };
     case 'cancelled':
-      return { color: colors.error };
+      return { color: colors.red };
     case 'spinning_completed':
-      return { color: colors.success };
+      return { color: colors.green };
     case 'spinning':
       return { color: colors.purple };
     case 'closed':
-      return { color: colors.textSecondary };
+      return { color: colors.white70 };
     default:
       return { color: colors.text };
   }
@@ -127,21 +127,21 @@ export const getSplitStatusDotStyle = (status: string) => {
     case 'active':
       return { backgroundColor: colors.green };
     case 'completed':
-      return { backgroundColor: colors.success };
+      return { backgroundColor: colors.green };
     case 'pending':
-      return { backgroundColor: colors.warning };
+      return { backgroundColor: colors.yellow };
     case 'draft':
-      return { backgroundColor: colors.textSecondary };
+      return { backgroundColor: colors.white70 };
     case 'locked':
       return { backgroundColor: colors.blue };
     case 'cancelled':
-      return { backgroundColor: colors.error };
+      return { backgroundColor: colors.red };
     case 'spinning_completed':
-      return { backgroundColor: colors.success };
+      return { backgroundColor: colors.green };
     case 'spinning':
       return { backgroundColor: colors.purple };
     case 'closed':
-      return { backgroundColor: colors.textSecondary };
+      return { backgroundColor: colors.white70 };
     default:
       return { backgroundColor: colors.text };
   }
@@ -159,18 +159,18 @@ export const getParticipantStatusColor = (status: string): string => {
     case 'accepted':
       return colors.green;
     case 'pending':
-      return colors.warning;
+      return colors.yellow;
     case 'declined':
-      return colors.error;
+      return colors.red;
     case 'paid':
-      return colors.success;
+      return colors.green;
     case 'ready_for_distribution':
       return colors.green;
     case 'completed':
-      return colors.success;
+      return colors.green;
     case 'invited':
-      return colors.textSecondary;
+      return colors.white70;
     default:
-      return colors.textSecondary;
+      return colors.white70;
   }
 };

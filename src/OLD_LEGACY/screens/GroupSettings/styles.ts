@@ -4,7 +4,7 @@ import { colors, spacing, typography } from '../../theme';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   // Header - Same as NotificationsScreen
   header: {
@@ -14,7 +14,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingTop: 24,
     paddingBottom: 16,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   backButton: {
     padding: 8,
@@ -242,7 +242,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   loadingText: {
     color: '#FFF',
@@ -258,7 +258,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   qrModalContent: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     borderRadius: 24,
     padding: 24,
     width: '90%',
@@ -346,7 +346,7 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   editModalContent: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -507,6 +507,6 @@ export const styles = StyleSheet.create({
   bottomActionContainer: {
     paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingBottom: 32,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
 }); 

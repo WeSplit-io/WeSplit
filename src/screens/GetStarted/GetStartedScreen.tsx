@@ -13,7 +13,7 @@ interface GetStartedScreenProps {
 const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
   return (
     <Container>
-      <StatusBar backgroundColor={colors.darkBackground} barStyle="light-content" />
+      <StatusBar backgroundColor={colors.black} barStyle="light-content" />
       
       <View style={styles.content}>
       

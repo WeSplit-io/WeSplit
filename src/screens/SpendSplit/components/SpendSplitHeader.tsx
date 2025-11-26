@@ -152,7 +152,7 @@ const SpendSplitHeader: React.FC<SpendSplitHeaderProps> = ({
         rightElement={
           onSettingsPress ? (
             <TouchableOpacity onPress={onSettingsPress} style={styles.settingsButton}>
-              <PhosphorIcon name="Gear" size={24} color={colors.textLight} weight="regular" />
+              <PhosphorIcon name="Gear" size={24} color={colors.white} weight="regular" />
             </TouchableOpacity>
           ) : (
             <SpendOrderBadge variant="compact" />
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.info + '40', // Slightly more opaque to match mockup
+    backgroundColor: colors.blue + '40', // Slightly more opaque to match mockup
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.error,
+    backgroundColor: colors.red,
   },
   statusText: {
     fontSize: typography.fontSize.xs,
@@ -557,19 +557,19 @@ const styles = StyleSheet.create({
   },
   quantityBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.info + '20',
+    backgroundColor: colors.blue + '20',
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: 4,
   },
   quantityBadgeText: {
     fontSize: typography.fontSize.xs - 2,
-    color: colors.info,
+    color: colors.blue,
     fontWeight: typography.fontWeight.bold,
   },
   primeBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.info + '30',
+    backgroundColor: colors.blue + '30',
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: 4,
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
   },
   primeBadgeText: {
     fontSize: typography.fontSize.xs - 2,
-    color: colors.info,
+    color: colors.blue,
     fontWeight: typography.fontWeight.bold,
   },
 });

@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   skipButtonText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
   },
   content: {
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   subtitle: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     lineHeight: 20,
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   billSummaryLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
   },
   billSummaryAmount: {
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   addressInput: {
     backgroundColor: colors.surface,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.white10,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -288,10 +288,10 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   addressInputError: {
-    borderColor: colors.error,
+    borderColor: colors.red,
   },
   errorText: {
-    color: colors.error,
+    color: colors.red,
     fontSize: typography.fontSize.sm,
     marginTop: spacing.xs,
   },
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   helpText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     lineHeight: 18,
   },
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   continueButtonTextDisabled: {
-    color: colors.textSecondary,
+    color: colors.white70,
   },
 });
 

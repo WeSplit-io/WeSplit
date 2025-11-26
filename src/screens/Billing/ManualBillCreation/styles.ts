@@ -44,7 +44,7 @@ export const styles = StyleSheet.create({
   },
   categoryText: {
     ...typography.textStyles.buttonSmall,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     textAlign: 'center',
   },
   categoryTextSelected: {
@@ -92,7 +92,7 @@ export const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   dropdownIcon: {
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     fontSize: spacing.iconSizeSmall,
   },
 
@@ -117,7 +117,7 @@ export const styles = StyleSheet.create({
   },
   totalValuePlaceholder: {
     fontSize: typography.fontSize.md,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
   },
 
   /** ================================ Button Styles ================================ */
@@ -160,11 +160,11 @@ export const styles = StyleSheet.create({
   /** ================================ Input Styles ================================ */
 
   inputError: {
-    borderColor: colors.error,
+    borderColor: colors.red,
     borderWidth: 2,
   },
   errorText: {
-    color: colors.error,
+    color: colors.red,
     fontSize: typography.fontSize.sm,
     marginTop: spacing.xs,
   },
@@ -203,31 +203,31 @@ export const styles = StyleSheet.create({
   },
   confidenceWarningBanner: {
     padding: spacing.md,
-    backgroundColor: colors.error + '20',
+    backgroundColor: colors.red + '20',
     marginBottom: spacing.sm,
     borderRadius: spacing.radiusSm,
     marginHorizontal: spacing.md,
   },
   confidenceWarningText: {
-    color: colors.error,
+    color: colors.red,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
   validationWarningBanner: {
     padding: spacing.md,
-    backgroundColor: colors.error + '20',
+    backgroundColor: colors.red + '20',
     marginBottom: spacing.sm,
     borderRadius: spacing.radiusSm,
     marginHorizontal: spacing.md,
   },
   validationWarningTitle: {
-    color: colors.error,
+    color: colors.red,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.bold,
     marginBottom: spacing.xs,
   },
   validationWarningText: {
-    color: colors.error,
+    color: colors.red,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.regular,
     marginTop: spacing.xs,

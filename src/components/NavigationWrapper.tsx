@@ -96,10 +96,10 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
         dark: true,
         colors: {
           primary: colors.green,
-          background: colors.darkBackground,
-          card: colors.darkBackground,
-          text: colors.textLight,
-          border: colors.border,
+          background: colors.black,
+          card: colors.black,
+          text: colors.white,
+          border: colors.white10,
           notification: colors.green,
         },
         fonts: {

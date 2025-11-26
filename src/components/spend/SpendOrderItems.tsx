@@ -36,7 +36,7 @@ const SpendOrderItems: React.FC<SpendOrderItemsProps> = ({ split }) => {
       <View style={styles.container}>
         <Text style={styles.sectionTitle}>Order Items</Text>
         <View style={styles.emptyState}>
-          <PhosphorIcon name="Package" size={32} color={colors.textSecondary} weight="regular" />
+          <PhosphorIcon name="Package" size={32} color={colors.white70} weight="regular" />
           <Text style={styles.emptyStateText}>No items available</Text>
           <Text style={styles.emptyStateSubtext}>
             Item details will appear here once available
@@ -162,11 +162,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
   },
   itemCount: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     backgroundColor: colors.white5,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs / 2,
@@ -208,23 +208,23 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 4,
   },
   itemQuantity: {
     fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginTop: spacing.xs / 4,
   },
   itemVariants: {
     fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginTop: spacing.xs / 4,
     fontStyle: 'italic',
   },
   primeBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.info + '20',
+    backgroundColor: colors.blue + '20',
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: 4,
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   },
   primeBadgeText: {
     fontSize: typography.fontSize.xs - 2,
-    color: colors.info,
+    color: colors.blue,
     fontWeight: typography.fontWeight.bold,
   },
   itemPriceContainer: {
@@ -241,12 +241,12 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 4,
   },
   itemUnitPrice: {
     fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   emptyState: {
     padding: spacing.xl,
@@ -255,13 +255,13 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
+    color: colors.white70,
     marginTop: spacing.md,
     fontWeight: typography.fontWeight.medium,
   },
   emptyStateSubtext: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary + 'CC',
+    color: colors.white70 + 'CC',
     marginTop: spacing.xs,
     textAlign: 'center',
   },
@@ -285,17 +285,17 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     fontWeight: typography.fontWeight.medium,
   },
   totalAmount: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.semibold,
   },
   totalLabelFinal: {
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white,
     fontWeight: typography.fontWeight.bold,
   },
   totalAmountFinal: {

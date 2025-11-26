@@ -400,7 +400,7 @@ const HowToEarnPointsScreen: React.FC = () => {
               onPress={() => rewardNav.goToHowItWorks()}
               activeOpacity={0.7}
             >
-              <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+              <PhosphorIcon name="Info" size={24} color={colors.white} weight="regular" />
             </TouchableOpacity>
           }
         />
@@ -444,7 +444,7 @@ const HowToEarnPointsScreen: React.FC = () => {
             onPress={() => rewardNav.goToHowItWorks()}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+            <PhosphorIcon name="Info" size={24} color={colors.white} weight="regular" />
           </TouchableOpacity>
         }
       />
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     marginTop: spacing.md,
   },
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   questTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 2,
   },
   questTitleCompleted: {
@@ -688,14 +688,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
   },
   infoCardBullets: {
     gap: spacing.xs,
   },
   infoCardBulletText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.whiteSecondary,
     lineHeight: 20,
   },
   // Primary Navigation Styles
@@ -763,7 +763,7 @@ const styles = StyleSheet.create({
   redeemTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.md,
   },
   redeemInputContainer: {
@@ -779,7 +779,7 @@ const styles = StyleSheet.create({
   availableBadgesTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
 });

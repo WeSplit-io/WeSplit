@@ -1991,7 +1991,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Bill Details Card */}
         <LinearGradient
-          colors={[colors.green, colors.greenLight]}
+          colors={[colors.green, colors.greenBlue]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.billCard}

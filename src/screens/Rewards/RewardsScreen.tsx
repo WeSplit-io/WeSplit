@@ -198,7 +198,7 @@ const RewardsScreen: React.FC = () => {
             onPress={() => rewardNav.goToHowItWorks()}
             activeOpacity={0.7}
           >
-            <PhosphorIcon name="Info" size={24} color={colors.textLight} weight="regular" />
+            <PhosphorIcon name="Info" size={24} color={colors.white} weight="regular" />
           </TouchableOpacity>
         }
       />
@@ -361,7 +361,7 @@ const RewardsScreen: React.FC = () => {
           <View style={styles.historyList}>
             {pointsHistory.length === 0 ? (
               <View style={styles.emptyHistoryContainer}>
-                <PhosphorIcon name="Receipt" size={32} color={colors.textLightSecondary} />
+                <PhosphorIcon name="Receipt" size={32} color={colors.whiteSecondary} />
                 <Text style={styles.emptyHistoryText}>No points history yet</Text>
               </View>
             ) : (
@@ -423,13 +423,13 @@ const styles = StyleSheet.create({
   },
   devToolsLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   devToolsHelper: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     marginBottom: spacing.sm,
   },
   devLaunchButton: {
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: 999,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
   },
   loadingText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     marginTop: spacing.md,
   },
@@ -466,12 +466,12 @@ const styles = StyleSheet.create({
   pointsValue: {
     fontSize: 48,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   pointsLabel: {
     fontSize: typography.fontSize.md,
-    color: colors.textLightSecondary,
+    color: colors.white70,
   },
   inviteButton: {
     borderRadius: 12,
@@ -519,12 +519,12 @@ const styles = StyleSheet.create({
   featureCardTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     textAlign: 'center',
   },
   featureCardSubtitle: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLightSecondary,
+    color: colors.white70,
     textAlign: 'left',
   },
   gradientIconMask: {
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
   historyTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
   },
   seeAllLink: {
     fontSize: typography.fontSize.md,

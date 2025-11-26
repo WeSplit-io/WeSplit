@@ -115,7 +115,7 @@ export const styles = StyleSheet.create({
   },
 
   debugButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: spacing.radiusSm,
@@ -313,7 +313,7 @@ export const styles = StyleSheet.create({
   externalWalletButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     padding: spacing.md,
     borderRadius: spacing.radiusMd,
     borderWidth: 1,
@@ -329,7 +329,7 @@ export const styles = StyleSheet.create({
 
   // External wallet card
   externalWalletCard: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     borderRadius: spacing.radiusMd,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -369,7 +369,7 @@ export const styles = StyleSheet.create({
   
   exportButton: {
     flex: 1,
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     borderRadius: spacing.radiusMd,
     padding: spacing.md,
     alignItems: 'center',
@@ -634,13 +634,13 @@ export const styles = StyleSheet.create({
   },
   
   optionText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
   },
   
   optionSubtext: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.normal,
     marginTop: spacing.xs / 2,
@@ -651,12 +651,12 @@ export const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     marginLeft: spacing.sm,
   },
 
   walletCard: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.radiusMd,
     padding: spacing.md,
     borderWidth: 1,
@@ -671,7 +671,7 @@ export const styles = StyleSheet.create({
   },
 
   walletType: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
     marginLeft: spacing.sm,
@@ -688,13 +688,13 @@ export const styles = StyleSheet.create({
   },
 
   walletLabel: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
   },
 
   walletValue: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
@@ -710,7 +710,7 @@ export const styles = StyleSheet.create({
   },
 
   walletAddress: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     marginRight: spacing.xs,
@@ -731,7 +731,7 @@ export const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -747,26 +747,26 @@ export const styles = StyleSheet.create({
   },
   
   transactionTitle: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.xs,
   },
 
   transactionSubtitle: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.xs,
   },
   
   transactionNote: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.xs,
     fontStyle: 'italic',
   },
 
   transactionSource: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.normal,
     marginTop: spacing.xs / 2,
@@ -778,7 +778,7 @@ export const styles = StyleSheet.create({
   },
 
   emptyTransactionsText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     marginTop: spacing.md,
@@ -786,7 +786,7 @@ export const styles = StyleSheet.create({
   },
 
   emptyTransactionsSubtext: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
   },
@@ -804,7 +804,7 @@ export const styles = StyleSheet.create({
   },
 
   loaderText: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
   },
   
@@ -814,7 +814,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     marginBottom: spacing.sm,
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderRadius: spacing.lg,
     padding: spacing.md,
     borderWidth: 1,
@@ -826,13 +826,13 @@ export const styles = StyleSheet.create({
   },
   
   transactionAmount: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },
   
   emptyText: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     padding: spacing.lg,
@@ -926,7 +926,7 @@ export const styles = StyleSheet.create({
   },
 
   privateKeyButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: spacing.radiusMd,
@@ -1090,7 +1090,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
     borderRadius: spacing.radiusMd,
@@ -1107,7 +1107,7 @@ export const styles = StyleSheet.create({
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   
   modalHeader: {
@@ -1177,7 +1177,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
     borderRadius: spacing.radiusMd,
@@ -1205,7 +1205,7 @@ export const styles = StyleSheet.create({
   },
 
   progressText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.sm,
@@ -1214,19 +1214,19 @@ export const styles = StyleSheet.create({
 
   progressBar: {
     height: 4,
-    backgroundColor: colors.border,
+    backgroundColor: colors.white10,
     borderRadius: 2,
     overflow: 'hidden',
   },
 
   progressFill: {
     height: '100%',
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     borderRadius: 2,
   },
 
   currentWordContainer: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     padding: spacing.lg,
     borderRadius: spacing.radiusMd,
     marginBottom: spacing.xl,
@@ -1234,13 +1234,13 @@ export const styles = StyleSheet.create({
   },
 
   currentWordLabel: {
-    color: colors.textLightSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     marginBottom: spacing.sm,
   },
 
   currentWordText: {
-    color: colors.primaryGreen,
+    color: colors.green,
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
   },
@@ -1250,7 +1250,7 @@ export const styles = StyleSheet.create({
   },
 
   enteredWordsLabel: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.md,
@@ -1265,7 +1265,7 @@ export const styles = StyleSheet.create({
   enteredWordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: spacing.radiusMd,
@@ -1291,7 +1291,7 @@ export const styles = StyleSheet.create({
   },
 
   wordSelectionLabel: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.md,
@@ -1304,7 +1304,7 @@ export const styles = StyleSheet.create({
   },
 
   wordSelectionButton: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: spacing.radiusMd,
@@ -1314,11 +1314,11 @@ export const styles = StyleSheet.create({
   },
 
   wordSelectionButtonSelected: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
   },
 
   wordSelectionButtonText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
   },
@@ -1334,7 +1334,7 @@ export const styles = StyleSheet.create({
   },
 
   clearButton: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.radiusMd,
@@ -1344,13 +1344,13 @@ export const styles = StyleSheet.create({
   },
 
   clearButtonText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
   },
 
   confirmButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.radiusMd,
@@ -1360,7 +1360,7 @@ export const styles = StyleSheet.create({
   },
 
   confirmButtonDisabled: {
-    backgroundColor: colors.border,
+    backgroundColor: colors.white50,
   },
 
   confirmButtonText: {
@@ -1378,7 +1378,7 @@ export const styles = StyleSheet.create({
 
   // Empty requests text
   emptyRequestsText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.normal,
   },
@@ -1399,7 +1399,7 @@ export const styles = StyleSheet.create({
 
   // Request message with amount
   requestMessageWithAmount: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.normal,
     marginBottom: spacing.xs / 2,
@@ -1407,7 +1407,7 @@ export const styles = StyleSheet.create({
 
   // Request amount in green
   requestAmountGreen: {
-    color: colors.primaryGreen,
+    color: colors.green,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
   },
@@ -1429,7 +1429,7 @@ export const styles = StyleSheet.create({
 
   // Bottom sheet container
   bottomSheet: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white70,
     borderTopLeftRadius: spacing.lg,
     borderTopRightRadius: spacing.lg,
     paddingTop: spacing.md,
@@ -1453,10 +1453,10 @@ export const styles = StyleSheet.create({
   appleSliderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: spacing.radiusRound,
     borderWidth: 1,
-    borderColor: colors.primaryGreen,
+    borderColor: colors.green,
     position: 'relative',
     overflow: 'hidden',
     minHeight: 70,
@@ -1475,7 +1475,7 @@ export const styles = StyleSheet.create({
   },
 
   appleSliderTrackActive: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
   },
 
   appleSliderThumb: {
@@ -1484,7 +1484,7 @@ export const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1539,7 +1539,7 @@ export const styles = StyleSheet.create({
   },
 
   goBackButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: spacing.radiusMd,
@@ -1556,7 +1556,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.radiusMd,
@@ -1601,7 +1601,7 @@ export const styles = StyleSheet.create({
 
   // Export All Button Styles
   exportAllButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     marginTop: spacing.sm,
   },
   
@@ -1618,7 +1618,7 @@ export const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1640,35 +1640,35 @@ export const styles = StyleSheet.create({
   exportOptionTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   
   exportOptionSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     lineHeight: 18,
   },
   
   warningBox: {
-    backgroundColor: colors.warning + '20',
+    backgroundColor: colors.yellow + '20',
     borderRadius: spacing.radiusMd,
     padding: spacing.lg,
     marginVertical: spacing.lg,
     borderLeftWidth: 4,
-    borderLeftColor: colors.warning,
+    borderLeftColor: colors.yellow,
   },
   
   warningTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.warning,
+    color: colors.yellow,
     marginBottom: spacing.sm,
   },
   
   warningText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
     lineHeight: 20,
   },
 

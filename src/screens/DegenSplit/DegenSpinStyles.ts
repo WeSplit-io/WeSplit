@@ -63,7 +63,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   participantId: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     transform: [{ rotate: '-90deg' }],
   },
@@ -115,7 +115,7 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   billSummaryDate: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   billTotalRow: {
@@ -124,7 +124,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   billTotalLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
   },
   billTotalAmount: {

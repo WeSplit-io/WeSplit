@@ -369,16 +369,16 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const getSplitStatusColor = (status: string) => {
     switch (status) {
       case 'active':
-        return colors.primaryGreen;
+        return colors.green;
       case 'locked':
-        return colors.warning;
+        return colors.yellow;
       case 'completed':
-        return colors.success;
+        return colors.green;
       case 'cancelled':
-        return colors.error;
+        return colors.red;
       case 'draft':
       default:
-        return colors.textSecondary;
+        return colors.white70;
     }
   };
 
@@ -1316,7 +1316,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             <TouchableOpacity
               style={[
                 styles.connectWalletButton,
-                connectingWallet && { opacity: 0.7, backgroundColor: colors.darkCard }
+                connectingWallet && { opacity: 0.7, backgroundColor: colors.white70 }
               ]}
               onPress={async () => {
                 if (connectingWallet) return;
@@ -1337,7 +1337,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             >
               <Text style={[
                 styles.connectWalletButtonText,
-                connectingWallet && { color: colors.textLight }
+                connectingWallet && { color: colors.white }
               ]}>
                 {connectingWallet ? 'Connecting...' : 'Connect External Wallet'}
               </Text>

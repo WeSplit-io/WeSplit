@@ -505,7 +505,7 @@ const WalletManagementScreen: React.FC = () => {
             {
               backgroundColor: sliderValue.interpolate({
                 inputRange: [0, maxSlideDistance],
-                outputRange: [colors.green10, colors.primaryGreen],
+                outputRange: [colors.white5, colors.green],
               }),
             },
           ]}
@@ -606,27 +606,27 @@ const WalletManagementScreen: React.FC = () => {
 
           if (isIncoming) {
             transactionIcon = require('../../../assets/icon-receive.png');
-            transactionColor = colors.primaryGreen;
+            transactionColor = colors.green;
             transactionTitle = `Received from ${transaction.recipient || 'someone'}`;
             transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
           } else if (isOutgoing) {
               transactionIcon = require('../../../assets/icon-send.png');
-              transactionColor = colors.textLight;
+              transactionColor = colors.white;
             transactionTitle = `Sent to ${transaction.recipient || 'someone'}`;
             transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
           } else if (isDeposit) {
             transactionIcon = require('../../../assets/card-add.png');
-            transactionColor = colors.primaryGreen;
+            transactionColor = colors.green;
             transactionTitle = 'Deposit';
             transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
           } else if (isWithdraw) {
             transactionIcon = require('../../../assets/widthdraw-icon.png');
-            transactionColor = colors.textLight;
+            transactionColor = colors.white;
             transactionTitle = 'Withdrawal';
             transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
           } else {
             transactionIcon = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
-            transactionColor = colors.textLight;
+            transactionColor = colors.white;
             transactionTitle = transaction.recipient || 'Unknown';
             transactionSubtitle = `$${transaction.amount.toFixed(2)}`;
           }
@@ -662,7 +662,7 @@ const WalletManagementScreen: React.FC = () => {
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={[
                   styles.transactionAmount,
-                  { color: isIncoming || isDeposit ? colors.primaryGreen : colors.textLight }
+                  { color: isIncoming || isDeposit ? colors.green : colors.white }
                 ]}>
                   {isIncoming || isDeposit ? '+' : isOutgoing || isWithdraw ? '-' : ''}
                   {transaction.amount.toFixed(2)} USDC
@@ -792,8 +792,8 @@ const WalletManagementScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={[colors.primaryGreen]}
-            tintColor={colors.primaryGreen}
+            colors={[colors.green]}
+            tintColor={colors.green}
           />
         }
       >
