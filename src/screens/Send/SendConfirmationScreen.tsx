@@ -12,7 +12,7 @@ import Avatar from '../../components/shared/Avatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import { logger } from '../../services/analytics/loggingService';
 import { notificationService } from '../../services/notifications/notificationService';
-import { Container } from '../../components/shared';
+import { Container, PhosphorIcon } from '../../components/shared';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 
 // --- AppleSlider adapted from WalletManagementScreen ---
@@ -780,13 +780,15 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
               />
             ) : destinationType === 'external' && (wallet as any)?.type === 'kast' ? (
               <Image
-                source={require('../../../assets/kast-logo.png')}
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkast-logo.png?alt=media&token=e338e812-0bb1-4725-b6ef-2a59b2bd696f' }}
                 style={[styles.recipientKastIcon]}
               />
             ) : destinationType === 'external' ? (
               <View style={styles.recipientWalletIcon}>
-                <Image
-                  source={require('../../../assets/wallet-icon-white.png')}
+                <PhosphorIcon
+                  name="Wallet"
+                  size={24}
+                  color={colors.white}
                   style={styles.recipientWalletIconImage}
                 />
               </View>

@@ -374,10 +374,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={styles.menuItemText}>🔧 Auth Debug</Text>
-            <SafeImage
-              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
+            <PhosphorIcon
+              name="ChevronRight"
+              size={20}
+              color={colors.white70}
               style={styles.chevronIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             />
           </TouchableOpacity> */}
 

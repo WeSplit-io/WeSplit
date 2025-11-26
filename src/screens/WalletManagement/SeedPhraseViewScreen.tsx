@@ -17,7 +17,7 @@ import { useWallet } from '../../context/WalletContext';
 import { walletExportService } from '../../services/blockchain/wallet';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
-import { Container, Button } from '../../components/shared';
+import { Container, Button, PhosphorIcon } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
 const SeedPhraseViewScreen: React.FC = () => {
@@ -370,7 +370,7 @@ const SeedPhraseViewScreen: React.FC = () => {
               <Text style={styles.blurredText}>Tap to reveal your seed phrase</Text>
               <Text style={styles.blurredSubtext}>Make sure no one is watching your screen.</Text>
               <View style={styles.revealButton}>
-                <Image source={require('../../../assets/eye-icon.png')} style={styles.iconWrapper} />
+                <PhosphorIcon name="Eye" size={20} color={colors.white} style={styles.iconWrapper} />
                 <Text style={styles.revealButtonText}>View</Text>
               </View>
             </TouchableOpacity>

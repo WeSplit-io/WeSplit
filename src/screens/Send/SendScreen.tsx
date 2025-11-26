@@ -242,13 +242,15 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
             >
               {isKastCard ? (
                 <Image
-                  source={require('../../../assets/kast-logo.png')}
+                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkast-logo.png?alt=media&token=e338e812-0bb1-4725-b6ef-2a59b2bd696f' }}
                   style={[styles.kastIcon]}
                 />
               ) : (
                 <View style={styles.walletIcon}>
-                  <Image
-                    source={require('../../../assets/wallet-icon-white.png')}
+                  <PhosphorIcon
+                    name="Wallet"
+                    size={24}
+                    color={colors.white}
                     style={styles.walletIconImage}
                   />
                 </View>

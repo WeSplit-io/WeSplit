@@ -11,14 +11,15 @@ import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 import { styles } from '../styles';
 import Header from '../../../components/shared/Header';
+import PhosphorIcon from '../../../components/shared/PhosphorIcon';
 
-// Local image mapping for category icons
+// Local image mapping for category icons - using Phosphor icons
 const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
-  trip: require('../../../../assets/trip-icon-black.png'),
-  food: require('../../../../assets/food-icon-black.png'),
-  home: require('../../../../assets/house-icon-black.png'),
-  event: require('../../../../assets/event-icon-black.png'),
-  rocket: require('../../../../assets/rocket-icon-black.png'),
+  trip: 'Suitcase',
+  food: 'Coffee',
+  home: 'House',
+  event: 'Calendar',
+  rocket: 'Rocket',
 };
 
 interface FairSplitHeaderProps {
@@ -63,11 +64,20 @@ const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
         end={{ x: 1, y: 0 }}
       >
         <View style={styles.billHeader}>
-          <Image
-            source={CATEGORY_IMAGES_LOCAL[category]}
-            style={styles.billIconImage}
-            resizeMode="contain"
-          />
+          {typeof CATEGORY_IMAGES_LOCAL[category] === 'string' ? (
+            <PhosphorIcon
+              name={CATEGORY_IMAGES_LOCAL[category] as any}
+              size={32}
+              color={colors.white}
+              style={styles.billIconImage}
+            />
+          ) : (
+            <Image
+              source={CATEGORY_IMAGES_LOCAL[category]}
+              style={styles.billIconImage}
+              resizeMode="contain"
+            />
+          )}
           <View style={styles.billTitleContainer}>
             <Text style={styles.billTitle}>
               {billName}

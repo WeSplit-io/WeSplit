@@ -22,7 +22,8 @@ import {
   QrCode,
   Bell,
   Eye,
-  EyeSlash
+  EyeSlash,
+  Copy
 } from 'phosphor-react-native';
 import { styles, BG_COLOR, GREEN } from './styles';
 import { colors, spacing } from '../../theme';
@@ -1306,8 +1307,9 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             <Text style={styles.balanceLimitText}>
               {hashWalletAddress(walletAddress || currentUser?.wallet_address || '')}
             </Text>
-            <Image
-              source={require('../../../assets/copy-icon.png')}
+            <Copy
+              size={20}
+              color={colors.white}
               style={styles.copyIcon}
             />
           </TouchableOpacity>

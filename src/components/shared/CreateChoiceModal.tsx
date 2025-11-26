@@ -30,11 +30,6 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
     onCreateSplit();
   };
 
-  const handleCreateSharedWallet = () => {
-    onClose();
-    onCreateSharedWallet();
-  };
-
   return (
     <Modal
       visible={visible}
@@ -43,62 +38,49 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
       title="Create New"
       description="Choose what you want to create"
     >
-      <View style={styles.container}>
+      <View style={styles.optionsContainer}>
         {/* Create Split Option */}
         <TouchableOpacity
-          style={styles.optionCard}
+          style={styles.option}
           onPress={handleCreateSplit}
           activeOpacity={0.7}
         >
           <View style={styles.optionIconContainer}>
             <PhosphorIcon
               name="Receipt"
-              size={32}
-              color={colors.green}
+              size={50}
+              color={colors.white70}
               weight="fill"
             />
           </View>
-          <View style={styles.optionContent}>
-            <Text style={styles.optionTitle}>Create Split</Text>
-            <Text style={styles.optionDescription}>
-              Split a bill with friends
-            </Text>
-          </View>
-          <PhosphorIcon
-            name="CaretRight"
-            size={20}
-            color={colors.white70}
-            weight="regular"
-          />
+          <Text style={styles.optionTitle}>Simple Split</Text>
+          <Text style={styles.optionDescription}>
+            Split a bill with friends
+          </Text>
         </TouchableOpacity>
 
         {/* Create Shared Wallet Option - DISABLED FOR DEPLOYMENT */}
         <TouchableOpacity
-          style={[styles.optionCard, styles.optionCardDisabled]}
+          style={[styles.option, styles.optionDisabled]}
           onPress={() => Alert.alert('Coming Soon', 'Shared wallet creation is currently unavailable. This feature will be available in a future update.')}
           activeOpacity={0.7}
           disabled={true}
         >
-          <View style={[styles.optionIconContainer, styles.optionIconContainerDisabled]}>
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+          <View style={styles.optionIconContainer}>
             <PhosphorIcon
               name="Wallet"
-              size={32}
+              size={50}
               color={colors.white50}
               weight="fill"
             />
           </View>
-          <View style={styles.optionContent}>
-            <Text style={[styles.optionTitle, styles.optionTitleDisabled]}>Create Shared Wallet</Text>
-            <Text style={styles.optionDescription}>
-              Coming soon - Feature in development
-            </Text>
-          </View>
-          <PhosphorIcon
-            name="CaretRight"
-            size={20}
-            color={colors.white50}
-            weight="regular"
-          />
+          <Text style={[styles.optionTitle, styles.optionTitleDisabled]}>Shared Wallet</Text>
+          <Text style={styles.optionDescription}>
+            Shared wallet for group expenses
+          </Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -106,47 +88,69 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  optionCard: {
+  optionsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white10,
-    borderRadius: spacing.md,
-    padding: spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: spacing.xl,
     gap: spacing.md,
+  },
+  option: {
+    flex: 1,
+    backgroundColor: colors.white5,
+    borderRadius: 16,
+    padding: spacing.md,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minHeight: 200,
+    justifyContent: 'center',
+    minWidth: 140,
+    position: 'relative',
+  },
+  optionDisabled: {
+    opacity: 0.8,
+    backgroundColor: colors.white5,
   },
   optionIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: spacing.md,
-    backgroundColor: colors.white5,
-    alignItems: 'center',
+    width: 50,
+    height: 50,
     justifyContent: 'center',
-  },
-  optionContent: {
-    flex: 1,
-    gap: spacing.xs / 2,
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   optionTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
     color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   optionDescription: {
+    color: colors.white80,
     fontSize: typography.fontSize.sm,
-    color: colors.white70,
-  },
-  optionCardDisabled: {
-    opacity: 0.5,
-  },
-  optionIconContainerDisabled: {
-    backgroundColor: colors.white10,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: spacing.xs,
   },
   optionTitleDisabled: {
     color: colors.white50,
+  },
+  comingSoonBadge: {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    borderRadius: 12,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1,
+    backgroundColor: colors.green,
+  },
+  comingSoonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
   },
 });
 

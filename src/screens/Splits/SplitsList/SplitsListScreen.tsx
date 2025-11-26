@@ -28,7 +28,7 @@ import NavBar from '../../../components/shared/NavBar';
 import Avatar from '../../../components/shared/Avatar';
 import GroupIcon from '../../../components/GroupIcon';
 import Icon from '../../../components/Icon';
-import { Container, Button, ModernLoader } from '../../../components/shared';
+import { Container, Button, ModernLoader, PhosphorIcon } from '../../../components/shared';
 import Tabs from '../../../components/shared/Tabs';
 import SharedWalletCard from '../../../components/SharedWalletCard';
 import { BillSplitSummary } from '../../../types/billSplitting';
@@ -1029,13 +1029,19 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
                 {splitTitle}
               </Text>
               <View style={styles.roleContainer}>
-                <Image 
-                  source={split.creatorId === currentUser?.id 
-                    ? require('../../../../assets/award-icon.png') 
-                    : require('../../../../assets/user-icon.png')
-                  }
-                  style={styles.roleIcon}
-                />
+                {split.creatorId === currentUser?.id ? (
+                  <Image 
+                    source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Faward-icon-black.png?alt=media&token=07283493-afd6-489e-a5c2-7dffc6922f41' }}
+                    style={styles.roleIcon}
+                  />
+                ) : (
+                  <PhosphorIcon
+                    name="User"
+                    size={16}
+                    color={colors.white70}
+                    style={styles.roleIcon}
+                  />
+                )}
                 <Text style={styles.createdBy}>
                   {split.creatorId === currentUser?.id ? 'Owner' : 'Member'}
                 </Text>
@@ -1100,8 +1106,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
             </View>
           </View>
 
-          <Image 
-            source={require('../../../../assets/chevron-right.png')} 
+          <PhosphorIcon 
+            name="ChevronRight" 
+            size={20}
+            color={colors.white70}
             style={styles.splitCardArrow} 
           />
         </View>
@@ -1360,8 +1368,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         ) : splits.length === 0 ? (
           // Global empty state when there are no pools at all
           <View style={styles.emptyState}>
-            <Image
-              source={require('../../../../assets/pool-empty-icon.png')}
+            <PhosphorIcon
+              name="Package"
+              size={64}
+              color={colors.white70}
               style={styles.emptyStateIcon}
             />
             <View style={styles.emptyStateContent}>

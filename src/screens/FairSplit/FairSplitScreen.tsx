@@ -3616,8 +3616,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 style={styles.privateKeyButton}
                 onPress={handleShowPrivateKey}
               >
-                <Image
-                  source={require('../../../assets/id-icon-white.png')}
+                <PhosphorIcon
+                  name="IdentificationCard"
+                  size={20}
+                  color={colors.white}
                   style={styles.privateKeyButtonIcon}
                 />
                 <Text style={styles.privateKeyButtonText}>View Private Key</Text>

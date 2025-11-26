@@ -22,17 +22,17 @@ import { notificationService } from '../../services/notifications';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenRoulette } from './components';
-import { Container, Button } from '../../components/shared';
+import { Container, Button, PhosphorIcon } from '../../components/shared';
 import { formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
 import { getSplitStatusDisplayText } from '../../utils/statusUtils';
 
-// Category images mapping for dynamic icons
+// Category images mapping for dynamic icons - using Phosphor icons
 const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
-  trip: require('../../../assets/trip-icon-black.png'),
-  food: require('../../../assets/food-icon-black.png'),
-  home: require('../../../assets/house-icon-black.png'),
-  event: require('../../../assets/event-icon-black.png'),
-  rocket: require('../../../assets/rocket-icon-black.png'),
+  trip: 'Suitcase',
+  food: 'Coffee',
+  home: 'House',
+  event: 'Calendar',
+  rocket: 'Rocket',
 };
 
 interface DegenSpinScreenProps {
@@ -280,10 +280,19 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
         <View style={styles.billSummaryContainer}>
           <View style={styles.billSummaryRow}>
             <View style={styles.billSummaryIcon}>
-              <Image
-                source={getCategoryIcon()}
-                style={styles.billSummaryIconImage}
-              />
+              {typeof getCategoryIcon() === 'string' ? (
+                <PhosphorIcon
+                  name={getCategoryIcon() as any}
+                  size={32}
+                  color={colors.white}
+                  style={styles.billSummaryIconImage}
+                />
+              ) : (
+                <Image
+                  source={getCategoryIcon()}
+                  style={styles.billSummaryIconImage}
+                />
+              )}
             </View>
             <Text style={styles.billSummaryTitle}>
               {splitData?.title || billData?.title || processedBillData?.title || 'Degen Split'}

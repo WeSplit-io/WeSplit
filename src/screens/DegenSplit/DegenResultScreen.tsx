@@ -28,7 +28,7 @@ import { logger } from '../../services/analytics/loggingService';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader } from './components';
-import { Container, Button, AppleSlider, Modal } from '@/components/shared';
+import { Container, Button, AppleSlider, Modal, PhosphorIcon } from '@/components/shared';
 import Avatar from '@/components/shared/Avatar';
 import BadgeDisplay from '../../components/profile/BadgeDisplay';
 
@@ -625,10 +625,11 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         {/* Share Button */}
         <TouchableOpacity style={styles.shareButton} onPress={handleShareOnX}>
           <Text style={styles.shareButtonText}>Share on </Text>
-          <Image
-            source={require('../../../assets/twitter-x.png')}
+          <PhosphorIcon
+            name="XLogo"
+            size={20}
+            color={colors.white}
             style={styles.twitterIcon}
-            resizeMode="contain"
           />
 
         </TouchableOpacity>
@@ -779,7 +780,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             <View style={styles.transferVisualization}>
               <View style={styles.transferIcon}>
                 <Image 
-                  source={require('../../../assets/wesplit-logo-card.png')} 
+                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-card.png?alt=media&token=aca93398-0e99-4f22-800f-f74252ab078d' }} 
                   style={styles.transferIconImage}
                   resizeMode="contain"
                 />
@@ -789,7 +790,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
               </View>
               <View style={styles.transferIcon}>
                 <Image 
-                  source={require('../../../assets/kast-logo.png')} 
+                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkast-logo.png?alt=media&token=e338e812-0bb1-4725-b6ef-2a59b2bd696f' }} 
                   style={styles.transferIconImage}
                   resizeMode="contain"
                 />
@@ -810,8 +811,10 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
                 degenState.setSelectedPaymentMethod(null);
               }}
             >
-              <Image 
-                source={require('../../../assets/chevron-left.png')} 
+              <PhosphorIcon 
+                name="ChevronLeft" 
+                size={24}
+                color={colors.white}
                 style={styles.modalBackButtonIcon}
               />
               <Text style={styles.modalBackButtonText}>Back</Text>
@@ -837,8 +840,10 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
               {degenLogic.formatWalletAddress(splitWallet.walletAddress)}
             </Text>
             <TouchableOpacity onPress={() => handleCopyWalletAddress(splitWallet.walletAddress)}>
-              <Image
-                source={require('../../../assets/copy-icon.png')}
+              <PhosphorIcon
+                name="Copy"
+                size={20}
+                color={colors.white}
                 style={styles.copyIcon}
               />
             </TouchableOpacity>

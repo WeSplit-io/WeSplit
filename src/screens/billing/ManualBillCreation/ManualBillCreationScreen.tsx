@@ -32,13 +32,13 @@ import {
   validateProcessedBillDataForNavigation 
 } from '../../../utils/navigation/splitNavigationHelpers';
 
-// Category options with images
+// Category options with images - using Phosphor icons
 const CATEGORIES = [
-  { id: 'trip', name: 'Trip', color: '#A5EA15', image: require('../../../../assets/trip-icon-black.png') },
-  { id: 'food', name: 'Food', color: '#FFB800', image: require('../../../../assets/food-icon-black.png') },
-  { id: 'home', name: 'Home', color: '#00BFA5', image: require('../../../../assets/house-icon-black.png') },
-  { id: 'event', name: 'Event', color: '#FF6B35', image: require('../../../../assets/event-icon-black.png') },
-  { id: 'rocket', name: 'Rocket', color: '#9C27B0', image: require('../../../../assets/rocket-icon-black.png') },
+  { id: 'trip', name: 'Trip', color: '#A5EA15', image: 'Suitcase', isPhosphor: true },
+  { id: 'food', name: 'Food', color: '#FFB800', image: 'Coffee', isPhosphor: true },
+  { id: 'home', name: 'Home', color: '#00BFA5', image: 'House', isPhosphor: true },
+  { id: 'event', name: 'Event', color: '#FF6B35', image: 'Calendar', isPhosphor: true },
+  { id: 'rocket', name: 'Rocket', color: '#9C27B0', image: 'Rocket', isPhosphor: true },
 ];
 
 // Currency options
@@ -626,18 +626,36 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                   >
-                    <Image
-                      source={category.image}
-                      style={styles.categoryIconSelected}
-                      resizeMode="contain"
-                    />
+                    {category.isPhosphor ? (
+                      <PhosphorIcon
+                        name={category.image as any}
+                        size={32}
+                        color={colors.white}
+                        style={styles.categoryIconSelected}
+                      />
+                    ) : (
+                      <Image
+                        source={category.image}
+                        style={styles.categoryIconSelected}
+                        resizeMode="contain"
+                      />
+                    )}
                   </LinearGradient>
                 ) : (
-                  <Image
-                    source={category.image}
-                    style={styles.categoryIcon}
-                    resizeMode="contain"
-                  />
+                  category.isPhosphor ? (
+                    <PhosphorIcon
+                      name={category.image as any}
+                      size={32}
+                      color={colors.white70}
+                      style={styles.categoryIcon}
+                    />
+                  ) : (
+                    <Image
+                      source={category.image}
+                      style={styles.categoryIcon}
+                      resizeMode="contain"
+                    />
+                  )
                 )}
               </TouchableOpacity>
             ))}

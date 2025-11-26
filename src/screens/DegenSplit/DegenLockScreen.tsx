@@ -33,16 +33,16 @@ import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/for
 import { getSplitStatusDisplayText } from '../../utils/statusUtils';
 
 
-// Category image mapping
+// Category image mapping - using Phosphor icons
 const CATEGORY_IMAGES: { [key: string]: any } = {
-  trip: require('../../../assets/trip-icon-black.png'),
-  food: require('../../../assets/food-icon-black.png'),
-  house: require('../../../assets/house-icon-black.png'),
-  event: require('../../../assets/event-icon-black.png'),
-  rocket: require('../../../assets/rocket-icon-black.png'),
-  lamp: require('../../../assets/lamp-icon-black.png'),
-  award: require('../../../assets/award-icon-black.png'),
-  user: require('../../../assets/user-icon-black.png'),
+  trip: 'Suitcase',
+  food: 'Coffee',
+  house: 'House',
+  event: 'Calendar',
+  rocket: 'Rocket',
+  lamp: 'Lightbulb',
+  award: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Faward-icon-black.png?alt=media&token=07283493-afd6-489e-a5c2-7dffc6922f41' },
+  user: 'User',
 };
 
 interface DegenLockScreenProps {
@@ -476,12 +476,21 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         >
           <View style={styles.billCardHeader}>
             <View style={styles.billIconContainer}>
-              <Image 
-                source={getCategoryImage()} 
-                style={styles.billIcon}
-                tintColor={colors.white}
-                resizeMode="contain"
-              />
+              {typeof getCategoryImage() === 'string' ? (
+                <PhosphorIcon
+                  name={getCategoryImage() as any}
+                  size={32}
+                  color={colors.white}
+                  style={styles.billIcon}
+                />
+              ) : (
+                <Image 
+                  source={getCategoryImage()} 
+                  style={styles.billIcon}
+                  tintColor={colors.white}
+                  resizeMode="contain"
+                />
+              )}
             </View>
             <View style={styles.billTitleContainer}>
               <Text style={styles.billTitle}>{splitData?.title || billData?.title || 'Degen Split'}</Text>
@@ -533,8 +542,10 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                   </>
                 ) : (
                   <>
-                <Image
-                  source={require('../../../assets/eye-icon.png')}
+                <PhosphorIcon
+                  name="Eye"
+                  size={20}
+                  color={colors.white}
                   style={styles.privateKeyButtonIcon}
                 />
                 <Text style={styles.privateKeyButtonText}>View Private Key</Text>

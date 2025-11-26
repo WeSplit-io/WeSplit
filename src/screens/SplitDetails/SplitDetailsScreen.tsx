@@ -51,7 +51,7 @@ import {
   UnifiedParticipant
 } from '../../types/splitNavigation';
 import { generateBillId } from '../../utils/navigation/splitNavigationHelpers';
-import { Container, Header, Button, LoadingScreen } from '../../components/shared';
+import { Container, Header, Button, LoadingScreen, PhosphorIcon } from '../../components/shared';
 import Modal from '../../components/shared/Modal';
 import { SpendPaymentStatus, SpendOrderBadge } from '../../components/spend';
 import { SpendPaymentModeService } from '../../services/integrations/spend';
@@ -66,12 +66,13 @@ const CATEGORY_IMAGES: { [key: string]: any } = {
 };
 
 // Local image mapping for category icons (for tintColor support)
+// Using Phosphor icons
 const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
-  trip: require('../../../assets/trip-icon-black.png'),
-  food: require('../../../assets/food-icon-black.png'),
-  home: require('../../../assets/house-icon-black.png'),
-  event: require('../../../assets/event-icon-black.png'),
-  rocket: require('../../../assets/rocket-icon-black.png'),
+  trip: 'Suitcase',
+  food: 'Coffee',
+  home: 'House',
+  event: 'Calendar',
+  rocket: 'Rocket',
 };
 
 interface SplitDetailsScreenProps {
@@ -2162,7 +2163,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               <View style={styles.participantStatus}>
                 {participant.status === 'accepted' ? (
                   <Image
-                    source={require('../../../assets/check-circle-icon.png')}
+                    source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcheck-circle-icon.png?alt=media&token=2205fe35-386d-469d-9e23-47c1ce12799a' }}
                     style={styles.statusAcceptedIcon}
                   />
                 ) : (
@@ -2244,8 +2245,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             ]}
             onPress={() => handleSplitTypeSelection('fair')}
           >
-            <Image
-              source={require('../../../assets/fair-split-icon.png')}
+            <PhosphorIcon
+              name="Scales"
+              size={48}
+              color={colors.white}
               style={styles.splitOptionIconImage}
             />
             <Text style={styles.splitOptionTitle}>Fair Split</Text>
@@ -2260,8 +2263,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             ]}
             onPress={() => handleSplitTypeSelection('degen')}
           >
-            <Image
-              source={require('../../../assets/degen-split-icon.png')}
+            <PhosphorIcon
+              name="Dice"
+              size={48}
+              color={colors.white}
               style={styles.splitOptionIconImage}
             />
             <Text style={styles.splitOptionTitle}>Degen Split</Text>

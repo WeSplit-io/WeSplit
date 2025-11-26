@@ -343,7 +343,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
       <Animated.View style={[styles.logoContainer, { opacity: logoOpacity }]}>
         <Image
-          source={require('../../../assets/wesplit-logo-new.png')}
+          source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-new.png?alt=media&token=f42ea1b1-5f23-419e-a499-931862819cbf' }}
           style={styles.logo}
           resizeMode="contain"
         />

@@ -32,7 +32,7 @@ import { styles } from './styles';
 import { QRCodeScreen } from '../QRCode';
 import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { logger } from '../../services/analytics/loggingService';
-import { Container, ModernLoader } from '../../components/shared';
+import { Container, ModernLoader, PhosphorIcon } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
 const WalletManagementScreen: React.FC = () => {
@@ -605,22 +605,22 @@ const WalletManagementScreen: React.FC = () => {
           let transactionSubtitle;
 
           if (isIncoming) {
-            transactionIcon = require('../../../assets/icon-receive.png');
+            transactionIcon = 'ArrowCircleDown';
             transactionColor = colors.green;
             transactionTitle = `Received from ${transaction.recipient || 'someone'}`;
             transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
           } else if (isOutgoing) {
-              transactionIcon = require('../../../assets/icon-send.png');
+              transactionIcon = 'PaperPlaneTilt';
               transactionColor = colors.white;
             transactionTitle = `Sent to ${transaction.recipient || 'someone'}`;
             transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
           } else if (isDeposit) {
-            transactionIcon = require('../../../assets/card-add.png');
+            transactionIcon = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcard-add-new.png?alt=media&token=8ca9ad64-c616-4f4c-9f3d-2be39c3091f2' };
             transactionColor = colors.green;
             transactionTitle = 'Deposit';
             transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
           } else if (isWithdraw) {
-            transactionIcon = require('../../../assets/widthdraw-icon.png');
+            transactionIcon = 'ArrowLineUp';
             transactionColor = colors.white;
             transactionTitle = 'Withdrawal';
             transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
@@ -646,7 +646,16 @@ const WalletManagementScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               <View style={[styles.transactionAvatarNew, { backgroundColor: colors.white5 }]}>
-                <Image source={transactionIcon} style={styles.transactionIcon} />
+                {typeof transactionIcon === 'string' ? (
+                  <PhosphorIcon
+                    name={transactionIcon as any}
+                    size={24}
+                    color={transactionColor}
+                    style={styles.transactionIcon}
+                  />
+                ) : (
+                  <Image source={transactionIcon} style={styles.transactionIcon} />
+                )}
               </View>
 
               <View style={styles.transactionDetails}>
@@ -799,7 +808,7 @@ const WalletManagementScreen: React.FC = () => {
       >
         {/* Balance Card */}
         <ImageBackground
-          source={require('../../../assets/wallet-bg.png')}
+          source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-bg-linear.png?alt=media&token=4347e0cd-056e-4681-a066-0fd74a563013' }}
           style={[styles.balanceCard, { alignItems: 'flex-start' }]}
           resizeMode="cover"
         >
@@ -849,8 +858,10 @@ const WalletManagementScreen: React.FC = () => {
             <Text style={styles.balanceLimitText}>
               {formatAddress(appWalletAddress)}
             </Text>
-            <Image
-              source={require('../../../assets/copy-icon.png')}
+            <PhosphorIcon
+              name="Copy"
+              size={20}
+              color={colors.white}
               style={styles.copyIcon}
             />
           </TouchableOpacity>
@@ -864,8 +875,10 @@ const WalletManagementScreen: React.FC = () => {
               onPress={() => navigation.navigate('Send')}
             >
               <View style={styles.actionButtonCircle}>
-                <Image
-                  source={require('../../../assets/money-send.png')}
+                <PhosphorIcon
+                  name="ArrowCircleUp"
+                  size={24}
+                  color={colors.white}
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
@@ -877,8 +890,10 @@ const WalletManagementScreen: React.FC = () => {
               onPress={() => navigation.navigate('RequestContacts')}
             >
               <View style={styles.actionButtonCircle}>
-                <Image
-                  source={require('../../../assets/money-recive.png')}
+                <PhosphorIcon
+                  name="ArrowCircleDown"
+                  size={24}
+                  color={colors.white}
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
@@ -891,7 +906,7 @@ const WalletManagementScreen: React.FC = () => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/card-add.png')}
+                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcard-add-new.png?alt=media&token=8ca9ad64-c616-4f4c-9f3d-2be39c3091f2' }}
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
@@ -905,8 +920,10 @@ const WalletManagementScreen: React.FC = () => {
               }}
             >
               <View style={styles.actionButtonCircle}>
-                <Image
-                  source={require('../../../assets/link-icon.png')}
+                <PhosphorIcon
+                  name="Link"
+                  size={24}
+                  color={colors.white}
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
