@@ -1,6 +1,12 @@
 /**
  * Deep Link Handler for WeSplit App
- * Handles wesplit:// links for group invitations and other app actions
+ * Handles both:
+ * - App-scheme links: wesplit://action/params
+ * - Universal links: https://wesplit.io/action?params
+ * 
+ * Universal links allow the app to be opened from web links, supporting:
+ * - Users with the app installed (opens directly in app)
+ * - Users without the app (web page redirects to app store)
  */
 
 import { Linking, Alert } from 'react-native';
@@ -8,6 +14,10 @@ import { NavigationContainerRef, ParamListBase } from '@react-navigation/native'
 import { FirebaseDataService } from './firebaseDataService';
 import { logger } from '../analytics/loggingService';
 import { User } from '../../types';
+import { pendingInvitationService, PendingInvitation } from './pendingInvitationService';
+
+// Universal link domains that we recognize
+const UNIVERSAL_LINK_DOMAINS = ['wesplit.io', 'www.wesplit.io'];
 
 export interface DeepLinkData {
   action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split' | 'view-split';
@@ -29,21 +39,70 @@ export interface DeepLinkData {
 }
 
 /**
+ * Check if a URL is a WeSplit deep link (either app-scheme or universal link)
+ */
+export function isWeSplitDeepLink(url: string): boolean {
+  try {
+    // Check app-scheme
+    if (url.startsWith('wesplit://')) {
+      return true;
+    }
+    
+    // Check universal link
+    const urlObj = new URL(url);
+    if (urlObj.protocol === 'https:' && UNIVERSAL_LINK_DOMAINS.includes(urlObj.hostname)) {
+      return true;
+    }
+    
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Parse a WeSplit deep link URL
- * Expected format: wesplit://action/params
+ * Supports both app-scheme (wesplit://) and universal links (https://wesplit.io)
+ * 
+ * @param url - The URL to parse
+ * @returns Parsed deep link data or null if invalid
  */
 export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
   try {
     logger.debug('Parsing deep link URL', { url }, 'deepLinkHandler');
     
-    if (!url.startsWith('wesplit://')) {
-      console.warn('🔥 URL does not start with wesplit://:', url);
+    // Determine if this is an app-scheme or universal link
+    const isAppScheme = url.startsWith('wesplit://');
+    let urlObj: URL;
+    let action: string;
+    let params: string[];
+    
+    try {
+      urlObj = new URL(url);
+    } catch {
+      logger.warn('Failed to parse URL', { url }, 'deepLinkHandler');
       return null;
     }
 
-    const urlParts = url.replace('wesplit://', '').split('/');
-    const action = urlParts[0];
-    const params = urlParts.slice(1);
+    if (isAppScheme) {
+      // App-scheme: wesplit://action/params
+      const urlParts = url.replace('wesplit://', '').split('?')[0].split('/');
+      action = urlParts[0];
+      params = urlParts.slice(1);
+    } else {
+      // Universal link: https://wesplit.io/action?params
+      // Check if it's a valid universal link domain
+      if (!UNIVERSAL_LINK_DOMAINS.includes(urlObj.hostname)) {
+        logger.debug('URL is not a WeSplit universal link', { hostname: urlObj.hostname }, 'deepLinkHandler');
+        return null;
+      }
+      
+      // Extract action from pathname
+      const pathname = urlObj.pathname.replace(/^\//, '').replace(/\/$/, '');
+      const pathParts = pathname.split('/');
+      action = pathParts[0] || '';
+      params = pathParts.slice(1);
+    }
 
     logger.debug('Parsed URL parts', { action, params }, 'deepLinkHandler');
 
@@ -125,9 +184,9 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       
       case 'join-split':
         // Handle split invitation deep links
-        // Format: wesplit://join-split?data=<encoded_invitation_data>
-        try {
-          const urlObj = new URL(url);
+        // Format (app-scheme): wesplit://join-split?data=<encoded_invitation_data>
+        // Format (universal): https://wesplit.io/join-split?data=<encoded_invitation_data>
+        {
           const dataParam = urlObj.searchParams.get('data');
           
           if (!dataParam) {
@@ -135,20 +194,23 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
             return null;
           }
           
+          logger.debug('Parsed join-split deep link', { 
+            isAppScheme, 
+            hasData: !!dataParam,
+            dataLength: dataParam.length 
+          }, 'deepLinkHandler');
+          
           return {
             action: 'join-split',
             splitInvitationData: dataParam
           };
-        } catch (urlError) {
-          console.warn('🔥 Error parsing join-split URL:', urlError);
-          return null;
         }
       
       case 'view-split':
         // Handle viewing a split from external source (e.g., "spend" integration)
-        // Format: wesplit://view-split?splitId=xxx&userId=xxx
-        try {
-          const urlObj = new URL(url);
+        // Format (app-scheme): wesplit://view-split?splitId=xxx&userId=xxx
+        // Format (universal): https://wesplit.io/view-split?splitId=xxx&userId=xxx
+        {
           const splitId = urlObj.searchParams.get('splitId');
           const userId = urlObj.searchParams.get('userId');
           
@@ -157,14 +219,13 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
             return null;
           }
           
+          logger.debug('Parsed view-split deep link', { splitId, userId }, 'deepLinkHandler');
+          
           return {
             action: 'view-split',
             splitId: splitId,
             userId: userId || undefined
           };
-        } catch (urlError) {
-          console.warn('🔥 Error parsing view-split URL:', urlError);
-          return null;
         }
       
       default:
@@ -415,28 +476,45 @@ export function setupDeepLinkListeners(
         break;
       
       case 'join-split':
-        if (!currentUser?.id) {
-          console.warn('🔥 User not authenticated, cannot join split');
-          Alert.alert('Authentication Required', 'Please log in to join the split.');
-          navigation.navigate('AuthMethods');
-          return;
-        }
-
         if (!linkData.splitInvitationData) {
           console.warn('🔥 Missing split invitation data');
           Alert.alert('Invalid Link', 'This split invitation link is not valid.');
           return;
         }
 
-        logger.info('Attempting to join split with invitation data', { splitInvitationData: linkData.splitInvitationData }, 'deepLinkHandler');
-        
         try {
-          // Validate split invitation data before navigation
-          const invitationData = JSON.parse(decodeURIComponent(linkData.splitInvitationData));
+          // Validate split invitation data before proceeding
+          const invitationData: PendingInvitation = JSON.parse(decodeURIComponent(linkData.splitInvitationData));
           
           if (!invitationData.splitId) {
             throw new Error('Invalid split invitation data: missing splitId');
           }
+
+          // Check if user is authenticated
+          if (!currentUser?.id) {
+            logger.info('User not authenticated, storing pending invitation for after login', {
+              splitId: invitationData.splitId,
+              splitType: invitationData.splitType,
+            }, 'deepLinkHandler');
+            
+            // Store the invitation for processing after authentication
+            await pendingInvitationService.storePendingInvitation(invitationData, url);
+            
+            // Inform user and redirect to authentication
+            Alert.alert(
+              'Sign In Required',
+              `You've been invited to join "${invitationData.billName || 'a split'}"!\n\nPlease sign in or create an account to join this split. Your invitation will be waiting for you.`,
+              [
+                {
+                  text: 'Sign In',
+                  onPress: () => navigation.navigate('AuthMethods'),
+                },
+              ]
+            );
+            return;
+          }
+          
+          logger.info('Attempting to join split with invitation data', { splitInvitationData: linkData.splitInvitationData }, 'deepLinkHandler');
           
           // Navigate to SplitDetails screen with validated invitation data
           navigation.navigate('SplitDetails', {

@@ -380,7 +380,9 @@ export const styles = StyleSheet.create({
     lineHeight: typography.fontSize.sm * 1.5,
   },
   loadingContainer: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xxl,
   },
   loadingText: {

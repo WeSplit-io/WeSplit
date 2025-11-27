@@ -4155,6 +4155,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           />
         </View>
       </Modal>
+
     </Container>
   );
 };

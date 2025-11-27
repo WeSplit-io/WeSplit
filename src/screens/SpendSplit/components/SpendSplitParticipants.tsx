@@ -22,13 +22,15 @@ type Participant = SplitParticipant | SplitWalletParticipant | { id: string; use
 interface SpendSplitParticipantsProps {
   participants: Participant[];
   currentUserId?: string;
-  onAddPress?: () => void; // Callback for "Add" button
+  onAddPress?: () => void; // Callback for "Add" button (contacts)
+  onSharePress?: () => void; // Callback for "Share" button (QR/link)
 }
 
 const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
   participants,
   currentUserId,
   onAddPress,
+  onSharePress,
 }) => {
   // Use shared formatting utility
   const formatAmount = formatAmountWithComma;
@@ -47,6 +49,13 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Participants ({participants.length})</Text>
+        <View style={styles.headerButtons}>
+          {onSharePress && (
+            <TouchableOpacity onPress={onSharePress} activeOpacity={0.8} style={styles.shareButton}>
+              <PhosphorIcon name="ShareNetwork" size={16} color={colors.green} weight="bold" />
+              <Text style={styles.shareButtonText}>Share</Text>
+            </TouchableOpacity>
+          )}
         {onAddPress && (
           <TouchableOpacity onPress={onAddPress} activeOpacity={0.8}>
             <LinearGradient
@@ -60,6 +69,7 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
             </LinearGradient>
           </TouchableOpacity>
         )}
+        </View>
       </View>
       {participants.map((participant, index) => {
         // Handle different participant structures
@@ -121,6 +131,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.md,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+    backgroundColor: colors.white10,
+    borderWidth: 1,
+    borderColor: colors.green + '40',
+  },
+  shareButtonText: {
+    fontSize: typography.fontSize.md,
+    color: colors.green,
+    fontWeight: typography.fontWeight.medium,
   },
   addButton: {
     flexDirection: 'row',

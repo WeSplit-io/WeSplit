@@ -29,6 +29,7 @@ interface FairSplitHeaderProps {
   category?: string;
   onBackPress: () => void;
   isRealtimeActive?: boolean;
+  onSharePress?: () => void; // Optional share button callback
 }
 
 const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
@@ -37,7 +38,8 @@ const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
   totalAmount,
   category = 'food',
   onBackPress,
-  isRealtimeActive = false
+  isRealtimeActive = false,
+  onSharePress
 }) => {
   return (
     <>
@@ -47,12 +49,29 @@ const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
         onBackPress={onBackPress}
         showBackButton={true}
         rightElement={
-          isRealtimeActive ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            {onSharePress && (
+              <TouchableOpacity 
+                onPress={onSharePress}
+                style={{
+                  backgroundColor: colors.white10,
+                  borderRadius: 8,
+                  padding: spacing.xs + 2,
+                  borderWidth: 1,
+                  borderColor: colors.green + '40',
+                }}
+                activeOpacity={0.7}
+              >
+                <PhosphorIcon name="ShareNetwork" size={20} color={colors.green} />
+              </TouchableOpacity>
+            )}
+            {isRealtimeActive && (
             <View style={styles.realtimeIndicator}>
               <View style={styles.realtimeDot} />
               <Text style={styles.realtimeText}>Live</Text>
             </View>
-          ) : undefined
+            )}
+          </View>
         }
       />
 

@@ -232,6 +232,43 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     authenticate();
   }, [isAuthenticated, currentUser?.id]); // Only re-run when user changes, not on every focus
 
+  // ✅ Check for pending invitations after authentication (deferred deep linking)
+  // This handles the case where a user clicked an invitation link before being logged in
+  useEffect(() => {
+    const checkPendingInvitation = async () => {
+      // Only check once authentication is complete and user is authenticated
+      if (isAuthenticating || !isAuthenticated || !currentUser?.id) {
+        return;
+      }
+
+      try {
+        const { pendingInvitationService } = await import('../../services/core/pendingInvitationService');
+        const result = await pendingInvitationService.processPendingInvitationAfterAuth();
+        
+        if (result.shouldNavigate && result.navigationParams) {
+          logger.info('Processing pending invitation after authentication', {
+            screen: result.navigationParams.screen,
+            splitId: result.navigationParams.params?.splitId,
+          }, 'DashboardScreen');
+          
+          // Small delay to ensure Dashboard is fully loaded
+          setTimeout(() => {
+            navigation.navigate(
+              result.navigationParams!.screen,
+              result.navigationParams!.params
+            );
+          }, 500);
+        }
+      } catch (error) {
+        logger.error('Error processing pending invitation', {
+          error: error instanceof Error ? error.message : String(error),
+        }, 'DashboardScreen');
+      }
+    };
+
+    checkPendingInvitation();
+  }, [isAuthenticating, isAuthenticated, currentUser?.id, navigation]);
+
   // Check phone prompt status
   useEffect(() => {
     const checkPhonePromptStatus = async () => {
@@ -1031,10 +1068,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Show loading screen while authenticating with Face ID
   if (isAuthenticating) {
     return (
+      <Container>
       <ModernLoader
         size="large"
         text="Authenticating..."
       />
+      </Container>
     );
   }
 

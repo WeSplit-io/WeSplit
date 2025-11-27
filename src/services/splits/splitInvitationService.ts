@@ -1,9 +1,21 @@
 /**
  * Split Invitation Service
  * Handles split invitations, QR codes, NFC sharing, and link generation
+ * 
+ * IMPORTANT: Link formats
+ * - Universal links (HTTPS): https://wesplit.io/join-split?data=... (works for all users)
+ * - App-scheme links: wesplit://join-split?data=... (only works if app is installed)
+ * 
+ * For sharing, we use universal links so users without the app can:
+ * 1. Be redirected to app store to download
+ * 2. Open the app directly if installed (via universal links / app links)
  */
 
 import { logger } from '../analytics/loggingService';
+
+// Base URL for universal links - this should be your web domain
+// The web page at this URL should handle redirects to app stores or deep links
+const UNIVERSAL_LINK_BASE_URL = 'https://wesplit.io';
 
 export interface SplitInvitationData {
   type: 'split_invitation';
@@ -15,6 +27,7 @@ export interface SplitInvitationData {
   creatorName?: string;
   timestamp: string;
   expiresAt?: string;
+  splitType?: 'fair' | 'degen' | 'spend'; // Add split type for proper routing
 }
 
 export interface SplitJoinResult {
@@ -60,10 +73,47 @@ export class SplitInvitationService {
 
   /**
    * Generate shareable link for split invitation
+   * 
+   * Uses universal links (HTTPS) by default so the link works for:
+   * - Users WITH the app: Opens directly in app via universal links
+   * - Users WITHOUT the app: Opens web page which redirects to app store
+   * 
+   * @param invitationData - The invitation data to encode
+   * @param useAppScheme - If true, uses wesplit:// (only works if app installed)
+   * @returns The shareable link
    */
-  static generateShareableLink(invitationData: SplitInvitationData): string {
+  static generateShareableLink(invitationData: SplitInvitationData, useAppScheme: boolean = false): string {
+    const encodedData = encodeURIComponent(JSON.stringify(invitationData));
+    
+    if (useAppScheme) {
+      // App-scheme link (only works if app is installed)
+      return `wesplit://join-split?data=${encodedData}`;
+    }
+    
+    // Universal link (works for everyone)
+    // The web page at this URL handles:
+    // 1. Redirecting to app if installed (via universal links / intent filters)
+    // 2. Redirecting to app store if not installed
+    // 3. Providing a web fallback experience
+    return `${UNIVERSAL_LINK_BASE_URL}/join-split?data=${encodedData}`;
+  }
+
+  /**
+   * Generate app-scheme link (for QR codes scanned within the app)
+   * Use this when you know the scanner has the app installed
+   */
+  static generateAppSchemeLink(invitationData: SplitInvitationData): string {
     const encodedData = encodeURIComponent(JSON.stringify(invitationData));
     return `wesplit://join-split?data=${encodedData}`;
+  }
+
+  /**
+   * Generate universal link (for external sharing)
+   * Use this for sharing via SMS, WhatsApp, email, etc.
+   */
+  static generateUniversalLink(invitationData: SplitInvitationData): string {
+    const encodedData = encodeURIComponent(JSON.stringify(invitationData));
+    return `${UNIVERSAL_LINK_BASE_URL}/join-split?data=${encodedData}`;
   }
 
   /**
@@ -491,21 +541,32 @@ export class SplitInvitationService {
 
   /**
    * Validate invitation URL
+   * Supports both app-scheme (wesplit://) and universal links (https://wesplit.io)
    */
   static validateInvitationURL(url: string): SplitInvitationData | null {
     try {
       const urlObj = new URL(url);
       
-      if (urlObj.protocol !== 'wesplit:') {
+      // Support both app-scheme and universal links
+      const isAppScheme = urlObj.protocol === 'wesplit:';
+      const isUniversalLink = urlObj.protocol === 'https:' && 
+                              (urlObj.hostname === 'wesplit.io' || urlObj.hostname === 'www.wesplit.io');
+      
+      if (!isAppScheme && !isUniversalLink) {
+        logger.debug('URL is not a valid WeSplit invitation URL', { url, protocol: urlObj.protocol, hostname: urlObj.hostname }, 'SplitInvitationService');
         return null;
       }
 
-      if (urlObj.hostname !== 'join-split') {
+      // Check for join-split path
+      const path = isAppScheme ? urlObj.hostname : urlObj.pathname.replace(/^\//, '');
+      if (path !== 'join-split') {
+        logger.debug('URL path is not join-split', { path }, 'SplitInvitationService');
         return null;
       }
 
       const dataParam = urlObj.searchParams.get('data');
       if (!dataParam) {
+        logger.debug('URL missing data parameter', { url }, 'SplitInvitationService');
         return null;
       }
 
@@ -513,6 +574,31 @@ export class SplitInvitationService {
     } catch (error) {
       logger.error('Failed to validate invitation URL', error, 'SplitInvitationService');
       return null;
+    }
+  }
+
+  /**
+   * Check if a URL is a WeSplit invitation link
+   */
+  static isInvitationURL(url: string): boolean {
+    try {
+      const urlObj = new URL(url);
+      
+      // Check app-scheme
+      if (urlObj.protocol === 'wesplit:' && urlObj.hostname === 'join-split') {
+        return true;
+      }
+      
+      // Check universal link
+      if (urlObj.protocol === 'https:' && 
+          (urlObj.hostname === 'wesplit.io' || urlObj.hostname === 'www.wesplit.io') &&
+          urlObj.pathname.replace(/^\//, '') === 'join-split') {
+        return true;
+      }
+      
+      return false;
+    } catch {
+      return false;
     }
   }
 

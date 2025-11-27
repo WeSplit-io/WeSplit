@@ -792,7 +792,9 @@ export const styles = StyleSheet.create({
   },
 
   loaderContainer: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xl,
   },
   loaderSeedPhraseContainer: {

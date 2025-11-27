@@ -799,6 +799,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           />
         </View>
       </Modal>
+
     </Container>
   );
 };

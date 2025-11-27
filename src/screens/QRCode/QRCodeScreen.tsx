@@ -97,14 +97,30 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
     logger.info('QR Code scanned', { data }, 'QRCodeScreen');
     
     try {
-      // Check if it's a WeSplit deep link
-      if (data.startsWith('wesplit://')) {
+      // Check if it's a WeSplit deep link (app-scheme or universal link)
+      // Supports both:
+      // - wesplit://join-split?data=...
+      // - https://wesplit.io/join-split?data=...
+      const isWeSplitLink = data.startsWith('wesplit://') || 
+                           data.startsWith('https://wesplit.io/') || 
+                           data.startsWith('https://www.wesplit.io/');
+      
+      if (isWeSplitLink) {
         const linkData = parseWeSplitDeepLink(data);
         if (linkData) {
+          logger.debug('Parsed QR code deep link', { 
+            action: linkData.action, 
+            hasData: !!linkData.splitInvitationData 
+          }, 'QRCodeScreen');
+          
           switch (linkData.action) {
             case 'join-split':
               // Navigate to SplitDetails screen with the invitation data
               if (navigation) {
+                logger.info('Navigating to SplitDetails from QR code', { 
+                  hasInvitationData: !!linkData.splitInvitationData 
+                }, 'QRCodeScreen');
+                
                 navigation.navigate('SplitDetails', {
                   shareableLink: data,
                   splitInvitationData: linkData.splitInvitationData

@@ -343,7 +343,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   loadingContainer: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xl,
   },
   loadingText: {
@@ -353,6 +355,7 @@ const styles = StyleSheet.create({
   },
   recoveryContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xl,
     backgroundColor: colors.green + '20',
     borderRadius: spacing.radiusMd,

@@ -30,6 +30,15 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
     onCreateSplit();
   };
 
+  const handleCreateSharedWallet = () => {
+    onClose();
+    onCreateSharedWallet();
+  };
+
+  // Enable shared wallet in dev mode, disable in production builds
+  // __DEV__ is false in production builds, true in development
+  const isSharedWalletEnabled = __DEV__;
+
   return (
     <Modal
       visible={visible}
@@ -59,7 +68,27 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
           </Text>
         </TouchableOpacity>
 
-        {/* Create Shared Wallet Option - DISABLED FOR DEPLOYMENT */}
+        {/* Create Shared Wallet Option - Enabled in dev, disabled in production */}
+        {isSharedWalletEnabled ? (
+          <TouchableOpacity
+            style={styles.option}
+            onPress={handleCreateSharedWallet}
+            activeOpacity={0.7}
+          >
+            <View style={styles.optionIconContainer}>
+              <PhosphorIcon
+                name="Wallet"
+                size={50}
+                color={colors.white70}
+                weight="fill"
+              />
+            </View>
+            <Text style={styles.optionTitle}>Shared Wallet</Text>
+            <Text style={styles.optionDescription}>
+              Shared wallet for group expenses
+            </Text>
+          </TouchableOpacity>
+        ) : (
         <TouchableOpacity
           style={[styles.option, styles.optionDisabled]}
           onPress={() => Alert.alert('Coming Soon', 'Shared wallet creation is currently unavailable. This feature will be available in a future update.')}
@@ -82,6 +111,7 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
             Shared wallet for group expenses
           </Text>
         </TouchableOpacity>
+        )}
       </View>
     </Modal>
   );

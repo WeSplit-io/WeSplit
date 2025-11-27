@@ -693,7 +693,9 @@ export const styles = StyleSheet.create({
   },
   // Wallet selection styles
   loadingContainer: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xl,
   },
   loadingText: {

@@ -55,7 +55,13 @@ module.exports = {
       },
       entitlements: {
         'com.apple.developer.devicecheck': true
-      }
+      },
+      // Associated domains for iOS Universal Links
+      // This allows https://wesplit.io links to open directly in the app
+      associatedDomains: [
+        "applinks:wesplit.io",
+        "applinks:www.wesplit.io"
+      ]
     },
     scheme: "wesplit",
     android: {
@@ -87,12 +93,42 @@ module.exports = {
         "android.permission.WAKE_LOCK"
       ],
       intentFilters: [
+        // App-scheme deep links (wesplit://)
         {
           action: "VIEW",
           autoVerify: true,
           data: [
             {
               scheme: "wesplit"
+            }
+          ],
+          category: ["BROWSABLE", "DEFAULT"]
+        },
+        // Android App Links for universal links (https://wesplit.io)
+        // This allows https://wesplit.io links to open directly in the app
+        {
+          action: "VIEW",
+          autoVerify: true,
+          data: [
+            {
+              scheme: "https",
+              host: "wesplit.io",
+              pathPrefix: "/join-split"
+            },
+            {
+              scheme: "https",
+              host: "wesplit.io",
+              pathPrefix: "/view-split"
+            },
+            {
+              scheme: "https",
+              host: "www.wesplit.io",
+              pathPrefix: "/join-split"
+            },
+            {
+              scheme: "https",
+              host: "www.wesplit.io",
+              pathPrefix: "/view-split"
             }
           ],
           category: ["BROWSABLE", "DEFAULT"]

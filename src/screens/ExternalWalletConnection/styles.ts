@@ -33,7 +33,9 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   loadingContainer: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xl,
   },
   loadingText: {

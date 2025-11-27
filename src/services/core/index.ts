@@ -45,6 +45,15 @@ export {
   parseWeSplitDeepLink
 } from './deepLinkHandler';
 
+// Re-export pending invitation service (for deferred deep linking)
+export { 
+  pendingInvitationService 
+} from './pendingInvitationService';
+export type { 
+  PendingInvitation,
+  PendingInvitationResult 
+} from './pendingInvitationService';
+
 // Re-export Solana Pay utilities
 export { 
   isSolanaPayUri,

@@ -3,7 +3,7 @@
   "version": "1.1.2",
   "main": "index.ts",
   "scripts": {
-    "start": "expo start --host lan",
+    "start": "expo start --host lan --clear",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -28,6 +28,12 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "test:links": "npx ts-node scripts/test-invitation-links.ts",
+    "test:links:verbose": "VERBOSE=true npx ts-node scripts/test-invitation-links.ts",
+    "test:deeplinks": "npx ts-node scripts/test-deeplink-config.ts",
+    "test:flow": "npx ts-node scripts/test-invitation-flow.ts",
+    "test:formats": "npx ts-node scripts/test-link-formats.ts",
+    "test:invitation": "npm run test:links && npm run test:deeplinks && npm run test:flow && npm run test:formats",
     "validate:rewards": "npx ts-node tools/scripts/validate-reward-configs.ts"
   },
   "dependencies": {

@@ -4,17 +4,18 @@
  */
 
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
-import { Header } from '../../../components/shared';
+import { Header, PhosphorIcon } from '../../../components/shared';
 
 interface DegenSplitHeaderProps {
   title?: string;
   onBackPress: () => void;
   showBackButton?: boolean;
   isRealtimeActive?: boolean;
+  onSharePress?: () => void; // Optional share button callback
 }
 
 const DegenSplitHeader: React.FC<DegenSplitHeaderProps> = ({
@@ -22,14 +23,26 @@ const DegenSplitHeader: React.FC<DegenSplitHeaderProps> = ({
   onBackPress,
   showBackButton = true,
   isRealtimeActive = false,
+  onSharePress,
 }) => {
-  const renderRealtimeIndicator = () => {
-    if (!isRealtimeActive) {return null;}
-    
+  const renderRightElement = () => {
     return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        {onSharePress && (
+          <TouchableOpacity 
+            onPress={onSharePress}
+            style={styles.shareButton}
+            activeOpacity={0.7}
+          >
+            <PhosphorIcon name="ShareNetwork" size={20} color={colors.green} />
+          </TouchableOpacity>
+        )}
+        {isRealtimeActive && (
       <View style={styles.realtimeIndicator}>
         <View style={styles.realtimeDot} />
         <Text style={styles.realtimeText}>Live</Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -39,7 +52,7 @@ const DegenSplitHeader: React.FC<DegenSplitHeaderProps> = ({
       title={title}
       onBackPress={onBackPress}
       showBackButton={showBackButton}
-      rightElement={renderRealtimeIndicator()}
+      rightElement={renderRightElement()}
     />
   );
 };
@@ -47,6 +60,13 @@ const DegenSplitHeader: React.FC<DegenSplitHeaderProps> = ({
 export default DegenSplitHeader;
 
 const styles = {
+  shareButton: {
+    backgroundColor: colors.white10,
+    borderRadius: 8,
+    padding: spacing.xs + 2,
+    borderWidth: 1,
+    borderColor: colors.green + '40',
+  } as const,
   realtimeIndicator: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,

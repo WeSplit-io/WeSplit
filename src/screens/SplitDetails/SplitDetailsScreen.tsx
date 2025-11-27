@@ -848,7 +848,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
       if (shouldRedirectFair || shouldRedirectDegen || shouldRedirectSpend) {
         // Split is already active in a downstream flow, redirect accordingly
-        setTimeout(() => {
+        // Use immediate redirect (no setTimeout) to prevent content flash
+        // The early return check above already shows loader, so we can redirect immediately
           if (shouldRedirectFair) {
             navigation.navigate('FairSplit', {
               splitData: currentSplitData,
@@ -879,7 +880,6 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               notificationId
             });
           }
-        }, 100);
       }
     };
 
@@ -1242,7 +1242,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
     if (splitIdToUse) {
       // Create split invitation data
-      const invitationData = {
+      const invitationData: import('../../services/splits/splitInvitationService').SplitInvitationData = {
         type: 'split_invitation' as const,
         splitId: splitIdToUse,
         billName: titleToUse,
@@ -1250,19 +1250,24 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         currency: 'USDC',
         creatorId: creatorId,
         creatorName: creatorName,
-        participantCount: currentSplitData?.participants?.length || 1,
+        timestamp: new Date().toISOString(),
         splitType: currentSplitData?.splitType || 'fair',
-        walletAddress: currentUser?.wallet_address || '',
-        invitationCode: `ws_inv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-        timestamp: new Date().toISOString()
       };
 
-      // Generate shareable link
-      const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
+      // Generate universal shareable link (works for users with AND without the app)
+      // For QR codes scanned within the app, we use the universal link
+      // which will either open in the app directly or redirect to the app store
+      const shareableLink = SplitInvitationService.generateUniversalLink(invitationData);
       setQrCodeData(shareableLink);
+      
+      logger.debug('Generated QR code with universal link', {
+        splitId: splitIdToUse,
+        link: shareableLink.substring(0, 50) + '...'
+      }, 'SplitDetailsScreen');
     } else {
       // Set a fallback QR code data if no split ID is available
-      setQrCodeData('wesplit://join-split?data=' + encodeURIComponent(JSON.stringify({
+      // Use universal link format for fallback too
+      setQrCodeData('https://wesplit.io/join-split?data=' + encodeURIComponent(JSON.stringify({
         type: 'split_invitation',
         message: 'Join this split'
       })));
@@ -1807,35 +1812,43 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const handleLinkShare = async () => {
     try {
-      if (!splitId || !currentUser) {
+      const splitIdToUse = createdSplitId || currentSplitData?.id || splitId;
+      
+      if (!splitIdToUse || !currentUser) {
         Alert.alert('Error', 'Split information is missing');
         return;
       }
 
-      // Generate invitation data
-      const invitationData = SplitInvitationService.generateInvitationData(
-        splitId,
-        billName,
-        parseFloat(totalAmount),
-        'USDC',
-        currentUser.id.toString(),
-        24 // 24 hours expiry
-      );
+      // Generate invitation data with split type for proper routing
+      const invitationData: import('../../services/splits/splitInvitationService').SplitInvitationData = {
+        type: 'split_invitation',
+        splitId: splitIdToUse,
+        billName: billName || currentSplitData?.title || 'Split',
+        totalAmount: parseFloat(totalAmount) || currentSplitData?.totalAmount || 0,
+        currency: 'USDC',
+        creatorId: currentUser.id.toString(),
+        creatorName: currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+        timestamp: new Date().toISOString(),
+        splitType: currentSplitData?.splitType || 'fair',
+      };
 
-      // Generate shareable link
-      const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
+      // Generate universal shareable link (works for everyone)
+      // Universal links work for:
+      // - Users WITH the app: Opens directly in app via universal links
+      // - Users WITHOUT the app: Opens web page which redirects to app store
+      const shareableLink = SplitInvitationService.generateUniversalLink(invitationData);
 
       // Copy to clipboard and show success message
       await Clipboard.setStringAsync(shareableLink);
       Alert.alert(
         'Link Copied!',
-        'The split invitation link has been copied to your clipboard. Share it with friends to invite them to join the split.',
+        'The split invitation link has been copied to your clipboard. Share it with friends to invite them to join the split.\n\nThis link works even if they don\'t have the app yet!',
         [{ text: 'OK' }]
       );
 
-      logger.info('Shareable link generated and copied', {
-        splitId,
-        link: shareableLink
+      logger.info('Universal shareable link generated and copied', {
+        splitId: splitIdToUse,
+        link: shareableLink.substring(0, 50) + '...'
       }, 'SplitDetailsScreen');
 
     } catch (error) {
@@ -1958,6 +1971,24 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       return (
       <LoadingScreen
         message="Processing your bill..."
+        showSpinner={true}
+      />
+    );
+  }
+
+  // Early check: If this is a SPEND split that should redirect, show loader immediately
+  // This prevents content flash before redirect happens
+  // Check both currentSplitData (from state) and splitData (from route params) for early detection
+  const splitDataToCheck = currentSplitData || splitData;
+  const shouldRedirectToSpend = !isActuallyNewBill && 
+                                 !isActuallyManualCreation && 
+                                 splitDataToCheck?.splitType === 'spend' && 
+                                 (splitDataToCheck.status === 'active' || splitDataToCheck.status === 'locked' || splitDataToCheck.status === 'pending');
+  
+  if (shouldRedirectToSpend) {
+    return (
+      <LoadingScreen
+        message="Loading SPEND split..."
         showSpinner={true}
       />
     );

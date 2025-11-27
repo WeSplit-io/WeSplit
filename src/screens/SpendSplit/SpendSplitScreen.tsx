@@ -35,6 +35,7 @@ import { extractOrderData, findUserParticipant, calculatePaymentTotals } from '.
 import { createSpendSplitWallet } from '../../utils/spend/spendWalletUtils';
 import { createMockSpendOrderData } from '../../services/integrations/spend/SpendMockData';
 import { formatAmountWithComma } from '../../utils/spend/formatUtils';
+import { SplitInvitationShare } from '../../components/split';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -90,9 +91,13 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   const [splitWallet, setSplitWallet] = useState<SplitWallet | null>((existingSplitWallet as SplitWallet) || null);
   const [isSplitConfirmed, setIsSplitConfirmed] = useState(false);
   const [isSendingPayment, setIsSendingPayment] = useState(false);
+  // Start with true to show loader immediately, prevent content flash
+  // Keep true until we're absolutely ready to render content
   const [isInitializing, setIsInitializing] = useState(true);
   const [isCheckingCompletion, setIsCheckingCompletion] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Track if component is ready to render (prevents flash)
+  const [isReady, setIsReady] = useState(false);
   
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -106,7 +111,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [showWalletSelector, setShowWalletSelector] = useState(false);
   
-  // Participant invitation state (removed unused variable)
+  // Participant invitation state
+  const [showShareModal, setShowShareModal] = useState(false);
   
   // Subscribe to live balance updates
   const { balance: liveBalance } = useLiveBalance(
@@ -140,6 +146,27 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         setError('Split data not found');
         }
         setIsInitializing(false);
+        setIsReady(true); // Allow error screen to show
+        return;
+      }
+
+      // If we already have the wallet from route params, use it immediately
+      // Add a delay to ensure loader shows first and prevent content flash
+      if (existingSplitWallet) {
+        // Use requestAnimationFrame to ensure loader renders first
+        requestAnimationFrame(() => {
+          setSplitWallet(existingSplitWallet as SplitWallet);
+          setIsSplitConfirmed(existingSplitWallet.status === 'active' || existingSplitWallet.status === 'locked');
+          // Delay to ensure smooth transition from loader to content
+          // Set both flags to ensure component is ready
+          setTimeout(() => {
+            setIsInitializing(false);
+            // Additional delay to ensure loader has rendered
+            setTimeout(() => {
+              setIsReady(true);
+            }, 50);
+          }, 150);
+        });
         return;
       }
 
@@ -151,6 +178,10 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             setSplitWallet(walletResult.wallet);
             setIsSplitConfirmed(walletResult.wallet.status === 'active' || walletResult.wallet.status === 'locked');
             setIsInitializing(false);
+            // Small delay to ensure loader has rendered before showing content
+            setTimeout(() => {
+              setIsReady(true);
+            }, 100);
             return;
           }
         }
@@ -189,11 +220,15 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         setError('Failed to load split data');
       } finally {
         setIsInitializing(false);
+        // Small delay to ensure loader has rendered before showing content
+        setTimeout(() => {
+          setIsReady(true);
+        }, 100);
       }
     };
 
     initializeSplit();
-  }, [splitData, currentUser]);
+  }, [splitData, currentUser, existingSplitWallet]);
 
   // Handle selected contacts from Contacts screen
   useEffect(() => {
@@ -711,7 +746,10 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     }
   };
 
-  if (isInitializing) {
+  // Show loader if initializing OR if splitData is not available yet OR if not ready
+  // This prevents flashing content before loader appears
+  // isReady ensures we don't show content until initialization is fully complete
+  if (isInitializing || !splitData || !isReady) {
     return (
       <Container>
         <ModernLoader text="Loading SPEND split..." />
@@ -737,14 +775,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             style={{ marginTop: spacing.md }}
           />
         </View>
-      </Container>
-    );
-  }
-
-  if (!splitData) {
-    return (
-      <Container>
-        <ModernLoader text="Loading split data..." />
       </Container>
     );
   }
@@ -869,7 +899,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
           <SpendSplitParticipants
             participants={participants}
             currentUserId={currentUser?.id?.toString()}
-            onAddPress={splitData.creatorId === currentUser?.id ? handleAddParticipants : undefined}
+            onAddPress={splitData.creatorId === currentUser?.id?.toString() ? handleAddParticipants : undefined}
+            onSharePress={splitData.creatorId === currentUser?.id?.toString() ? () => setShowShareModal(true) : undefined}
               />
         </View>
       </ScrollView>
@@ -1041,6 +1072,17 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       <WalletSelectorModal
         visible={showWalletSelector}
         onClose={() => setShowWalletSelector(false)}
+      />
+
+      {/* Share Invitation Modal */}
+      <SplitInvitationShare
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        split={splitData}
+        currentUserId={currentUser?.id?.toString() || ''}
+        currentUserName={currentUser?.name || currentUser?.email?.split('@')[0]}
+        onAddFromContacts={handleAddParticipants}
+        title="Invite Friends to Split"
       />
     </Container>
   );
