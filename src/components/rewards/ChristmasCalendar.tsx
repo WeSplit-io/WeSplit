@@ -526,6 +526,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
           transparent={true}
           closeOnBackdrop={true}
           showHandle={true}
+          maxHeight={400}
         >
           <TouchableOpacity
             style={styles.modalPreviewContent}
@@ -533,8 +534,11 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
             onPress={handleUnwrapGift}
           >
             <View style={styles.giftIllustrationWrapper}>
-              <View style={styles.giftIllustrationHalo} />
-              <Text style={styles.giftBoxEmoji}>🎁</Text>
+              <Image
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchristmas%2FChristmas%20icons.png?alt=media&token=28f22ccf-b366-4869-935b-f1c341b006b2' }}
+                style={styles.giftBoxImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.unwrapTitle}>Tap to unwrap your daily gift!</Text>
             <Text style={styles.unwrapSubtitle}>Something special is hiding inside...</Text>
@@ -592,25 +596,39 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
           transparent={true}
           closeOnBackdrop={true}
           showHandle={true}
+          maxHeight={450}
         >
           <View style={styles.modalClaimingContent}>
             <View style={styles.rewardFrame}>
               <View style={styles.rewardBoxContainer}>
-                {gift.type === 'badge' && (() => {
-                  const badgeGift = gift as BadgeGift;
-                  const resolvedUrl = resolvedBadgeUrls[badgeGift.badgeId];
-                  const fallbackUrl = (reward as any).iconUrl;
-                  // Only use URL if it's resolved or if it's already an HTTPS URL (not gs://)
-                  const imageUrl = resolvedUrl || (fallbackUrl && !fallbackUrl.startsWith('gs://') ? fallbackUrl : null);
-                  return imageUrl ? (
-                    <Image
-                      source={{ uri: imageUrl }}
-                      style={styles.rewardBoxImage}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <Text style={styles.rewardBoxEmoji}>{reward.icon}</Text>
-                  );
+                {(() => {
+                  if (gift.type === 'badge') {
+                    const badgeGift = gift as BadgeGift;
+                    const resolvedUrl = resolvedBadgeUrls[badgeGift.badgeId];
+                    const fallbackUrl = (reward as any).iconUrl;
+                    // Only use URL if it's resolved or if it's already an HTTPS URL (not gs://)
+                    const imageUrl = resolvedUrl || (fallbackUrl && !fallbackUrl.startsWith('gs://') ? fallbackUrl : null);
+                    return imageUrl ? (
+                      <Image
+                        source={{ uri: imageUrl }}
+                        style={styles.rewardBoxImage}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={styles.rewardBoxEmoji}>{reward.icon}</Text>
+                    );
+                  } else if (gift.type === 'points') {
+                    // Use Christmas icons image for points
+                    return (
+                      <Image
+                        source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchristmas%2FChristmas%20icons.png?alt=media&token=28f22ccf-b366-4869-935b-f1c341b006b2' }}
+                        style={styles.rewardBoxImage}
+                        resizeMode="contain"
+                      />
+                    );
+                  } else {
+                    return <Text style={styles.rewardBoxEmoji}>{reward.icon}</Text>;
+                  }
                 })()}
               </View>
               <View style={styles.rewardAmountContainer}>
@@ -664,12 +682,15 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
           transparent={true}
           closeOnBackdrop={true}
           showHandle={true}
+          maxHeight={350}
         >
           <View style={styles.modalSuccessContent}>
             <View style={styles.successIconContainer}>
-              <View style={styles.successIcon}>
-                <PhosphorIcon name="Check" size={48} color={colors.black} weight="bold" />
-              </View>
+              <Image
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsuccess-icon.png?alt=media&token=dea777a6-b0f3-4e9a-804b-c8b4c036244b' }}
+                style={styles.successIconImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.successTitle}>Claim Successful!</Text>
             <Text style={styles.successMessage}>{getSuccessMessage()}</Text>
@@ -1270,41 +1291,24 @@ const styles = StyleSheet.create({
   },
   // Preview modal styles
   modalPreviewContent: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xxxl,
+    paddingVertical: spacing.xl,
     paddingHorizontal: spacing.lg,
   },
   giftIllustrationWrapper: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: '#08140F',
+    width: 200,
+    height: 200,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 10,
-    overflow: 'hidden',
+    marginBottom: spacing.lg,
   },
-  giftIllustrationHalo: {
-    position: 'absolute',
-    width: '140%',
-    height: '140%',
-    borderRadius: 200,
-    backgroundColor: colors.green,
-    opacity: 0.15,
-    transform: [{ scale: 1.1 }],
-  },
-  giftBoxEmoji: {
-    fontSize: 120,
+  giftBoxImage: {
+    width: '100%',
+    height: '100%',
   },
   unwrapTitle: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textAlign: 'center',
@@ -1317,12 +1321,13 @@ const styles = StyleSheet.create({
   },
   // Claiming modal styles
   modalClaimingContent: {
-    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   rewardFrame: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: colors.white50,
     borderRadius: 20,
@@ -1331,27 +1336,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
-    backgroundColor: '#0F1B16',
+    backgroundColor: colors.white5,
   },
   rewardBoxContainer: {
     width: 96,
     height: 96,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#122018',
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 8,
   },
   rewardBoxEmoji: {
     fontSize: 60,
   },
   rewardBoxImage: {
-    width: 60,
-    height: 60,
+    width: 96,
+    height: 96,
   },
   rewardAmountContainer: {
     flex: 1,
@@ -1388,35 +1387,26 @@ const styles = StyleSheet.create({
   },
   claimRewardButton: {
     marginTop: spacing.md,
+    width: '100%',
   },
   // Success modal styles
   modalSuccessContent: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xxxl,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.md,
   },
   successIconContainer: {
     marginBottom: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  successIcon: {
+  successIconImage: {
     width: 120,
     height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.green,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
   },
   successTitle: {
-    fontSize: typography.fontSize.xxl,
+    fontSize: typography.fontSize.xxxl,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textAlign: 'center',
@@ -1426,7 +1416,7 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: colors.white70,
     textAlign: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.sm,
   },
   cannotClaimContainer: {
     flexDirection: 'row',
