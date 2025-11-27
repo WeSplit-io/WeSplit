@@ -42,6 +42,13 @@ export const colors = {
     spendGradientStart: '#2EC4B6',
     spendGradientEnd: '#20A4F3',
 
+    // ===== CHRISTMAS CALENDAR COLORS =====
+    christmasGreenDark: '#2C352B',
+    christmasGreenLight: '#9DCE99',
+    christmasRed: '#CB343D',
+    christmasYellow: '#FFFFD9',
+ 
+
 
 
   

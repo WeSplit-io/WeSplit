@@ -4,9 +4,10 @@
  */
 
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { Container, Header } from '../../components/shared';
+import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import ChristmasCalendar from '../../components/rewards/ChristmasCalendar';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing } from '../../theme';
@@ -14,7 +15,7 @@ import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 import { useMemo } from 'react';
 
 const ChristmasCalendarScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<any>>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
   const { state } = useApp();
   const { currentUser } = state;
@@ -26,10 +27,19 @@ const ChristmasCalendarScreen: React.FC = () => {
   return (
     <Container style={{ backgroundColor: colors.black }} paddingHorizontal={0}>
       <Header
-        title="Christmas Calendar"
+        title="Advent Calendar"
         showBackButton={true}
         onBackPress={() => rewardNav.goBack()}
         backgroundColor={colors.black}
+        customStyle={{ paddingHorizontal: spacing.md }}
+        rightElement={
+          <TouchableOpacity
+            onPress={() => rewardNav.goToChristmasCalendarHistory()}
+            activeOpacity={0.7}
+          >
+            <PhosphorIcon name="ListBullets" size={24} color={colors.white} weight="regular" />
+          </TouchableOpacity>
+        }
       />
       
       <View style={styles.content}>
@@ -48,7 +58,6 @@ const ChristmasCalendarScreen: React.FC = () => {
 const styles = StyleSheet.create({
   content: {
     flex: 1,
-    paddingTop: spacing.md,
     paddingHorizontal: 0,
   },
 });

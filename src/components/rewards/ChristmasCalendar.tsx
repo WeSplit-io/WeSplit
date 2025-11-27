@@ -24,6 +24,12 @@ import { christmasCalendarService } from '../../services/rewards/christmasCalend
 import { getGiftForDay } from '../../services/rewards/christmasCalendarConfig';
 import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 import {
+  getTileBackgroundStyle,
+  getDefaultTileBackgroundStyle,
+  type ImageResizeMode,
+  type ImagePosition,
+} from '../../services/rewards/christmasCalendarTileStyles';
+import {
   ChristmasCalendarStatus,
   Gift,
   PointsGift,
@@ -31,22 +37,8 @@ import {
   AssetGift
 } from '../../types/rewards';
 
-interface DayTilePattern {
-  background: string;
-  accent: string;
-  secondary?: string;
-}
-
-const DEFAULT_PATTERN: DayTilePattern = { background: '#1C2B23', accent: '#F5F0DC' };
-
-const DAY_TILE_PATTERNS: DayTilePattern[] = [
-  { background: '#18221A', accent: '#F5F0DC' },
-  { background: '#D04848', accent: '#FFF4E5' },
-  { background: '#0F1C16', accent: '#F5F0DC' },
-  { background: '#FFF1CD', accent: '#162118' },
-  { background: '#163024', accent: '#F5F0DC' },
-  { background: '#B83232', accent: '#FFF4E5' },
-];
+// Note: DayTilePattern and related constants removed as all days now use centered style
+const DEFAULT_PATTERN = { background: '#1C2B23', accent: '#F5F0DC' };
 
 const COLUMN_COUNT = 4;
 const COLUMN_GAP = spacing.sm;
@@ -129,12 +121,85 @@ const buildCalendarLayout = (grid: number[][]): LayoutTile[] => {
 const CALENDAR_LAYOUT = buildCalendarLayout(CALENDAR_GRID);
 const TOTAL_GRID_ROWS = CALENDAR_GRID.length;
 
-const getPattern = (seed: number): DayTilePattern => {
-  if (DAY_TILE_PATTERNS.length === 0) {
-    return DEFAULT_PATTERN;
+// Note: getPattern and getTextColorForBackground removed as all days now use centered style
+
+/**
+ * Days that should have centered number with white text
+ */
+const CENTERED_NUMBER_DAYS = [1, 2, 5, 7, 9, 10, 12, 15, 18, 19, 20, 21, 25];
+
+/**
+ * Days that should have number at the top with padding
+ */
+const TOP_NUMBER_DAYS = [4, 9, 12, 18, 24];
+
+/**
+ * Day 2 - specific top position
+ */
+const DAY_2_TOP = 2;
+
+/**
+ * Day 16 - specific top position
+ */
+const DAY_16_TOP = 16;
+
+/**
+ * Day 21 - specific top position
+ */
+const DAY_21_TOP = 21;
+
+/**
+ * Check if a day should have centered number style with white text
+ */
+const shouldUseCenteredNumberStyle = (day: number): boolean => {
+  return CENTERED_NUMBER_DAYS.includes(day);
+};
+
+/**
+ * Check if a day should have number at the top
+ */
+const shouldUseTopNumberStyle = (day: number): boolean => {
+  return TOP_NUMBER_DAYS.includes(day);
+};
+
+/**
+ * Get the specific top number style for a day
+ * Returns the day number if it needs a specific top style, null otherwise
+ */
+const getTopNumberDayStyle = (day: number): number | null => {
+  if (day === DAY_2_TOP) return DAY_2_TOP;
+  if (day === DAY_16_TOP) return DAY_16_TOP;
+  if (day === DAY_21_TOP) return DAY_21_TOP;
+  return null;
+};
+
+/**
+ * Convert position string to React Native Image style properties
+ * For background images, we use alignment and positioning
+ */
+const getImagePositionStyle = (position?: ImagePosition, resizeMode?: ImageResizeMode) => {
+  if (!position || position === 'center') {
+    return { alignSelf: 'center' };
   }
-  const pattern = DAY_TILE_PATTERNS[seed % DAY_TILE_PATTERNS.length];
-  return pattern ?? DEFAULT_PATTERN;
+  
+  // For cover/stretch, position doesn't matter much, but we can still align
+  if (resizeMode === 'cover' || resizeMode === 'stretch') {
+    return {};
+  }
+  
+  // For contain/center/repeat, we can position the image
+  const positionMap: Record<string, any> = {
+    'top': { alignSelf: 'flex-start', top: 0 },
+    'bottom': { alignSelf: 'flex-end', bottom: 0 },
+    'left': { alignSelf: 'flex-start', left: 0 },
+    'right': { alignSelf: 'flex-end', right: 0 },
+    'top-left': { alignSelf: 'flex-start', top: 0, left: 0 },
+    'top-right': { alignSelf: 'flex-end', top: 0, right: 0 },
+    'bottom-left': { alignSelf: 'flex-start', bottom: 0, left: 0 },
+    'bottom-right': { alignSelf: 'flex-end', bottom: 0, right: 0 },
+  };
+  
+  return positionMap[position] || { alignSelf: 'center' };
 };
 
 interface ChristmasCalendarProps {
@@ -157,6 +222,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   const [countdown, setCountdown] = useState<string>('00 : 00 : 00');
   const [gridWidth, setGridWidth] = useState(0);
   const [resolvedBadgeUrls, setResolvedBadgeUrls] = useState<Record<string, string>>({});
+  const [resolvedTileImageUrls, setResolvedTileImageUrls] = useState<Record<number, string>>({});
 
   const updateCountdown = useCallback(() => {
     const now = new Date();
@@ -235,6 +301,119 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
     setBypassMode(isBypassEnabled);
     loadCalendarStatus();
   }, [loadCalendarStatus]);
+
+  // Resolve Firebase Storage URLs for tile background images
+  useEffect(() => {
+    const resolveTileImageUrls = async () => {
+      const urlsToResolve: Array<{ day: number; url: string }> = [];
+      
+      // Collect all tile background images that need resolution
+      for (let day = 1; day <= 25; day++) {
+        const tileStyle = getTileBackgroundStyle(day);
+        if (tileStyle?.backgroundImage?.url && typeof tileStyle.backgroundImage.url === 'string') {
+          const url = tileStyle.backgroundImage.url;
+          // Check if it's a Firebase Storage URL (gs://)
+          if (url.startsWith('gs://')) {
+            urlsToResolve.push({ day, url });
+          }
+        }
+      }
+
+      // Resolve all URLs in parallel
+      if (urlsToResolve.length > 0) {
+        const resolutionPromises = urlsToResolve.map(async ({ day, url }) => {
+          try {
+            const resolved = await resolveStorageUrl(url, { day, source: 'tileBackground' });
+            if (resolved) {
+              return { day, resolvedUrl: resolved };
+            }
+          } catch (error) {
+            console.error(`Failed to resolve tile image URL for day ${day}:`, error);
+          }
+          return null;
+        });
+
+        const results = await Promise.all(resolutionPromises);
+        const newResolvedUrls: Record<number, string> = {};
+        results.forEach(result => {
+          if (result) {
+            newResolvedUrls[result.day] = result.resolvedUrl;
+          }
+        });
+
+        if (Object.keys(newResolvedUrls).length > 0) {
+          setResolvedTileImageUrls(prev => ({ ...prev, ...newResolvedUrls }));
+        }
+      }
+    };
+
+    resolveTileImageUrls();
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Resolve all badge icon URLs when status is loaded
+  useEffect(() => {
+    if (!status) return;
+
+    const resolveBadgeUrls = async () => {
+      const urlsToResolve: Array<{ badgeId: string; url: string }> = [];
+      
+      // Collect all badge icon URLs that need resolution
+      for (let day = 1; day <= 24; day++) {
+        const giftConfig = getGiftForDay(day);
+        if (giftConfig?.gift.type === 'badge') {
+          const badgeGift = giftConfig.gift as BadgeGift;
+          if (badgeGift.iconUrl && !resolvedBadgeUrls[badgeGift.badgeId]) {
+            // Check if it's a Firebase Storage URL (gs://)
+            if (badgeGift.iconUrl.startsWith('gs://')) {
+              urlsToResolve.push({ badgeId: badgeGift.badgeId, url: badgeGift.iconUrl });
+            }
+          }
+        }
+        
+        // Also check claimed gifts
+        const dayData = status.days[day - 1];
+        if (dayData?.gift_data?.type === 'badge') {
+          const badgeGift = dayData.gift_data as BadgeGift;
+          if (badgeGift.iconUrl && !resolvedBadgeUrls[badgeGift.badgeId]) {
+            if (badgeGift.iconUrl.startsWith('gs://')) {
+              urlsToResolve.push({ badgeId: badgeGift.badgeId, url: badgeGift.iconUrl });
+            }
+          }
+        }
+      }
+
+      // Resolve all URLs in parallel
+      if (urlsToResolve.length > 0) {
+        const resolutionPromises = urlsToResolve.map(async ({ badgeId, url }) => {
+          try {
+            const resolved = await resolveStorageUrl(url, { badgeId });
+            if (resolved) {
+              return { badgeId, resolvedUrl: resolved };
+            }
+          } catch (error) {
+            console.error(`Failed to resolve badge icon URL for ${badgeId}:`, error);
+          }
+          return null;
+        });
+
+        const results = await Promise.all(resolutionPromises);
+        const newResolvedUrls: Record<string, string> = {};
+        results.forEach(result => {
+          if (result) {
+            newResolvedUrls[result.badgeId] = result.resolvedUrl;
+          }
+        });
+
+        if (Object.keys(newResolvedUrls).length > 0) {
+          setResolvedBadgeUrls(prev => ({ ...prev, ...newResolvedUrls }));
+        }
+      }
+    };
+
+    resolveBadgeUrls();
+  }, [status, resolvedBadgeUrls]);
 
   const toggleBypassMode = () => {
     const newBypassState = !bypassMode;
@@ -417,15 +596,22 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
           <View style={styles.modalClaimingContent}>
             <View style={styles.rewardFrame}>
               <View style={styles.rewardBoxContainer}>
-                {gift.type === 'badge' && (resolvedBadgeUrls[(gift as BadgeGift).badgeId] || (reward as any).iconUrl) ? (
-                  <Image
-                    source={{ uri: resolvedBadgeUrls[(gift as BadgeGift).badgeId] || (reward as any).iconUrl }}
-                    style={styles.rewardBoxImage}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <Text style={styles.rewardBoxEmoji}>{reward.icon}</Text>
-                )}
+                {gift.type === 'badge' && (() => {
+                  const badgeGift = gift as BadgeGift;
+                  const resolvedUrl = resolvedBadgeUrls[badgeGift.badgeId];
+                  const fallbackUrl = (reward as any).iconUrl;
+                  // Only use URL if it's resolved or if it's already an HTTPS URL (not gs://)
+                  const imageUrl = resolvedUrl || (fallbackUrl && !fallbackUrl.startsWith('gs://') ? fallbackUrl : null);
+                  return imageUrl ? (
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={styles.rewardBoxImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Text style={styles.rewardBoxEmoji}>{reward.icon}</Text>
+                  );
+                })()}
               </View>
               <View style={styles.rewardAmountContainer}>
                 <Text
@@ -544,7 +730,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   const gridHeight =
     TOTAL_GRID_ROWS * BASE_ROW_HEIGHT + (TOTAL_GRID_ROWS - 1) * ROW_GAP;
 
-  const renderGridTile = (tile: LayoutTile, index: number) => {
+  const renderGridTile = (tile: LayoutTile) => {
   if (!tileWidth) {
     return null;
   }
@@ -558,8 +744,20 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   const key = `day-${tile.day}-${tile.row}-${tile.col}`;
 
   const { isClaimed, isLocked, isToday } = getDayState(tile.day);
-  const pattern = getPattern(index);
+  
+  // Get background style from configuration
+  const backgroundStyle = getTileBackgroundStyle(tile.day) || getDefaultTileBackgroundStyle();
+  const backgroundColor = backgroundStyle.backgroundColor || DEFAULT_PATTERN.background;
+  const backgroundImage = backgroundStyle.backgroundImage;
+  
+  // Get resolved image URL if available (for Firebase Storage URLs)
+  const imageUrl = backgroundImage && typeof backgroundImage.url === 'string'
+    ? (resolvedTileImageUrls[tile.day] || backgroundImage.url)
+    : backgroundImage?.url;
 
+  // Remove padding and border when there's a background image
+  const hasBackgroundImage = Boolean(backgroundImage && imageUrl);
+  
   return (
     <TouchableOpacity
       key={key}
@@ -571,22 +769,123 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
           height,
           left,
           top,
-          backgroundColor: pattern.background,
+          backgroundColor,
+          // Remove padding and border when image is present
+          ...(hasBackgroundImage && {
+            padding: 0,
+            borderWidth: 0,
+          }),
         },
         isToday && styles.dayTileToday,
+        // Keep border for today even with image, but make it overlay
+        isToday && hasBackgroundImage && {
+          borderWidth: 2,
+          borderColor: colors.green,
+        },
       ]}
       onPress={() => handleDayPress(tile.day)}
       activeOpacity={0.85}
       disabled={isLocked && !bypassMode}
     >
-      <View style={styles.dayTileContent}>
-        <View style={styles.dayTileTopRow}>
-          <Text style={[styles.dayNumber, { color: pattern.accent }]}>
-            {tile.day.toString().padStart(2, '0')}
-          </Text>
-        </View>
-        <View style={styles.tilePlaceholder} />
-      </View>
+      {/* Background Image */}
+      {backgroundImage && imageUrl && (
+        <Image
+          source={
+            typeof imageUrl === 'string'
+              ? { uri: imageUrl }
+              : imageUrl
+          }
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              opacity: backgroundImage.opacity ?? 1,
+              ...getImagePositionStyle(backgroundImage.position, backgroundImage.resizeMode),
+            },
+          ]}
+          resizeMode={backgroundImage.resizeMode || 'cover'}
+        />
+      )}
+      
+      {/* Number style - centered or top based on day */}
+      {(() => {
+        const topDayStyle = getTopNumberDayStyle(tile.day);
+        if (topDayStyle === DAY_2_TOP) {
+          // Day 2 specific top number style
+          return (
+            <View style={styles.topNumberContainerDay2}>
+              <Text style={[
+                styles.topNumberTextDay2,
+                // White text for days in CENTERED_NUMBER_DAYS, black for others
+                shouldUseCenteredNumberStyle(tile.day)
+                  ? { color: colors.white }
+                  : { color: colors.black }
+              ]}>
+                {tile.day.toString().padStart(2, '0')}
+              </Text>
+            </View>
+          );
+        } else if (topDayStyle === DAY_16_TOP) {
+          // Day 16 specific top number style
+          return (
+            <View style={styles.topNumberContainerDay16}>
+              <Text style={[
+                styles.topNumberTextDay16,
+                // White text for days in CENTERED_NUMBER_DAYS, black for others
+                shouldUseCenteredNumberStyle(tile.day)
+                  ? { color: colors.white }
+                  : { color: colors.black }
+              ]}>
+                {tile.day.toString().padStart(2, '0')}
+              </Text>
+            </View>
+          );
+        } else if (topDayStyle === DAY_21_TOP) {
+          // Day 21 specific top number style
+          return (
+            <View style={styles.topNumberContainerDay21}>
+              <Text style={[
+                styles.topNumberTextDay21,
+                // White text for days in CENTERED_NUMBER_DAYS, black for others
+                shouldUseCenteredNumberStyle(tile.day)
+                  ? { color: colors.white }
+                  : { color: colors.black }
+              ]}>
+                {tile.day.toString().padStart(2, '0')}
+              </Text>
+            </View>
+          );
+        } else if (shouldUseTopNumberStyle(tile.day)) {
+          // Top number style for specific days (4, 9, 12, 18, 24)
+          return (
+            <View style={styles.topNumberContainer}>
+              <Text style={[
+                styles.topNumberText,
+                // White text for days in CENTERED_NUMBER_DAYS, black for others
+                shouldUseCenteredNumberStyle(tile.day)
+                  ? { color: colors.white }
+                  : { color: colors.black }
+              ]}>
+                {tile.day.toString().padStart(2, '0')}
+              </Text>
+            </View>
+          );
+        } else {
+          // Centered number style for all other days
+          return (
+            <View style={styles.centeredNumberContainer}>
+              <Text style={[
+                styles.centeredNumberText,
+                // White text for specific days, black for others
+                shouldUseCenteredNumberStyle(tile.day) 
+                  ? { color: colors.white }
+                  : { color: colors.black }
+              ]}>
+                {tile.day.toString().padStart(2, '0')}
+              </Text>
+            </View>
+          );
+        }
+      })()}
       {isToday && (
         <View style={styles.todayPill}>
           <Text style={styles.todayPillText}>Today</Text>
@@ -616,17 +915,25 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
       >
         <View style={styles.calendarCardWrapper}>
           <View style={styles.heroSection}>
-            <Text style={styles.heroTitle}>Advent Calendar</Text>
             <Text style={styles.heroSubtitle}>Come back every day to unlock a new reward.</Text>
-            <Text style={styles.heroMeta}>{status.totalClaimed} of 24 gifts claimed</Text>
           </View>
-          <View style={[styles.countdownCard, styles.sectionPadding]}>
-            <Text style={styles.countdownLabel}>
-              {isActive ? 'Next reward in' : 'Calendar locked'}
-            </Text>
-            <Text style={[styles.countdownValue, !isActive && styles.countdownValueLocked]}>
-              {isActive ? countdown : 'Opens Dec 1'}
-            </Text>
+          <View style={styles.countdownWrapper}>
+            <View style={styles.countdownCard}>
+              {/* Snow/Ice decoration at the top - positioned above the card */}
+              <Image
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchristmas%2Fice-xmas.png?alt=media&token=c462cd52-0d97-4eb8-9fc5-f1562889110f' }}
+                style={styles.countdownSnowDecoration}
+                resizeMode="cover"
+              />
+              <View style={styles.countdownContent}>
+                <Text style={styles.countdownLabel}>
+                  {isActive ? 'Next reward in' : 'Calendar locked'}
+                </Text>
+                <Text style={[styles.countdownValue, !isActive && styles.countdownValueLocked]}>
+                  {isActive ? countdown : 'Opens Dec 1'}
+                </Text>
+              </View>
+            </View>
           </View>
 
           {!isActive && (
@@ -662,7 +969,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
             }}
           >
             {tileWidth > 0 &&
-              CALENDAR_LAYOUT.map((tile, index) => renderGridTile(tile, index))}
+              CALENDAR_LAYOUT.map((tile) => renderGridTile(tile))}
           </View>
         </View>
       </ScrollView>
@@ -679,7 +986,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   scrollContent: {
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xxxl * 2, // Extra padding to prevent cards from being cut
   },
   loadingContainer: {
     padding: spacing.xxxl,
@@ -688,7 +995,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: spacing.md,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   errorContainer: {
@@ -698,49 +1005,72 @@ const styles = StyleSheet.create({
   },
   errorText: {
     marginTop: spacing.md,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
   calendarCardWrapper: {
-    paddingVertical: spacing.lg,
+    paddingBottom: spacing.xl, // Add extra padding at bottom to prevent cards from being cut
+    paddingHorizontal: spacing.sm, // Add horizontal padding for spacing
   },
   heroSection: {
     paddingHorizontal: spacing.sm,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm, // Reduced to move subtitle higher
   },
   sectionPadding: {
     paddingHorizontal: spacing.sm,
   },
-  heroTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    marginBottom: spacing.xs,
-  },
+
   heroSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.whiteSecondary,
+    fontSize: typography.fontSize.md,
+    color: colors.white70,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   heroMeta: {
     fontSize: typography.fontSize.sm,
     color: colors.green,
     fontWeight: typography.fontWeight.semibold,
   },
+  countdownWrapper: {
+    position: 'relative',
+    marginTop: spacing.xl, // Add margin to accommodate the snow decoration
+    marginBottom: spacing.md,
+    alignItems: 'center', // Center the countdown card
+  },
   countdownCard: {
-    backgroundColor: '#060B08',
-    borderRadius: 16,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.radiusMd,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
     borderWidth: 1,
     borderColor: colors.white10,
+    position: 'relative',
+    alignSelf: 'center', // Center the card
+    minWidth: 300, // Don't take full width
+    maxWidth: '80%', // Limit maximum width
+    overflow: 'visible', // Allow the snow decoration to overflow
+  },
+  countdownSnowDecoration: {
+    position: 'absolute',
+    top: -30, // Position above the card to create the snow effect
+    left: 0,
+    right: 0,
+    height: 50, // Adjust height as needed
+    minWidth: 300, // Don't take full width
+    maxWidth: '80%', // Limit maximum width
+    zIndex: 3, // Above the timer content
+  },
+  countdownContent: {
+    alignItems: 'center', // Center the content
   },
   countdownLabel: {
     fontSize: typography.fontSize.xs,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     marginBottom: spacing.xs,
     letterSpacing: 1,
     textTransform: 'uppercase',
+    textAlign: 'center',
   },
   countdownValue: {
     fontSize: 28,
@@ -749,7 +1079,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   countdownValueLocked: {
-    color: colors.whiteSecondary,
+    color: colors.white70,
   },
   secondaryButton: {
     alignSelf: 'flex-start',
@@ -770,19 +1100,20 @@ const styles = StyleSheet.create({
   },
   calendarGrid: {
     position: 'relative',
-    marginTop: spacing.lg,
-    marginHorizontal: spacing.sm,
+    marginTop: spacing.xs,
+    width: '100%', // Ensure grid takes full available width
   },
   dayTile: {
     borderRadius: 18,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     borderWidth: 1,
     borderColor: colors.white10,
     overflow: 'hidden',
   },
   dayTileToday: {
-    borderColor: colors.green,
-    borderWidth: 2,
+    borderColor: colors.white,
+    borderWidth: 1,
   },
   dayTileContent: {
     flex: 1,
@@ -796,6 +1127,89 @@ const styles = StyleSheet.create({
   dayNumber: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
+  },
+  centeredNumberContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  centeredNumberText: {
+    color: colors.white,
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: 28, // Increased to prevent clipping (slightly larger than fontSize)
+    textAlign: 'center',
+  },
+  topNumberContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: spacing.xxl,
+    zIndex: 1,
+  },
+  topNumberText: {
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: 28,
+    textAlign: 'center',
+  },
+  // Day 2 specific top number style
+  topNumberContainerDay2: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingLeft: spacing.xxl,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    zIndex: 1,
+  },
+  topNumberTextDay2: {
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: 28,
+    textAlign: 'center',
+  },
+  // Day 16 specific top number style
+  topNumberContainerDay16: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingRight: spacing.xxl,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    zIndex: 1,
+  },
+  topNumberTextDay16: {
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: 28,
+    textAlign: 'center',
+  },
+  // Day 21 specific top number style
+  topNumberContainerDay21: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    paddingLeft: spacing.lg,
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  topNumberTextDay21: {
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: 28,
+    textAlign: 'left',
   },
   todayPill: {
     position: 'absolute',
@@ -898,7 +1312,7 @@ const styles = StyleSheet.create({
   },
   unwrapSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     textAlign: 'center',
   },
   // Claiming modal styles
@@ -957,7 +1371,7 @@ const styles = StyleSheet.create({
   },
   rewardLabel: {
     fontSize: typography.fontSize.md,
-    color: colors.whiteSecondary,
+    color: colors.white70,
   },
   unlockedTitle: {
     fontSize: typography.fontSize.lg,
@@ -968,7 +1382,7 @@ const styles = StyleSheet.create({
   },
   unlockedSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
@@ -1010,7 +1424,7 @@ const styles = StyleSheet.create({
   },
   successMessage: {
     fontSize: typography.fontSize.md,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     textAlign: 'center',
     paddingHorizontal: spacing.lg,
   },
@@ -1026,7 +1440,7 @@ const styles = StyleSheet.create({
   },
   cannotClaimText: {
     fontSize: typography.fontSize.sm,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     textAlign: 'center',
   },
 });

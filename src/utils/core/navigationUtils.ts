@@ -73,6 +73,7 @@ export const NAVIGATION_ROUTES = {
   REFERRAL: 'Referral',
   POINTS_HISTORY: 'PointsHistory',
   CHRISTMAS_CALENDAR: 'ChristmasCalendar',
+  CHRISTMAS_CALENDAR_HISTORY: 'ChristmasCalendarHistory',
   HOW_IT_WORKS: 'HowItWorks',
   DEV_ASSET_PREVIEW: 'DevAssetPreview'
 } as const;
@@ -248,6 +249,14 @@ export class RewardNavigationHelper {
   goToDevAssetPreview() {
     try {
       this.navigation.navigate(NAVIGATION_ROUTES.DEV_ASSET_PREVIEW);
+    } catch (error) {
+      // Navigation error handled silently
+    }
+  }
+
+  goToChristmasCalendarHistory() {
+    try {
+      this.navigation.navigate(NAVIGATION_ROUTES.CHRISTMAS_CALENDAR_HISTORY);
     } catch (error) {
       // Navigation error handled silently
     }
