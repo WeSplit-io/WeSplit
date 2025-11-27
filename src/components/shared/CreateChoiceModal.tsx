@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Dimensions } from 'react-native';
 import Modal from './Modal';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -18,6 +18,9 @@ interface CreateChoiceModalProps {
   onCreateSplit: () => void;
   onCreateSharedWallet: () => void;
 }
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MODAL_MAX_HEIGHT = Math.min(SCREEN_HEIGHT * 0.45, 520);
 
 const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
   visible,
@@ -46,6 +49,7 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
       showHandle={true}
       title="Create New"
       description="Choose what you want to create"
+      maxHeight={MODAL_MAX_HEIGHT}
     >
       <View style={styles.optionsContainer}>
         {/* Create Split Option */}
@@ -121,7 +125,7 @@ const styles = StyleSheet.create({
   optionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.xl,
+    marginVertical: spacing.md,
     gap: spacing.md,
   },
   option: {

@@ -10,11 +10,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import PhosphorIcon from '../shared/PhosphorIcon';
 import { formatAmountWithComma } from '../../utils/spend/formatUtils';
 
 interface SpendPaymentSuccessModalProps {
@@ -32,12 +33,16 @@ const SpendPaymentSuccessModal: React.FC<SpendPaymentSuccessModalProps> = ({
 }) => {
   const displayOrderNumber = orderNumber || orderId || 'N/A';
 
+  const successIconUrl = 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fpartners%2Ficon-sucess-sp3nd.png?alt=media&token=c52afbe5-3550-4efb-b276-0b5935ebf082';
+
   return (
     <View style={styles.container}>
       {/* Success Icon */}
-      <View style={styles.iconCircle}>
-        <PhosphorIcon name="Check" size={48} color={colors.white} weight="bold" />
-      </View>
+      <Image
+        source={{ uri: successIconUrl }}
+        style={styles.successIcon}
+        resizeMode="contain"
+      />
 
       {/* Success Title */}
       <Text style={styles.title}>
@@ -49,14 +54,22 @@ const SpendPaymentSuccessModal: React.FC<SpendPaymentSuccessModalProps> = ({
         You have successfully paid {formatAmountWithComma(amount)} USDC for your Order #{displayOrderNumber}!
       </Text>
 
-      {/* OK Button */}
+      {/* OK Button with SPEND Gradient */}
       <TouchableOpacity
-        style={styles.okButton}
+        style={styles.okButtonContainer}
         onPress={onClose}
+        activeOpacity={0.8}
       >
-        <Text style={styles.okButtonText}>
-          OK
-        </Text>
+        <LinearGradient
+          colors={[colors.spendGradientStart, colors.spendGradientEnd]}
+          style={styles.okButton}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Text style={styles.okButtonText}>
+            Done
+          </Text>
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
@@ -65,16 +78,12 @@ const SpendPaymentSuccessModal: React.FC<SpendPaymentSuccessModalProps> = ({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    padding: spacing.xl,
-    gap: spacing.lg,
+    padding: spacing.md,
+    gap: spacing.md,
   },
-  iconCircle: {
+  successIcon: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.green,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   title: {
     fontSize: typography.fontSize.xxl,
@@ -87,13 +96,18 @@ const styles = StyleSheet.create({
     color: colors.white70,
     textAlign: 'center',
     lineHeight: typography.fontSize.md * 1.5,
+    paddingHorizontal: spacing.sm,
+  },
+  okButtonContainer: {
+    width: '100%',
+    marginTop: spacing.sm,
   },
   okButton: {
-    backgroundColor: colors.green,
     borderRadius: 12,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
-    marginTop: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   okButtonText: {
     fontSize: typography.fontSize.md,

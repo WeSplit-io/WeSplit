@@ -11,7 +11,6 @@ import {
   TextInput,
   StyleSheet,
   Image,
-  ImageSourcePropType,
 } from 'react-native';
 import Button from './Button';
 import PhosphorIcon, { PhosphorIconName } from './PhosphorIcon';
@@ -27,6 +26,7 @@ export interface RecipientInfo {
   userId?: string;
   icon?: PhosphorIconName;
   iconColor?: string;
+  imageUrl?: string; // Direct image URL for logos/external images
 }
 
 export interface WalletInfo {
@@ -35,6 +35,7 @@ export interface WalletInfo {
   balanceFormatted?: string;
   icon?: PhosphorIconName;
   iconColor?: string;
+  imageUrl?: string; // Direct image URL for logos/external images
 }
 
 interface SendComponentProps {
@@ -63,6 +64,7 @@ interface SendComponentProps {
   sendButtonDisabled?: boolean;
   sendButtonLoading?: boolean;
   sendButtonTitle?: string;
+  sendButtonGradientColors?: string[]; // Custom gradient colors for send button
 
   // Optional styling
   containerStyle?: any;
@@ -85,6 +87,7 @@ const SendComponent: React.FC<SendComponentProps> = ({
   sendButtonDisabled = false,
   sendButtonLoading = false,
   sendButtonTitle = 'Send',
+  sendButtonGradientColors,
   containerStyle,
 }) => {
   const [showNoteInput, setShowNoteInput] = useState(!!note);
@@ -116,7 +119,7 @@ const SendComponent: React.FC<SendComponentProps> = ({
     }
 
     // Limit to 2 decimal places
-    if (parts.length === 2 && parts[1].length > 2) {
+    if (parts.length === 2 && parts[1] && parts[1].length > 2) {
       cleaned = parts[0] + ',' + parts[1].substring(0, 2);
     }
 
@@ -196,7 +199,13 @@ const SendComponent: React.FC<SendComponentProps> = ({
         </View>
 
         <View style={styles.recipientCard}>
-          {recipient.avatarUrl || recipient.userId ? (
+          {recipient.imageUrl ? (
+            <Image
+              source={{ uri: recipient.imageUrl }}
+              style={styles.recipientImage}
+              resizeMode="contain"
+            />
+          ) : recipient.avatarUrl || recipient.userId ? (
             <Avatar
               userId={recipient.userId}
               userName={recipient.name}
@@ -282,7 +291,13 @@ const SendComponent: React.FC<SendComponentProps> = ({
 
         {/* Wallet Information */}
         <View style={styles.walletCard}>
-          {wallet.icon ? (
+          {wallet.imageUrl ? (
+            <Image
+              source={{ uri: wallet.imageUrl }}
+              style={styles.walletImage}
+              resizeMode="contain"
+            />
+          ) : wallet.icon ? (
             <View style={[styles.walletIcon, { backgroundColor: (wallet.iconColor || colors.green) + '30' }]}>
               <PhosphorIcon
                 name={wallet.icon}
@@ -354,6 +369,7 @@ const SendComponent: React.FC<SendComponentProps> = ({
           loading={sendButtonLoading}
           fullWidth={true}
           style={styles.sendButton}
+          gradientColors={sendButtonGradientColors}
         />
       </View>
 
@@ -401,6 +417,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  recipientImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
   recipientInfo: {
     flex: 1,
   },
@@ -421,7 +442,7 @@ const styles = StyleSheet.create({
     marginVertical: spacing.lg,
   },
   amountInput: {
-    fontSize: typography.fontSize.xxl + typography.fontSize.lg,
+    fontSize: typography.fontSize.xxl + typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textAlign: 'center',
@@ -430,7 +451,7 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   amountCurrency: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     color: colors.white70,
   },
   addNoteButton: {
@@ -467,27 +488,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  walletImage: {
+    width: 40,
+    height: 40,
+    borderRadius: spacing.radiusSm,
+  },
   walletInfo: {
     flex: 1,
   },
   walletName: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
     marginBottom: 2,
   },
   walletBalance: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     color: colors.white70,
   },
   changeButton: {
     backgroundColor: colors.white5,
     borderRadius: spacing.radiusSm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   changeButtonText: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     color: colors.white,
     fontWeight: typography.fontWeight.medium,
   },

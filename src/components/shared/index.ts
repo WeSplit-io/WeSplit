@@ -20,3 +20,5 @@ export { default as Avatar } from './Avatar';
 export { ParticipationCircle } from './ParticipationCircle';
 export { default as SendComponent } from './SendComponent';
 export type { RecipientInfo, WalletInfo } from './SendComponent';
+export { default as SendConfirmation } from './SendConfirmation';
+export type { SendConfirmationProps } from './SendConfirmation';

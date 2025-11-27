@@ -12,6 +12,7 @@ interface AppleSliderProps {
   loading?: boolean;
   text?: string;
   style?: StyleProp<ViewStyle>;
+  gradientColors?: string[]; // Custom gradient colors
 }
 
 const AppleSlider: React.FC<AppleSliderProps> = ({ 
@@ -19,7 +20,8 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
   disabled = false, 
   loading = false, 
   text = 'Sign transaction',
-  style 
+  style,
+  gradientColors,
 }) => {
   // Calculate dynamic slide distance based on screen width and paddings
   const screenWidth = Dimensions.get('window').width;
@@ -211,13 +213,14 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
   });
 
   // Determine colors based on state
+  const defaultGradient = gradientColors || [colors.gradientStart, colors.gradientEnd];
   const borderColors = disabled 
     ? [colors.white50, colors.white50] as const
-    : [colors.gradientStart, colors.gradientEnd] as const;
+    : (defaultGradient as readonly [string, string]);
 
   const thumbColors = disabled 
     ? [colors.white50, colors.white50] as const
-    : [colors.gradientStart, colors.gradientEnd] as const;
+    : (defaultGradient as readonly [string, string]);
 
   // For signing state, move thumb to right and show full gradient
   const getThumbPosition = () => {
@@ -251,7 +254,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
           }}
         >
           <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
+            colors={defaultGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{

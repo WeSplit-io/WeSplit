@@ -34,6 +34,7 @@ interface ButtonProps {
   textStyle?: StyleProp<TextStyle>;
   icon?: PhosphorIconName;
   iconPosition?: 'left' | 'right';
+  gradientColors?: string[]; // Custom gradient colors for primary variant
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -48,6 +49,7 @@ const Button: React.FC<ButtonProps> = ({
   textStyle,
   icon,
   iconPosition = 'left',
+  gradientColors,
 }) => {
   // Animation values
   const opacityAnim = useRef(new Animated.Value(disabled ? 0.5 : 1)).current;
@@ -222,7 +224,7 @@ const Button: React.FC<ButtonProps> = ({
             </View>
           ) : (
             <LinearGradient
-              colors={[colors.green, colors.greenBlue || colors.green]}
+              colors={gradientColors || [colors.green, colors.greenBlue || colors.green]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradient}

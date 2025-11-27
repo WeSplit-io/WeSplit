@@ -52,7 +52,7 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
         <View style={styles.headerButtons}>
           {onSharePress && (
             <TouchableOpacity onPress={onSharePress} activeOpacity={0.8} style={styles.shareButton}>
-              <PhosphorIcon name="ShareNetwork" size={16} color={colors.green} weight="bold" />
+              <PhosphorIcon name="ShareNetwork" size={16} color={colors.spendGradientStart} weight="bold" />
               <Text style={styles.shareButtonText}>Share</Text>
             </TouchableOpacity>
           )}
@@ -146,11 +146,11 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     backgroundColor: colors.white10,
     borderWidth: 1,
-    borderColor: colors.green + '40',
+    borderColor: colors.spendGradientStart + '40',
   },
   shareButtonText: {
     fontSize: typography.fontSize.md,
-    color: colors.green,
+    color: colors.spendGradientStart,
     fontWeight: typography.fontWeight.medium,
   },
   addButton: {

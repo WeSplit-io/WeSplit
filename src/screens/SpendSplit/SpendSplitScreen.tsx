@@ -13,6 +13,7 @@ import {
   StatusBar,
   TouchableOpacity,
   Dimensions,
+  Share,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing, typography } from '../../theme';
@@ -20,8 +21,8 @@ import { SplitWalletService, SplitWallet } from '../../services/split';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import { SpendPaymentModeService, SpendMerchantPaymentService } from '../../services/integrations/spend';
-import { SpendPaymentStatus, SpendPaymentConfirmationModal, SpendPaymentSuccessModal } from '../../components/spend';
-import { SendComponent } from '../../components/shared';
+import { SpendPaymentStatus, SpendPaymentSuccessModal } from '../../components/spend';
+import { SendComponent, SendConfirmation } from '../../components/shared';
 import { WalletSelectorModal } from '../../components/wallet';
 import { useWallet } from '../../context/WalletContext';
 import { Container, Header, Button, ModernLoader } from '../../components/shared';
@@ -36,6 +37,7 @@ import { createSpendSplitWallet } from '../../utils/spend/spendWalletUtils';
 import { createMockSpendOrderData } from '../../services/integrations/spend/SpendMockData';
 import { formatAmountWithComma } from '../../utils/spend/formatUtils';
 import { SplitInvitationShare } from '../../components/split';
+import { SplitInvitationService, SplitInvitationData } from '../../services/splits/splitInvitationService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -318,6 +320,54 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     });
   }, [splitData, currentUser, navigation, billData, processedBillData, splitWallet]);
 
+  // Handle direct share (opens system share panel directly)
+  const handleDirectShare = useCallback(async () => {
+    if (!splitData || !currentUser) {
+      Alert.alert('Error', 'Split data not available');
+      return;
+    }
+
+    try {
+      // Generate invitation data
+      const invitationData: SplitInvitationData = {
+        type: 'split_invitation',
+        splitId: splitData.id,
+        billName: splitData.title || 'Split',
+        totalAmount: splitData.totalAmount || 0,
+        currency: splitData.currency || 'USDC',
+        creatorId: currentUser.id.toString(),
+        creatorName: currentUser.name || currentUser.email?.split('@')[0],
+        timestamp: new Date().toISOString(),
+        splitType: splitData.splitType || 'spend',
+      };
+
+      // Generate universal link
+      const shareableLink = SplitInvitationService.generateUniversalLink(invitationData);
+
+      // Create share message
+      const shareMessage = `Join my split "${splitData.title || 'Split'}" on WeSplit!\n\nTotal: $${(splitData.totalAmount || 0).toFixed(2)} USDC\n\n${shareableLink}`;
+
+      // Open system share panel directly
+      const result = await Share.share({
+        message: shareMessage,
+        title: `Join Split: ${splitData.title || 'Split'}`,
+      });
+
+      if (result.action === Share.sharedAction) {
+        logger.info('Split invitation shared successfully', {
+          splitId: splitData.id,
+          sharedWith: result.activityType,
+        }, 'SpendSplitScreen');
+      }
+    } catch (error) {
+      logger.error('Error sharing invitation', {
+        error: error instanceof Error ? error.message : String(error),
+        splitId: splitData?.id,
+      }, 'SpendSplitScreen');
+      Alert.alert('Error', 'Failed to share invitation. Please try again.');
+    }
+  }, [splitData, currentUser]);
+
   // Check payment completion and trigger merchant payment
   const checkPaymentCompletion = useCallback(async () => {
     if (!splitWallet?.id || !splitData) {
@@ -377,7 +427,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             Alert.alert(
               'Payment Sent to SPEND ✅',
               `Payment of ${wallet.totalAmount} USDC has been sent to SPEND. Your order will be fulfilled shortly.`,
-              [{ text: 'OK' }]
+              [{ text: 'Done' }]
             );
 
             // Reload split data to get updated payment status
@@ -761,7 +811,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     return (
       <Container>
         <Header
-          title="SPEND Split"
+          title="SP3ND Split"
           onBackPress={() => navigation.navigate('SplitsList')}
         />
         <View style={{ padding: spacing.md, alignItems: 'center' }}>
@@ -900,7 +950,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             participants={participants}
             currentUserId={currentUser?.id?.toString()}
             onAddPress={splitData.creatorId === currentUser?.id?.toString() ? handleAddParticipants : undefined}
-            onSharePress={splitData.creatorId === currentUser?.id?.toString() ? () => setShowShareModal(true) : undefined}
+            onSharePress={splitData.creatorId === currentUser?.id?.toString() ? handleDirectShare : undefined}
               />
         </View>
       </ScrollView>
@@ -977,8 +1027,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             recipient={{
               name: `Order #${orderNumber || orderId || 'N/A'}`,
               address: splitWallet?.walletAddress || splitData?.externalMetadata?.orderData?.user_wallet || currentUser?.wallet_address || undefined,
-              icon: 'CurrencyDollar',
-              iconColor: colors.blue,
+              imageUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fpartners%2Fsp3nd-icon.png?alt=media&token=3b2603eb-57cb-4dc6-aafd-0fff463f1579',
             }}
             onRecipientChange={undefined}
             showRecipientChange={false}
@@ -1001,11 +1050,10 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
               name: walletContext.walletName || 'WeSplit Wallet',
               balance: liveBalance?.usdcBalance || 0,
               balanceFormatted: liveBalance?.usdcBalance !== undefined ? formatAmountWithComma(liveBalance.usdcBalance) : undefined,
-              icon: 'Wallet',
-              iconColor: colors.green,
+              imageUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-new.png?alt=media&token=f42ea1b1-5f23-419e-a499-931862819cbf',
             }}
             onWalletChange={() => setShowWalletSelector(true)}
-            showWalletChange={true}
+            showWalletChange={false}
             onSendPress={() => {
               setShowPaymentModal(false);
               setShowConfirmationModal(true);
@@ -1013,45 +1061,29 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             sendButtonDisabled={isSendingPayment || isCheckingBalance || paymentAmount <= 0}
             sendButtonLoading={isSendingPayment || isCheckingBalance}
             sendButtonTitle={isSendingPayment || isCheckingBalance ? 'Processing...' : 'Send'}
+            sendButtonGradientColors={[colors.spendGradientStart, colors.spendGradientEnd]}
           />
-          
-          {/* Balance Error Display */}
-          {balanceCheckError && (
-            <View style={{
-              marginTop: spacing.sm,
-              backgroundColor: colors.red + '20',
-              borderRadius: spacing.radiusMd,
-              padding: spacing.sm,
-              borderWidth: 1,
-              borderColor: colors.red + '40',
-            }}>
-              <Text style={{
-                fontSize: typography.fontSize.xs,
-                color: colors.red,
-              }}>
-                {balanceCheckError}
-              </Text>
-            </View>
-          )}
         </View>
       </Modal>
 
       {/* Payment Confirmation Modal */}
-      <Modal
+      <SendConfirmation
         visible={showConfirmationModal}
         onClose={() => setShowConfirmationModal(false)}
-        showHandle={true}
-        closeOnBackdrop={true}
-      >
-        <SpendPaymentConfirmationModal
-          orderNumber={orderNumber || undefined}
-          orderId={orderId || undefined}
-          amount={paymentAmount}
-            onSlideComplete={handlePaymentModalConfirm}
-            disabled={isSendingPayment || isCheckingBalance}
-            loading={isSendingPayment || isCheckingBalance}
-        />
-      </Modal>
+        recipientName={`Order #${orderNumber || orderId || 'N/A'}`}
+        amount={paymentAmount}
+        currency="USDC"
+        onSlideComplete={handlePaymentModalConfirm}
+        disabled={isSendingPayment || isCheckingBalance}
+        loading={isSendingPayment || isCheckingBalance}
+        gradientColors={[colors.spendGradientStart, colors.spendGradientEnd]}
+        insufficientFunds={
+          liveBalance?.usdcBalance !== null && 
+          liveBalance?.usdcBalance !== undefined && 
+          paymentAmount > 0 && 
+          liveBalance.usdcBalance < (paymentAmount + paymentAmount * 0.03)
+        }
+      />
 
       {/* Payment Success Modal */}
       <Modal
@@ -1059,6 +1091,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         onClose={() => setShowSuccessModal(false)}
         showHandle={true}
         closeOnBackdrop={true}
+        maxHeight={400}
       >
         <SpendPaymentSuccessModal
           amount={successPaymentAmount}
@@ -1081,7 +1114,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         split={splitData}
         currentUserId={currentUser?.id?.toString() || ''}
         currentUserName={currentUser?.name || currentUser?.email?.split('@')[0]}
-        onAddFromContacts={handleAddParticipants}
         title="Invite Friends to Split"
       />
     </Container>
