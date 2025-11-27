@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
   },
   tabText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     color: colors.white70,
     paddingHorizontal: spacing.xs,
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: colors.black,
     fontWeight: typography.fontWeight.semibold,
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
   },
 });
 

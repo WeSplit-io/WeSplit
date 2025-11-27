@@ -16,6 +16,8 @@ export { default as ModernLoader } from './ModernLoader';
 export type { PhosphorIconName, PhosphorIconProps } from './PhosphorIcon';
 export { default as Tabs } from './Tabs';
 export type { Tab } from './Tabs';
+export { default as TabSecondary } from './TabSecondary';
+export type { TabSecondaryItem } from './TabSecondary';
 export { default as Avatar } from './Avatar';
 export { ParticipationCircle } from './ParticipationCircle';
 export { default as SendComponent } from './SendComponent';

@@ -205,6 +205,12 @@ export const styles = StyleSheet.create({
   categoryIcon: {
     flexShrink: 0,
   },
+  spendIcon: {
+    padding: spacing.xs,
+    width: 48,
+    height: 48,
+    // No background for spend icon
+  },
   splitTitleContainer: {
     flex: 1,
   },
@@ -460,38 +466,46 @@ export const styles = StyleSheet.create({
   paginationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.white10,
+    paddingBottom: spacing.xxxl + spacing.lg,
     backgroundColor: colors.black,
+    gap: spacing.sm,
   },
-  paginationButton: {
-    minWidth: 44,
-    width: 44,
-    height: 44,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
+  paginationButtonTouchable: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // No background when active/enabled - just the icon
   },
   pageInfo: {
-    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+    gap: spacing.xs,
   },
   pageText: {
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
+    textAlign: 'center',
+    lineHeight: typography.fontSize.md * 1.2,
   },
   // Swipe-to-delete styles
+  deleteActionContainer: {
+    marginBottom: spacing.md,
+    marginLeft: spacing.xs,
+    height: `100% - ${spacing.md}`,
+  },
   deleteAction: {
-    backgroundColor: colors.red,
+    backgroundColor: colors.white5,
     justifyContent: 'center',
     alignItems: 'center',
     width: 100,
-    borderRadius: 16,
-    marginVertical: spacing.xs,
-    marginRight: spacing.md,
+    height: '100%',
+    borderRadius: 12,
   },
   deleteActionContent: {
     alignItems: 'center',
@@ -501,6 +515,6 @@ export const styles = StyleSheet.create({
   deleteText: {
     color: colors.white,
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.medium,
   },
 });

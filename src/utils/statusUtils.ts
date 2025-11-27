@@ -75,7 +75,7 @@ export const getSplitStatusBadgeStyle = (status: string) => {
     case 'pending':
       return { backgroundColor: colors.yellow + '20' };
     case 'draft':
-      return { backgroundColor: colors.white70 + '20' };
+      return { backgroundColor: colors.white + '20' };
     case 'locked':
       return { backgroundColor: colors.blue + '20' };
     case 'cancelled':
@@ -83,11 +83,11 @@ export const getSplitStatusBadgeStyle = (status: string) => {
     case 'spinning_completed':
       return { backgroundColor: colors.green + '20' };
     case 'spinning':
-      return { backgroundColor: colors.purple + '20' };
+      return { backgroundColor: colors.greenBlue + '20' };
     case 'closed':
       return { backgroundColor: colors.white70 + '20' };
     default:
-      return { backgroundColor: colors.surface };
+      return { backgroundColor: colors.white5 };
   }
 };
 

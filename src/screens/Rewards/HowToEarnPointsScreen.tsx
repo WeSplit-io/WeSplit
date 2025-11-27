@@ -16,7 +16,7 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
-import { Container, Header, LoadingScreen, Input, Button } from '../../components/shared';
+import { Container, Header, LoadingScreen, Input, Button, TabSecondary } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import Tabs from '../../components/shared/Tabs';
 import BadgeCard from '../../components/rewards/BadgeCard';
@@ -464,39 +464,15 @@ const HowToEarnPointsScreen: React.FC = () => {
 
       {/* Secondary Navigation: All / Claimed / Redeem Code (only for badges) */}
       {activeSection === 'badges' && (
-        <View style={styles.secondaryNavWrapper}>
-          <View style={styles.secondaryNavContainer}>
-            {[
-              { label: 'All', value: 'all' },
-              { label: 'Claimed', value: 'claimed' },
-              { label: 'Redeem Code', value: 'redeem' },
-            ].map((tab) => (
-              <TouchableOpacity
-                key={tab.value}
-                style={styles.secondaryNavTab}
-                onPress={() => setBadgeTab(tab.value as 'all' | 'claimed' | 'redeem')}
-              >
-                <Text
-                  style={[
-                    styles.secondaryNavText,
-                    badgeTab === tab.value && styles.secondaryNavTextActive,
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-                {badgeTab === tab.value && (
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.secondaryNavIndicator}
-                  />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.secondaryNavUnderline} />
-        </View>
+        <TabSecondary
+          tabs={[
+            { label: 'All', value: 'all' },
+            { label: 'Claimed', value: 'claimed' },
+            { label: 'Redeem Code', value: 'redeem' },
+          ]}
+          activeTab={badgeTab}
+          onTabChange={(tab) => setBadgeTab(tab as 'all' | 'claimed' | 'redeem')}
+        />
       )}
 
       <ScrollView
@@ -695,48 +671,13 @@ const styles = StyleSheet.create({
   },
   infoCardBulletText: {
     fontSize: typography.fontSize.sm,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     lineHeight: 20,
   },
   // Primary Navigation Styles
   primaryNavWrapper: {
     marginTop: spacing.md,
     marginBottom: spacing.sm,
-  },
-  secondaryNavWrapper: {
-    marginBottom: spacing.lg,
-  },
-  secondaryNavContainer: {
-    flexDirection: 'row',
-    width: '100%',
-    justifyContent: 'flex-start',
-    gap: spacing.lg,
-  },
-  secondaryNavTab: {
-    position: 'relative',
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  secondaryNavText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white70,
-  },
-  secondaryNavTextActive: {
-    color: colors.white,
-  },
-  secondaryNavIndicator: {
-    position: 'absolute',
-    bottom: -spacing.xs - 1,
-    left: 0,
-    right: 0,
-    height: 2,
-  },
-  secondaryNavUnderline: {
-    width: '100%',
-    height: 1,
-    backgroundColor: colors.white10,
-    marginTop: spacing.xs,
   },
   // Badge Styles
   badgesGrid: {

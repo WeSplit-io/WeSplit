@@ -19,17 +19,20 @@ import {
   StyleSheet,
   PanResponder,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';  
 import { colors } from '../../../theme/colors';
+import { spacing } from '../../../theme/spacing';
 import NavBar from '../../../components/shared/NavBar';
 import Avatar from '../../../components/shared/Avatar';
 import GroupIcon from '../../../components/GroupIcon';
 import Icon from '../../../components/Icon';
-import { Container, Button, ModernLoader, PhosphorIcon } from '../../../components/shared';
+import { Container, Button, ModernLoader, PhosphorIcon, TabSecondary } from '../../../components/shared';
 import Tabs from '../../../components/shared/Tabs';
+import CreateChoiceModal from '../../../components/shared/CreateChoiceModal';
 import SharedWalletCard from '../../../components/SharedWalletCard';
 import { BillSplitSummary } from '../../../types/billSplitting';
 import { splitStorageService, Split, SplitStorageService } from '../../../services/splits';
@@ -92,6 +95,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
   const [activeTab, setActiveTab] = useState<'splits' | 'sharedWallets'>(__DEV__ ? 'splits' : 'splits'); // NEW: Top-level tab state
   const [sharedWallets, setSharedWallets] = useState<SharedWallet[]>([]);
   const [isLoadingSharedWallets, setIsLoadingSharedWallets] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   
   // Safeguard: Reset to splits tab if shared wallets are disabled and activeTab is sharedWallets
   useEffect(() => {
@@ -99,7 +103,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
       setActiveTab('splits');
     }
   }, [activeTab]);
-  const SPLITS_PER_PAGE = 20;
+  const SPLITS_PER_PAGE = 10;
   
   // Refs to prevent infinite loops
   const hasLoadedOnFocusRef = useRef(false);
@@ -423,6 +427,12 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         if (!hasLoadedOnFocusRef.current) {
           // Clear avatar cache to force reload
           setParticipantAvatars({});
+          // Reset pagination state to ensure fresh load
+          setCurrentPage(1);
+          setPageHistory([]);
+          setLastDoc(null);
+          setMaxKnownPage(1);
+          setKnownTotalPages(null);
           // Always load total count first if not already loaded, then load page 1
           // This ensures we have the count before showing pagination
           if (totalSplits === 0 && !isLoadingCount) {
@@ -476,6 +486,11 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         logger.debug('Loading splits for user', { userId: currentUser.id, page, totalCount }, 'SplitsListScreen');
       }
 
+      // Log to verify we're using the correct page size
+      if (__DEV__) {
+        console.log('🔍 Loading splits with SPLITS_PER_PAGE:', SPLITS_PER_PAGE);
+      }
+
       const result = await SplitStorageService.getUserSplits(
         String(currentUser.id),
         SPLITS_PER_PAGE,
@@ -486,8 +501,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
 
       if (result.success && result.splits) {
         if (__DEV__) {
+          console.log('🔍 Loaded splits count:', result.splits.length, 'Expected:', SPLITS_PER_PAGE);
           logger.debug('Loaded splits', {
             count: result.splits.length,
+            expectedCount: SPLITS_PER_PAGE,
             hasMore: result.hasMore,
             page: result.currentPage,
             willShowPagination: result.hasMore || result.currentPage > 1
@@ -805,6 +822,14 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     }
   }, [navigation]);
 
+  const handleOpenCreateModal = useCallback(() => {
+    setShowCreateModal(true);
+  }, []);
+
+  const handleCloseCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+  }, []);
+
   const handleCreateSharedWallet = useCallback(() => {
     try {
       navigation.navigate('CreateSharedWallet');
@@ -1002,18 +1027,32 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
 
     // Render delete action (right swipe) - available for all splits
     // Validation will happen in handleDeleteSplit
-    const renderRightActions = () => {
+    const renderRightActions = (progress: any) => {
+      const trans = progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [100, 0],
+      });
+
       return (
-        <TouchableOpacity
-          style={styles.deleteAction}
-          onPress={() => handleDeleteSplit(split)}
-          activeOpacity={0.8}
+        <Animated.View
+          style={[
+            styles.deleteActionContainer,
+            {
+              transform: [{ translateX: trans }],
+            },
+          ]}
         >
-          <View style={styles.deleteActionContent}>
-            <Icon name="trash" size={24} color={colors.white} />
-            <Text style={styles.deleteText}>Delete</Text>
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteAction}
+            onPress={() => handleDeleteSplit(split)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.deleteActionContent}>
+              <Icon name="trash" size={24} color={colors.white} />
+              <Text style={styles.deleteText}>Delete</Text>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
       );
     };
 
@@ -1033,19 +1072,29 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         <View style={styles.splitHeader}>
           <View style={styles.splitHeaderLeft}>
             {/* Category Icon */}
-            <GroupIcon
-              category={split.category || 'trip'}
-              size={48}
-              style={styles.categoryIcon}
-            />
+            {split.splitType === 'spend' ? (
+              <Image
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fpartners%2Fsp3nd-icon.png?alt=media&token=3b2603eb-57cb-4dc6-aafd-0fff463f1579' }}
+                style={[styles.categoryIcon, styles.spendIcon]}
+                resizeMode="contain"
+              />
+            ) : (
+              <GroupIcon
+                category={split.category || 'trip'}
+                size={48}
+                style={styles.categoryIcon}
+              />
+            )}
             <View style={styles.splitTitleContainer}>
               <Text style={styles.splitTitle} numberOfLines={1}>
                 {splitTitle}
               </Text>
               <View style={styles.roleContainer}>
                 {split.creatorId === currentUser?.id ? (
-                  <Image 
-                    source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Faward-icon-black.png?alt=media&token=07283493-afd6-489e-a5c2-7dffc6922f41' }}
+                  <PhosphorIcon
+                    name="Medal"
+                    size={16}
+                    color={colors.white70}
                     style={styles.roleIcon}
                   />
                 ) : (
@@ -1199,7 +1248,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
           <Text style={styles.headerTitle}>Pools</Text>
           <TouchableOpacity
             style={[styles.newPoolButton, activeTab === 'sharedWallets' && !__DEV__ && styles.newPoolButtonDisabled]}
-            onPress={activeTab === 'splits' ? handleCreateSplit : (__DEV__ && activeTab === 'sharedWallets' ? handleCreateSharedWallet : undefined)}
+            onPress={activeTab === 'splits' ? handleOpenCreateModal : (__DEV__ && activeTab === 'sharedWallets' ? handleCreateSharedWallet : undefined)}
             activeOpacity={0.8}
             disabled={activeTab === 'sharedWallets' && !__DEV__}
           >
@@ -1209,9 +1258,9 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
               end={{ x: 1, y: 0 }}
               style={styles.newPoolButton}
             >
-              <Icon name="plus" size={16} color={activeTab === 'sharedWallets' && !__DEV__ ? colors.white50 : colors.black} />
+              <PhosphorIcon name="Plus" size={14} color={activeTab === 'sharedWallets' && !__DEV__ ? colors.white50 : colors.black} weight="bold" />
               <Text style={[styles.newPoolButtonText, activeTab === 'sharedWallets' && !__DEV__ && styles.newPoolButtonTextDisabled]}>
-                {activeTab === 'splits' ? 'New Pool' : 'New Wallet'}
+                {activeTab === 'splits' ? 'Create' : 'New Wallet'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -1242,135 +1291,15 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
 
         {/* Filter Tabs - Only show when "Splits" tab is active */}
         {activeTab === 'splits' && (
-        <View style={styles.filtersContainer}>
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            onPress={() => setActiveFilter('all')}
-            activeOpacity={0.8}
-          >
-            {activeFilter === 'all' ? (
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.filterButton}
-              >
-                <Text style={styles.filterButtonTextActive}>
-                  All
-                </Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.filterButton}>
-                <Text style={styles.filterButtonText}>
-                  All
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            onPress={() => setActiveFilter('active')}
-            activeOpacity={0.8}
-          >
-            {activeFilter === 'active' ? (
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.filterButton}
-              >
-                <Text style={styles.filterButtonTextActive}>
-                  Active
-                </Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.filterButton}>
-                <Text style={styles.filterButtonText}>
-                  Active
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            onPress={() => setActiveFilter('closed')}
-            activeOpacity={0.8}
-          >
-            {activeFilter === 'closed' ? (
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.filterButton}
-              >
-                <Text style={styles.filterButtonTextActive}>
-                  Closed
-                </Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.filterButton}>
-                <Text style={styles.filterButtonText}>
-                  Closed
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-        )}
-
-        {/* Pagination Buttons - Only show for "All" filter when there are multiple pages or loading count */}
-        {activeTab === 'splits' && activeFilter === 'all' && splits.length > 0 && (hasMore || currentPage > 1 || totalPages > 1 || (isLoadingCount && totalSplits === 0)) && (
-          <View style={styles.paginationContainer}>
-            <Button
-              title=""
-              onPress={goToPreviousPage}
-              variant="secondary"
-              size="small"
-              disabled={isLoading || currentPage <= 1}
-              icon="CaretLeft"
-              iconPosition="left"
-              style={styles.paginationButton}
-            />
-            <View style={styles.pageInfo}>
-              <Text style={styles.pageText}>
-                {(() => {
-                  // If we're loading the count and don't have it yet, show loading
-                  if (isLoadingCount && totalSplits === 0 && knownTotalPages === null) {
-                    return `Page ${currentPage} (loading...)`;
-                  }
-                  // If we have known total pages, use it
-                  if (knownTotalPages !== null) {
-                    return `Page ${currentPage} of ${knownTotalPages}`;
-                  }
-                  // If we have totalSplits count, calculate and show
-                  if (totalSplits > 0) {
-                    const calculated = Math.ceil(totalSplits / SPLITS_PER_PAGE);
-                    return `Page ${currentPage} of ${calculated}`;
-                  }
-                  // If totalPages is 0 (loading), show loading
-                  if (totalPages === 0) {
-                    return `Page ${currentPage} (loading...)`;
-                  }
-                  // If we have hasMore, show estimate
-                  if (hasMore) {
-                    return `Page ${currentPage} (more available)`;
-                  }
-                  // Fallback: show current calculation
-                  return `Page ${currentPage} of ${totalPages}`;
-                })()}
-              </Text>
-            </View>
-            <Button
-              title=""
-              onPress={goToNextPage}
-              variant="secondary"
-              size="small"
-              disabled={isLoading || !hasMore}
-              icon="CaretRight"
-              iconPosition="right"
-              style={styles.paginationButton}
+          <View style={{ marginTop: spacing.sm }}>
+            <TabSecondary
+              tabs={[
+                { label: 'All', value: 'all' },
+                { label: 'Active', value: 'active' },
+                { label: 'Closed', value: 'closed' },
+              ]}
+              activeTab={activeFilter}
+              onTabChange={(tab) => setActiveFilter(tab as 'all' | 'active' | 'closed')}
             />
           </View>
         )}
@@ -1413,6 +1342,65 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         ) : (
           <View>
             {displaySplits.map(renderSplitCard)}
+            
+            {/* Pagination Buttons - Only show for "All" filter when there are multiple pages or loading count */}
+            {activeTab === 'splits' && activeFilter === 'all' && splits.length > 0 && (hasMore || currentPage > 1 || totalPages > 1 || (isLoadingCount && totalSplits === 0)) && (
+              <View style={styles.paginationContainer}>
+                <TouchableOpacity
+                  onPress={goToPreviousPage}
+                  disabled={isLoading || currentPage <= 1}
+                  activeOpacity={0.6}
+                  style={styles.paginationButtonTouchable}
+                >
+                  <PhosphorIcon
+                    name="CaretLeft"
+                    size={20}
+                    color={isLoading || currentPage <= 1 ? colors.white50 : colors.white}
+                  />
+                </TouchableOpacity>
+                <View style={styles.pageInfo}>
+                  <Text style={styles.pageText}>
+                    {(() => {
+                      // If we're loading the count and don't have it yet, show loading
+                      if (isLoadingCount && totalSplits === 0 && knownTotalPages === null) {
+                        return `Page ${currentPage} (loading...)`;
+                      }
+                      // If we have known total pages, use it
+                      if (knownTotalPages !== null) {
+                        return `Page ${currentPage} of ${knownTotalPages}`;
+                      }
+                      // If we have totalSplits count, calculate and show
+                      if (totalSplits > 0) {
+                        const calculated = Math.ceil(totalSplits / SPLITS_PER_PAGE);
+                        return `Page ${currentPage} of ${calculated}`;
+                      }
+                      // If totalPages is 0 (loading), show loading
+                      if (totalPages === 0) {
+                        return `Page ${currentPage} (loading...)`;
+                      }
+                      // If we have hasMore, show estimate
+                      if (hasMore) {
+                        return `Page ${currentPage} (more available)`;
+                      }
+                      // Fallback: show current calculation
+                      return `Page ${currentPage} of ${totalPages}`;
+                    })()}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={goToNextPage}
+                  disabled={isLoading || !hasMore}
+                  activeOpacity={0.6}
+                  style={styles.paginationButtonTouchable}
+                >
+                  <PhosphorIcon
+                    name="CaretRight"
+                    size={20}
+                    color={isLoading || !hasMore ? colors.white50 : colors.white}
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
           )
         ) : (
@@ -1447,6 +1435,16 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         )}
         </ScrollView>
       </View>
+
+      {/* Create Choice Modal */}
+      {activeTab === 'splits' && (
+        <CreateChoiceModal
+          visible={showCreateModal}
+          onClose={handleCloseCreateModal}
+          onCreateSplit={handleCreateSplit}
+          onCreateSharedWallet={handleCreateSharedWallet}
+        />
+      )}
 
       <NavBar currentRoute="SplitsList" navigation={navigation} />
     </Container>
