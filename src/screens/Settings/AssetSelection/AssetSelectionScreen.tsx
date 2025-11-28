@@ -74,6 +74,15 @@ interface AssetSelectionScreenProps {
 // Stable empty array to prevent re-renders
 const EMPTY_ARRAY: string[] = [];
 
+// Asset ID mapping for backward compatibility (old IDs -> canonical IDs)
+const ASSET_ID_MAPPING: Record<string, string> = {
+  'profile_border_admin': 'profile_border_admin_2025',
+  'profile_border_admin_2024': 'profile_border_admin_2025',
+  'wallet_biscuit_2024': 'wallet_biscuit_2025',
+  'profile_border_ice_crystal_2024': 'profile_border_ice_crystal_2025',
+  'profile_border_christmas_wreath_2024': 'profile_border_christmas_wreath_2025',
+};
+
 const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) => {
   const navigation = useNavigation<NavigationProp<any>>();
   const { state, updateUser, refreshUser } = useApp();
@@ -86,24 +95,71 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
 
   // Track which asset IDs we've already resolved to prevent infinite loops
   const resolvedAssetIdsRef = useRef<string>('');
+  // Track last refresh time to avoid too frequent refreshes
+  const lastRefreshRef = useRef<number>(0);
 
-  // Get user's owned assets - use stable empty array to prevent infinite loops
-  const ownedBorders = currentUser?.profile_borders ?? EMPTY_ARRAY;
-  const ownedBackgrounds = currentUser?.wallet_backgrounds ?? EMPTY_ARRAY;
+  // Get user's owned assets - memoize to ensure stability
+  const ownedBorders = useMemo(() =>
+    currentUser?.profile_borders ?? EMPTY_ARRAY,
+    [currentUser?.profile_borders]
+  );
+  const ownedBackgrounds = useMemo(() =>
+    currentUser?.wallet_backgrounds ?? EMPTY_ARRAY,
+    [currentUser?.wallet_backgrounds]
+  );
   
   // Get all available assets from config
-  const allBorders = useMemo(() => getAssetsByType('profile_border'), []);
-  const allBackgrounds = useMemo(() => getAssetsByType('wallet_background'), []);
+  const allBorders = useMemo(() => {
+    const borders = getAssetsByType('profile_border');
+    console.log('🎨 All borders loaded:', borders.map(b => b.assetId));
+    return borders;
+  }, []);
+  const allBackgrounds = useMemo(() => {
+    const backgrounds = getAssetsByType('wallet_background');
+    console.log('🎨 All backgrounds loaded:', backgrounds.map(b => b.assetId));
+    return backgrounds;
+  }, []);
   
-  // Filter to show only owned assets - memoize with stable dependencies
-  const userBorders = useMemo(() => 
-    allBorders.filter(a => ownedBorders.includes(a.assetId)),
-    [allBorders, ownedBorders]
-  );
-  const userBackgrounds = useMemo(() => 
-    allBackgrounds.filter(a => ownedBackgrounds.includes(a.assetId)),
-    [allBackgrounds, ownedBackgrounds]
-  );
+  // Filter to show only owned assets and deduplicate canonical assets - memoize with stable dependencies
+  const userBorders = useMemo(() => {
+    // Create a set of canonical asset IDs that the user owns (including mapped old IDs)
+    const canonicalOwnedBorderIds = new Set<string>();
+
+    // Check each owned border ID
+    ownedBorders.forEach(ownedId => {
+      // If it's a direct match, add it
+      if (allBorders.some(a => a.assetId === ownedId)) {
+        canonicalOwnedBorderIds.add(ownedId);
+      }
+      // If it's mapped to a canonical ID, add the canonical ID
+      else if (ASSET_ID_MAPPING[ownedId] && allBorders.some(a => a.assetId === ASSET_ID_MAPPING[ownedId])) {
+        canonicalOwnedBorderIds.add(ASSET_ID_MAPPING[ownedId]);
+      }
+    });
+
+    // Return the canonical assets that the user owns
+    return allBorders.filter(a => canonicalOwnedBorderIds.has(a.assetId));
+  }, [allBorders, ownedBorders]);
+
+  const userBackgrounds = useMemo(() => {
+    // Create a set of canonical asset IDs that the user owns (including mapped old IDs)
+    const canonicalOwnedBackgroundIds = new Set<string>();
+
+    // Check each owned background ID
+    ownedBackgrounds.forEach(ownedId => {
+      // If it's a direct match, add it
+      if (allBackgrounds.some(a => a.assetId === ownedId)) {
+        canonicalOwnedBackgroundIds.add(ownedId);
+      }
+      // If it's mapped to a canonical ID, add the canonical ID
+      else if (ASSET_ID_MAPPING[ownedId] && allBackgrounds.some(a => a.assetId === ASSET_ID_MAPPING[ownedId])) {
+        canonicalOwnedBackgroundIds.add(ASSET_ID_MAPPING[ownedId]);
+      }
+    });
+
+    // Return the canonical assets that the user owns
+    return allBackgrounds.filter(a => canonicalOwnedBackgroundIds.has(a.assetId));
+  }, [allBackgrounds, ownedBackgrounds]);
 
   // Create stable asset list for URL resolution
   const assetIdsToResolve = useMemo(() => 
@@ -111,50 +167,47 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
     [userBorders, userBackgrounds]
   );
 
-  // Refresh user data when screen comes into focus
+  // Refresh user data when screen comes into focus (throttled to avoid excessive calls)
   useFocusEffect(
     React.useCallback(() => {
       const refreshUserData = async () => {
+        const now = Date.now();
+        // Only refresh if it's been more than 30 seconds since last refresh
+        if (now - lastRefreshRef.current < 30000) {
+          return;
+        }
+        lastRefreshRef.current = now;
+
         try {
-          logger.debug('Refreshing user data on AssetSelectionScreen focus', {
-            currentOwnedBackgrounds: ownedBackgrounds,
-            currentUserId: currentUser?.id
-          }, 'AssetSelectionScreen');
-
+          console.log('🎨 Refreshing user data on AssetSelectionScreen focus');
           await refreshUser();
-
-          logger.debug('User data refreshed on AssetSelectionScreen focus', {
-            newOwnedBackgrounds: currentUser?.wallet_backgrounds,
-            currentUserId: currentUser?.id
-          }, 'AssetSelectionScreen');
+          console.log('🎨 User data refreshed on AssetSelectionScreen focus');
         } catch (error) {
-          logger.error('Failed to refresh user data on focus', { error }, 'AssetSelectionScreen');
+          console.error('Failed to refresh user data on focus', error);
+          // Reset timestamp on error so we can retry sooner
+          lastRefreshRef.current = 0;
         }
       };
 
       refreshUserData();
-    }, [refreshUser, ownedBackgrounds, currentUser?.id, currentUser?.wallet_backgrounds])
+    }, [refreshUser]) // Include refreshUser as dependency but throttle calls
   );
 
-  // Debug logging for asset selection
+  // Debug logging for asset selection - only log when assets actually change
   useEffect(() => {
-    logger.debug('AssetSelectionScreen mounted', {
-      ownedBorders: ownedBorders,
-      ownedBackgrounds: ownedBackgrounds,
-      userBordersCount: userBorders.length,
-      userBackgroundsCount: userBackgrounds.length,
-      allBordersCount: allBorders.length,
-      allBackgroundsCount: allBackgrounds.length,
-    }, 'AssetSelectionScreen');
-
-    // Also log to console for easier debugging
-    console.log('🎨 AssetSelectionScreen Debug:', {
+    console.log('🎨 Asset Selection Debug:', {
       ownedBorders,
       ownedBackgrounds,
       userBordersCount: userBorders.length,
       userBackgroundsCount: userBackgrounds.length,
+      allBordersCount: allBorders.length,
+      allBackgroundsCount: allBackgrounds.length,
+      userBorderIds: userBorders.map(b => b.assetId),
+      userBackgroundIds: userBackgrounds.map(b => b.assetId),
+      activeBorder: currentUser?.active_profile_border,
+      activeBackground: currentUser?.active_wallet_background
     });
-  }, [ownedBorders, ownedBackgrounds, userBorders.length, userBackgrounds.length]);
+  }, [ownedBorders, ownedBackgrounds, userBorders, userBackgrounds, currentUser?.active_profile_border, currentUser?.active_wallet_background]);
 
   // Resolve storage URLs for assets
   useEffect(() => {
@@ -280,14 +333,17 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
           displayName={currentUser?.name || currentUser?.display_name || 'User'}
           avatarUrl={currentUser?.avatar}
           size={100}
-          borderImageUrl={currentUser?.active_profile_border 
-            ? resolvedUrls[currentUser.active_profile_border] || undefined
+          borderImageUrl={currentUser?.active_profile_border
+            ? resolvedUrls[currentUser.active_profile_border] ||
+              resolvedUrls[ASSET_ID_MAPPING[currentUser.active_profile_border] || ''] || undefined
             : undefined}
         />
         <Text style={styles.previewLabel}>Current Preview</Text>
         {currentUser?.active_profile_border && (
           <Text style={styles.previewAssetName}>
-            {getAssetInfo(currentUser.active_profile_border)?.name || 'Custom Border'}
+            {getAssetInfo(currentUser.active_profile_border)?.name ||
+             getAssetInfo(ASSET_ID_MAPPING[currentUser.active_profile_border] || '')?.name ||
+             'Custom Border'}
           </Text>
         )}
       </View>
@@ -323,7 +379,9 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
 
           {/* User's owned borders */}
           {userBorders.map((asset) => {
-            const isActive = currentUser?.active_profile_border === asset.assetId;
+            // Check if this asset is active (including mapped old IDs)
+            const isActive = currentUser?.active_profile_border === asset.assetId ||
+              (currentUser?.active_profile_border && ASSET_ID_MAPPING[currentUser.active_profile_border] === asset.assetId);
             const isLoading = loading === asset.assetId;
             const imageUrl = resolvedUrls[asset.assetId];
             const hasImage = isSafeUrl(imageUrl);
@@ -409,7 +467,9 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
 
           {/* User's owned backgrounds */}
           {userBackgrounds.map((asset) => {
-            const isActive = currentUser?.active_wallet_background === asset.assetId;
+            // Check if this asset is active (including mapped old IDs)
+            const isActive = currentUser?.active_wallet_background === asset.assetId ||
+              (currentUser?.active_wallet_background && ASSET_ID_MAPPING[currentUser.active_wallet_background] === asset.assetId);
             const isLoading = loading === asset.assetId;
             const imageUrl = resolvedUrls[asset.assetId];
             const hasImage = isSafeUrl(imageUrl);
