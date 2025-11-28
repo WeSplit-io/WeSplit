@@ -163,7 +163,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'wallet_solstice_2024',
     name: 'Winter Solstice',
     description: 'Celebrate the longest night',
-    url: buildAssetUrl('wallet_solstice_2024.png'),
+    url: buildBackgroundUrl('WinterSolstice.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'epic'
@@ -172,7 +172,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'wallet_northpole_2024',
     name: 'North Pole Lights',
     description: 'Neon aurora gradient for your wallet card',
-    url: buildAssetUrl('wallet_northpole_2024.png'),
+    url: buildBackgroundUrl('NorthPoleLights.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'epic'

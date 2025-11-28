@@ -23,6 +23,9 @@ import Button from '../shared/Button';
 import { christmasCalendarService } from '../../services/rewards/christmasCalendarService';
 import { getGiftForDay } from '../../services/rewards/christmasCalendarConfig';
 import { resolveStorageUrl } from '../../services/shared/storageUrlService';
+import { getAssetInfo } from '../../services/rewards/assetConfig';
+import UserAvatar from '../UserAvatar';
+import { useApp } from '../../context/AppContext';
 import {
   getTileBackgroundStyle,
   getDefaultTileBackgroundStyle,
@@ -180,12 +183,12 @@ const getImagePositionStyle = (position?: ImagePosition, resizeMode?: ImageResiz
   if (!position || position === 'center') {
     return { alignSelf: 'center' };
   }
-  
+
   // For cover/stretch, position doesn't matter much, but we can still align
   if (resizeMode === 'cover' || resizeMode === 'stretch') {
     return {};
   }
-  
+
   // For contain/center/repeat, we can position the image
   const positionMap: Record<string, any> = {
     'top': { alignSelf: 'flex-start', top: 0 },
@@ -197,7 +200,7 @@ const getImagePositionStyle = (position?: ImagePosition, resizeMode?: ImageResiz
     'bottom-left': { alignSelf: 'flex-start', bottom: 0, left: 0 },
     'bottom-right': { alignSelf: 'flex-end', bottom: 0, right: 0 },
   };
-  
+
   return positionMap[position] || { alignSelf: 'center' };
 };
 
@@ -212,7 +215,10 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   onClaimSuccess,
   onAssetClaimed
 }) => {
+  const { state } = useApp();
+  const { currentUser } = state;
   const [status, setStatus] = useState<ChristmasCalendarStatus | null>(null);
+  const [resolvedAssetUrls, setResolvedAssetUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -269,6 +275,39 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
     return () => clearInterval(interval);
   }, [updateCountdown]);
 
+  // Resolve asset URLs for previews
+  useEffect(() => {
+    const resolveAssetUrl = async (assetId: string, assetUrl: string) => {
+      try {
+        const resolved = await resolveStorageUrl(assetUrl);
+        if (resolved) {
+          setResolvedAssetUrls(prev => ({ ...prev, [assetId]: resolved }));
+        }
+      } catch (error) {
+        console.warn('Failed to resolve asset URL:', assetId, error);
+      }
+    };
+
+    if (selectedDay && status) {
+      const dayData = status.days[selectedDay - 1];
+      if (dayData) {
+        const isClaimed = dayData.claimed;
+        const giftConfig = getGiftForDay(selectedDay);
+        if (!giftConfig) return;
+
+        const gift = isClaimed && dayData.gift_data ? dayData.gift_data : giftConfig.gift;
+
+        if (gift.type === 'asset') {
+          const assetGift = gift as any;
+          const assetInfo = getAssetInfo(assetGift.assetId);
+          if (assetInfo?.url && !resolvedAssetUrls[assetGift.assetId]) {
+            resolveAssetUrl(assetGift.assetId, assetInfo.url);
+          }
+        }
+      }
+    }
+  }, [selectedDay, status, resolvedAssetUrls]);
+
   // Load calendar status function
   const loadCalendarStatus = useCallback(async () => {
     try {
@@ -294,7 +333,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   useEffect(() => {
     const resolveTileImageUrls = async () => {
       const urlsToResolve: Array<{ day: number; url: string }> = [];
-      
+
       // Collect all tile background images that need resolution
       for (let day = 1; day <= 25; day++) {
         const tileStyle = getTileBackgroundStyle(day);
@@ -353,12 +392,12 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
     if (!status) { return; }
 
     const dayData = status.days[day - 1];
-    
+
     // If dayData is undefined, return early
     if (!dayData) {
       return;
     }
-    
+
     // If already claimed, show what was claimed
     if (dayData.claimed) {
       setSelectedDay(day);
@@ -371,7 +410,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
     // Check if can claim
     const userTimezone = christmasCalendarService.getUserTimezone();
     const canClaim = christmasCalendarService.canClaimDay(day, userTimezone);
-    
+
     if (!canClaim.canClaim) {
       Alert.alert('Cannot Claim', canClaim.reason || 'This gift cannot be claimed yet.');
       return;
@@ -401,16 +440,17 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
 
       if (result.success) {
         setClaimedGift(result.gift);
-        setModalView('success');
 
         // Call asset callback if this was an asset claim
         if (result.gift.type === 'asset') {
           console.log('🎄 ChristmasCalendar: Asset claimed, calling onAssetClaimed callback', {
-            assetId: result.gift.assetId,
-            assetType: result.gift.assetType
+            assetId: (result.gift as AssetGift).assetId,
+            assetType: (result.gift as AssetGift).assetType
           });
           onAssetClaimed?.();
         }
+
+        setModalView('success');
 
         // Auto-close after 3 seconds
         setTimeout(() => {
@@ -485,6 +525,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
 
     // Claiming state - shows reward details with claim button
     if (modalView === 'claiming' && !isClaimed) {
+
       const getRewardDisplay = () => {
         if (gift.type === 'points') {
           const pointsGift = gift as PointsGift;
@@ -496,7 +537,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
           };
         }
         if (gift.type === 'asset') {
-          const assetGift = gift as AssetGift;
+          const assetGift = gift as any; // gift config has assetType property
           return {
             icon: '✨',
             primary: assetGift.name,
@@ -522,42 +563,83 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
           transparent={true}
           closeOnBackdrop={true}
           showHandle={true}
-          maxHeight={450}
+          maxHeight={gift.type === 'asset' ? 620 : 400}
         >
           <View style={styles.modalClaimingContent}>
-            <View style={styles.rewardFrame}>
-              <View style={styles.rewardBoxContainer}>
-                {(() => {
-                  if (gift.type === 'points') {
-                    // Use Christmas icons image for points
-                    return (
-                      <Image
-                        source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchristmas%2FChristmas%20icons.png?alt=media&token=28f22ccf-b366-4869-935b-f1c341b006b2' }}
-                        style={styles.rewardBoxImage}
-                        resizeMode="contain"
+            {/* Asset Preview - shown at top for wallet backgrounds and profile borders */}
+            {gift.type === 'asset' && (() => {
+              const assetGift = gift as any; // gift config has assetType property
+              const resolvedAssetUrl = resolvedAssetUrls[assetGift.assetId];
+
+              if (assetGift.assetType === 'wallet_background') {
+                return (
+                  <View style={styles.walletPreviewTopContainer}>
+                    <View style={styles.walletPreviewWrapper}>
+                      {resolvedAssetUrl ? (
+                        <Image
+                          source={{ uri: resolvedAssetUrl }}
+                          style={styles.walletPreviewTopImage}
+                          resizeMode="contain"
+                          onError={() => {
+                            console.warn('Wallet background image failed to load');
+                          }}
+                        />
+                      ) : (
+                        <View style={[styles.walletPreviewTopImage, { backgroundColor: colors.white10, justifyContent: 'center', alignItems: 'center' }]}>
+                          <PhosphorIcon name="Image" size={32} color={colors.white70} />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.previewTopTitle}>{assetGift.name}</Text>
+                  </View>
+                );
+              } else if (assetGift.assetType === 'profile_border') {
+                return (
+                  <View style={styles.profilePreviewTopContainer}>
+                    <View style={styles.profilePreviewWrapper}>
+                      <UserAvatar
+                        userId={userId}
+                        userName="Preview User"
+                        displayName="Preview User"
+                        avatarUrl={currentUser?.avatar}
+                        size={80}
+                        borderImageUrl={resolvedAssetUrl}
                       />
-                    );
-                  } else {
-                    return <Text style={styles.rewardBoxEmoji}>{reward.icon}</Text>;
-                  }
-                })()}
+                    </View>
+                    <Text style={styles.previewTopTitle}>{assetGift.name}</Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
+
+            {/* For points rewards, show the reward details */}
+            {gift.type === 'points' && (
+              <View style={styles.rewardFrame}>
+                <View style={styles.rewardBoxContainer}>
+                  <Image
+                    source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchristmas%2FChristmas%20icons.png?alt=media&token=28f22ccf-b366-4869-935b-f1c341b006b2' }}
+                    style={styles.rewardBoxImage}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={styles.rewardAmountContainer}>
+                  <Text style={styles.rewardAmount} numberOfLines={1}>
+                    {reward.primary}
+                  </Text>
+                  <Text style={styles.rewardLabel}>{reward.secondary}</Text>
+                </View>
               </View>
-              <View style={styles.rewardAmountContainer}>
-                <Text
-                  style={[
-                    gift.type === 'points' ? styles.rewardAmount : styles.rewardTitleText,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {gift.type === 'points' ? reward.primary : reward.primary}
-                </Text>
-                <Text style={styles.rewardLabel}>{reward.secondary}</Text>
-              </View>
-            </View>
-            <Text style={styles.unlockedTitle}>You've unlocked today's reward!</Text>
+            )}
+
+            <Text style={styles.unlockedTitle}>
+              {gift.type === 'points' ? "You've unlocked today's reward!" : 'Ready to claim?'}
+            </Text>
+
             <Text style={styles.unlockedSubtitle}>
               {reward.details}
             </Text>
+
             <Button
               title="Claim Reward"
               onPress={handleClaimGift}
@@ -572,12 +654,12 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
       );
     }
 
-    // Success state - shows success message with checkmark
+    // Success state - shows success message
     if (modalView === 'success' && claimedGift) {
       const getSuccessMessage = () => {
         if (claimedGift.type === 'points') {
           return `You have successfully claimed ${(claimedGift as PointsGift).amount} split points!`;
-        } else         if (claimedGift.type === 'asset') {
+        } else if (claimedGift.type === 'asset') {
           return `You have successfully claimed ${(claimedGift as AssetGift).name}!`;
         }
         return 'You have successfully claimed your reward!';
@@ -661,180 +743,180 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
     TOTAL_GRID_ROWS * BASE_ROW_HEIGHT + (TOTAL_GRID_ROWS - 1) * ROW_GAP;
 
   const renderGridTile = (tile: LayoutTile) => {
-  if (!tileWidth) {
-    return null;
-  }
+    if (!tileWidth) {
+      return null;
+    }
 
-  const width =
-    tileWidth * tile.colSpan + COLUMN_GAP * (tile.colSpan - 1);
-  const height =
-    BASE_ROW_HEIGHT * tile.rowSpan + ROW_GAP * (tile.rowSpan - 1);
-  const left = tile.col * (tileWidth + COLUMN_GAP);
-  const top = tile.row * (BASE_ROW_HEIGHT + ROW_GAP);
-  const key = `day-${tile.day}-${tile.row}-${tile.col}`;
+    const width =
+      tileWidth * tile.colSpan + COLUMN_GAP * (tile.colSpan - 1);
+    const height =
+      BASE_ROW_HEIGHT * tile.rowSpan + ROW_GAP * (tile.rowSpan - 1);
+    const left = tile.col * (tileWidth + COLUMN_GAP);
+    const top = tile.row * (BASE_ROW_HEIGHT + ROW_GAP);
+    const key = `day-${tile.day}-${tile.row}-${tile.col}`;
 
-  const { isClaimed, isLocked, isToday } = getDayState(tile.day);
-  
-  // Get background style from configuration
-  const backgroundStyle = getTileBackgroundStyle(tile.day) || getDefaultTileBackgroundStyle();
-  const backgroundColor = backgroundStyle.backgroundColor || DEFAULT_PATTERN.background;
-  const backgroundImage = backgroundStyle.backgroundImage;
-  
-  // Get resolved image URL if available (for Firebase Storage URLs)
-  const imageUrl = backgroundImage && typeof backgroundImage.url === 'string'
-    ? (resolvedTileImageUrls[tile.day] || backgroundImage.url)
-    : backgroundImage?.url;
+    const { isClaimed, isLocked, isToday } = getDayState(tile.day);
 
-  // Remove padding and border when there's a background image
-  const hasBackgroundImage = Boolean(backgroundImage && imageUrl);
-  
-  return (
-    <TouchableOpacity
-      key={key}
-      style={[
-        styles.dayTile,
-        styles.absoluteTile,
-        {
-          width,
-          height,
-          left,
-          top,
-          backgroundColor,
-          // Remove padding and border when image is present
-          ...(hasBackgroundImage && {
-            padding: 0,
-            borderWidth: 0,
-          }),
-        },
-        isToday && styles.dayTileToday,
-        // Keep border for today even with image, but make it overlay
-        isToday && hasBackgroundImage && {
-          borderWidth: 2,
-          borderColor: colors.green,
-        },
-      ]}
-      onPress={() => handleDayPress(tile.day)}
-      activeOpacity={0.85}
-      disabled={isLocked && !bypassMode}
-    >
-      {/* Background Image */}
-      {backgroundImage && imageUrl && (
-        <Image
-          source={
-            typeof imageUrl === 'string'
-              ? { uri: imageUrl }
-              : imageUrl
+    // Get background style from configuration
+    const backgroundStyle = getTileBackgroundStyle(tile.day) || getDefaultTileBackgroundStyle();
+    const backgroundColor = backgroundStyle.backgroundColor || DEFAULT_PATTERN.background;
+    const backgroundImage = backgroundStyle.backgroundImage;
+
+    // Get resolved image URL if available (for Firebase Storage URLs)
+    const imageUrl = backgroundImage && typeof backgroundImage.url === 'string'
+      ? (resolvedTileImageUrls[tile.day] || backgroundImage.url)
+      : backgroundImage?.url;
+
+    // Remove padding and border when there's a background image
+    const hasBackgroundImage = Boolean(backgroundImage && imageUrl);
+
+    return (
+      <TouchableOpacity
+        key={key}
+        style={[
+          styles.dayTile,
+          styles.absoluteTile,
+          {
+            width,
+            height,
+            left,
+            top,
+            backgroundColor,
+            // Remove padding and border when image is present
+            ...(hasBackgroundImage && {
+              padding: 0,
+              borderWidth: 0,
+            }),
+          },
+          isToday && styles.dayTileToday,
+          // Keep border for today even with image, but make it overlay
+          isToday && hasBackgroundImage && {
+            borderWidth: 2,
+            borderColor: colors.green,
+          },
+        ]}
+        onPress={() => handleDayPress(tile.day)}
+        activeOpacity={0.85}
+        disabled={isLocked && !bypassMode}
+      >
+        {/* Background Image */}
+        {backgroundImage && imageUrl && (
+          <Image
+            source={
+              typeof imageUrl === 'string'
+                ? { uri: imageUrl }
+                : imageUrl
+            }
+            style={[
+              StyleSheet.absoluteFillObject,
+              {
+                opacity: backgroundImage.opacity ?? 1,
+                ...getImagePositionStyle(backgroundImage.position, backgroundImage.resizeMode),
+              },
+            ]}
+            resizeMode={backgroundImage.resizeMode || 'cover'}
+          />
+        )}
+
+        {/* Number style - centered or top based on day */}
+        {(() => {
+          const topDayStyle = getTopNumberDayStyle(tile.day);
+          if (topDayStyle === DAY_2_TOP) {
+            // Day 2 specific top number style
+            return (
+              <View style={styles.topNumberContainerDay2}>
+                <Text style={[
+                  styles.topNumberTextDay2,
+                  // White text for days in CENTERED_NUMBER_DAYS, black for others
+                  shouldUseCenteredNumberStyle(tile.day)
+                    ? { color: colors.white }
+                    : { color: colors.black }
+                ]}>
+                  {tile.day.toString().padStart(2, '0')}
+                </Text>
+              </View>
+            );
+          } else if (topDayStyle === DAY_16_TOP) {
+            // Day 16 specific top number style
+            return (
+              <View style={styles.topNumberContainerDay16}>
+                <Text style={[
+                  styles.topNumberTextDay16,
+                  // White text for days in CENTERED_NUMBER_DAYS, black for others
+                  shouldUseCenteredNumberStyle(tile.day)
+                    ? { color: colors.white }
+                    : { color: colors.black }
+                ]}>
+                  {tile.day.toString().padStart(2, '0')}
+                </Text>
+              </View>
+            );
+          } else if (topDayStyle === DAY_21_TOP) {
+            // Day 21 specific top number style
+            return (
+              <View style={styles.topNumberContainerDay21}>
+                <Text style={[
+                  styles.topNumberTextDay21,
+                  // White text for days in CENTERED_NUMBER_DAYS, black for others
+                  shouldUseCenteredNumberStyle(tile.day)
+                    ? { color: colors.white }
+                    : { color: colors.black }
+                ]}>
+                  {tile.day.toString().padStart(2, '0')}
+                </Text>
+              </View>
+            );
+          } else if (shouldUseTopNumberStyle(tile.day)) {
+            // Top number style for specific days (4, 9, 12, 18, 24)
+            return (
+              <View style={styles.topNumberContainer}>
+                <Text style={[
+                  styles.topNumberText,
+                  // White text for days in CENTERED_NUMBER_DAYS, black for others
+                  shouldUseCenteredNumberStyle(tile.day)
+                    ? { color: colors.white }
+                    : { color: colors.black }
+                ]}>
+                  {tile.day.toString().padStart(2, '0')}
+                </Text>
+              </View>
+            );
+          } else {
+            // Centered number style for all other days
+            return (
+              <View style={styles.centeredNumberContainer}>
+                <Text style={[
+                  styles.centeredNumberText,
+                  // White text for specific days, black for others
+                  shouldUseCenteredNumberStyle(tile.day)
+                    ? { color: colors.white }
+                    : { color: colors.black }
+                ]}>
+                  {tile.day.toString().padStart(2, '0')}
+                </Text>
+              </View>
+            );
           }
-          style={[
-            StyleSheet.absoluteFillObject,
-            {
-              opacity: backgroundImage.opacity ?? 1,
-              ...getImagePositionStyle(backgroundImage.position, backgroundImage.resizeMode),
-            },
-          ]}
-          resizeMode={backgroundImage.resizeMode || 'cover'}
-        />
-      )}
-      
-      {/* Number style - centered or top based on day */}
-      {(() => {
-        const topDayStyle = getTopNumberDayStyle(tile.day);
-        if (topDayStyle === DAY_2_TOP) {
-          // Day 2 specific top number style
-          return (
-            <View style={styles.topNumberContainerDay2}>
-              <Text style={[
-                styles.topNumberTextDay2,
-                // White text for days in CENTERED_NUMBER_DAYS, black for others
-                shouldUseCenteredNumberStyle(tile.day)
-                  ? { color: colors.white }
-                  : { color: colors.black }
-              ]}>
-                {tile.day.toString().padStart(2, '0')}
-              </Text>
-            </View>
-          );
-        } else if (topDayStyle === DAY_16_TOP) {
-          // Day 16 specific top number style
-          return (
-            <View style={styles.topNumberContainerDay16}>
-              <Text style={[
-                styles.topNumberTextDay16,
-                // White text for days in CENTERED_NUMBER_DAYS, black for others
-                shouldUseCenteredNumberStyle(tile.day)
-                  ? { color: colors.white }
-                  : { color: colors.black }
-              ]}>
-                {tile.day.toString().padStart(2, '0')}
-              </Text>
-            </View>
-          );
-        } else if (topDayStyle === DAY_21_TOP) {
-          // Day 21 specific top number style
-          return (
-            <View style={styles.topNumberContainerDay21}>
-              <Text style={[
-                styles.topNumberTextDay21,
-                // White text for days in CENTERED_NUMBER_DAYS, black for others
-                shouldUseCenteredNumberStyle(tile.day)
-                  ? { color: colors.white }
-                  : { color: colors.black }
-              ]}>
-                {tile.day.toString().padStart(2, '0')}
-              </Text>
-            </View>
-          );
-        } else if (shouldUseTopNumberStyle(tile.day)) {
-          // Top number style for specific days (4, 9, 12, 18, 24)
-          return (
-            <View style={styles.topNumberContainer}>
-              <Text style={[
-                styles.topNumberText,
-                // White text for days in CENTERED_NUMBER_DAYS, black for others
-                shouldUseCenteredNumberStyle(tile.day)
-                  ? { color: colors.white }
-                  : { color: colors.black }
-              ]}>
-                {tile.day.toString().padStart(2, '0')}
-              </Text>
-            </View>
-          );
-        } else {
-          // Centered number style for all other days
-          return (
-            <View style={styles.centeredNumberContainer}>
-              <Text style={[
-                styles.centeredNumberText,
-                // White text for specific days, black for others
-                shouldUseCenteredNumberStyle(tile.day) 
-                  ? { color: colors.white }
-                  : { color: colors.black }
-              ]}>
-                {tile.day.toString().padStart(2, '0')}
-              </Text>
-            </View>
-          );
-        }
-      })()}
-      {isToday && (
-        <View style={styles.todayPill}>
-          <Text style={styles.todayPillText}>Today</Text>
-        </View>
-      )}
-      {isLocked && !isClaimed && (
-        <View style={styles.lockOverlay}>
-          <PhosphorIcon name="Lock" size={16} color={colors.white} weight="fill" />
-        </View>
-      )}
-      {isClaimed && (
-        <View style={styles.claimedOverlay}>
-          <PhosphorIcon name="CheckCircle" size={16} color={colors.black} weight="fill" />
-          <Text style={styles.claimedOverlayText}>Claimed</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-};
+        })()}
+        {isToday && (
+          <View style={styles.todayPill}>
+            <Text style={styles.todayPillText}>Today</Text>
+          </View>
+        )}
+        {isLocked && !isClaimed && (
+          <View style={styles.lockOverlay}>
+            <PhosphorIcon name="Lock" size={16} color={colors.white} weight="fill" />
+          </View>
+        )}
+        {isClaimed && (
+          <View style={styles.claimedOverlay}>
+            <PhosphorIcon name="CheckCircle" size={16} color={colors.black} weight="fill" />
+            <Text style={styles.claimedOverlayText}>Claimed</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -1326,6 +1408,49 @@ const styles = StyleSheet.create({
     color: colors.white70,
     textAlign: 'center',
     paddingHorizontal: spacing.sm,
+  },
+  profilePreviewTopContainer: {
+    alignItems: 'center',
+    padding: spacing.lg,
+    backgroundColor: colors.white10,
+    borderRadius: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.green,
+    marginBottom: spacing.lg,
+  },
+  previewTopTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  profilePreviewWrapper: {
+    alignItems: 'center',
+  },
+  previewTopDescription: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.green,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  walletPreviewWrapper: {
+    position: 'relative',
+  },
+  walletPreviewTopContainer: {
+    width: '100%',
+    height: 180,
+    borderRadius: spacing.lg,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: spacing.lg,
+    borderWidth: 2,
+    borderColor: colors.green,
+  },
+  walletPreviewTopImage: {
+    width: '100%',
+    height: '100%',
   },
   cannotClaimContainer: {
     flexDirection: 'row',

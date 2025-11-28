@@ -118,15 +118,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 8 - December 8th
   {
     day: 8,
-    title: 'Ice Crystal Border',
-    description: 'A sparkling ice crystal frame for your avatar',
+    title: 'Winter Solstice Background',
+    description: 'Celebrate the longest night with a winter solstice theme',
     gift: {
       type: 'asset',
-      assetId: 'profile_border_ice_crystal_2024',
-      assetType: 'profile_border',
-      assetUrl: getAssetPreviewUrl('profile_border_ice_crystal_2024'),
-      name: 'Ice Crystal Border',
-      description: 'Sparkling ice crystal border for a frosty look'
+      assetId: 'wallet_solstice_2024',
+      assetType: 'wallet_background',
+      assetUrl: getAssetPreviewUrl('wallet_solstice_2024'),
+      name: 'Winter Solstice',
+      description: 'Celebrate the longest night'
     }
   },
   
@@ -144,45 +144,37 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 10 - December 10th
   {
     day: 10,
-    title: 'Biscuit Bliss Background',
-    description: 'A festive gingerbread treat for your balance card',
+    title: 'North Pole Lights Background',
+    description: 'Neon aurora gradient for your wallet card',
     gift: {
       type: 'asset',
-      assetId: 'wallet_biscuit_2024',
+      assetId: 'wallet_northpole_2024',
       assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_biscuit_2024'),
-      name: 'Biscuit Bliss',
-      description: 'Festive gingerbread cookie background for your balance card'
+      assetUrl: getAssetPreviewUrl('wallet_northpole_2024'),
+      name: 'North Pole Lights',
+      description: 'Neon aurora gradient for your wallet card'
     }
   },
   
   // Day 11 - December 11th
   {
     day: 11,
-    title: 'Biscuit Bliss Background',
-    description: 'Festive gingerbread cookie background for your balance card',
+    title: 'Festive Points',
+    description: 'More holiday points to celebrate!',
     gift: {
-      type: 'asset',
-      assetId: 'wallet_biscuit_2024',
-      assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_biscuit_2024'),
-      name: 'Biscuit Bliss',
-      description: 'Festive gingerbread cookie background for your balance card'
+      type: 'points',
+      amount: 85
     }
   },
   
   // Day 12 - December 12th
   {
     day: 12,
-    title: 'Ice Crystal Border',
-    description: 'Unlock a sparkling ice crystal profile frame',
+    title: 'Winter Points',
+    description: 'Cozy up with bonus winter points!',
     gift: {
-      type: 'asset',
-      assetId: 'profile_border_ice_crystal_2024',
-      assetType: 'profile_border',
-      assetUrl: getAssetPreviewUrl('profile_border_ice_crystal_2024'),
-      name: 'Ice Crystal Border',
-      description: 'Sparkling ice crystal border for a frosty look'
+      type: 'points',
+      amount: 95
     }
   },
   
@@ -215,15 +207,11 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 15 - December 15th
   {
     day: 15,
-    title: 'Christmas Wreath Border',
-    description: 'The ultimate festive crown for completing the calendar!',
+    title: 'Festive Points',
+    description: 'Points to help you celebrate the season!',
     gift: {
-      type: 'asset',
-      assetId: 'profile_border_christmas_wreath_2024',
-      assetType: 'profile_border',
-      assetUrl: getAssetPreviewUrl('profile_border_christmas_wreath_2024'),
-      name: 'Christmas Wreath',
-      description: 'A festive wreath border with holly and berries'
+      type: 'points',
+      amount: 130
     }
   },
   
@@ -241,45 +229,33 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 17 - December 17th
   {
     day: 17,
-    title: 'Ice Crystal Border',
-    description: 'A sparkling ice crystal frame for your avatar',
+    title: 'Holiday Points',
+    description: 'Extra festive points for the season!',
     gift: {
-      type: 'asset',
-      assetId: 'profile_border_ice_crystal_2024',
-      assetType: 'profile_border',
-      assetUrl: getAssetPreviewUrl('profile_border_ice_crystal_2024'),
-      name: 'Ice Crystal Border',
-      description: 'Sparkling ice crystal border for a frosty look'
+      type: 'points',
+      amount: 125
     }
   },
   
   // Day 18 - December 18th
   {
     day: 18,
-    title: 'Christmas Wreath Border',
-    description: 'The ultimate festive crown for completing the calendar!',
+    title: 'Festive Bonus Points',
+    description: 'Extra points to make your holiday brighter!',
     gift: {
-      type: 'asset',
-      assetId: 'profile_border_christmas_wreath_2024',
-      assetType: 'profile_border',
-      assetUrl: getAssetPreviewUrl('profile_border_christmas_wreath_2024'),
-      name: 'Christmas Wreath',
-      description: 'A festive wreath border with holly and berries'
+      type: 'points',
+      amount: 135
     }
   },
   
   // Day 19 - December 19th
   {
     day: 19,
-    title: 'Snowflake Dance Background',
-    description: 'Delicate snowflakes dancing across your balance card',
+    title: 'Winter Points',
+    description: 'More points for your winter collection!',
     gift: {
-      type: 'asset',
-      assetId: 'wallet_snowflakes_2024',
-      assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_snowflakes_2024'),
-      name: 'Snowflake Dance',
-      description: 'Delicate snowflakes floating across your balance card'
+      type: 'points',
+      amount: 145
     }
   },
   

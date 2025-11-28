@@ -37,12 +37,12 @@ const DevAssetPreviewScreen: React.FC = () => {
   const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
 
   const allAssets = useMemo(() => getAllAssets(), []);
-  const profileBorders = useMemo(() =>
+  const profileBorders = useMemo(() => 
     allAssets.filter(a => a.assetType === 'profile_border' && a.category === 'christmas'),
     [allAssets]
   );
 
-  const walletBackgrounds = useMemo(() =>
+  const walletBackgrounds = useMemo(() => 
     allAssets.filter(a => a.assetType === 'wallet_background' && a.category === 'christmas'),
     [allAssets]
   );
@@ -58,7 +58,7 @@ const DevAssetPreviewScreen: React.FC = () => {
           try {
             const resolved = await resolveStorageUrl(asset.url, { assetId: asset.assetId });
             if (resolved) {
-              urlMap[asset.assetId] = resolved;
+            urlMap[asset.assetId] = resolved;
             }
           } catch (error) {
             logger.warn('Failed to resolve asset URL', { assetId: asset.assetId }, 'DevAssetPreviewScreen');

@@ -334,16 +334,16 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         if (assetInfo?.url) {
           // Resolve the URL (handles gs:// to https:// conversion)
           const resolvedUrl = await resolveStorageUrl(assetInfo.url, { assetId: currentUser.active_wallet_background });
-          logger.info('Resolved background URL', {
-            assetId: currentUser.active_wallet_background,
+        logger.info('Resolved background URL', {
+          assetId: currentUser.active_wallet_background,
             resolvedUrl,
             originalUrl: assetInfo.url,
             assetInfoFound: !!assetInfo
-          }, 'DashboardScreen');
+        }, 'DashboardScreen');
 
-          if (isMounted) {
+        if (isMounted) {
             setWalletBackgroundUrl(resolvedUrl || null);
-            setBackgroundError(false);
+          setBackgroundError(false);
           }
         } else {
           logger.warn('No URL found for wallet background', {
