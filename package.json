@@ -43,7 +43,6 @@
   "test:transactions": "node scripts/test-transaction-duplicates.js",
   "test:transactions:emulator": "USE_EMULATOR=true node scripts/test-transaction-duplicates.js",
   "test:frontend": "node scripts/test-frontend-deduplication.js",
-  "test:spend": "node scripts/test-spend-transactions.js",
   "test:spend:emulator": "USE_EMULATOR=true node scripts/test-spend-transactions.js"
   },
   "dependencies": {
