@@ -110,7 +110,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
   },
   */
   
-  // Admin Crown Border (canonical definition)
+  // Christmas 2024/2025 Profile Borders (PNG)
   'profile_border_admin_2025': {
     assetId: 'profile_border_admin_2025',
     name: 'Admin Crown',
