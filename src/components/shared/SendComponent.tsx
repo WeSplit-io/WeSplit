@@ -131,6 +131,9 @@ const SendComponent: React.FC<SendComponentProps> = ({
       // Backspace
       const newAmount = amount.slice(0, -1) || '0';
       onAmountChange(newAmount);
+    } else if (value === 'clear') {
+      // Clear all
+      onAmountChange('0');
     } else if (value === ',') {
       // Decimal separator (comma)
       if (!amount.includes(',') && !amount.includes('.')) {
@@ -141,8 +144,22 @@ const SendComponent: React.FC<SendComponentProps> = ({
         onAmountChange(amount.replace('.', ','));
       }
     } else {
-      // Number
-      let newAmount = amount === '0' ? value : amount + value;
+      // Number - handle pre-filled amounts intelligently
+      let newAmount;
+
+      // If amount is '0' or empty, replace with the digit
+      if (amount === '0' || amount === '') {
+        newAmount = value;
+      }
+      // If amount ends with ',00' (formatted default amount like "33,00"), replace it
+      else if (amount.match(/^\d+,\d{2}$/)) {
+        // This is a formatted amount like "33,00" - replace with new digit
+        newAmount = value;
+      }
+      // Otherwise, append the digit
+      else {
+        newAmount = amount + value;
+      }
 
       // Limit to 2 decimal places (handle both comma and period)
       if (newAmount.includes(',') || newAmount.includes('.')) {
@@ -248,16 +265,16 @@ const SendComponent: React.FC<SendComponentProps> = ({
         <TextInput
           style={styles.amountInput}
           value={amount}
-          onChangeText={handleAmountTextChange}
           placeholder="0"
           placeholderTextColor={colors.white70}
-          keyboardType="decimal-pad"
           textAlign="center"
           selectionColor={colors.green}
           maxLength={12}
           returnKeyType="done"
           blurOnSubmit={true}
-          editable={true}
+          editable={false}
+          showSoftInputOnFocus={false}
+          pointerEvents="none"
         />
         <Text style={styles.amountCurrency}>{currency}</Text>
 
@@ -279,10 +296,10 @@ const SendComponent: React.FC<SendComponentProps> = ({
             onChangeText={onNoteChange}
             placeholder="Add note"
             placeholderTextColor={colors.white50}
-            autoFocus
             maxLength={100}
             returnKeyType="done"
             blurOnSubmit={true}
+            showSoftInputOnFocus={false}
           />
         )}
       </View>
@@ -342,11 +359,20 @@ const SendComponent: React.FC<SendComponentProps> = ({
                   key={key}
                   style={styles.keypadButton}
                   onPress={() => handleKeypadPress(key)}
-                  activeOpacity={0.7}
+                  onLongPress={key === 'backspace' ? () => onAmountChange('0') : undefined}
+                  activeOpacity={0.6}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   {key === 'backspace' ? (
                     <PhosphorIcon
                       name="ArrowLeft"
+                      size={20}
+                      color={colors.white}
+                      weight="bold"
+                    />
+                  ) : key === 'clear' ? (
+                    <PhosphorIcon
+                      name="X"
                       size={20}
                       color={colors.white}
                       weight="bold"

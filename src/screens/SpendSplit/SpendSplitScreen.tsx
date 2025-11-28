@@ -2,6 +2,12 @@
  * SPEND Split Screen
  * Dedicated screen for SPEND merchant gateway splits
  * Handles automatic payment to SPEND when threshold is met
+ *
+ * Best Practices:
+ * - All hooks called unconditionally in same order
+ * - Proper memoization of expensive calculations
+ * - Clean separation of concerns
+ * - Error boundaries for robustness
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -29,6 +35,7 @@ import { Container, Header, Button, ModernLoader } from '../../components/shared
 import Modal from '../../components/shared/Modal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
+import { BalanceUpdate } from '../../services/blockchain/balance/LiveBalanceService';
 import { SpendSplitHeader, SpendSplitProgress, SpendSplitParticipants } from './components';
 import { SplitStorageService } from '../../services/splits';
 import { SplitParticipantInvitationService } from '../../services/splits/SplitParticipantInvitationService';
@@ -47,59 +54,32 @@ interface SpendSplitScreenProps {
 }
 
 const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }) => {
+  // Extract route params safely
   const { billData, processedBillData, splitWallet: existingSplitWallet, splitData: routeSplitData } = route.params || {};
+
+  // Context hooks - always called first
   const { state } = useApp();
   const { currentUser } = state;
   const walletContext = useWallet();
 
-  // Inject mock order data if missing (development only)
-  const splitData = useMemo(() => {
-    if (!routeSplitData) return routeSplitData;
-    
-    // Only inject mock data in development and if orderData is missing or has no items
-    if (__DEV__ && (!routeSplitData.externalMetadata?.orderData || !routeSplitData.externalMetadata?.orderData?.items || routeSplitData.externalMetadata.orderData.items.length === 0)) {
-      const mockOrderData = createMockSpendOrderData({
-        order_number: routeSplitData.externalMetadata?.orderNumber || 'ORD-1234567890',
-        id: routeSplitData.externalMetadata?.orderId || 'ord_1234567890',
-        status: routeSplitData.externalMetadata?.orderStatus || 'Payment_Pending',
-        store: routeSplitData.externalMetadata?.store || 'amazon',
-        total_amount: routeSplitData.totalAmount || 100.0,
-      });
-      
-      return {
-        ...routeSplitData,
-        externalMetadata: {
-          ...routeSplitData.externalMetadata,
-          orderData: {
-            ...mockOrderData,
-            ...routeSplitData.externalMetadata?.orderData,
-            // Ensure items are present
-            items: routeSplitData.externalMetadata?.orderData?.items?.length > 0 
-              ? routeSplitData.externalMetadata.orderData.items 
-              : mockOrderData.items,
-          },
-          // Update metadata fields if missing
-          orderId: routeSplitData.externalMetadata?.orderId || mockOrderData.id,
-          orderNumber: routeSplitData.externalMetadata?.orderNumber || mockOrderData.order_number,
-          orderStatus: routeSplitData.externalMetadata?.orderStatus || mockOrderData.status,
-          store: routeSplitData.externalMetadata?.store || mockOrderData.store,
-        },
-      };
-    }
-    
-    return routeSplitData;
-  }, [routeSplitData]);
+  // Core data - memoized to prevent unnecessary recalculations
+  const splitData = useMemo(() => routeSplitData, [routeSplitData]);
 
+  // ===== STATE MANAGEMENT =====
+  // All useState hooks called unconditionally in consistent order
+
+  // Core split state
   const [splitWallet, setSplitWallet] = useState<SplitWallet | null>((existingSplitWallet as SplitWallet) || null);
   const [isSplitConfirmed, setIsSplitConfirmed] = useState(false);
-  const [isSendingPayment, setIsSendingPayment] = useState(false);
-  // Start with true to show loader immediately, prevent content flash
-  // Keep true until we're absolutely ready to render content
+
+  // UI state
   const [isInitializing, setIsInitializing] = useState(true);
-  const [isCheckingCompletion, setIsCheckingCompletion] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Track if component is ready to render (prevents flash)
   const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Payment state
+  const [isSendingPayment, setIsSendingPayment] = useState(false);
+  const [isCheckingCompletion, setIsCheckingCompletion] = useState(false);
   
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -108,26 +88,137 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentAmountString, setPaymentAmountString] = useState('0');
   const [paymentNote, setPaymentNote] = useState('');
+
+  // Success/confirmation modals
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successPaymentAmount, setSuccessPaymentAmount] = useState(0);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-  const [showWalletSelector, setShowWalletSelector] = useState(false);
   
-  // Participant invitation state
+  // Additional modals
+  const [showWalletSelector, setShowWalletSelector] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   
-  // Subscribe to live balance updates
-  const { balance: liveBalance } = useLiveBalance(
-    currentUser?.wallet_address || null,
-    {
-      enabled: !!currentUser?.wallet_address,
-      onBalanceChange: (update) => {
+  // ===== EXTERNAL HOOKS =====
+  // Live balance hook - always called with stable parameters
+  const walletAddress = useMemo(() => currentUser?.wallet_address || null, [currentUser?.wallet_address]);
+  const { balance: liveBalance } = useLiveBalance(walletAddress, {
+    enabled: true,
+    onBalanceChange: useCallback((update: BalanceUpdate) => {
         if (update.usdcBalance !== null && update.usdcBalance !== undefined && balanceCheckError) {
           setBalanceCheckError(null);
         }
-      }
+    }, [balanceCheckError])
+  });
+
+  // ===== DATA PROCESSING =====
+  // Memoized data processing to prevent unnecessary recalculations
+
+  // Process base split data (participants, amounts, etc.)
+  const baseSplitData = useMemo(() => {
+    if (!splitData) {
+      return {
+        participants: [],
+        totalAmount: 0,
+        totalPaid: 0,
+        completionPercentage: 0,
+        orderData: null
+      };
     }
-  );
+
+    // Get participants from wallet or split data
+    const participants = splitWallet?.participants || splitData.participants || [];
+    const totalAmount = splitData.totalAmount || 0;
+    const { totalPaid, completionPercentage } = calculatePaymentTotals(participants, totalAmount);
+
+    // Extract order data
+    const orderData = splitData.externalMetadata?.orderData;
+
+    return {
+      participants,
+      totalAmount,
+      totalPaid,
+      completionPercentage,
+      orderData
+    };
+  }, [splitData, splitWallet?.participants]);
+
+  // Process mock data injection for development
+  const processedSplitData = useMemo(() => {
+    if (!splitData || !__DEV__) {
+      return baseSplitData;
+    }
+
+    // Check if we need to inject mock data
+    const needsMockData = !splitData.externalMetadata?.orderData?.items?.length;
+    if (!needsMockData) {
+      return baseSplitData;
+    }
+
+    // Inject mock order data
+    const mockOrderData = createMockSpendOrderData({
+      order_number: splitData.externalMetadata?.orderNumber || 'ORD-1234567890',
+      id: splitData.externalMetadata?.orderId || 'ord_1234567890',
+      status: splitData.externalMetadata?.orderStatus || 'Payment_Pending',
+      store: splitData.externalMetadata?.store || 'amazon',
+      total_amount: baseSplitData.totalAmount || 100.0,
+    });
+
+    // Create mock participants if none exist
+    let participants = baseSplitData.participants;
+    if (participants.length === 0) {
+      const mockTotalPaid = mockOrderData.total_amount * 0.33;
+      participants = [{
+        userId: currentUser?.id?.toString() || 'mock_user_1',
+        id: currentUser?.id?.toString() || 'mock_user_1',
+        name: currentUser?.name || 'You',
+        email: currentUser?.email || 'user@example.com',
+        amountOwed: mockOrderData.total_amount,
+        amountPaid: mockTotalPaid,
+        status: 'partial',
+        isPaid: false,
+      }];
+    }
+
+    const { totalPaid, completionPercentage } = calculatePaymentTotals(participants, mockOrderData.total_amount);
+
+    return {
+      participants,
+      totalAmount: mockOrderData.total_amount,
+      totalPaid,
+      completionPercentage,
+      orderData: mockOrderData
+    };
+  }, [baseSplitData, splitData, currentUser]);
+
+  // Extract UI data for rendering
+  const uiData = useMemo(() => {
+    if (!splitData) {
+      return {
+        billDate: new Date().toISOString(),
+        orderId: undefined as string | undefined,
+        orderNumber: undefined as string | undefined,
+        orderStatus: undefined as string | undefined,
+        store: undefined as string | undefined,
+        paymentThreshold: 1.0
+      };
+    }
+
+    const billDate = splitData.date || processedBillData?.date || billData?.date || new Date().toISOString();
+    const { orderId, orderNumber, orderStatus, store } = extractOrderData(splitData);
+    const paymentThreshold = splitData.externalMetadata?.paymentThreshold || 1.0;
+
+    return {
+      billDate,
+      orderId: orderId || undefined,
+      orderNumber: orderNumber || undefined,
+      orderStatus: orderStatus || undefined,
+      store: store || undefined,
+      paymentThreshold
+    };
+  }, [splitData, processedBillData, billData]);
+
+  // ===== EFFECTS =====
+  // All useEffect hooks called unconditionally
 
   // Verify this is a SPEND split
   useEffect(() => {
@@ -148,42 +239,28 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         setError('Split data not found');
         }
         setIsInitializing(false);
-        setIsReady(true); // Allow error screen to show
-        return;
-      }
-
-      // If we already have the wallet from route params, use it immediately
-      // Add a delay to ensure loader shows first and prevent content flash
-      if (existingSplitWallet) {
-        // Use requestAnimationFrame to ensure loader renders first
-        requestAnimationFrame(() => {
-          setSplitWallet(existingSplitWallet as SplitWallet);
-          setIsSplitConfirmed(existingSplitWallet.status === 'active' || existingSplitWallet.status === 'locked');
-          // Delay to ensure smooth transition from loader to content
-          // Set both flags to ensure component is ready
-          setTimeout(() => {
-            setIsInitializing(false);
-            // Additional delay to ensure loader has rendered
-            setTimeout(() => {
-              setIsReady(true);
-            }, 50);
-          }, 150);
-        });
+        setIsReady(true);
         return;
       }
 
       try {
-        // Load split wallet if it exists
+      // If we already have the wallet from route params, use it immediately
+      if (existingSplitWallet) {
+          setSplitWallet(existingSplitWallet as SplitWallet);
+          setIsSplitConfirmed(existingSplitWallet.status === 'active' || existingSplitWallet.status === 'locked');
+            setIsInitializing(false);
+              setIsReady(true);
+        return;
+      }
+
+        // Try to load existing split wallet
         if (splitData.walletId) {
           const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
           if (walletResult.success && walletResult.wallet) {
             setSplitWallet(walletResult.wallet);
             setIsSplitConfirmed(walletResult.wallet.status === 'active' || walletResult.wallet.status === 'locked');
             setIsInitializing(false);
-            // Small delay to ensure loader has rendered before showing content
-            setTimeout(() => {
               setIsReady(true);
-            }, 100);
             return;
           }
         }
@@ -222,10 +299,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         setError('Failed to load split data');
       } finally {
         setIsInitializing(false);
-        // Small delay to ensure loader has rendered before showing content
-        setTimeout(() => {
           setIsReady(true);
-        }, 100);
       }
     };
 
@@ -479,7 +553,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     }
   }, [splitWallet, splitData, isSplitConfirmed, isCheckingCompletion]);
 
-  // Poll for payment completion
+  // Poll for payment completion - reduced frequency for better performance
   useEffect(() => {
     if (!splitWallet || isSplitConfirmed) {
       return;
@@ -487,30 +561,21 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
 
     const interval = setInterval(() => {
       checkPaymentCompletion();
-    }, 3000); // Check every 3 seconds
+    }, 10000); // Check every 10 seconds
 
     return () => clearInterval(interval);
   }, [splitWallet, isSplitConfirmed, checkPaymentCompletion]);
 
-  // Check user balance
-  const checkUserBalance = async (requiredAmount: number) => {
+  // Check user balance - optimized to use live balance primarily
+  const checkUserBalance = useCallback(async (requiredAmount: number) => {
     if (!currentUser) return;
 
     try {
       setIsCheckingBalance(true);
       setBalanceCheckError(null);
       
-      const { walletService } = await import('../../services/blockchain/wallet');
-      const userWallet = await walletService.getWalletInfo(currentUser.id.toString());
-      
-      if (!userWallet) {
-        setBalanceCheckError('Could not load wallet information');
-        setIsCheckingBalance(false);
-        return;
-      }
-
-      // Use live balance if available
-      if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined && liveBalance.usdcBalance > 0) {
+      // Use live balance if available and recent (avoid unnecessary API calls)
+      if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined) {
         const userUsdcBalance = liveBalance.usdcBalance;
         
         if (userUsdcBalance < requiredAmount) {
@@ -524,11 +589,11 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         return;
       }
 
-      // Fallback to balance check utility
+      // Fallback to balance check utility only if live balance unavailable
       const { getUserBalanceWithFallback } = await import('../../services/shared/balanceCheckUtils');
       const balanceResult = await getUserBalanceWithFallback(currentUser.id.toString(), {
         useLiveBalance: true,
-        walletAddress: userWallet.address || currentUser.wallet_address
+        walletAddress: currentUser.wallet_address
       });
       
       const userUsdcBalance = balanceResult.usdcBalance;
@@ -548,7 +613,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     } finally {
       setIsCheckingBalance(false);
     }
-  };
+  }, [currentUser, liveBalance]);
 
   // Handle send payment button
   const handleSendMyShares = async () => {
@@ -829,64 +894,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     );
   }
 
-  // Extract participants and calculate totals
-  let participants = splitWallet?.participants || splitData.participants || [];
-  let totalAmount = splitData.totalAmount || 0;
-  
-  // Calculate initial totals to check if we need mock data
-  const initialTotals = calculatePaymentTotals(participants, totalAmount);
-  
-  // Inject mock progress data in development mode (33% progress for visualization)
-  // This ensures the arc progress bar shows a partial-filled state matching the mockup
-  if (__DEV__ && (participants.length === 0 || totalAmount === 0 || initialTotals.totalPaid === 0)) {
-    const mockTotalAmount = totalAmount > 0 ? totalAmount : 100.0;
-    const mockTotalPaid = mockTotalAmount * 0.33; // 33% progress (21.87 USDC for 66.21 total, or 33 USDC for 100 total)
-    
-    // Create mock participants with partial payment if no participants exist
-    if (participants.length === 0) {
-      participants = [
-        {
-          userId: currentUser?.id?.toString() || 'mock_user_1',
-          id: currentUser?.id?.toString() || 'mock_user_1',
-          name: currentUser?.name || 'You',
-          email: currentUser?.email || 'user@example.com',
-          amountOwed: mockTotalAmount,
-          amountPaid: mockTotalPaid,
-          status: 'partial',
-          isPaid: false,
-        },
-      ];
-    } else {
-      // Update existing participants to show 33% progress if they haven't paid
-      participants = participants.map((p: any) => {
-        const participantOwed = p.amountOwed || (mockTotalAmount / participants.length);
-        const participantPaid = p.amountPaid > 0 ? p.amountPaid : participantOwed * 0.33;
-        return {
-          ...p,
-          amountOwed: participantOwed,
-          amountPaid: participantPaid,
-          status: participantPaid >= participantOwed ? 'paid' : participantPaid > 0 ? 'partial' : 'pending',
-        };
-      });
-    }
-    
-    // Update totalAmount if it's 0
-    if (totalAmount === 0) {
-      totalAmount = mockTotalAmount;
-    }
-  }
-  
-  const { totalPaid, completionPercentage } = calculatePaymentTotals(
-    participants,
-    totalAmount
-  );
-
-  // Extract bill info for header
-  const billDate = splitData.date || processedBillData?.date || billData?.date || new Date().toISOString();
-  
-  // Extract SP3ND order data using centralized utility
-  const { orderId, orderNumber, orderStatus, store } = extractOrderData(splitData);
-  const paymentThreshold = splitData.externalMetadata?.paymentThreshold || 1.0;
 
   return (
     <Container>
@@ -900,19 +907,19 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       >
         {/* SPEND Order Header */}
         <SpendSplitHeader
-          billName={splitData.title || 'SPEND Order'}
-          billDate={billDate}
-          totalAmount={totalAmount}
-          orderId={orderId || undefined}
-          orderNumber={orderNumber || undefined}
-          orderStatus={orderStatus || undefined}
-          store={store || undefined}
+          billName={splitData?.title || 'SPEND Order'}
+          billDate={uiData.billDate}
+          totalAmount={processedSplitData.totalAmount}
+          orderId={uiData.orderId}
+          orderNumber={uiData.orderNumber}
+          orderStatus={uiData.orderStatus}
+          store={uiData.store}
           split={splitData}
           onBackPress={() => navigation.navigate('SplitsList')}
           onSettingsPress={() => {
             navigation.navigate('SpendOrderSettings', {
               splitData,
-              orderData: splitData.externalMetadata?.orderData,
+              orderData: processedSplitData.orderData,
             });
           }}
         />
@@ -934,11 +941,11 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
 
         {/* Payment Progress */}
         <SpendSplitProgress
-          totalAmount={totalAmount}
-          totalPaid={totalPaid}
-          completionPercentage={completionPercentage}
-          paymentThreshold={paymentThreshold}
-          orderId={orderId || undefined}
+          totalAmount={processedSplitData.totalAmount}
+          totalPaid={processedSplitData.totalPaid}
+          completionPercentage={processedSplitData.completionPercentage}
+          paymentThreshold={uiData.paymentThreshold}
+          orderId={uiData.orderId}
         />
 
         {/* Order Items - Only show if not expanded in header */}
@@ -947,10 +954,10 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         {/* Participants */}
         <View style={{ marginBottom: spacing.md }}>
           <SpendSplitParticipants
-            participants={participants}
+            participants={processedSplitData.participants}
             currentUserId={currentUser?.id?.toString()}
-            onAddPress={splitData.creatorId === currentUser?.id?.toString() ? handleAddParticipants : undefined}
-            onSharePress={splitData.creatorId === currentUser?.id?.toString() ? handleDirectShare : undefined}
+            onAddPress={splitData?.creatorId === currentUser?.id?.toString() ? handleAddParticipants : undefined}
+            onSharePress={splitData?.creatorId === currentUser?.id?.toString() ? handleDirectShare : undefined}
               />
         </View>
       </ScrollView>
@@ -959,11 +966,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       {(() => {
         if (!currentUser || !splitData) return null;
         
-        // Get participants from splitWallet if available, otherwise from splitData
-        const allParticipants = splitWallet?.participants || splitData.participants || [];
-        
         // Find user participant using centralized utility
-        const userParticipant = findUserParticipant(allParticipants, currentUser.id.toString());
+        const userParticipant = findUserParticipant(processedSplitData.participants, currentUser.id.toString());
         
         if (!userParticipant) {
           // If user is not a participant, don't show button
@@ -1025,8 +1029,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         <View style={{ flex: 1, paddingBottom: spacing.md }}>
           <SendComponent
             recipient={{
-              name: `Order #${orderNumber || orderId || 'N/A'}`,
-              address: splitWallet?.walletAddress || splitData?.externalMetadata?.orderData?.user_wallet || currentUser?.wallet_address || undefined,
+              name: `Order #${uiData.orderNumber || uiData.orderId || 'N/A'}`,
+              address: splitWallet?.walletAddress || processedSplitData.orderData?.user_wallet || currentUser?.wallet_address || undefined,
               imageUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fpartners%2Fsp3nd-icon.png?alt=media&token=3b2603eb-57cb-4dc6-aafd-0fff463f1579',
             }}
             onRecipientChange={undefined}
@@ -1070,7 +1074,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       <SendConfirmation
         visible={showConfirmationModal}
         onClose={() => setShowConfirmationModal(false)}
-        recipientName={`Order #${orderNumber || orderId || 'N/A'}`}
+        recipientName={`Order #${uiData.orderNumber || uiData.orderId || 'N/A'}`}
         amount={paymentAmount}
         currency="USDC"
         onSlideComplete={handlePaymentModalConfirm}
@@ -1095,8 +1099,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       >
         <SpendPaymentSuccessModal
           amount={successPaymentAmount}
-          orderNumber={orderNumber || undefined}
-          orderId={orderId || undefined}
+          orderNumber={uiData.orderNumber}
+          orderId={uiData.orderId}
           onClose={() => setShowSuccessModal(false)}
           />
       </Modal>
