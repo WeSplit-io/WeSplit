@@ -6,7 +6,7 @@
 import { getDownloadURL, ref } from 'firebase/storage';
 
 import { storage } from '../../config/firebase/firebase';
-import { logger } from '../analytics/loggingService';
+import { logger, urlUtils } from '../analytics/loggingService';
 
 /**
  * Checks whether a URL uses the gs:// protocol.
@@ -41,9 +41,20 @@ export const resolveStorageUrl = async (
   url?: string | null,
   context?: Record<string, unknown>
 ): Promise<string | undefined> => {
+  // First validate the URL if it's not a gs:// URL
   if (!isGsUrl(url)) {
+    if (url && !urlUtils.isValidUrl(url)) {
+      logger.warn('Invalid asset URL provided', {
+        url: url.substring(0, 50) + (url.length > 50 ? '...' : ''),
+        ...context
+      }, 'storageUrlService');
+      return undefined;
+    }
     return url ?? undefined;
   }
+
+  // If it's a gs:// URL, we must resolve it - never return the gs:// URL
+  logger.debug('Resolving gs:// URL', { url, ...context }, 'storageUrlService');
 
   const storagePath = extractStoragePath(url);
   if (!storagePath) {
@@ -52,6 +63,13 @@ export const resolveStorageUrl = async (
 
   try {
     const downloadUrl = await getDownloadURL(ref(storage, storagePath));
+
+    // Validate the resolved URL
+    if (!urlUtils.isValidUrl(downloadUrl)) {
+      logger.warn('Resolved URL is invalid', { storagePath, downloadUrl, ...context }, 'storageUrlService');
+      return undefined;
+    }
+
     logger.debug('Converted gs:// URL to HTTPS', { storagePath, ...context }, 'storageUrlService');
     return downloadUrl;
   } catch (error: any) {
@@ -80,6 +98,10 @@ export const resolveStorageUrl = async (
 
     return undefined;
   }
+
+  // This should never happen - if we reach here, something went wrong
+  logger.error('resolveStorageUrl reached end without resolving URL', { url, ...context }, 'storageUrlService');
+  return undefined;
 };
 
 

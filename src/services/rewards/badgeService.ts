@@ -4,13 +4,14 @@
  */
 
 import { db } from '../../config/firebase/firebase';
-import { doc, getDoc, setDoc, collection, getDocs, serverTimestamp, query, where, runTransaction, QueryDocumentSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, serverTimestamp, query, where, runTransaction, QueryDocumentSnapshot, limit } from 'firebase/firestore';
 import { logger } from '../analytics/loggingService';
 import priceManagementService from '../core/priceManagementService';
 import { BADGE_DEFINITIONS, BadgeInfo } from './badgeConfig';
 import { pointsService } from './pointsService';
 import { seasonService } from './seasonService';
 import { resolveStorageUrl } from '../shared/storageUrlService';
+import { checkAndUnlockBadgeAssets } from './badgeAssetUnlockService';
 
 export interface BadgeProgress {
   badgeId: string;
@@ -638,6 +639,21 @@ class BadgeService {
         points: badgeInfo.points
       }, 'BadgeService');
 
+      // Check and unlock any assets associated with this badge
+      try {
+        const assetUnlockResult = await checkAndUnlockBadgeAssets(userId);
+        if (assetUnlockResult.newlyUnlocked.length > 0) {
+          logger.info('Assets unlocked via badge claim', {
+            userId,
+            badgeId,
+            unlockedAssets: assetUnlockResult.newlyUnlocked
+          }, 'BadgeService');
+        }
+      } catch (assetError) {
+        // Don't fail badge claim if asset unlock fails
+        logger.error('Failed to check/unlock badge assets', { userId, badgeId, error: assetError }, 'BadgeService');
+      }
+
       return {
         success: true,
         badgeId
@@ -827,6 +843,21 @@ class BadgeService {
         redeemCode,
         points: badgeInfo.points
       }, 'BadgeService');
+
+      // Check and unlock any assets associated with this badge
+      try {
+        const assetUnlockResult = await checkAndUnlockBadgeAssets(userId);
+        if (assetUnlockResult.newlyUnlocked.length > 0) {
+          logger.info('Assets unlocked via badge claim', {
+            userId,
+            badgeId: badgeInfo.badgeId,
+            unlockedAssets: assetUnlockResult.newlyUnlocked
+          }, 'BadgeService');
+        }
+      } catch (assetError) {
+        // Don't fail badge claim if asset unlock fails
+        logger.error('Failed to check/unlock badge assets', { userId, badgeId: badgeInfo.badgeId, error: assetError }, 'BadgeService');
+      }
 
       return {
         success: true,

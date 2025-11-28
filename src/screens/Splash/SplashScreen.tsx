@@ -122,8 +122,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
               // Check if existing user should skip onboarding
               const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
 
-              // Transform to app user format
+              // Transform to app user format - include ALL user fields from Firestore
               const transformedUser = {
+                // Spread all Firestore data first
+                ...userData,
+                // Then override with critical fields that need fallbacks
                 id: userData.id || firebaseUser.uid,
                 name: userData.name || '',
                 email: userData.email || firebaseUser.email || '',
@@ -131,7 +134,18 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
                 wallet_public_key: userData.wallet_public_key || userData.wallet_address || '',
                 created_at: userData.created_at || new Date().toISOString(),
                 avatar: userData.avatar || '',
-                hasCompletedOnboarding: shouldSkipOnboarding
+                hasCompletedOnboarding: shouldSkipOnboarding,
+                // Ensure asset fields are included with proper defaults
+                badges: userData.badges || [],
+                active_badge: userData.active_badge || undefined,
+                profile_assets: userData.profile_assets || [],
+                active_profile_asset: userData.active_profile_asset || undefined,
+                profile_borders: userData.profile_borders || [],
+                active_profile_border: userData.active_profile_border || undefined,
+                wallet_backgrounds: userData.wallet_backgrounds || [],
+                active_wallet_background: userData.active_wallet_background || undefined,
+                points: userData.points || 0,
+                total_points_earned: userData.total_points_earned || 0,
               };
 
               // Update app context with fresh data
@@ -180,8 +194,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
               // Check if existing user should skip onboarding
               const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
 
-              // Transform to app user format
+              // Transform to app user format - include ALL user fields from Firestore
               const transformedUser = {
+                // Spread all Firestore data first
+                ...userData,
+                // Then override with critical fields that need fallbacks
                 id: userData.id || currentUser.id,
                 name: userData.name || '',
                 email: userData.email || currentUser.email || '',
@@ -189,7 +206,18 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
                 wallet_public_key: userData.wallet_public_key || userData.wallet_address || currentUser.wallet_public_key || '',
                 created_at: userData.created_at || currentUser.created_at || new Date().toISOString(),
                 avatar: userData.avatar || currentUser.avatar || '',
-                hasCompletedOnboarding: shouldSkipOnboarding
+                hasCompletedOnboarding: shouldSkipOnboarding,
+                // Ensure asset fields are included with proper defaults
+                badges: userData.badges || [],
+                active_badge: userData.active_badge || undefined,
+                profile_assets: userData.profile_assets || [],
+                active_profile_asset: userData.active_profile_asset || undefined,
+                profile_borders: userData.profile_borders || [],
+                active_profile_border: userData.active_profile_border || undefined,
+                wallet_backgrounds: userData.wallet_backgrounds || [],
+                active_wallet_background: userData.active_wallet_background || undefined,
+                points: userData.points || 0,
+                total_points_earned: userData.total_points_earned || 0,
               };
 
               // Update app context with fresh data
@@ -273,8 +301,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
                   // Check if existing user should skip onboarding
                   const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
 
-                  // Transform to app user format
+                  // Transform to app user format - include ALL user fields from Firestore
                   const transformedUser = {
+                    // Spread all Firestore data first
+                    ...userData,
+                    // Then override with critical fields
                     id: userData.id,
                     name: userData.name,
                     email: userData.email,
@@ -282,7 +313,18 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
                     wallet_public_key: userData.wallet_public_key || '',
                     created_at: userData.created_at,
                     avatar: userData.avatar || '',
-                    hasCompletedOnboarding: shouldSkipOnboarding
+                    hasCompletedOnboarding: shouldSkipOnboarding,
+                    // Ensure asset fields are included with proper defaults
+                    badges: userData.badges || [],
+                    active_badge: userData.active_badge || undefined,
+                    profile_assets: userData.profile_assets || [],
+                    active_profile_asset: userData.active_profile_asset || undefined,
+                    profile_borders: userData.profile_borders || [],
+                    active_profile_border: userData.active_profile_border || undefined,
+                    wallet_backgrounds: userData.wallet_backgrounds || [],
+                    active_wallet_background: userData.active_wallet_background || undefined,
+                    points: userData.points || 0,
+                    total_points_earned: userData.total_points_earned || 0,
                   };
 
                   // Update the global app context with the authenticated user

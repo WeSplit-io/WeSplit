@@ -10,13 +10,14 @@ import {
   Image,
   ViewStyle,
   TextStyle,
-  StyleSheet,
 } from 'react-native';
+import { SvgUri } from 'react-native-svg';
 import { colors } from '../theme/colors';
 import { logger } from '../services/core';
 import { userImageService } from '../services/core';
 import { UserImageInfo, UserImageService } from '../services/core/userImageService';
 import { DEFAULT_AVATAR_URL } from '../config/constants/constants';
+import { isSvgUrl, isSafeUrl } from '../utils/ui/format/formatUtils';
 
 interface UserAvatarProps {
   userId?: string;
@@ -37,6 +38,7 @@ interface UserAvatarProps {
   borderImageUrl?: string;
 }
 
+
 const UserAvatar: React.FC<UserAvatarProps> = ({
   userId,
   userName,
@@ -54,6 +56,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   const [imageInfo, setImageInfo] = useState<UserImageInfo | null>(userImageInfo || null);
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [borderError, setBorderError] = useState(false);
 
   useEffect(() => {
     logger.debug('Props received', {
@@ -137,6 +140,11 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     setIsLoading(false);
   };
 
+  const handleBorderError = () => {
+    logger.warn('Border image failed to load', { userId, borderImageUrl }, 'UserAvatar');
+    setBorderError(true);
+  };
+
   const avatarStyle: ViewStyle = {
     width: size,
     height: size,
@@ -178,7 +186,8 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     ? imageInfo.imageUrl 
     : DEFAULT_AVATAR_URL;
 
-  const borderScale = 1.15;
+  // Responsive border scaling - smaller on mobile devices
+  const borderScale = size < 60 ? 1.12 : size < 100 ? 1.14 : 1.15;
 
   return (
     <View style={[avatarStyle, { overflow: 'hidden', position: 'relative' }]}>
@@ -201,19 +210,44 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
         onError={handleImageError}
         resizeMode="cover"
       />
-      {borderImageUrl && (
-        <Image
-          source={{ uri: borderImageUrl }}
-          style={[
-            StyleSheet.absoluteFillObject,
-            {
-              transform: [{ scale: borderScale }],
+      {borderImageUrl && !borderError && isSafeUrl(borderImageUrl) && (
+        isSvgUrl(borderImageUrl) ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: -(size * (borderScale - 1)) / 2,
+              left: -(size * (borderScale - 1)) / 2,
+              width: size * borderScale,
+              height: size * borderScale,
               zIndex: 2,
-            },
-          ]}
-          resizeMode="contain"
-          pointerEvents="none"
-        />
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            pointerEvents="none"
+          >
+            <SvgUri
+              uri={borderImageUrl}
+              width={size * borderScale}
+              height={size * borderScale}
+              onError={handleBorderError}
+            />
+          </View>
+        ) : (
+          <Image
+            source={{ uri: borderImageUrl }}
+            style={{
+              position: 'absolute',
+              top: -(size * (borderScale - 1)) / 2,
+              left: -(size * (borderScale - 1)) / 2,
+              width: size * borderScale,
+              height: size * borderScale,
+              zIndex: 2,
+            }}
+            resizeMode="contain"
+            pointerEvents="none"
+            onError={handleBorderError}
+          />
+        )
       )}
     </View>
   );

@@ -14,9 +14,13 @@ import { typography } from '../../theme/typography';
 interface BalanceCardProps {
   balance: number;
   currency: string;
-  status: string;
+  status: 'active' | 'inactive' | 'locked' | 'completed' | 'cancelled' | 'draft' | string;
   customColor?: string;
-  customLogo?: string;
+  customLogo?: string | PhosphorIconName;
+}
+
+interface BalanceCardState {
+  // Component is stateless, but we can define computed properties
 }
 
 const BalanceCard: React.FC<BalanceCardProps> = ({

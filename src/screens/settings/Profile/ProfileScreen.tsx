@@ -8,11 +8,8 @@ import Avatar from '../../../components/shared/Avatar';
 import { logger } from '../../../services/analytics/loggingService';
 import { Container, PhosphorIcon } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
-import BadgeDisplay from '../../../components/profile/BadgeDisplay';
-import ProfileAssetDisplay from '../../../components/profile/ProfileAssetDisplay';
 import { colors } from '../../../theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUserAssetMetadata } from '../../../services/rewards/assetService';
 
 // Avatar component wrapper for backward compatibility
 const AvatarComponent = ({ avatar, displayName, style, userId, borderImageUrl }: { avatar?: string, displayName: string, style: any, userId?: string, borderImageUrl?: string }) => {
@@ -86,10 +83,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       }
 
       try {
-        const metadata = await getUserAssetMetadata(currentUser.id, currentUser.active_profile_border);
-        const url = metadata?.url || metadata?.nftMetadata?.imageUrl || null;
-        if (isMounted) {
-          setProfileBorderUrl(url);
+        // Get asset info from config
+        const { getAssetInfo } = await import('../../../services/rewards/assetConfig');
+        const { resolveStorageUrl } = await import('../../../services/shared/storageUrlService');
+        
+        const assetInfo = getAssetInfo(currentUser.active_profile_border);
+        if (assetInfo?.url) {
+          const resolvedUrl = await resolveStorageUrl(assetInfo.url, { assetId: currentUser.active_profile_border });
+          if (isMounted && resolvedUrl) {
+            setProfileBorderUrl(resolvedUrl);
+          }
+        } else {
+          if (isMounted) {
+            setProfileBorderUrl(null);
+          }
         }
       } catch (error) {
         if (isMounted) {
@@ -278,30 +285,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 <Text style={styles.pointsLabel}>Points:</Text>
                 <Text style={styles.pointsValue}>{currentUser.points || 0}</Text>
               </View>
-            )}
-            {currentUser?.badges && currentUser.badges.length > 0 && (
-              <BadgeDisplay
-                badges={currentUser.badges}
-                activeBadge={currentUser.active_badge}
-                showAll={false}
-              />
-            )}
-            {currentUser?.active_profile_asset && (
-              <ProfileAssetDisplay
-                userId={currentUser.id}
-                profileAssets={currentUser.profile_assets}
-                activeProfileAsset={currentUser.active_profile_asset}
-                showProfileAsset={true}
-              />
-            )}
-            {currentUser?.active_profile_border && (
-              <ProfileAssetDisplay
-                userId={currentUser.id}
-                profileBorders={currentUser.profile_borders}
-                activeProfileBorder={currentUser.active_profile_border}
-                showProfileAsset={false}
-                showProfileBorder={true}
-              />
             )}
           </View>
           <TouchableOpacity style={styles.editButton} onPress={handleAccountInfo}>

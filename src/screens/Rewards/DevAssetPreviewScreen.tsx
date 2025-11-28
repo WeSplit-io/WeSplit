@@ -171,7 +171,7 @@ const DevAssetPreviewScreen: React.FC = () => {
           avatarUrl={currentUser?.avatar}
           size={80}
           borderImageUrl={currentUser?.active_profile_border 
-            ? resolvedUrls[currentUser.active_profile_border] || getAssetInfo(currentUser.active_profile_border)?.url
+            ? resolvedUrls[currentUser.active_profile_border]
             : undefined}
         />
         <Text style={styles.previewLabel}>Current Avatar</Text>

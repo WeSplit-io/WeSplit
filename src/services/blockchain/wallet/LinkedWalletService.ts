@@ -52,8 +52,6 @@ export class LinkedWalletService {
 
       const linkedWallets = await firebaseDataService.linkedWallet.getLinkedWallets(userId);
       
-      console.log('LinkedWalletService: Raw wallets from Firebase:', linkedWallets);
-      
       // Transform the data to ensure consistent structure
       const transformedWallets: LinkedWallet[] = linkedWallets.map(wallet => {
         // CRITICAL: Preserve the original type from Firebase - don't default to 'external' for KAST cards
@@ -82,11 +80,6 @@ export class LinkedWalletService {
           updatedAt: wallet.updated_at || wallet.updatedAt || new Date().toISOString(),
           lastUsed: wallet.lastUsed
         };
-        console.log('LinkedWalletService: Transformed wallet:', {
-          ...transformed,
-          originalType: wallet.type,
-          preservedType: transformed.type
-        });
         return transformed;
       });
 

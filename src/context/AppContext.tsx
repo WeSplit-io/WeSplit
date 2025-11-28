@@ -9,6 +9,7 @@ import { firebaseDataService } from '../services/data';
 import { notificationService } from '../services/notifications';
 import { logger } from '../services/analytics/loggingService';
 import { SplitInvitationService } from '../services/splits/splitInvitationService';
+import { checkAndUnlockBadgeAssets } from '../services/rewards/badgeAssetUnlockService';
 
 // Initial State - clean without group-related data
 const initialState: AppState = {
@@ -80,6 +81,7 @@ interface AppContextType {
   // User operations
   authenticateUser: (user: User, method: 'wallet' | 'email' | 'guest' | 'social') => void;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  refreshUser: () => Promise<void>;
   logoutUser: () => void;
   
   // Utility functions
@@ -252,6 +254,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Load notifications after authentication
       await loadNotifications(true);
+      
+      // Check and unlock any badge-based assets (e.g., admin border for WeSplit badge holders)
+      // This runs in background and doesn't block authentication
+      checkAndUnlockBadgeAssets(user.id).then(result => {
+        if (result.newlyUnlocked.length > 0) {
+          logger.info('Badge assets unlocked on login', { 
+            userId: user.id, 
+            assets: result.newlyUnlocked 
+          }, 'AppContext');
+        }
+      }).catch(error => {
+        logger.error('Failed to check badge assets on login', { userId: user.id, error }, 'AppContext');
+      });
       } catch (error) {
       logger.error('Failed to authenticate user:', error as Record<string, unknown>, 'AppContext');
       throw error;
@@ -276,6 +291,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [state.currentUser]);
 
+  const refreshUser = useCallback(async () => {
+    if (!state.currentUser?.id) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      logger.debug('Refreshing user data from Firestore', {
+        userId: state.currentUser.id,
+        currentWalletBackgrounds: state.currentUser.wallet_backgrounds
+      }, 'AppContext');
+
+      const userData = await firebaseDataService.user.getUser(state.currentUser.id.toString());
+
+      logger.debug('User data refreshed from Firestore', {
+        userId: state.currentUser.id,
+        newWalletBackgrounds: userData.wallet_backgrounds,
+        walletBackgroundsChanged: JSON.stringify(userData.wallet_backgrounds) !== JSON.stringify(state.currentUser.wallet_backgrounds)
+      }, 'AppContext');
+
+      dispatch({
+        type: 'SET_CURRENT_USER',
+        payload: userData
+      });
+    } catch (error) {
+      logger.error('Failed to refresh user data:', error as Record<string, unknown>, 'AppContext');
+      throw error;
+    }
+  }, [state.currentUser]);
+
   const logoutUser = useCallback(() => {
     dispatch({ type: 'LOGOUT_USER' });
   }, []);
@@ -296,6 +340,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch,
     authenticateUser,
     updateUser,
+    refreshUser,
     logoutUser,
     clearError,
     notifications: state.notifications ?? [],

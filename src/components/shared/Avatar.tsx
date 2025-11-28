@@ -12,12 +12,13 @@ import {
   ViewStyle,
   TextStyle,
   ActivityIndicator,
-  StyleSheet,
 } from 'react-native';
+import { SvgUri } from 'react-native-svg';
 import { colors } from '../../theme/colors';
 import { logger } from '../../services/analytics/loggingService';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import { AvatarService } from '../../services/core/avatarService';
+import { isSvgUrl, isSafeUrl } from '../../utils/ui/format/formatUtils';
 
 interface AvatarProps {
   userId?: string;
@@ -38,6 +39,14 @@ interface AvatarProps {
   dynamicSize?: boolean;
 }
 
+interface AvatarState {
+  imageUrl: string | null;
+  isLoading: boolean;
+  hasError: boolean;
+  initials: string;
+  borderError: boolean;
+}
+
 const Avatar: React.FC<AvatarProps> = ({
   userId,
   userName,
@@ -56,6 +65,7 @@ const Avatar: React.FC<AvatarProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [initials, setInitials] = useState<string>('');
+  const [borderError, setBorderError] = useState(false);
 
   // Generate initials from name
   const generateInitials = useCallback((name: string): string => {
@@ -141,16 +151,21 @@ const Avatar: React.FC<AvatarProps> = ({
 
   // Handle image load error
   const handleImageError = useCallback(() => {
-    logger.warn('Avatar image failed to load', { userId, imageUrl }, 'Avatar');
+    logger.warn('Avatar image failed to load', { userId }, 'Avatar');
     setHasError(true);
-    setImageUrl(null);
-  }, [userId, imageUrl]);
+  }, [userId]);
 
   // Handle image load success
   const handleImageLoad = useCallback(() => {
     logger.debug('Avatar image loaded successfully', { userId }, 'Avatar');
     setHasError(false);
   }, [userId]);
+
+  // Handle border image error
+  const handleBorderError = useCallback(() => {
+    logger.warn('Border image failed to load', { userId, borderImageUrl }, 'Avatar');
+    setBorderError(true);
+  }, [userId, borderImageUrl]);
 
   // Determine what to display
   const getDisplayContent = () => {
@@ -227,24 +242,55 @@ const Avatar: React.FC<AvatarProps> = ({
     borderRadius: size / 2,
   };
 
-  const borderScale = dynamicSize || hasCustomDimensions ? 1.08 : 1.15;
+  // Responsive border scaling - smaller on mobile devices and for dynamic sizing
+  const borderScale = dynamicSize || hasCustomDimensions
+    ? 1.08
+    : size < 60 ? 1.12 : size < 100 ? 1.14 : 1.15;
+
+  // Compute border size for SVG
+  const borderSize = dynamicSize ? 50 : size; // Fallback size for dynamic mode
 
   return (
     <View style={[avatarStyle, { justifyContent: 'center', alignItems: 'center' }]}>
       {getDisplayContent()}
-      {borderImageUrl && (
-        <Image
-          source={{ uri: borderImageUrl }}
-          style={[
-            StyleSheet.absoluteFillObject,
-            {
-              transform: [{ scale: borderScale }],
+      {borderImageUrl && !borderError && isSafeUrl(borderImageUrl) && (
+        isSvgUrl(borderImageUrl) ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: -(borderSize * (borderScale - 1)) / 2,
+              left: -(borderSize * (borderScale - 1)) / 2,
+              width: borderSize * borderScale,
+              height: borderSize * borderScale,
               zIndex: 2,
-            },
-          ]}
-          resizeMode="contain"
-          pointerEvents="none"
-        />
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            pointerEvents="none"
+          >
+            <SvgUri
+              uri={borderImageUrl}
+              width={borderSize * borderScale}
+              height={borderSize * borderScale}
+              onError={handleBorderError}
+            />
+          </View>
+        ) : (
+          <Image
+            source={{ uri: borderImageUrl }}
+            style={{
+              position: 'absolute',
+              top: -(borderSize * (borderScale - 1)) / 2,
+              left: -(borderSize * (borderScale - 1)) / 2,
+              width: borderSize * borderScale,
+              height: borderSize * borderScale,
+              zIndex: 2,
+            }}
+            resizeMode="contain"
+            pointerEvents="none"
+            onError={handleBorderError}
+          />
+        )
       )}
     </View>
   );

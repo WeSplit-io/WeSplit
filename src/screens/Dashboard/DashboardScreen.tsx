@@ -12,6 +12,7 @@ import {
   Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SvgUri } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from '@react-navigation/native';
 import { 
@@ -47,14 +48,13 @@ import { RequestCard } from '../../components/requests';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { useWalletState } from '../../hooks/useWalletState';
 import { secureVault, isVaultAuthenticated } from '../../services/security/secureVault';
-import BadgeDisplay from '../../components/profile/BadgeDisplay';
-import ProfileAssetDisplay from '../../components/profile/ProfileAssetDisplay';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PhonePromptModal from '../../components/auth/PhonePromptModal';
 import { authService } from '../../services/auth/AuthService';
 import { normalizePhoneNumber } from '../../utils/validation/phone';
 import { getUserAssetMetadata } from '../../services/rewards/assetService';
 import { getAssetInfo } from '../../services/rewards/assetConfig';
+import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 
 
 
@@ -127,6 +127,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [userNames, setUserNames] = useState<Map<string, string>>(new Map());
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [walletBackgroundUrl, setWalletBackgroundUrl] = useState<string | null>(null);
+  const [profileBorderUrl, setProfileBorderUrl] = useState<string | null>(null);
+  const [backgroundError, setBackgroundError] = useState(false);
   
   // Loading States
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -309,11 +311,21 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     let isMounted = true;
 
     const loadWalletBackground = async () => {
+      logger.info('Loading wallet background', {
+        activeWalletBackground: currentUser?.active_wallet_background,
+        hasActiveBackground: !!currentUser?.active_wallet_background
+      }, 'DashboardScreen');
+
       if (!currentUser?.active_wallet_background) {
         if (isMounted) {
           setWalletBackgroundUrl(null);
+          setBackgroundError(false);
         }
         return;
+      }
+
+      if (isMounted) {
+        setBackgroundError(false);
       }
 
       try {
@@ -327,12 +339,27 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         }
 
         const url = metadata?.url || metadata?.nftMetadata?.imageUrl || null;
+        logger.info('Resolved background URL', {
+          assetId: currentUser.active_wallet_background,
+          url,
+          isSvg: url?.includes('.svg'),
+          metadataFound: !!metadata
+        }, 'DashboardScreen');
+
         if (isMounted) {
           setWalletBackgroundUrl(url);
+          setBackgroundError(false);
         }
       } catch (error) {
+        logger.warn('Failed to load wallet background', {
+          userId: currentUser?.id,
+          assetId: currentUser?.active_wallet_background,
+          error: error instanceof Error ? error.message : String(error)
+        }, 'DashboardScreen');
+
         if (isMounted) {
           setWalletBackgroundUrl(null);
+          setBackgroundError(true);
         }
       }
     };
@@ -343,6 +370,44 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       isMounted = false;
     };
   }, [currentUser?.id, currentUser?.active_wallet_background]);
+
+  // Load profile border URL
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfileBorder = async () => {
+      if (!currentUser?.active_profile_border) {
+        if (isMounted) {
+          setProfileBorderUrl(null);
+        }
+        return;
+      }
+
+      try {
+        // Get asset info from config
+        const assetInfo = getAssetInfo(currentUser.active_profile_border);
+        
+        if (assetInfo?.url) {
+          // Resolve the URL (handles gs:// to https:// conversion)
+          const resolvedUrl = await resolveStorageUrl(assetInfo.url, { assetId: currentUser.active_profile_border });
+          if (isMounted && resolvedUrl) {
+            setProfileBorderUrl(resolvedUrl);
+          }
+        }
+      } catch (error) {
+        logger.warn('Failed to load profile border', { error }, 'DashboardScreen');
+        if (isMounted) {
+          setProfileBorderUrl(null);
+        }
+      }
+    };
+
+    loadProfileBorder();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id, currentUser?.active_profile_border]);
 
   // Handle phone prompt actions
   const handleAddPhone = async (phone: string) => {
@@ -402,6 +467,85 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       Alert.alert('Error', 'Failed to copy wallet address');
     }
   };
+
+  // Balance Card Content Component
+  const BalanceCardContent: React.FC<{
+    isBalanceHidden: boolean;
+    setIsBalanceHidden: (hidden: boolean) => void;
+    walletLoading: boolean;
+    liveBalanceLoading: boolean;
+    effectiveBalance: number;
+    walletAddress: string | null;
+    currentUser: any;
+    setShowQRCodeScreen: (show: boolean) => void;
+  }> = ({
+    isBalanceHidden,
+    setIsBalanceHidden,
+    walletLoading,
+    liveBalanceLoading,
+    effectiveBalance,
+    walletAddress,
+    currentUser,
+    setShowQRCodeScreen
+  }) => (
+    <>
+      <View style={styles.balanceHeader}>
+        <View style={styles.balanceHeaderContent}>
+          <Text style={styles.balanceLabel}>
+            WeSplit Balance
+          </Text>
+          <TouchableOpacity
+            onPress={() => setIsBalanceHidden(!isBalanceHidden)}
+            style={{ padding: 4, marginLeft: 8 }}
+          >
+            {isBalanceHidden ? (
+              <EyeSlash size={20} color={colors.white} />
+            ) : (
+              <Eye size={20} color={colors.white} />
+            )}
+          </TouchableOpacity>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {/* QR Code Button for Profile Sharing */}
+          <TouchableOpacity
+            style={styles.qrCodeIcon}
+            onPress={() => setShowQRCodeScreen(true)}
+          >
+            <QrCode size={30} color={colors.white} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.balanceContainer}>
+        <View style={{ flex: 1, alignItems: 'flex-start' }}>
+          {walletLoading || liveBalanceLoading ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={colors.white} style={{ marginRight: 8 }} />
+            </View>
+          ) : (
+            <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
+              {isBalanceHidden ? '$--.--' : `$ ${effectiveBalance.toFixed(2)}`}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Wallet Address with Copy Button */}
+      <TouchableOpacity
+        style={styles.walletAddressContainer}
+        onPress={() => copyWalletAddress(walletAddress || currentUser?.wallet_address || '')}
+      >
+        <Text style={styles.balanceLimitText}>
+          {hashWalletAddress(walletAddress || currentUser?.wallet_address || '')}
+        </Text>
+        <Copy
+          size={20}
+          color={colors.white}
+          style={styles.copyIcon}
+        />
+      </TouchableOpacity>
+    </>
+  );
 
   // Helper functions for split status
   const getSplitStatusColor = (status: string) => {
@@ -1135,6 +1279,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               userId={currentUser?.id}
               userName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
               avatarUrl={currentUser?.avatar}
+              borderImageUrl={profileBorderUrl || undefined}
               style={styles.profileImage}
               size={50}
             />
@@ -1143,21 +1288,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               <Text style={styles.userName}>
                 {currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}!
               </Text>
-              {currentUser?.badges && currentUser.badges.length > 0 && (
-                <BadgeDisplay
-                  badges={currentUser.badges}
-                  activeBadge={currentUser.active_badge}
-                  showAll={false}
-                />
-              )}
-              {currentUser?.active_profile_asset && (
-                <ProfileAssetDisplay
-                  userId={currentUser.id}
-                  profileAssets={currentUser.profile_assets}
-                  activeProfileAsset={currentUser.active_profile_asset}
-                  showProfileAsset={true}
-                />
-              )}
             </View>
           </TouchableOpacity>
 
@@ -1287,71 +1417,89 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         )}
 
         {/* Balance Card */}
+        {(() => {
+          // Handle SVG backgrounds with special styling
+          const isSvgBackground = walletBackgroundUrl && walletBackgroundUrl.includes('.svg') && !backgroundError;
+          const backgroundAssetId = currentUser?.active_wallet_background;
+
+          if (isSvgBackground) {
+            // Render SVG as background using SvgUri
+            return (
+              <View style={[styles.balanceCard, { alignItems: 'flex-start' }]}>
+                <SvgUri
+                  uri={walletBackgroundUrl!}
+                  width="100%"
+                  height="100%"
+                  preserveAspectRatio="xMidYMid slice"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                  }}
+                  onError={() => {
+                    logger.warn('Balance background SVG failed to load', {
+                      userId: currentUser?.id,
+                      backgroundUrl: walletBackgroundUrl,
+                      assetId: backgroundAssetId
+                    }, 'DashboardScreen');
+                    setBackgroundError(true);
+                  }}
+                  onLoad={() => {
+                    // Reset error state on successful load
+                    setBackgroundError(false);
+                  }}
+                />
+                <BalanceCardContent
+                  isBalanceHidden={isBalanceHidden}
+                  setIsBalanceHidden={setIsBalanceHidden}
+                  walletLoading={walletLoading}
+                  liveBalanceLoading={liveBalanceLoading}
+                  effectiveBalance={effectiveBalance}
+                  walletAddress={walletAddress}
+                  currentUser={currentUser}
+                  setShowQRCodeScreen={setShowQRCodeScreen}
+                />
+              </View>
+            );
+          } else {
+            // Regular image background for PNG/JPG assets
+            return (
         <ImageBackground
-          source={{ uri: walletBackgroundUrl || DEFAULT_WALLET_BACKGROUND }}
+                source={{
+                  uri: backgroundError
+                    ? DEFAULT_WALLET_BACKGROUND
+                    : (walletBackgroundUrl || DEFAULT_WALLET_BACKGROUND)
+                }}
           style={[styles.balanceCard, { alignItems: 'flex-start' }]}
           resizeMode="cover"
-        >
-          <View style={styles.balanceHeader}>
-            <View style={styles.balanceHeaderContent}>
-              <Text style={styles.balanceLabel}>
-                WeSplit Balance
-              </Text>
-              <TouchableOpacity
-                onPress={() => setIsBalanceHidden(!isBalanceHidden)}
-                style={{ padding: 4, marginLeft: 8 }}
+                onError={() => {
+                  logger.warn('Balance background image failed to load', {
+                    userId: currentUser?.id,
+                    backgroundUrl: walletBackgroundUrl
+                  }, 'DashboardScreen');
+                  setBackgroundError(true);
+                }}
+                onLoad={() => {
+                  // Reset error state on successful load
+                  setBackgroundError(false);
+                }}
               >
-                {isBalanceHidden ? (
-                  <EyeSlash size={20} color={colors.white} />
-                ) : (
-                  <Eye size={20} color={colors.white} />
-                )}
-              </TouchableOpacity>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {/* Auto-refresh Status Indicator */}
-              {/* Removed as per edit hint */}
-
-
-              {/* QR Code Button for Profile Sharing */}
-              <TouchableOpacity
-                style={styles.qrCodeIcon}
-                onPress={() => setShowQRCodeScreen(true)}
-              >
-                <QrCode size={30} color={colors.white} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.balanceContainer}>
-            <View style={{ flex: 1, alignItems: 'flex-start' }}>
-              {walletLoading || liveBalanceLoading ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color={colors.white} style={{ marginRight: 8 }} />
-                
-                </View>
-              ) : (
-                <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                  {isBalanceHidden ? '$--.--' : `$ ${effectiveBalance.toFixed(2)}`}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          {/* Wallet Address with Copy Button */}
-          <TouchableOpacity
-            style={styles.walletAddressContainer}
-            onPress={() => copyWalletAddress(walletAddress || currentUser?.wallet_address || '')}
-          >
-            <Text style={styles.balanceLimitText}>
-              {hashWalletAddress(walletAddress || currentUser?.wallet_address || '')}
-            </Text>
-            <Copy
-              size={20}
-              color={colors.white}
-              style={styles.copyIcon}
+                <BalanceCardContent
+                  isBalanceHidden={isBalanceHidden}
+                  setIsBalanceHidden={setIsBalanceHidden}
+                  walletLoading={walletLoading}
+                  liveBalanceLoading={liveBalanceLoading}
+                  effectiveBalance={effectiveBalance}
+                  walletAddress={walletAddress}
+                  currentUser={currentUser}
+                  setShowQRCodeScreen={setShowQRCodeScreen}
             />
-          </TouchableOpacity>
+              </ImageBackground>
+            );
+          }
+        })()}
 
           {/* {!walletConnected && userCreatedWalletBalance && (
             <TouchableOpacity
@@ -1384,7 +1532,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               </Text>
             </TouchableOpacity>
           )}*/}
-        </ImageBackground>
+        
 
         {/* Action Buttons */}
         <View style={styles.actionsGrid}>

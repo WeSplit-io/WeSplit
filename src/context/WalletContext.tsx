@@ -617,11 +617,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   // App wallet methods
   const ensureAppWallet = async (userId: string): Promise<{ success: boolean; wallet?: any; error?: string }> => {
     try {
-      console.log('🔍 WalletProvider: Starting ensureAppWallet...');
       // Import userWalletService to ensure app wallet
       const { walletService } = await import('../services/blockchain/wallet');
-      console.log('🔍 WalletProvider: walletService imported:', !!walletService);
-      console.log('🔍 WalletProvider: walletService.ensureUserWallet method:', typeof walletService?.ensureUserWallet);
       
       const walletResult = await walletService.ensureUserWallet(userId);
       

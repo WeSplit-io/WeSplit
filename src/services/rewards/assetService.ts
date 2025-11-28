@@ -128,7 +128,10 @@ async function withResolvedAssetUrl(
 
   const resolvedUrl = await resolveStorageUrl(metadata.url, { assetId, ...context });
   if (!resolvedUrl) {
-    return metadata;
+    // Don't return the metadata with unresolved gs:// URL
+    // Return metadata without the URL field instead
+    const { url, ...metadataWithoutUrl } = metadata;
+    return metadataWithoutUrl;
   }
 
   return {

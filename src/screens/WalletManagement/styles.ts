@@ -141,13 +141,16 @@ export const styles = StyleSheet.create({
   // Large green card displaying user's balance
   balanceCard: {
     borderRadius: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.white10,
     marginHorizontal: spacing.md,
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     marginBottom: spacing.md,
-    minHeight: spacing.balanceCardMinHeight,
+    minHeight: 200,
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: spacing.xs },
     shadowOpacity: 0.1,

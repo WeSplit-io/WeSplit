@@ -109,7 +109,8 @@ export const useApp = () => {
     
     leaveGroup: async (groupId: number | string) => {
       // Implementation would depend on your data service
-      console.log('Leave group:', groupId);
+      // Legacy implementation - replaced with logger
+      console.warn('Legacy leaveGroup called - not implemented', { groupId });
     },
     
     selectGroup: (group: GroupWithDetails | null) => {
@@ -129,12 +130,12 @@ export const useApp = () => {
     
     updateExpense: async (groupId: number, expense: Expense) => {
       // Implementation would depend on your data service
-      console.log('Update expense:', groupId, expense);
+      console.warn('Legacy updateExpense called - not implemented', { groupId, expenseId: expense?.id });
     },
     
     deleteExpense: async (groupId: number, expenseId: number) => {
       // Implementation would depend on your data service
-      console.log('Delete expense:', groupId, expenseId);
+      console.warn('Legacy deleteExpense called - not implemented', { groupId, expenseId });
     },
     
     // User operations
@@ -190,7 +191,7 @@ export const useApp = () => {
     },
     
     invalidateCache: (pattern: string) => {
-      console.log('Invalidate cache:', pattern);
+      console.warn('Legacy invalidateCache called - not implemented', { pattern });
     },
     
     invalidateGroupsCache: () => {
@@ -217,12 +218,12 @@ export const useApp = () => {
     
     acceptGroupInvitation: async (notificationId: string, groupId: string) => {
       // Implementation would depend on your data service
-      console.log('Accept group invitation:', notificationId, groupId);
+      console.warn('Legacy acceptGroupInvitation called - not implemented', { notificationId, groupId });
     },
     
     acceptSplitInvitation: async (notificationId: string, splitId: string) => {
       // Implementation would depend on your data service
-      console.log('Accept split invitation:', notificationId, splitId);
+      console.warn('Legacy acceptSplitInvitation called - not implemented', { notificationId, splitId });
     },
   };
 };

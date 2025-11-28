@@ -5,7 +5,7 @@
 
 import { Keypair, PublicKey, Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
-import { logger } from '../../analytics/loggingService';
+import { logger, safeLogging } from '../../analytics/loggingService';
 import { firebaseDataService } from '../../data/firebaseDataService';
 import { walletRecoveryService, WalletRecoveryService, WalletRecoveryError } from './walletRecoveryService';
 import { walletExportService } from './walletExportService';
@@ -327,7 +327,10 @@ class SimplifiedWalletService {
       }, userEmail);
 
       if (!stored) {
-        logger.error('Failed to store wallet in SecureStore', { userId, address: wallet.address }, 'SimplifiedWalletService');
+        logger.error('Failed to store wallet in SecureStore', {
+          userId,
+          address: safeLogging.truncateWalletAddress(wallet.address)
+        }, 'SimplifiedWalletService');
         throw new Error('Failed to store new wallet');
       }
 

@@ -363,6 +363,9 @@ const CreateProfileScreen: React.FC = () => {
           
           // User already has a username, authenticate them directly
           const user = {
+            // Spread all Firestore data first
+            ...existingUser,
+            // Then override with critical fields
             id: existingUser.id.toString(),
             name: existingUser.name,
             email: existingUser.email,
@@ -371,7 +374,14 @@ const CreateProfileScreen: React.FC = () => {
             wallet_address: existingUser.wallet_address,
             wallet_public_key: existingUser.wallet_public_key,
             created_at: existingUser.created_at,
-            hasCompletedOnboarding: true
+            hasCompletedOnboarding: true,
+            // Ensure asset fields are included with proper defaults
+            badges: existingUser.badges || [],
+            active_badge: existingUser.active_badge || undefined,
+            profile_borders: existingUser.profile_borders || [],
+            active_profile_border: existingUser.active_profile_border || undefined,
+            wallet_backgrounds: existingUser.wallet_backgrounds || [],
+            active_wallet_background: existingUser.active_wallet_background || undefined,
           };
 
           authenticateUser(user, 'email');
@@ -466,8 +476,11 @@ const CreateProfileScreen: React.FC = () => {
           }
         }
 
-        // Build user object for local state
+        // Build user object for local state - include ALL user fields
         const appUser = {
+          // Spread all Firestore data first to include asset fields
+          ...user,
+          // Then override with critical fields
           id: user.id.toString(),
           name: user.name,
           email: user.email,
@@ -476,7 +489,14 @@ const CreateProfileScreen: React.FC = () => {
           wallet_address: user.wallet_address,
           wallet_public_key: user.wallet_public_key,
           created_at: user.created_at,
-          hasCompletedOnboarding: true // User has completed profile creation
+          hasCompletedOnboarding: true, // User has completed profile creation
+          // Ensure asset fields are included with proper defaults
+          badges: user.badges || [],
+          active_badge: user.active_badge || undefined,
+          profile_borders: user.profile_borders || [],
+          active_profile_border: user.active_profile_border || undefined,
+          wallet_backgrounds: user.wallet_backgrounds || [],
+          active_wallet_background: user.active_wallet_background || undefined,
         };
 
         logger.info('Final user data for authentication', { 

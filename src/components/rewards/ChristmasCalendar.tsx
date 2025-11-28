@@ -205,11 +205,13 @@ const getImagePositionStyle = (position?: ImagePosition, resizeMode?: ImageResiz
 interface ChristmasCalendarProps {
   userId: string;
   onClaimSuccess?: () => void;
+  onAssetClaimed?: () => void;
 }
 
 const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   userId,
-  onClaimSuccess
+  onClaimSuccess,
+  onAssetClaimed
 }) => {
   const [status, setStatus] = useState<ChristmasCalendarStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -476,6 +478,16 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
       if (result.success) {
         setClaimedGift(result.gift);
         setModalView('success');
+
+        // Call asset callback if this was an asset claim
+        if (result.gift.type === 'asset') {
+          console.log('🎄 ChristmasCalendar: Asset claimed, calling onAssetClaimed callback', {
+            assetId: result.gift.assetId,
+            assetType: result.gift.assetType
+          });
+          onAssetClaimed?.();
+        }
+
         // Auto-close after 3 seconds
         setTimeout(() => {
           setShowGiftModal(false);

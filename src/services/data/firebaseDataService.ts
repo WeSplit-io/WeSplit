@@ -1062,16 +1062,12 @@ export const firebaseDataService = {
           };
         });
         
-        console.log('Raw linked wallets from Firebase:', linkedWallets);
-        
         // Sort in memory instead of in Firestore
         linkedWallets.sort((a, b) => {
           const aTime = a.createdAt?.seconds || a.createdAt || 0;
           const bTime = b.createdAt?.seconds || b.createdAt || 0;
           return bTime - aTime; // Descending order
         });
-        
-        console.log('Sorted linked wallets:', linkedWallets);
         
         logger.info('Linked wallets retrieved successfully', { 
           userId, 

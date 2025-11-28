@@ -391,12 +391,27 @@ class ChristmasCalendarService {
             }
           } else if (assetGift.assetType === 'wallet_background') {
             const walletBackgrounds = userData.wallet_backgrounds || [];
+            console.log('🎄 Adding wallet background asset:', {
+              assetId: assetGift.assetId,
+              currentWalletBackgrounds: walletBackgrounds,
+              alreadyOwned: walletBackgrounds.includes(assetGift.assetId)
+            });
+
             if (!walletBackgrounds.includes(assetGift.assetId)) {
+              const newWalletBackgrounds = [...walletBackgrounds, assetGift.assetId];
+              console.log('✅ Adding asset to wallet_backgrounds:', {
+                assetId: assetGift.assetId,
+                newWalletBackgrounds,
+                currentActive: userData.active_wallet_background
+              });
+
               transaction.update(userRef, {
-                wallet_backgrounds: [...walletBackgrounds, assetGift.assetId],
+                wallet_backgrounds: newWalletBackgrounds,
                 // Set as active if user doesn't have one
                 active_wallet_background: userData.active_wallet_background || assetGift.assetId
               });
+            } else {
+              console.log('⚠️ Asset already owned, skipping addition:', assetGift.assetId);
             }
           } else if (assetGift.assetType === 'profile_border') {
             const profileBorders = userData.profile_borders || [];

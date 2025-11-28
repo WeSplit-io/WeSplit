@@ -28,6 +28,8 @@ import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { badgeService } from '../../services/rewards/badgeService';
 import { userInteractionService, UserInteraction } from '../../services/user/userInteractionService';
 import { getBadgeInfo } from '../../services/rewards/badgeConfig';
+import { getAssetInfo } from '../../services/rewards/assetConfig';
+import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { User } from '../../types';
 
@@ -52,6 +54,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
   const [communityBadges, setCommunityBadges] = useState<any[]>([]);
   const [interactions, setInteractions] = useState<UserInteraction[]>([]);
   const [loadingInteractions, setLoadingInteractions] = useState(false);
+  const [profileBorderUrl, setProfileBorderUrl] = useState<string | null>(null);
 
   const targetUserId = route.params?.userId || route.params?.user?.id || route.params?.contact?.id;
   
@@ -83,6 +86,34 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
       }, 'UserProfileScreen');
     }
   }, [targetUserId, isCurrentUser]);
+
+  // Load profile border URL
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfileBorder = async () => {
+      if (!profileUser?.active_profile_border) {
+        if (isMounted) setProfileBorderUrl(null);
+        return;
+      }
+
+      try {
+        const assetInfo = getAssetInfo(profileUser.active_profile_border);
+        if (assetInfo?.url) {
+          const resolvedUrl = await resolveStorageUrl(assetInfo.url, { assetId: profileUser.active_profile_border });
+          if (isMounted && resolvedUrl) {
+            setProfileBorderUrl(resolvedUrl);
+          }
+        }
+      } catch (error) {
+        logger.warn('Failed to load profile border', { error }, 'UserProfileScreen');
+        if (isMounted) setProfileBorderUrl(null);
+      }
+    };
+
+    loadProfileBorder();
+    return () => { isMounted = false; };
+  }, [profileUser?.id, profileUser?.active_profile_border]);
 
   // Load user profile
   const loadUserProfile = useCallback(async () => {
@@ -389,6 +420,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
               size={110}
               avatarUrl={profileUser.avatar}
               style={styles.avatar}
+              borderImageUrl={profileBorderUrl || undefined}
             />
           </View>
           <View style={styles.nameContainer}>

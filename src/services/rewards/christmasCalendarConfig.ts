@@ -130,11 +130,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 8 - December 8th
   {
     day: 8,
-    title: 'Double Points Day',
-    description: 'A special points bonus!',
+    title: 'Ice Crystal Border',
+    description: 'A sparkling ice crystal frame for your avatar',
     gift: {
-      type: 'points',
-      amount: 150
+      type: 'asset',
+      assetId: 'profile_border_ice_crystal_2024',
+      assetType: 'profile_border',
+      assetUrl: getAssetPreviewUrl('profile_border_ice_crystal_2024'),
+      name: 'Ice Crystal Border',
+      description: 'Sparkling ice crystal border for a frosty look'
     }
   },
   
@@ -156,11 +160,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 10 - December 10th
   {
     day: 10,
-    title: 'Mid-Month Bonus',
-    description: 'Halfway through! Here\'s a reward',
+    title: 'Biscuit Bliss Background',
+    description: 'A festive gingerbread treat for your balance card',
     gift: {
-      type: 'points',
-      amount: 200
+      type: 'asset',
+      assetId: 'wallet_biscuit_2024',
+      assetType: 'wallet_background',
+      assetUrl: getAssetPreviewUrl('wallet_biscuit_2024'),
+      name: 'Biscuit Bliss',
+      description: 'Festive gingerbread cookie background for your balance card'
     }
   },
   
@@ -287,15 +295,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 19 - December 19th
   {
     day: 19,
-    title: 'North Pole Wallet',
-    description: 'A vibrant aurora backdrop for your balance card',
+    title: 'Snowflake Dance Background',
+    description: 'Delicate snowflakes dancing across your balance card',
     gift: {
       type: 'asset',
-      assetId: 'wallet_northpole_2024',
+      assetId: 'wallet_snowflakes_2024',
       assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_northpole_2024'),
-      name: 'North Pole Lights',
-      description: 'Neon aurora gradient for your wallet card'
+      assetUrl: getAssetPreviewUrl('wallet_snowflakes_2024'),
+      name: 'Snowflake Dance',
+      description: 'Delicate snowflakes floating across your balance card'
     }
   },
   
@@ -317,15 +325,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 21 - December 21st
   {
     day: 21,
-    title: 'Winter Solstice Wallet',
-    description: 'A special background for the solstice',
+    title: 'Snow Land Background',
+    description: 'A magical winter landscape for your balance card',
     gift: {
       type: 'asset',
-      assetId: 'wallet_solstice_2024',
+      assetId: 'wallet_snowland_2024',
       assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_solstice_2024'),
-      name: 'Winter Solstice',
-      description: 'Celebrate the longest night'
+      assetUrl: getAssetPreviewUrl('wallet_snowland_2024'),
+      name: 'Snow Land',
+      description: 'A magical winter landscape with penguin for your balance card'
     }
   },
   
@@ -362,11 +370,15 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 24 - December 24th (Christmas Eve) - Special Grand Prize
   {
     day: 24,
-    title: 'Grand Prize! 🎉',
-    description: 'Congratulations on completing the calendar!',
+    title: 'Christmas Wreath Border 🎄',
+    description: 'The ultimate festive crown for completing the calendar!',
     gift: {
-      type: 'points',
-      amount: 1000
+      type: 'asset',
+      assetId: 'profile_border_christmas_wreath_2024',
+      assetType: 'profile_border',
+      assetUrl: getAssetPreviewUrl('profile_border_christmas_wreath_2024'),
+      name: 'Christmas Wreath',
+      description: 'A festive wreath border with holly and berries - exclusive grand prize!'
     }
   }
 ];

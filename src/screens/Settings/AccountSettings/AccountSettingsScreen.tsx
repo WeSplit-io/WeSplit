@@ -608,6 +608,128 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
             </View>
           </View>
 
+          {/* Customize Appearance Section */}
+          <View style={{ marginTop: spacing.lg }}>
+            <Text style={{
+              fontSize: typography.fontSize.md,
+              fontWeight: typography.fontWeight.regular,
+              color: colors.white80,
+              marginBottom: spacing.md,
+            }}>
+              Customize Appearance
+            </Text>
+            
+            {/* Profile Borders Option */}
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: colors.white5,
+                borderRadius: spacing.md,
+                padding: spacing.md,
+                marginBottom: spacing.sm,
+              }}
+              onPress={() => navigation.navigate('AssetSelection', { assetType: 'profile_border' })}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <PhosphorIcon name="CircleHalf" size={20} color={colors.white} weight="regular" />
+                <Text style={{
+                  color: colors.white,
+                  fontSize: typography.fontSize.md,
+                  marginLeft: spacing.sm,
+                }}>
+                  Profile Borders
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {currentUser?.active_profile_border && (
+                  <View style={{
+                    backgroundColor: colors.green,
+                    paddingHorizontal: spacing.xs,
+                    paddingVertical: 2,
+                    borderRadius: spacing.xs,
+                    marginRight: spacing.sm,
+                  }}>
+                    <Text style={{
+                      color: colors.black,
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.bold,
+                    }}>
+                      Active
+                    </Text>
+                  </View>
+                )}
+                <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
+              </View>
+            </TouchableOpacity>
+
+            {/* Wallet Backgrounds Option */}
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: colors.white5,
+                borderRadius: spacing.md,
+                padding: spacing.md,
+              }}
+              onPress={() => navigation.navigate('AssetSelection', { assetType: 'wallet_background' })}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <PhosphorIcon name="ImageSquare" size={20} color={colors.white} weight="regular" />
+                <Text style={{
+                  color: colors.white,
+                  fontSize: typography.fontSize.md,
+                  marginLeft: spacing.sm,
+                }}>
+                  Balance Card Background
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {currentUser?.active_wallet_background && (
+                  <View style={{
+                    backgroundColor: colors.green,
+                    paddingHorizontal: spacing.xs,
+                    paddingVertical: 2,
+                    borderRadius: spacing.xs,
+                    marginRight: spacing.sm,
+                  }}>
+                    <Text style={{
+                      color: colors.black,
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.bold,
+                    }}>
+                      Active
+                    </Text>
+                  </View>
+                )}
+                <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
+              </View>
+            </TouchableOpacity>
+
+            {/* Asset count info */}
+            {(currentUser?.profile_borders?.length || currentUser?.wallet_backgrounds?.length) ? (
+              <Text style={{
+                color: colors.white50,
+                fontSize: typography.fontSize.sm,
+                marginTop: spacing.sm,
+                textAlign: 'center',
+              }}>
+                You own {currentUser?.profile_borders?.length || 0} border{(currentUser?.profile_borders?.length || 0) !== 1 ? 's' : ''} and {currentUser?.wallet_backgrounds?.length || 0} background{(currentUser?.wallet_backgrounds?.length || 0) !== 1 ? 's' : ''}
+              </Text>
+            ) : (
+              <Text style={{
+                color: colors.white50,
+                fontSize: typography.fontSize.sm,
+                marginTop: spacing.sm,
+                textAlign: 'center',
+              }}>
+                Earn customization assets through the Advent Calendar
+              </Text>
+            )}
+          </View>
+
           {/* Delete Account Button */}
           <TouchableOpacity 
             style={[styles.deleteAccountButton, isDeletingAccount && { opacity: 0.6 }]} 

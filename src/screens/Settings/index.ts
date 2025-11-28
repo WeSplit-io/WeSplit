@@ -8,3 +8,4 @@ export { default as ProfileScreen } from './Profile/ProfileScreen';
 export { default as LanguageScreen } from './Language/LanguageScreen';
 export { default as PremiumScreen } from './Premium/PremiumScreen';
 export { default as LinkedCardsScreen } from './LinkedCards/LinkedCardsScreen';
+export { AssetSelectionScreen } from './AssetSelection';

@@ -17,7 +17,7 @@ import { useMemo } from 'react';
 const ChristmasCalendarScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
-  const { state } = useApp();
+  const { state, refreshUser } = useApp();
   const { currentUser } = state;
 
   if (!currentUser?.id) {
@@ -48,6 +48,16 @@ const ChristmasCalendarScreen: React.FC = () => {
           onClaimSuccess={() => {
             // Refresh user data after claiming
             // This will be handled by the component's internal state
+          }}
+          onAssetClaimed={async () => {
+            // Refresh user data when an asset is claimed
+            try {
+              console.log('🎄 ChristmasCalendarScreen: Asset claimed, refreshing user data');
+              await refreshUser();
+              console.log('✅ ChristmasCalendarScreen: User data refreshed after asset claim');
+            } catch (error) {
+              console.warn('Failed to refresh user data after asset claim:', error);
+            }
           }}
         />
       </View>

@@ -27,7 +27,9 @@ module.exports = {
     'no-new-func': 'error',
     'no-script-url': 'error',
     'no-alert': 'warn',
-    'no-console': ['warn', { allow: ['warn', 'error'] }], // Only allow console.warn and console.error in production
+    'no-console': ['warn', {
+      allow: ['warn', 'error', 'table', 'group', 'groupEnd', 'groupCollapsed']
+    }], // Allow console.log with warning for gradual migration
     
     // React rules
     'react/prop-types': 'off',

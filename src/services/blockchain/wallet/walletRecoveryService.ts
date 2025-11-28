@@ -5,7 +5,7 @@
 
 import * as SecureStore from 'expo-secure-store';
 import { Keypair, PublicKey } from '@solana/web3.js';
-import { logger } from '../../analytics/loggingService';
+import { logger, safeLogging } from '../../analytics/loggingService';
 import { firebaseDataService } from '../../data/firebaseDataService';
 import { secureVault } from '../../security/secureVault';
 import * as Crypto from 'expo-crypto';
@@ -232,7 +232,10 @@ export class WalletRecoveryService {
       if (newStoredData) {
         const walletData: StoredWallet = JSON.parse(newStoredData);
         wallets.push(walletData);
-        logger.debug('Found wallet in new format', { userId, address: walletData.address }, 'WalletRecoveryService');
+        logger.debug('Found wallet in new format', {
+          userId,
+          address: safeLogging.truncateWalletAddress(walletData.address)
+        }, 'WalletRecoveryService');
       }
 
       // 2. Check legacy format: wallet_private_key
@@ -257,7 +260,10 @@ export class WalletRecoveryService {
           };
           
           wallets.push(legacyWallet);
-          logger.debug('Found wallet in legacy format', { userId, address: legacyWallet.address }, 'WalletRecoveryService');
+          logger.debug('Found wallet in legacy format', {
+            userId,
+            address: safeLogging.truncateWalletAddress(legacyWallet.address)
+          }, 'WalletRecoveryService');
         } catch (error) {
           logger.warn('Failed to parse legacy private key', error, 'WalletRecoveryService');
         }
@@ -283,7 +289,10 @@ export class WalletRecoveryService {
           };
           
           wallets.push(userSpecificWallet);
-          logger.debug('Found wallet in user-specific legacy format', { userId, address: userSpecificWallet.address }, 'WalletRecoveryService');
+          logger.debug('Found wallet in user-specific legacy format', {
+            userId,
+            address: safeLogging.truncateWalletAddress(userSpecificWallet.address)
+          }, 'WalletRecoveryService');
         } catch (error) {
           logger.warn('Failed to parse user-specific private key', error, 'WalletRecoveryService');
         }

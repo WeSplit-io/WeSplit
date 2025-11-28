@@ -44,6 +44,7 @@ import SendAmountScreen from './src/screens/Send/SendAmountScreen';
 import SendConfirmationScreen from './src/screens/Send/SendConfirmationScreen';
 import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
 import LinkedCardsScreen from './src/screens/Settings/LinkedCards/LinkedCardsScreen';
+import { AssetSelectionScreen } from './src/screens/Settings/AssetSelection';
 import RequestContactsScreen from './src/screens/Request/RequestContactsScreen';
 import RequestAmountScreen from './src/screens/Request/RequestAmountScreen';
 import RequestSuccessScreen from './src/screens/Request/RequestSuccessScreen';
@@ -162,6 +163,7 @@ export default function App() {
                     <Stack.Screen name="CryptoTransfer" component={CryptoTransferScreen} />
                     <Stack.Screen name="MoonPayWebView" component={MoonPayWebViewScreen} />
                     <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+                    <Stack.Screen name="AssetSelection" component={AssetSelectionScreen} />
                     <Stack.Screen name="Premium" component={PremiumScreen} />
                     <Stack.Screen name="Notifications" component={NotificationsScreen} />
                     <Stack.Screen name="Language" component={LanguageScreen} />

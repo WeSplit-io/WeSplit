@@ -224,6 +224,25 @@ export function calculateEqualSplit(totalAmount: number, participantCount: numbe
   return roundUsdcAmount(splitAmount);
 }
 
+/**
+ * Check if a URL points to an SVG file
+ * @param url URL to check
+ * @returns true if URL is an SVG
+ */
+export function isSvgUrl(url?: string): boolean {
+  return !!url && url.toLowerCase().includes('.svg');
+}
+
+/**
+ * Check if a URL is safe to use (not a gs:// URL or placeholder)
+ * @param url URL to check
+ * @returns true if URL is safe to use
+ */
+export function isSafeUrl(url?: string): boolean {
+  if (!url) return false;
+  return !url.startsWith('gs://') && !url.includes('PLACEHOLDER');
+}
+
 export const formatUtils = {
   usdc: formatUsdcAmount,
   sol: formatSolAmount,
@@ -238,6 +257,8 @@ export const formatUtils = {
   largeNumber: formatLargeNumber,
   parseAmount,
   calculateEqualSplit,
+  isSvgUrl,
+  isSafeUrl,
 };
 
 export default formatUtils;

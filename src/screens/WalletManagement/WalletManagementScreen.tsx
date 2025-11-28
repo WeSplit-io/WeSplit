@@ -6,67 +6,65 @@ import {
   ScrollView,
   Image,
   ImageBackground,
-  Switch,
   Alert,
-  ActivityIndicator,
   Clipboard,
   Modal,
   Animated,
   PanResponder,
   RefreshControl,
-  StatusBar,
-  Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { SvgUri } from 'react-native-svg';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/shared/NavBar';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
-import { walletService, UserWalletBalance, SolanaAppKitService, emergencyFundRecovery } from '../../services/blockchain/wallet';
-import { multiSignStateService } from '../../services/core';
+import { UserWalletBalance, SolanaAppKitService, emergencyFundRecovery } from '../../services/blockchain/wallet';
 import { MultiSignStateService } from '../../services/core/multiSignStateService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import { QRCodeScreen } from '../QRCode';
-import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { logger } from '../../services/analytics/loggingService';
 import { Container, ModernLoader, PhosphorIcon } from '../../components/shared';
 import Header from '../../components/shared/Header';
+import { getUserAssetMetadata } from '../../services/rewards/assetService';
+import { getAssetInfo } from '../../services/rewards/assetConfig';
 
 const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { state } = useApp();
+  const { state, refreshUser } = useApp();
   const currentUser = state.currentUser;
   const {
     // External wallet state (for funding/withdrawals)
-    walletInfo,
     isConnected: externalWalletConnected,
     balance: externalWalletBalance,
     // App wallet state (for internal transactions)
     appWalletAddress,
     appWalletBalance,
-    appWalletConnected,
     ensureAppWallet,
     getAppWalletBalance,
-    getAppWalletInfo
   } = useWallet();
 
   // Local state
   const [localAppWalletBalance, setLocalAppWalletBalance] = useState<UserWalletBalance | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [multiSignEnabled, setMultiSignEnabled] = useState(false);
+  const [, setMultiSignEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [multiSignRemainingDays, setMultiSignRemainingDays] = useState<number>(0);
+  const [, setMultiSignRemainingDays] = useState<number>(0);
   const [showMultiSignExplanation, setShowMultiSignExplanation] = useState(false);
   const [showMultiSignActivated, setShowMultiSignActivated] = useState(false);
   const [sliderValue] = useState(new Animated.Value(0));
-  const [isSliderActive, setIsSliderActive] = useState(false);
+  const [, setIsSliderActive] = useState(false);
   const [showQRCodeScreen, setShowQRCodeScreen] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
+
+  // Wallet background state
+  const [walletBackgroundUrl, setWalletBackgroundUrl] = useState<string | null>(null);
+  const [backgroundError, setBackgroundError] = useState(false);
   
   // Initialize SolanaAppKitService for multi-signature operations
   const solanaAppKitService = new SolanaAppKitService();
@@ -208,6 +206,85 @@ const WalletManagementScreen: React.FC = () => {
 
     loadWalletInfo();
   }, [currentUser?.id]);
+
+  // Load wallet background (exact same logic as Dashboard)
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadWalletBackground = async () => {
+      logger.info('Loading wallet background', {
+        activeWalletBackground: currentUser?.active_wallet_background,
+        hasActiveBackground: !!currentUser?.active_wallet_background
+      }, 'WalletManagementScreen');
+
+      if (!currentUser?.active_wallet_background) {
+        if (isMounted) {
+          setWalletBackgroundUrl(null);
+          setBackgroundError(false);
+        }
+        return;
+      }
+
+      if (isMounted) {
+        setBackgroundError(false);
+      }
+
+      try {
+        let metadata = null;
+        if (currentUser?.id) {
+          metadata = await getUserAssetMetadata(currentUser.id, currentUser.active_wallet_background);
+        }
+
+        if (!metadata) {
+          metadata = getAssetInfo(currentUser.active_wallet_background);
+        }
+
+        const url = metadata?.url || metadata?.nftMetadata?.imageUrl || null;
+        logger.info('Resolved background URL', {
+          assetId: currentUser.active_wallet_background,
+          url,
+          isSvg: url?.includes('.svg'),
+          metadataFound: !!metadata
+        }, 'WalletManagementScreen');
+
+        if (isMounted) {
+          setWalletBackgroundUrl(url);
+          setBackgroundError(false);
+        }
+      } catch (error) {
+        logger.warn('Failed to load wallet background', {
+          userId: currentUser?.id,
+          activeWalletBackground: currentUser?.active_wallet_background,
+          error
+        }, 'WalletManagementScreen');
+
+        if (isMounted) {
+          setBackgroundError(true);
+        }
+      }
+    };
+
+    loadWalletBackground();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id, currentUser?.active_wallet_background]);
+
+  // Refresh user data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const refreshUserData = async () => {
+        try {
+          await refreshUser();
+        } catch (error) {
+          logger.error('Failed to refresh user data on focus', { error }, 'WalletManagementScreen');
+        }
+      };
+
+      refreshUserData();
+    }, [refreshUser])
+  );
 
   // Monitor balance changes
   useEffect(() => {
@@ -397,62 +474,6 @@ const WalletManagementScreen: React.FC = () => {
     navigation.navigate('TransactionHistory');
   };
 
-  const handleMultiSignToggle = async (value: boolean) => {
-    if (value) {
-      // Show multi-sign explanation modal
-      setShowMultiSignExplanation(true);
-    } else {
-      try {
-        await MultiSignStateService.saveMultiSignState(false);
-        setMultiSignEnabled(false);
-        setMultiSignRemainingDays(0);
-      } catch (error) {
-        logger.error('Error saving multi-sign state', { error }, 'WalletManagementScreen');
-        Alert.alert('Error', 'Failed to update multi-sign state');
-      }
-    }
-  };
-
-
-  const handleApproveTransaction = async (transactionId: string) => {
-    try {
-      if (!currentUser?.id) {return;}
-
-      const result = await solanaAppKitService.approveMultiSigTransaction('', transactionId, currentUser.id.toString());
-
-      if (result) {
-        Alert.alert('Success', 'Transaction approved successfully!');
-        // Reload multi-signature data
-        await loadMultiSigData();
-      } else {
-        Alert.alert('Error', 'Failed to approve transaction');
-      }
-    } catch (error) {
-      logger.error('Error approving transaction', { error }, 'WalletManagementScreen');
-      Alert.alert('Error', 'Failed to approve transaction');
-    }
-  };
-
-  const handleRejectTransaction = async (transactionId: string) => {
-    try {
-      if (!currentUser?.id) {return;}
-
-      const result = await solanaAppKitService.rejectMultiSigTransaction('', transactionId, currentUser.id.toString());
-
-      if (result) {
-        Alert.alert('Success', 'Transaction rejected successfully!');
-        // Reload multi-signature data
-        await loadMultiSigData();
-      } else {
-        Alert.alert('Error', 'Failed to reject transaction');
-      }
-    } catch (error) {
-      logger.error('Error rejecting transaction', { error }, 'WalletManagementScreen');
-      Alert.alert('Error', 'Failed to reject transaction');
-    }
-  };
-
-
   // Apple-style slider component
   const appleSlider = () => {
     const maxSlideDistance = 300; // Adjusted for container width minus thumb width
@@ -602,33 +623,27 @@ const WalletManagementScreen: React.FC = () => {
           let transactionIcon;
           let transactionColor;
           let transactionTitle;
-          let transactionSubtitle;
 
           if (isIncoming) {
             transactionIcon = 'ArrowCircleDown';
             transactionColor = colors.green;
             transactionTitle = `Received from ${transaction.recipient || 'someone'}`;
-            transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
           } else if (isOutgoing) {
               transactionIcon = 'PaperPlaneTilt';
               transactionColor = colors.white;
             transactionTitle = `Sent to ${transaction.recipient || 'someone'}`;
-            transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
           } else if (isDeposit) {
             transactionIcon = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcard-add-new.png?alt=media&token=8ca9ad64-c616-4f4c-9f3d-2be39c3091f2' };
             transactionColor = colors.green;
             transactionTitle = 'Deposit';
-            transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
           } else if (isWithdraw) {
             transactionIcon = 'ArrowLineUp';
             transactionColor = colors.white;
             transactionTitle = 'Withdrawal';
-            transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
           } else {
             transactionIcon = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
             transactionColor = colors.white;
             transactionTitle = transaction.recipient || 'Unknown';
-            transactionSubtitle = `$${transaction.amount.toFixed(2)}`;
           }
 
           return (
@@ -700,19 +715,6 @@ const WalletManagementScreen: React.FC = () => {
     </View>
   );
 
-  const handleExternalWalletConnectionSuccess = (result: any) => {
-    logger.info('External wallet connected successfully', { result }, 'WalletManagementScreen');
-
-    Alert.alert(
-      'External Wallet Connected',
-      `Successfully connected to your external wallet!\n\nYou can now transfer funds to your app wallet.`,
-      [{ text: 'OK' }]
-    );
-
-    // Refresh the wallet data
-    handleRefresh();
-  };
-
   const handleEmergencyFundRecovery = async () => {
     if (!currentUser?.id) {
       Alert.alert('Error', 'User not authenticated');
@@ -766,7 +768,7 @@ const WalletManagementScreen: React.FC = () => {
                 );
               }
             } catch (error) {
-              logger.error('Emergency recovery error', error, 'WalletManagementScreen');
+              logger.error('Emergency recovery error', { error }, 'WalletManagementScreen');
               Alert.alert(
                 'Error',
                 `Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -782,9 +784,8 @@ const WalletManagementScreen: React.FC = () => {
   };
 
 
-
   return (
-    <Container>
+     <Container>
 
       {/* Header */}
       <Header 
@@ -807,65 +808,121 @@ const WalletManagementScreen: React.FC = () => {
         }
       >
         {/* Balance Card */}
-        <ImageBackground
-          source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-bg-linear.png?alt=media&token=4347e0cd-056e-4681-a066-0fd74a563013' }}
-          style={[styles.balanceCard, { alignItems: 'flex-start' }]}
-          resizeMode="cover"
-        >
-          <View style={styles.balanceHeader}>
-            <Text style={styles.balanceLabel}>
-              WeSplit Wallet
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {/* QR Code Button for Profile Sharing */}
-              <TouchableOpacity
-                style={styles.qrCodeIcon}
-                onPress={() => setShowQRCodeScreen(true)}
-              >
-                <Image
-                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fqr-code-scan.png?alt=media&token=3fc388bd-fdf7-4863-a8b1-9313490d6382' }}
-                  style={styles.qrCodeImage}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
+        {(() => {
+          const isSvgBackground = walletBackgroundUrl && walletBackgroundUrl.includes('.svg') && !backgroundError;
+          const backgroundAssetId = currentUser?.active_wallet_background;
 
-          {refreshing ? (
-            <View style={styles.priceLoadingContainer}>
-              <ModernLoader size="small" text="" />
-              <Text style={styles.priceLoadingText}>
-                Updating balance...
-              </Text>
+          const balanceCardContent = (
+                <View style={styles.balanceHeader}>
+                  <Text style={styles.balanceLabel}>
+                    WeSplit Wallet
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity
+                      style={styles.qrCodeIcon}
+                      onPress={() => setShowQRCodeScreen(true)}
+                    >
+                      <Image
+                        source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fqr-code-scan.png?alt=media&token=3fc388bd-fdf7-4863-a8b1-9313490d6382' }}
+                        style={styles.qrCodeImage}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+          );
+
+          const balanceDisplay = refreshing ? (
+                  <View style={styles.priceLoadingContainer}>
+                    <ModernLoader size="small" text="" />
+                    <Text style={styles.priceLoadingText}>
+                      Updating balance...
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.balanceContainer}>
+                    <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
+                          $ {(getDisplayBalance()).toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+          );
+
+          const walletAddressSection = (
+                <TouchableOpacity
+                  style={styles.walletAddressContainer}
+                  onPress={() => handleCopyAddress(appWalletAddress || '')}
+                >
+                  <Text style={styles.balanceLimitText}>
+                    {formatAddress(appWalletAddress)}
+                  </Text>
+                  <PhosphorIcon
+                    name="Copy"
+                    size={20}
+                    color={colors.white}
+                    style={styles.copyIcon}
+                  />
+                </TouchableOpacity>
+          );
+
+          return isSvgBackground ? (
+            <View style={[styles.balanceCard, { alignItems: 'flex-start' }]}>
+              <SvgUri
+                uri={walletBackgroundUrl!}
+                width="100%"
+                height="100%"
+                preserveAspectRatio="xMidYMid meet"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                }}
+                onError={() => {
+                  logger.warn('Balance background SVG failed to load', {
+                    userId: currentUser?.id,
+                    backgroundUrl: walletBackgroundUrl,
+                    assetId: backgroundAssetId
+                  }, 'WalletManagementScreen');
+                  setBackgroundError(true);
+                }}
+                onLoad={() => {
+                  setBackgroundError(false);
+                }}
+              />
+              {balanceCardContent}
+              {balanceDisplay}
+              {walletAddressSection}
             </View>
           ) : (
-            <View style={styles.balanceContainer}>
-              {/* App Wallet Balance Display */}
-              <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                    $ {(getDisplayBalance()).toFixed(2)}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Wallet Address with Copy Button */}
-          <TouchableOpacity
-            style={styles.walletAddressContainer}
-            onPress={() => handleCopyAddress(appWalletAddress || '')}
-          >
-            <Text style={styles.balanceLimitText}>
-              {formatAddress(appWalletAddress)}
-            </Text>
-            <PhosphorIcon
-              name="Copy"
-              size={20}
-              color={colors.white}
-              style={styles.copyIcon}
-            />
-          </TouchableOpacity>
-        </ImageBackground>
+              <ImageBackground
+                source={{
+                  uri: backgroundError
+                    ? 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-bg-linear.png?alt=media&token=4347e0cd-056e-4681-a066-0fd74a563013'
+                    : (walletBackgroundUrl || 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-bg-linear.png?alt=media&token=4347e0cd-056e-4681-a066-0fd74a563013')
+                }}
+                style={[styles.balanceCard, { alignItems: 'flex-start' }]}
+                resizeMode="cover"
+                onError={() => {
+                  logger.warn('Balance background image failed to load', {
+                    userId: currentUser?.id,
+                    backgroundUrl: walletBackgroundUrl
+                  }, 'WalletManagementScreen');
+                  setBackgroundError(true);
+                }}
+                onLoad={() => {
+                  setBackgroundError(false);
+                }}
+              >
+              {balanceCardContent}
+              {balanceDisplay}
+              {walletAddressSection}
+              </ImageBackground>
+            );
+        })()}
 
         {/* Action Buttons */}
         <View style={styles.actionsGrid}>

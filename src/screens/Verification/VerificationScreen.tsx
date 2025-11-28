@@ -101,6 +101,9 @@ const VerificationScreen: React.FC = () => {
               
               if (updatedUserData) {
                 const transformedUser = {
+                  // Spread all Firestore data first
+                  ...updatedUserData,
+                  // Then override with critical fields
                   id: updatedUserData.id,
                   name: updatedUserData.name,
                   email: updatedUserData.email || '',
@@ -109,7 +112,14 @@ const VerificationScreen: React.FC = () => {
                   wallet_public_key: updatedUserData.wallet_public_key || updatedUserData.wallet_address || '',
                   created_at: updatedUserData.created_at || new Date().toISOString(),
                   avatar: updatedUserData.avatar || '',
-                  hasCompletedOnboarding: updatedUserData.hasCompletedOnboarding || false
+                  hasCompletedOnboarding: updatedUserData.hasCompletedOnboarding || false,
+                  // Ensure asset fields are included with proper defaults
+                  badges: updatedUserData.badges || [],
+                  active_badge: updatedUserData.active_badge || undefined,
+                  profile_borders: updatedUserData.profile_borders || [],
+                  active_profile_border: updatedUserData.active_profile_border || undefined,
+                  wallet_backgrounds: updatedUserData.wallet_backgrounds || [],
+                  active_wallet_background: updatedUserData.active_wallet_background || undefined,
                 };
 
                 // CRITICAL: Preserve email in SecureStore after phone linking
@@ -183,6 +193,9 @@ const VerificationScreen: React.FC = () => {
             
             if (existingUserData) {
               const transformedUser = {
+                // Spread all Firestore data first
+                ...existingUserData,
+                // Then override with critical fields
                 id: existingUserData.id,
                 name: existingUserData.name,
                 email: existingUserData.email || '',
@@ -191,7 +204,14 @@ const VerificationScreen: React.FC = () => {
                 wallet_public_key: existingUserData.wallet_public_key || existingUserData.wallet_address || '',
                 created_at: existingUserData.created_at || new Date().toISOString(),
                 avatar: existingUserData.avatar || '',
-                hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false
+                hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false,
+                // Ensure asset fields are included with proper defaults
+                badges: existingUserData.badges || [],
+                active_badge: existingUserData.active_badge || undefined,
+                profile_borders: existingUserData.profile_borders || [],
+                active_profile_border: existingUserData.active_profile_border || undefined,
+                wallet_backgrounds: existingUserData.wallet_backgrounds || [],
+                active_wallet_background: existingUserData.active_wallet_background || undefined,
               };
 
               // CRITICAL: If user has email, save it to SecureStore for future logins

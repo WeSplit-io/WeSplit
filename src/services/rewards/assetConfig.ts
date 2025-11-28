@@ -104,6 +104,35 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     rarity: 'legendary'
   },
   
+  // Christmas 2024 New Profile Borders
+  'profile_border_admin_2024': {
+    assetId: 'profile_border_admin_2024',
+    name: 'Admin Crown',
+    description: 'Exclusive golden crown border for administrators',
+    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/AdminBorder.svg',
+    assetType: 'profile_border',
+    category: 'special',
+    rarity: 'legendary'
+  },
+  'profile_border_christmas_wreath_2024': {
+    assetId: 'profile_border_christmas_wreath_2024',
+    name: 'Christmas Wreath',
+    description: 'A festive wreath border with holly and berries',
+    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/ChristmasBorder.svg',
+    assetType: 'profile_border',
+    category: 'christmas',
+    rarity: 'epic'
+  },
+  'profile_border_ice_crystal_2024': {
+    assetId: 'profile_border_ice_crystal_2024',
+    name: 'Ice Crystal',
+    description: 'Sparkling ice crystal border for a frosty look',
+    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/IceBorder.svg',
+    assetType: 'profile_border',
+    category: 'christmas',
+    rarity: 'rare'
+  },
+  
   // Christmas Calendar 2024 Wallet Backgrounds
   'wallet_winter_2024': {
     assetId: 'wallet_winter_2024',
@@ -140,6 +169,35 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'epic'
+  },
+  
+  // Christmas 2024 New Wallet Backgrounds
+  'wallet_biscuit_2024': {
+    assetId: 'wallet_biscuit_2024',
+    name: 'Biscuit Bliss',
+    description: 'Festive gingerbread cookie background for your balance card',
+    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/BiscuitBackground.svg',
+    assetType: 'wallet_background',
+    category: 'christmas',
+    rarity: 'rare'
+  },
+  'wallet_snowflakes_2024': {
+    assetId: 'wallet_snowflakes_2024',
+    name: 'Snowflake Dance',
+    description: 'Delicate snowflakes floating across your balance card',
+    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/SnowFlakes.svg',
+    assetType: 'wallet_background',
+    category: 'christmas',
+    rarity: 'epic'
+  },
+  'wallet_snowland_2024': {
+    assetId: 'wallet_snowland_2024',
+    name: 'Snow Land',
+    description: 'A magical winter landscape with penguin for your balance card',
+    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/SnowLand.svg',
+    assetType: 'wallet_background',
+    category: 'christmas',
+    rarity: 'legendary'
   },
   
   // Add more assets here as they are created
