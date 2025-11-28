@@ -13,5 +13,6 @@
 ## API Documentation
 * [Complete API Reference](SPEND_API_REFERENCE.md)
 
-## Resources
+## Reference
+* [Glossary](GLOSSARY.md)
 * [SP3ND Order JSON Schema](../SP3ND_ORDER_JSON_MODEL.json)
