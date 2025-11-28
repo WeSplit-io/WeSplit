@@ -16,6 +16,7 @@ import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import { Container, Header } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 import { christmasCalendarService } from '../../services/rewards/christmasCalendarService';
@@ -23,6 +24,9 @@ import { getGiftForDay } from '../../services/rewards/christmasCalendarConfig';
 import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 import { Gift, PointsGift, BadgeGift, AssetGift } from '../../types/rewards';
 import { Image } from 'react-native';
+
+const POINTS_ICON_URL =
+  'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchristmas%2FChristmas%20icons.png?alt=media&token=28f22ccf-b366-4869-935b-f1c341b006b2';
 
 const ChristmasCalendarHistoryScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
@@ -34,6 +38,7 @@ const ChristmasCalendarHistoryScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [resolvedBadgeUrls, setResolvedBadgeUrls] = useState<Record<string, string>>({});
+  const [totalGifts, setTotalGifts] = useState(24);
 
   const loadHistory = useCallback(async () => {
     if (!currentUser?.id) {
@@ -47,7 +52,9 @@ const ChristmasCalendarHistoryScreen: React.FC = () => {
       
       const claimed: Array<{ day: number; gift: Gift; claimedAt: Date }> = [];
       
-      for (let day = 1; day <= 24; day++) {
+      setTotalGifts(status.days.length);
+
+      for (let day = 1; day <= status.days.length; day++) {
         const dayData = status.days[day - 1];
         if (dayData?.claimed && dayData.gift_data) {
           const giftConfig = getGiftForDay(day);
@@ -102,51 +109,96 @@ const ChristmasCalendarHistoryScreen: React.FC = () => {
 
   const renderGift = (item: { day: number; gift: Gift; claimedAt: Date }) => {
     const { day, gift } = item;
-    
-    let displayContent;
+
+    let title = '';
+    let subtitle = `Day ${day}`;
+    let visual: React.ReactNode = (
+      <View style={styles.giftVisual}>
+        <PhosphorIcon name="Gift" size={24} color={colors.white} />
+      </View>
+    );
+
     if (gift.type === 'points') {
       const pointsGift = gift as PointsGift;
-      displayContent = (
-        <View style={styles.giftContent}>
-          <Text style={styles.giftEmoji}>🎁</Text>
-          <View style={styles.giftInfo}>
-            <Text style={styles.giftTitle}>{pointsGift.amount} Split Points</Text>
-            <Text style={styles.giftSubtitle}>Day {day}</Text>
-          </View>
+      title = `${pointsGift.amount} Split Points`;
+      visual = (
+        <View style={[styles.giftVisual, styles.pointsVisual]}>
+          <Image source={{ uri: POINTS_ICON_URL }} style={styles.pointsVisualImage} resizeMode="contain" />
         </View>
       );
     } else if (gift.type === 'badge') {
       const badgeGift = gift as BadgeGift;
+      title = badgeGift.title;
+      subtitle = `Day ${day} • Badge`;
       const iconUrl = resolvedBadgeUrls[badgeGift.badgeId] || badgeGift.iconUrl;
-      displayContent = (
-        <View style={styles.giftContent}>
-          {iconUrl ? (
-            <Image source={{ uri: iconUrl }} style={styles.giftIcon} resizeMode="contain" />
-          ) : (
-            <Text style={styles.giftEmoji}>{badgeGift.icon || '🏅'}</Text>
-          )}
-          <View style={styles.giftInfo}>
-            <Text style={styles.giftTitle}>{badgeGift.title}</Text>
-            <Text style={styles.giftSubtitle}>Day {day} • Badge</Text>
-          </View>
+      visual = iconUrl ? (
+        <View style={styles.giftVisual}>
+          <Image source={{ uri: iconUrl }} style={styles.badgeVisualImage} resizeMode="contain" />
+        </View>
+      ) : (
+        <View style={styles.giftVisual}>
+          <PhosphorIcon name="Medal" size={24} color={colors.white} />
         </View>
       );
     } else if (gift.type === 'asset') {
       const assetGift = gift as AssetGift;
-      displayContent = (
-        <View style={styles.giftContent}>
-          <Text style={styles.giftEmoji}>✨</Text>
-          <View style={styles.giftInfo}>
-            <Text style={styles.giftTitle}>{assetGift.name}</Text>
-            <Text style={styles.giftSubtitle}>Day {day} • {assetGift.assetType === 'profile_image' ? 'Profile Asset' : 'Wallet Asset'}</Text>
+      title = assetGift.name;
+      const assetLabel =
+        assetGift.assetType === 'profile_border'
+          ? 'Profile Border'
+          : assetGift.assetType === 'wallet_background'
+          ? 'Wallet Background'
+          : 'Profile Asset';
+      subtitle = `Day ${day} • ${assetLabel}`;
+      const assetPreviewUrl = assetGift.assetUrl;
+
+      if (assetGift.assetType === 'wallet_background') {
+        visual = (
+          <View style={styles.walletVisualWrapper}>
+            {assetPreviewUrl ? (
+              <Image source={{ uri: assetPreviewUrl }} style={styles.walletVisualImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.walletVisualPlaceholder}>
+                <PhosphorIcon name="Image" size={20} color={colors.white70} />
+              </View>
+            )}
           </View>
-        </View>
-      );
+        );
+      } else if (assetGift.assetType === 'profile_border') {
+        visual = (
+          <View style={styles.borderVisualWrapper}>
+            <UserAvatar
+              userId={currentUser?.id}
+              displayName="Preview User"
+              avatarUrl={currentUser?.avatar}
+              borderImageUrl={assetPreviewUrl}
+              size={48}
+              borderScaleOverride={1.5}
+            />
+          </View>
+        );
+      } else {
+        visual = (
+          <View style={styles.profileAssetVisualWrapper}>
+            {assetPreviewUrl ? (
+              <Image source={{ uri: assetPreviewUrl }} style={styles.profileAssetVisualImage} resizeMode="cover" />
+            ) : (
+              <PhosphorIcon name="Image" size={20} color={colors.white70} />
+            )}
+          </View>
+        );
+      }
     }
 
     return (
       <View key={day} style={styles.giftItem}>
-        {displayContent}
+        <View style={styles.giftContent}>
+          {visual}
+          <View style={styles.giftInfo}>
+            <Text style={styles.giftTitle}>{title}</Text>
+            <Text style={styles.giftSubtitle}>{subtitle}</Text>
+          </View>
+        </View>
       </View>
     );
   };
@@ -199,7 +251,7 @@ const ChristmasCalendarHistoryScreen: React.FC = () => {
         ) : (
           <View style={styles.giftsList}>
             <Text style={styles.sectionTitle}>
-              {claimedGifts.length} of 24 gifts claimed
+              {claimedGifts.length} of {totalGifts} gifts claimed
             </Text>
             {claimedGifts.map((item) => renderGift(item))}
           </View>
@@ -214,7 +266,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.md,
     paddingBottom: spacing.xxxl,
   },
   loadingContainer: {
@@ -256,23 +307,72 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   giftItem: {
-    backgroundColor: '#0F1B16',
+    backgroundColor: colors.white5,
     borderRadius: 16,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white10,
   },
   giftContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
   },
-  giftEmoji: {
-    fontSize: 32,
+  giftVisual: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  giftIcon: {
+  pointsVisual: {
+    backgroundColor: colors.white5,
+  },
+  pointsVisualImage: {
     width: 32,
     height: 32,
+  },
+  badgeVisualImage: {
+    width: 36,
+    height: 36,
+  },
+  walletVisualWrapper: {
+    width: 70,
+    height: 46,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.white10,
+    backgroundColor: colors.blackWhite5,
+  },
+  walletVisualImage: {
+    width: '100%',
+    height: '100%',
+  },
+  walletVisualPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white5,
+  },
+  borderVisualWrapper: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAssetVisualWrapper: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAssetVisualImage: {
+    width: '100%',
+    height: '100%',
   },
   giftInfo: {
     flex: 1,

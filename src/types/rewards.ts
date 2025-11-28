@@ -56,7 +56,7 @@ export interface QuestCompletionResult {
 
 /**
  * Christmas Calendar Types
- * Types for the advent calendar reward system (Dec 1-24)
+ * Types for the advent calendar reward system (Dec 1-25)
  */
 
 export type GiftType = 'points' | 'badge' | 'asset';
@@ -97,14 +97,14 @@ export interface AssetGift {
 export type Gift = PointsGift | BadgeGift | AssetGift;
 
 export interface ChristmasCalendarGift {
-  day: number; // 1-24
+  day: number; // 1-25
   gift: Gift;
   title: string; // Display title for the gift
   description?: string; // Optional description
 }
 
 export interface ChristmasCalendarDay {
-  day: number; // 1-24
+  day: number; // 1-25
   claimed: boolean;
   claimed_at?: string; // ISO timestamp
   gift_id?: string; // Reference to gift config
@@ -123,9 +123,9 @@ export interface ChristmasCalendarClaim {
 
 export interface ChristmasCalendarStatus {
   year: number;
-  days: ChristmasCalendarDay[]; // Array of 24 days
+  days: ChristmasCalendarDay[]; // Array of 25 days
   totalClaimed: number;
   canClaimToday: boolean;
-  todayDay?: number; // Current day (1-24) or null if outside calendar period
+  todayDay?: number; // Current day (1-25) or null if outside calendar period
 }
 

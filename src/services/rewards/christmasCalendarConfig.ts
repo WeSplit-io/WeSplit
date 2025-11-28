@@ -1,6 +1,6 @@
 /**
  * Christmas Calendar Configuration
- * Centralized configuration for the advent calendar gift system (December 1-24)
+ * Centralized configuration for the advent calendar gift system (December 1-25)
  * 
  * This file defines all gifts for the Christmas calendar.
  * Gifts can be easily edited here by the design team.
@@ -20,8 +20,8 @@ const getAssetPreviewUrl = (assetId: string): string | undefined => {
 
 
 /**
- * Christmas Calendar Gift Definitions for 2024
- * Each day (1-24) has a gift that users can claim
+ * Christmas Calendar Gift Definitions for 2025
+ * Each day (1-25) has a gift that users can claim
  * 
  * To edit gifts, simply modify the gift object for each day below.
  * The structure supports:
@@ -29,7 +29,7 @@ const getAssetPreviewUrl = (assetId: string): string | undefined => {
  * - Badges: { type: 'badge', badgeId: string, title: string, description: string, icon?: string }
  * - Assets: { type: 'asset', assetId: string, assetType: 'profile_image' | 'wallet_background' | 'profile_border', assetUrl: string, name: string }
  */
-export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
+export const CHRISTMAS_CALENDAR_2025: ChristmasCalendarGift[] = [
   // Day 1 - December 1st
   {
     day: 1,
@@ -70,9 +70,9 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
     description: 'A sparkling ice crystal frame for your avatar',
     gift: {
       type: 'asset',
-      assetId: 'profile_border_ice_crystal_2024',
+      assetId: 'profile_border_ice_crystal_2025',
       assetType: 'profile_border',
-      assetUrl: getAssetPreviewUrl('profile_border_ice_crystal_2024'),
+      assetUrl: getAssetPreviewUrl('profile_border_ice_crystal_2025'),
       name: 'Ice Crystal Border',
       description: 'Sparkling ice crystal border for a frosty look'
     }
@@ -107,9 +107,9 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
     description: 'Decorate your wallet with a festive background',
     gift: {
       type: 'asset',
-      assetId: 'wallet_biscuit_2024',
+      assetId: 'wallet_biscuit_2025',
       assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_biscuit_2024'),
+      assetUrl: getAssetPreviewUrl('wallet_biscuit_2025'),
       name: 'Biscuit Bliss',
       description: 'Festive gingerbread cookie background for your balance card'
     }
@@ -118,15 +118,11 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 8 - December 8th
   {
     day: 8,
-    title: 'Winter Solstice Background',
-    description: 'Celebrate the longest night with a winter solstice theme',
+    title: 'Blizzard Bonus Points',
+    description: 'Bundle up and grab extra holiday points!',
     gift: {
-      type: 'asset',
-      assetId: 'wallet_solstice_2024',
-      assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_solstice_2024'),
-      name: 'Winter Solstice',
-      description: 'Celebrate the longest night'
+      type: 'points',
+      amount: 105
     }
   },
   
@@ -144,15 +140,11 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 10 - December 10th
   {
     day: 10,
-    title: 'North Pole Lights Background',
-    description: 'Neon aurora gradient for your wallet card',
+    title: 'Polar Express Points',
+    description: 'Full steam ahead with extra seasonal points!',
     gift: {
-      type: 'asset',
-      assetId: 'wallet_northpole_2024',
-      assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_northpole_2024'),
-      name: 'North Pole Lights',
-      description: 'Neon aurora gradient for your wallet card'
+      type: 'points',
+      amount: 115
     }
   },
   
@@ -196,9 +188,9 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
     description: 'Delicate snowflakes dancing across your balance card',
     gift: {
       type: 'asset',
-      assetId: 'wallet_snowflakes_2024',
+      assetId: 'wallet_snowflakes_2025',
       assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_snowflakes_2024'),
+      assetUrl: getAssetPreviewUrl('wallet_snowflakes_2025'),
       name: 'Snowflake Dance',
       description: 'Delicate snowflakes floating across your balance card'
     }
@@ -273,15 +265,11 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
   // Day 21 - December 21st
   {
     day: 21,
-    title: 'Snow Land Background',
-    description: 'A magical winter landscape for your balance card',
+    title: 'Snow Day Bonus Points',
+    description: 'Warm up with a big stash of bonus points!',
     gift: {
-      type: 'asset',
-      assetId: 'wallet_snowland_2024',
-      assetType: 'wallet_background',
-      assetUrl: getAssetPreviewUrl('wallet_snowland_2024'),
-      name: 'Snow Land',
-      description: 'A magical winter landscape with penguin for your balance card'
+      type: 'points',
+      amount: 180
     }
   },
   
@@ -314,25 +302,40 @@ export const CHRISTMAS_CALENDAR_2024: ChristmasCalendarGift[] = [
     description: 'The ultimate festive crown for completing the calendar!',
     gift: {
       type: 'asset',
-      assetId: 'profile_border_christmas_wreath_2024',
+      assetId: 'profile_border_christmas_wreath_2025',
       assetType: 'profile_border',
-      assetUrl: getAssetPreviewUrl('profile_border_christmas_wreath_2024'),
+      assetUrl: getAssetPreviewUrl('profile_border_christmas_wreath_2025'),
       name: 'Christmas Wreath',
       description: 'A festive wreath border with holly and berries - exclusive grand prize!'
+    }
+  },
+
+  // Day 25 - December 25th (Christmas Day)
+  {
+    day: 25,
+    title: 'Snow Land Celebration',
+    description: 'Wrap up the calendar with a legendary wallet background!',
+    gift: {
+      type: 'asset',
+      assetId: 'wallet_snowland_2025',
+      assetType: 'wallet_background',
+      assetUrl: getAssetPreviewUrl('wallet_snowland_2025'),
+      name: 'Snow Land',
+      description: 'A magical winter landscape with penguin for your balance card'
     }
   }
 ];
 
 /**
  * Get gift configuration for a specific day
- * @param day Day number (1-24)
+ * @param day Day number (1-25)
  * @returns Gift configuration or null if day is invalid
  */
 export function getGiftForDay(day: number): ChristmasCalendarGift | null {
-  if (day < 1 || day > 24) {
+  if (day < 1 || day > 25) {
     return null;
   }
-  return CHRISTMAS_CALENDAR_2024.find(gift => gift.day === day) || null;
+  return CHRISTMAS_CALENDAR_2025.find(gift => gift.day === day) || null;
 }
 
 /**
@@ -340,16 +343,16 @@ export function getGiftForDay(day: number): ChristmasCalendarGift | null {
  * @returns Array of all gift configurations
  */
 export function getAllGifts(): ChristmasCalendarGift[] {
-  return CHRISTMAS_CALENDAR_2024;
+  return CHRISTMAS_CALENDAR_2025;
 }
 
 /**
  * Calendar configuration
  */
 export const CHRISTMAS_CALENDAR_CONFIG = {
-  year: 2024,
-  startDate: new Date(2024, 11, 1), // December 1, 2024 (month is 0-indexed)
-  endDate: new Date(2024, 11, 24), // December 24, 2024
-  totalDays: 24
+  year: 2025,
+  startDate: new Date(2025, 11, 1), // December 1, 2025 (month is 0-indexed)
+  endDate: new Date(2025, 11, 25), // December 25, 2025
+  totalDays: 25
 };
 

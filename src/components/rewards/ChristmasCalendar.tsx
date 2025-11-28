@@ -1,6 +1,6 @@
 /**
  * Christmas Calendar Component
- * Displays the advent calendar (24 days) with gift claiming functionality
+ * Displays the advent calendar (25 days) with gift claiming functionality
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -554,6 +554,13 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
       };
 
       const reward = getRewardDisplay();
+      const isAssetGift = gift.type === 'asset';
+      const assetGiftForLayout = isAssetGift ? (gift as AssetGift) : null;
+      const modalMaxHeight = isAssetGift
+        ? assetGiftForLayout?.assetType === 'wallet_background'
+          ? 550
+          : 480
+        : 400;
 
       return (
         <Modal
@@ -563,7 +570,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
           transparent={true}
           closeOnBackdrop={true}
           showHandle={true}
-          maxHeight={gift.type === 'asset' ? 620 : 400}
+          maxHeight={modalMaxHeight}
         >
           <View style={styles.modalClaimingContent}>
             {/* Asset Preview - shown at top for wallet backgrounds and profile borders */}
@@ -572,25 +579,29 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
               const resolvedAssetUrl = resolvedAssetUrls[assetGift.assetId];
 
               if (assetGift.assetType === 'wallet_background') {
+                const previewTitle = `${assetGift.name} Wallet Background`;
+
                 return (
                   <View style={styles.walletPreviewTopContainer}>
                     <View style={styles.walletPreviewWrapper}>
                       {resolvedAssetUrl ? (
-                        <Image
-                          source={{ uri: resolvedAssetUrl }}
-                          style={styles.walletPreviewTopImage}
-                          resizeMode="contain"
-                          onError={() => {
-                            console.warn('Wallet background image failed to load');
-                          }}
-                        />
+                        <View style={styles.walletPreviewImageFrame}>
+                          <Image
+                            source={{ uri: resolvedAssetUrl }}
+                            style={styles.walletPreviewTopImage}
+                            resizeMode="cover"
+                            onError={() => {
+                              console.warn('Wallet background image failed to load');
+                            }}
+                          />
+                        </View>
                       ) : (
                         <View style={[styles.walletPreviewTopImage, { backgroundColor: colors.white10, justifyContent: 'center', alignItems: 'center' }]}>
                           <PhosphorIcon name="Image" size={32} color={colors.white70} />
                         </View>
                       )}
                     </View>
-                    <Text style={styles.previewTopTitle}>{assetGift.name}</Text>
+                    <Text style={styles.previewTopTitle}>{previewTitle}</Text>
                   </View>
                 );
               } else if (assetGift.assetType === 'profile_border') {
@@ -604,6 +615,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
                         avatarUrl={currentUser?.avatar}
                         size={80}
                         borderImageUrl={resolvedAssetUrl}
+                        borderScaleOverride={1.5}
                       />
                     </View>
                     <Text style={styles.previewTopTitle}>{assetGift.name}</Text>
@@ -633,7 +645,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
             )}
 
             <Text style={styles.unlockedTitle}>
-              {gift.type === 'points' ? "You've unlocked today's reward!" : 'Ready to claim?'}
+              {gift.type === 'points' ? "You've unlocked today's reward!" : 'You’ve unlocked today’s reward!'}
             </Text>
 
             <Text style={styles.unlockedSubtitle}>
@@ -1315,7 +1327,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
   rewardFrame: {
     borderWidth: 1,
@@ -1364,17 +1376,17 @@ const styles = StyleSheet.create({
     color: colors.white70,
   },
   unlockedTitle: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   unlockedSubtitle: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     color: colors.white70,
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   claimRewardButton: {
     marginTop: spacing.md,
@@ -1410,13 +1422,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   profilePreviewTopContainer: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.white50,
+    borderRadius: 20,
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
     alignItems: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.white10,
-    borderRadius: spacing.md,
-    borderWidth: 2,
-    borderColor: colors.green,
-    marginBottom: spacing.lg,
+    gap: spacing.md,
+    backgroundColor: colors.white5,
+    width: '100%',
   },
   previewTopTitle: {
     fontSize: typography.fontSize.lg,
@@ -1436,21 +1451,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   walletPreviewWrapper: {
-    position: 'relative',
+    width: '100%',
   },
   walletPreviewTopContainer: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.white50,
+    borderRadius: 20,
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.white5,
     width: '100%',
-    height: 180,
-    borderRadius: spacing.lg,
-    overflow: 'hidden',
-    position: 'relative',
-    marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.green,
   },
   walletPreviewTopImage: {
     width: '100%',
-    height: '100%',
+    height: 150,
+    borderRadius: 18,
+  },
+  walletPreviewImageFrame: {
+    width: '100%',
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.white10,
+    backgroundColor: colors.black,
+    position: 'relative',
   },
   cannotClaimContainer: {
     flexDirection: 'row',

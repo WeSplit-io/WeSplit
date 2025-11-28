@@ -36,6 +36,7 @@ interface UserAvatarProps {
   // Loading timeout in milliseconds (default: 5000)
   loadingTimeout?: number;
   borderImageUrl?: string;
+  borderScaleOverride?: number;
 }
 
 
@@ -52,6 +53,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   displayName,
   loadingTimeout = 5000,
   borderImageUrl,
+  borderScaleOverride,
 }) => {
   const [imageInfo, setImageInfo] = useState<UserImageInfo | null>(userImageInfo || null);
   const [imageError, setImageError] = useState(false);
@@ -145,18 +147,27 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     setBorderError(true);
   };
 
-  const avatarStyle: ViewStyle = {
+  const avatarContainerStyle: ViewStyle = {
+    width: size,
+    height: size,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    ...style,
+  };
+
+  const avatarCircleStyle: ViewStyle = {
     width: size,
     height: size,
     borderRadius: size / 2,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white5,
     justifyContent: 'center',
     alignItems: 'center',
     ...(showBorder && {
       borderWidth: 2,
       borderColor: borderColor,
     }),
-    ...style,
+    overflow: 'hidden',
   };
 
   const initialsStyle: TextStyle = {
@@ -175,8 +186,10 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   if (!imageInfo) {
     // Loading state
     return (
-      <View style={avatarStyle}>
-        <Text style={initialsStyle}>...</Text>
+      <View style={avatarContainerStyle}>
+        <View style={avatarCircleStyle}>
+          <Text style={initialsStyle}>...</Text>
+        </View>
       </View>
     );
   }
@@ -187,36 +200,39 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     : DEFAULT_AVATAR_URL;
 
   // Responsive border scaling - smaller on mobile devices
-  const borderScale = size < 60 ? 1.12 : size < 100 ? 1.14 : 1.15;
+  const baseBorderScale = size < 60 ? 1.12 : size < 100 ? 1.14 : 1.15;
+  const borderScale = borderScaleOverride ?? baseBorderScale;
 
   return (
-    <View style={[avatarStyle, { overflow: 'hidden', position: 'relative' }]}>
-      {isLoading && (
-        <View style={[avatarStyle, { 
-          position: 'absolute', 
-          backgroundColor: colors.surface,
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1
-        }]}>
-          <Text style={initialsStyle}>...</Text>
-        </View>
-      )}
-      <Image
-        source={{ uri: imageUri }}
-        style={[imageStyle, { opacity: isLoading ? 0 : 1 }]}
-        onLoadStart={handleImageLoadStart}
-        onLoad={handleImageLoad}
-        onError={handleImageError}
-        resizeMode="cover"
-      />
+    <View style={avatarContainerStyle}>
+      <View style={avatarCircleStyle}>
+        {isLoading && (
+          <View style={[avatarCircleStyle, { 
+            position: 'absolute', 
+            backgroundColor: colors.white5,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1
+          }]}>
+            <Text style={initialsStyle}>...</Text>
+          </View>
+        )}
+        <Image
+          source={{ uri: imageUri }}
+          style={[imageStyle, { opacity: isLoading ? 0 : 1 }]}
+          onLoadStart={handleImageLoadStart}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          resizeMode="cover"
+        />
+      </View>
       {borderImageUrl && !borderError && isSafeUrl(borderImageUrl) && (
         isSvgUrl(borderImageUrl) ? (
           <View
             style={{
               position: 'absolute',
-              top: -(size * (borderScale - 1)) / 2,
-              left: -(size * (borderScale - 1)) / 2,
+              top: (size - size * borderScale) / 2,
+              left: (size - size * borderScale) / 2,
               width: size * borderScale,
               height: size * borderScale,
               zIndex: 2,
@@ -227,8 +243,8 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
           >
             <SvgUri
               uri={borderImageUrl}
-              width={size * borderScale}
-              height={size * borderScale}
+              width="100%"
+              height="100%"
               onError={handleBorderError}
             />
           </View>
@@ -237,14 +253,13 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
             source={{ uri: borderImageUrl }}
             style={{
               position: 'absolute',
-              top: -(size * (borderScale - 1)) / 2,
-              left: -(size * (borderScale - 1)) / 2,
+              top: (size - size * borderScale) / 2,
+              left: (size - size * borderScale) / 2,
               width: size * borderScale,
               height: size * borderScale,
               zIndex: 2,
             }}
-            resizeMode="contain"
-            pointerEvents="none"
+            resizeMode="cover"
             onError={handleBorderError}
           />
         )

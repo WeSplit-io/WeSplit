@@ -39,7 +39,7 @@ export interface AssetInfo {
  * Asset Definitions
  * All assets available in the app
  */
-const FIREBASE_STORAGE_BUCKET = 'gs://wesplit-35186.firebasestorage.app';
+const FIREBASE_STORAGE_BUCKET = 'gs://wesplit-35186.appspot.com';
 
 const buildBorderUrl = (fileName: string) =>
   `${FIREBASE_STORAGE_BUCKET}/visuals-app/christmas/Rewards/Borders/${fileName}`;
@@ -48,71 +48,71 @@ const buildBackgroundUrl = (fileName: string) =>
   `${FIREBASE_STORAGE_BUCKET}/visuals-app/christmas/Rewards/Backgrounds/${fileName}`;
 
 export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
-  // Christmas 2024 Profile Images (not available)
+  // Christmas 2025 Profile Images (not available)
   /*
-  'profile_snowflake_2024': {
-    assetId: 'profile_snowflake_2024',
+  'profile_snowflake_2025': {
+    assetId: 'profile_snowflake_2025',
     name: 'Snowflake Profile',
     description: 'A festive snowflake profile image',
-    url: buildAssetUrl('profile_snowflake_2024.png'),
+    url: buildAssetUrl('profile_snowflake_2025.png'),
     assetType: 'profile_image',
     category: 'christmas',
     rarity: 'common'
   },
-  'profile_reindeer_2024': {
-    assetId: 'profile_reindeer_2024',
+  'profile_reindeer_2025': {
+    assetId: 'profile_reindeer_2025',
     name: 'Reindeer Profile',
     description: 'A cute reindeer profile image',
-    url: buildAssetUrl('profile_reindeer_2024.png'),
+    url: buildAssetUrl('profile_reindeer_2025.png'),
     assetType: 'profile_image',
     category: 'christmas',
     rarity: 'common'
   },
-  'profile_ornament_2024': {
-    assetId: 'profile_ornament_2024',
+  'profile_ornament_2025': {
+    assetId: 'profile_ornament_2025',
     name: 'Ornament Profile',
     description: 'A festive ornament profile image',
-    url: buildAssetUrl('profile_ornament_2024.png'),
+    url: buildAssetUrl('profile_ornament_2025.png'),
     assetType: 'profile_image',
     category: 'christmas',
     rarity: 'rare'
   },
   */
   
-  // Christmas 2024 Profile Borders (PNG - not uploaded)
+  // Christmas 2025 Profile Borders (PNG - not uploaded)
   /*
-  'profile_border_candycane_2024': {
-    assetId: 'profile_border_candycane_2024',
+  'profile_border_candycane_2025': {
+    assetId: 'profile_border_candycane_2025',
     name: 'Candy Cane Border',
     description: 'Striped candy cane ring for your avatar',
-    url: buildAssetUrl('profile_border_candycane_2024.png'),
+    url: buildAssetUrl('profile_border_candycane_2025.png'),
     assetType: 'profile_border',
     category: 'christmas',
     rarity: 'rare'
   },
-  'profile_border_aurora_2024': {
-    assetId: 'profile_border_aurora_2024',
+  'profile_border_aurora_2025': {
+    assetId: 'profile_border_aurora_2025',
     name: 'Aurora Border',
     description: 'A glowing aurora halo for your profile picture',
-    url: buildAssetUrl('profile_border_aurora_2024.png'),
+    url: buildAssetUrl('profile_border_aurora_2025.png'),
     assetType: 'profile_border',
     category: 'christmas',
     rarity: 'epic'
   },
-  'profile_border_midnight_2024': {
-    assetId: 'profile_border_midnight_2024',
+  'profile_border_midnight_2025': {
+    assetId: 'profile_border_midnight_2025',
     name: 'Midnight Frost Border',
     description: 'Frosted midnight rim for a premium look',
-    url: buildAssetUrl('profile_border_midnight_2024.png'),
+    url: buildAssetUrl('profile_border_midnight_2025.png'),
     assetType: 'profile_border',
     category: 'christmas',
     rarity: 'legendary'
   },
   */
   
-  // Christmas 2024 Profile Borders (PNG)
-  'profile_border_admin_2024': {
-    assetId: 'profile_border_admin_2024',
+  // Christmas 2025 Profile Borders (PNG)
+  'profile_border_admin_2025': {
+    assetId: 'profile_border_admin_2025',
     name: 'Admin Crown',
     description: 'Exclusive golden crown border for administrators',
     url: buildBorderUrl('AdminBorder.png'),
@@ -120,8 +120,8 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     category: 'special',
     rarity: 'legendary'
   },
-  'profile_border_christmas_wreath_2024': {
-    assetId: 'profile_border_christmas_wreath_2024',
+  'profile_border_christmas_wreath_2025': {
+    assetId: 'profile_border_christmas_wreath_2025',
     name: 'Christmas Wreath',
     description: 'A festive wreath border with holly and berries',
     url: buildBorderUrl('ChristmasBorder.png'),
@@ -129,8 +129,8 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     category: 'christmas',
     rarity: 'epic'
   },
-  'profile_border_ice_crystal_2024': {
-    assetId: 'profile_border_ice_crystal_2024',
+  'profile_border_ice_crystal_2025': {
+    assetId: 'profile_border_ice_crystal_2025',
     name: 'Ice Crystal',
     description: 'Sparkling ice crystal border for a frosty look',
     url: buildBorderUrl('IceBorder.png'),
@@ -139,49 +139,31 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     rarity: 'rare'
   },
   
-  // Christmas Calendar 2024 Wallet Backgrounds (PNG - not uploaded)
+  // Christmas Calendar 2025 Wallet Backgrounds (PNG - not uploaded)
   /*
-  'wallet_winter_2024': {
-    assetId: 'wallet_winter_2024',
+  'wallet_winter_2025': {
+    assetId: 'wallet_winter_2025',
     name: 'Winter Wonderland',
     description: 'A beautiful winter scene for your wallet',
-    url: buildAssetUrl('wallet_winter_2024.png'),
+    url: buildAssetUrl('wallet_winter_2025.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'common'
   },
-  'wallet_christmas_2024': {
-    assetId: 'wallet_christmas_2024',
+  'wallet_christmas_2025': {
+    assetId: 'wallet_christmas_2025',
     name: 'Christmas Magic',
     description: 'A magical Christmas scene',
-    url: buildAssetUrl('wallet_christmas_2024.png'),
+    url: buildAssetUrl('wallet_christmas_2025.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'rare'
   },
-  'wallet_solstice_2024': {
-    assetId: 'wallet_solstice_2024',
-    name: 'Winter Solstice',
-    description: 'Celebrate the longest night',
-    url: buildBackgroundUrl('WinterSolstice.png'),
-    assetType: 'wallet_background',
-    category: 'christmas',
-    rarity: 'epic'
-  },
-  'wallet_northpole_2024': {
-    assetId: 'wallet_northpole_2024',
-    name: 'North Pole Lights',
-    description: 'Neon aurora gradient for your wallet card',
-    url: buildBackgroundUrl('NorthPoleLights.png'),
-    assetType: 'wallet_background',
-    category: 'christmas',
-    rarity: 'epic'
-  },
   */
   
-  // Christmas 2024 Wallet Backgrounds (PNG)
-  'wallet_biscuit_2024': {
-    assetId: 'wallet_biscuit_2024',
+  // Christmas 2025 Wallet Backgrounds (PNG)
+  'wallet_biscuit_2025': {
+    assetId: 'wallet_biscuit_2025',
     name: 'Biscuit Bliss',
     description: 'Festive gingerbread cookie background for your balance card',
     url: buildBackgroundUrl('BiscuitBackground.png'),
@@ -189,8 +171,9 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     category: 'christmas',
     rarity: 'rare'
   },
-  'wallet_snowflakes_2024': {
-    assetId: 'wallet_snowflakes_2024',
+
+  'wallet_snowflakes_2025': {
+    assetId: 'wallet_snowflakes_2025',
     name: 'Snowflake Dance',
     description: 'Delicate snowflakes floating across your balance card',
     url: buildBackgroundUrl('SnowFlakes.png'),
@@ -198,8 +181,8 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     category: 'christmas',
     rarity: 'epic'
   },
-  'wallet_snowland_2024': {
-    assetId: 'wallet_snowland_2024',
+  'wallet_snowland_2025': {
+    assetId: 'wallet_snowland_2025',
     name: 'Snow Land',
     description: 'A magical winter landscape with penguin for your balance card',
     url: buildBackgroundUrl('SnowLand.png'),
