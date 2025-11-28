@@ -92,3 +92,14 @@ const spendIntegration = require('./spendIntegration');
 exports.mockSpendWebhook = spendIntegration.mockSpendWebhook;
 exports.testSpendPaymentFlow = spendIntegration.testSpendPaymentFlow;
 exports.getSpendWebhookFormat = spendIntegration.getSpendWebhookFormat;
+
+// Import and export SPEND API endpoints
+const spendApiEndpoints = require('./spendApiEndpoints');
+exports.inviteParticipantsToSplit = spendApiEndpoints.inviteParticipantsToSplit;
+exports.payParticipantShare = spendApiEndpoints.payParticipantShare;
+exports.searchKnownUsers = spendApiEndpoints.searchKnownUsers;
+exports.getSplitStatus = spendApiEndpoints.getSplitStatus;
+exports.spendWebhook = spendApiEndpoints.spendWebhook;
+// New SPEND cross-reference endpoints
+exports.matchUsersByEmail = spendApiEndpoints.matchUsersByEmail;
+exports.batchInviteParticipants = spendApiEndpoints.batchInviteParticipants;
