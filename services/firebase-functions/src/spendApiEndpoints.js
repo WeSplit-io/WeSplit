@@ -444,7 +444,21 @@ exports.payParticipantShare = functions.https.onRequest(async (req, res) => {
       
       // Check if split is fully funded
       const totalPaid = updatedParticipants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
-      const isFullyFunded = totalPaid >= (splitData.totalAmount * (splitData.externalMetadata?.paymentThreshold || 1.0) - 0.01);
+      const paymentThreshold = splitData.externalMetadata?.paymentThreshold || 1.0;
+      const requiredAmount = splitData.totalAmount * paymentThreshold - 0.01;
+      const isFullyFunded = totalPaid >= requiredAmount;
+
+      // Debug logging
+      console.log('Split funding check:', {
+        splitId: splitData.id,
+        totalAmount: splitData.totalAmount,
+        paymentThreshold,
+        requiredAmount,
+        totalPaid,
+        isFullyFunded,
+        currentStatus: splitData.status,
+        newStatus: isFullyFunded ? 'funded' : splitData.status
+      });
       
       // Update split status
       let newSplitStatus = splitData.status;

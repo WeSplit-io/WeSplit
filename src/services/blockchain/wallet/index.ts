@@ -14,7 +14,6 @@ export const emergencyFundRecovery = async (userId: string, originalAddress: str
 export { walletExportService, WalletExportService } from './walletExportService';
 export { LinkedWalletService } from './LinkedWalletService';
 export { SolanaAppKitService } from './solanaAppKitService';
-export { solanaWalletService } from './api/solanaWalletApi';
 
 // Enhanced wallet services for fixing off-curve wallet issues
 export { walletValidationService } from './walletValidationService';

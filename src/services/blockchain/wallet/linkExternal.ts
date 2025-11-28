@@ -4,7 +4,6 @@
  */
 
 import { PublicKey } from '@solana/web3.js';
-import { solanaWalletService } from './api/solanaWalletApi';
 import { logger } from '../../analytics/loggingService';
 
 import type { LinkedWallet } from './LinkedWalletService';
