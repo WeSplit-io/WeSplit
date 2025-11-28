@@ -18,10 +18,8 @@ import { getAssetInfo } from './assetConfig';
 export const BADGE_ASSET_UNLOCKS: Record<string, string[]> = {
   // Users with the WeSplit community badge get the Admin Crown border
   'community_wesplit': ['profile_border_admin_2024'],
-  
+
   // Add more badge-to-asset mappings here as needed
-  // Example:
-  // 'champion_2024': ['some_exclusive_asset'],
 };
 
 /**

@@ -52,7 +52,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import PhonePromptModal from '../../components/auth/PhonePromptModal';
 import { authService } from '../../services/auth/AuthService';
 import { normalizePhoneNumber } from '../../utils/validation/phone';
-import { getUserAssetMetadata } from '../../services/rewards/assetService';
 import { getAssetInfo } from '../../services/rewards/assetConfig';
 import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 
@@ -329,26 +328,31 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       }
 
       try {
-        let metadata = null;
-        if (currentUser?.id) {
-          metadata = await getUserAssetMetadata(currentUser.id, currentUser.active_wallet_background);
-        }
+        // Get asset info from config (always has latest URLs)
+        const assetInfo = getAssetInfo(currentUser.active_wallet_background);
 
-        if (!metadata) {
-          metadata = getAssetInfo(currentUser.active_wallet_background);
-        }
+        if (assetInfo?.url) {
+          // Resolve the URL (handles gs:// to https:// conversion)
+          const resolvedUrl = await resolveStorageUrl(assetInfo.url, { assetId: currentUser.active_wallet_background });
+          logger.info('Resolved background URL', {
+            assetId: currentUser.active_wallet_background,
+            resolvedUrl,
+            originalUrl: assetInfo.url,
+            assetInfoFound: !!assetInfo
+          }, 'DashboardScreen');
 
-        const url = metadata?.url || metadata?.nftMetadata?.imageUrl || null;
-        logger.info('Resolved background URL', {
-          assetId: currentUser.active_wallet_background,
-          url,
-          isSvg: url?.includes('.svg'),
-          metadataFound: !!metadata
-        }, 'DashboardScreen');
-
-        if (isMounted) {
-          setWalletBackgroundUrl(url);
-          setBackgroundError(false);
+          if (isMounted) {
+            setWalletBackgroundUrl(resolvedUrl || null);
+            setBackgroundError(false);
+          }
+        } else {
+          logger.warn('No URL found for wallet background', {
+            assetId: currentUser.active_wallet_background
+          }, 'DashboardScreen');
+          if (isMounted) {
+            setWalletBackgroundUrl(null);
+            setBackgroundError(true);
+          }
         }
       } catch (error) {
         logger.warn('Failed to load wallet background', {

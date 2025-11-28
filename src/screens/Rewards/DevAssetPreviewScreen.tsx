@@ -20,7 +20,6 @@ import { typography } from '../../theme/typography';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { useApp } from '../../context/AppContext';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
-import { getBadgesByCategory } from '../../services/rewards/badgeConfig';
 import { getAllAssets, getAssetInfo } from '../../services/rewards/assetConfig';
 import { getAssetImageUrl } from '../../services/rewards/assetService';
 import { resolveStorageUrl } from '../../services/shared/storageUrlService';
@@ -33,17 +32,17 @@ const DevAssetPreviewScreen: React.FC = () => {
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
   const { state, updateUser } = useApp();
   const { currentUser } = state;
-  const [activeTab, setActiveTab] = useState<'borders' | 'backgrounds' | 'badges'>('borders');
+  const [activeTab, setActiveTab] = useState<'borders' | 'backgrounds'>('borders');
   const [loading, setLoading] = useState<string | null>(null);
   const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
 
-  const christmasBadges = useMemo(() => getBadgesByCategory('christmas'), []);
   const allAssets = useMemo(() => getAllAssets(), []);
-  const profileBorders = useMemo(() => 
+  const profileBorders = useMemo(() =>
     allAssets.filter(a => a.assetType === 'profile_border' && a.category === 'christmas'),
     [allAssets]
   );
-  const walletBackgrounds = useMemo(() => 
+
+  const walletBackgrounds = useMemo(() =>
     allAssets.filter(a => a.assetType === 'wallet_background' && a.category === 'christmas'),
     [allAssets]
   );
@@ -58,30 +57,21 @@ const DevAssetPreviewScreen: React.FC = () => {
         if (asset.url) {
           try {
             const resolved = await resolveStorageUrl(asset.url, { assetId: asset.assetId });
-            urlMap[asset.assetId] = resolved;
+            if (resolved) {
+              urlMap[asset.assetId] = resolved;
+            }
           } catch (error) {
             logger.warn('Failed to resolve asset URL', { assetId: asset.assetId }, 'DevAssetPreviewScreen');
           }
         }
       }
       
-      // Resolve badge icon URLs
-      for (const badge of christmasBadges) {
-        if (badge.iconUrl) {
-          try {
-            const resolved = await resolveStorageUrl(badge.iconUrl, { badgeId: badge.badgeId });
-            urlMap[badge.badgeId] = resolved;
-          } catch (error) {
-            logger.warn('Failed to resolve badge URL', { badgeId: badge.badgeId }, 'DevAssetPreviewScreen');
-          }
-        }
-      }
       
       setResolvedUrls(urlMap);
     };
     
     resolveUrls();
-  }, [profileBorders, walletBackgrounds, christmasBadges]);
+  }, [profileBorders, walletBackgrounds]);
 
   const handleApplyBorder = async (assetId: string) => {
     if (!currentUser?.id) return;
@@ -185,8 +175,11 @@ const DevAssetPreviewScreen: React.FC = () => {
           {profileBorders.map((asset) => {
             const isActive = currentUser?.active_profile_border === asset.assetId;
             const isLoading = loading === asset.assetId;
-            const imageUrl = resolvedUrls[asset.assetId] || asset.url;
+            const resolvedUrl = resolvedUrls[asset.assetId];
+            const originalUrl = asset.url;
+            const imageUrl = resolvedUrl || originalUrl;
             const hasImage = imageUrl && !imageUrl.includes('gs://');
+            const isResolving = originalUrl && originalUrl.includes('gs://') && !resolvedUrl;
             
             return (
               <TouchableOpacity
@@ -204,6 +197,11 @@ const DevAssetPreviewScreen: React.FC = () => {
                       // Image failed to load, will show placeholder
                     }}
                   />
+                ) : isResolving ? (
+                  <View style={styles.assetPlaceholder}>
+                    <PhosphorIcon name="Spinner" size={32} color={colors.white70} />
+                    <Text style={styles.placeholderText}>Loading...</Text>
+                  </View>
                 ) : (
                   <View style={styles.assetPlaceholder}>
                     <PhosphorIcon name="Image" size={32} color={colors.white70} />
@@ -252,8 +250,11 @@ const DevAssetPreviewScreen: React.FC = () => {
           {walletBackgrounds.map((asset) => {
             const isActive = currentUser?.active_wallet_background === asset.assetId;
             const isLoading = loading === asset.assetId;
-            const imageUrl = resolvedUrls[asset.assetId] || asset.url;
+            const resolvedUrl = resolvedUrls[asset.assetId];
+            const originalUrl = asset.url;
+            const imageUrl = resolvedUrl || originalUrl;
             const hasImage = imageUrl && !imageUrl.includes('gs://');
+            const isResolving = originalUrl && originalUrl.includes('gs://') && !resolvedUrl;
             
             return (
               <TouchableOpacity
@@ -271,6 +272,11 @@ const DevAssetPreviewScreen: React.FC = () => {
                       // Image failed to load, will show placeholder
                     }}
                   />
+                ) : isResolving ? (
+                  <View style={styles.assetPlaceholder}>
+                    <PhosphorIcon name="Spinner" size={32} color={colors.white70} />
+                    <Text style={styles.placeholderText}>Loading...</Text>
+                  </View>
                 ) : (
                   <View style={styles.assetPlaceholder}>
                     <PhosphorIcon name="Image" size={32} color={colors.white70} />
@@ -298,51 +304,6 @@ const DevAssetPreviewScreen: React.FC = () => {
     </View>
   );
 
-  const renderBadges = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Christmas Badges</Text>
-      <Text style={styles.sectionSubtitle}>
-        Preview all available Christmas badges
-      </Text>
-
-      <View style={styles.grid}>
-        {christmasBadges.map((badge) => {
-          const imageUrl = resolvedUrls[badge.badgeId] || badge.iconUrl;
-          const hasImage = imageUrl && !imageUrl.includes('gs://');
-          
-          return (
-            <View key={badge.badgeId} style={styles.badgeCard}>
-              {hasImage ? (
-                <Image
-                  source={{ uri: imageUrl }}
-                  style={styles.badgeImage}
-                  resizeMode="contain"
-                  onError={() => {
-                    // Image failed to load
-                  }}
-                />
-              ) : (
-                <View style={styles.badgePlaceholder}>
-                  <Text style={styles.placeholderTextSmall}>Image not uploaded</Text>
-                </View>
-              )}
-              <Text style={styles.badgeName} numberOfLines={2}>
-                {badge.title}
-              </Text>
-              <Text style={styles.badgeDescription} numberOfLines={2}>
-                {badge.description}
-              </Text>
-              {badge.rarity && (
-                <View style={[styles.rarityBadge, styles[`rarity${badge.rarity.charAt(0).toUpperCase() + badge.rarity.slice(1)}`]]}>
-                  <Text style={styles.rarityText}>{badge.rarity}</Text>
-                </View>
-              )}
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
 
   if (!__DEV__ && process.env.EXPO_PUBLIC_ENV !== 'development') {
     return null;
@@ -374,20 +335,11 @@ const DevAssetPreviewScreen: React.FC = () => {
             Backgrounds
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'badges' && styles.tabActive]}
-          onPress={() => setActiveTab('badges')}
-        >
-          <Text style={[styles.tabText, activeTab === 'badges' && styles.tabTextActive]}>
-            Badges
-          </Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {activeTab === 'borders' && renderProfileBorders()}
         {activeTab === 'backgrounds' && renderWalletBackgrounds()}
-        {activeTab === 'badges' && renderBadges()}
       </ScrollView>
     </Container>
   );
@@ -556,68 +508,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: spacing.md,
-  },
-  badgeCard: {
-    width: '47%',
-    backgroundColor: colors.white10,
-    borderRadius: spacing.md,
-    padding: spacing.md,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    position: 'relative',
-  },
-  badgeImage: {
-    width: 64,
-    height: 64,
-    marginBottom: spacing.sm,
-  },
-  badgePlaceholder: {
-    width: 64,
-    height: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.white5,
-    borderRadius: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  badgeName: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  badgeDescription: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white70,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  rarityBadge: {
-    position: 'absolute',
-    top: spacing.xs,
-    right: spacing.xs,
-    borderRadius: spacing.xs,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-  },
-  rarityCommon: {
-    backgroundColor: colors.white30,
-  },
-  rarityRare: {
-    backgroundColor: '#4A90E2',
-  },
-  rarityEpic: {
-    backgroundColor: '#9B59B6',
-  },
-  rarityLegendary: {
-    backgroundColor: '#F39C12',
-  },
-  rarityText: {
-    fontSize: typography.fontSize.xxs,
-    color: colors.white,
-    fontWeight: typography.fontWeight.bold,
-    textTransform: 'uppercase',
   },
 });
 

@@ -46,7 +46,8 @@ export async function getUserAssetMetadata(
         assetId: data.assetId || assetId,
         name: data.name || configAsset?.name || assetId,
         description: data.description || configAsset?.description || '',
-        url: data.assetUrl || configAsset?.url,
+        // Always use config URL for Christmas assets to ensure latest PNG URLs
+        url: (configAsset?.category === 'christmas') ? configAsset?.url : (configAsset?.url || data.assetUrl),
         nftMetadata: data.nftMetadata || configAsset?.nftMetadata,
         assetType: data.assetType || configAsset?.assetType || 'profile_image',
         category: configAsset?.category,

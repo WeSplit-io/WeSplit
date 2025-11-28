@@ -40,13 +40,16 @@ export interface AssetInfo {
  * All assets available in the app
  */
 const FIREBASE_STORAGE_BUCKET = 'gs://wesplit-35186.firebasestorage.app';
-const CHRISTMAS_ASSET_BASE_PATH = 'visuals-app/rewards/christmas';
 
-const buildAssetUrl = (fileName: string) =>
-  `${FIREBASE_STORAGE_BUCKET}/${CHRISTMAS_ASSET_BASE_PATH}/${fileName}`;
+const buildBorderUrl = (fileName: string) =>
+  `${FIREBASE_STORAGE_BUCKET}/visuals-app/christmas/Rewards/Borders/${fileName}`;
+
+const buildBackgroundUrl = (fileName: string) =>
+  `${FIREBASE_STORAGE_BUCKET}/visuals-app/christmas/Rewards/Backgrounds/${fileName}`;
 
 export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
-  // Christmas Calendar 2024 Profile Images
+  // Christmas 2024 Profile Images (not available)
+  /*
   'profile_snowflake_2024': {
     assetId: 'profile_snowflake_2024',
     name: 'Snowflake Profile',
@@ -74,8 +77,10 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     category: 'christmas',
     rarity: 'rare'
   },
+  */
   
-  // Christmas 2024 Profile Borders
+  // Christmas 2024 Profile Borders (PNG - not uploaded)
+  /*
   'profile_border_candycane_2024': {
     assetId: 'profile_border_candycane_2024',
     name: 'Candy Cane Border',
@@ -103,13 +108,14 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     category: 'christmas',
     rarity: 'legendary'
   },
+  */
   
-  // Christmas 2024 New Profile Borders
+  // Christmas 2024 Profile Borders (PNG)
   'profile_border_admin_2024': {
     assetId: 'profile_border_admin_2024',
     name: 'Admin Crown',
     description: 'Exclusive golden crown border for administrators',
-    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/AdminBorder.svg',
+    url: buildBorderUrl('AdminBorder.png'),
     assetType: 'profile_border',
     category: 'special',
     rarity: 'legendary'
@@ -118,7 +124,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'profile_border_christmas_wreath_2024',
     name: 'Christmas Wreath',
     description: 'A festive wreath border with holly and berries',
-    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/ChristmasBorder.svg',
+    url: buildBorderUrl('ChristmasBorder.png'),
     assetType: 'profile_border',
     category: 'christmas',
     rarity: 'epic'
@@ -127,13 +133,14 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'profile_border_ice_crystal_2024',
     name: 'Ice Crystal',
     description: 'Sparkling ice crystal border for a frosty look',
-    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/IceBorder.svg',
+    url: buildBorderUrl('IceBorder.png'),
     assetType: 'profile_border',
     category: 'christmas',
     rarity: 'rare'
   },
   
-  // Christmas Calendar 2024 Wallet Backgrounds
+  // Christmas Calendar 2024 Wallet Backgrounds (PNG - not uploaded)
+  /*
   'wallet_winter_2024': {
     assetId: 'wallet_winter_2024',
     name: 'Winter Wonderland',
@@ -170,13 +177,14 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     category: 'christmas',
     rarity: 'epic'
   },
+  */
   
-  // Christmas 2024 New Wallet Backgrounds
+  // Christmas 2024 Wallet Backgrounds (PNG)
   'wallet_biscuit_2024': {
     assetId: 'wallet_biscuit_2024',
     name: 'Biscuit Bliss',
     description: 'Festive gingerbread cookie background for your balance card',
-    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/BiscuitBackground.svg',
+    url: buildBackgroundUrl('BiscuitBackground.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'rare'
@@ -185,7 +193,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'wallet_snowflakes_2024',
     name: 'Snowflake Dance',
     description: 'Delicate snowflakes floating across your balance card',
-    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/SnowFlakes.svg',
+    url: buildBackgroundUrl('SnowFlakes.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'epic'
@@ -194,7 +202,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetId: 'wallet_snowland_2024',
     name: 'Snow Land',
     description: 'A magical winter landscape with penguin for your balance card',
-    url: 'gs://wesplit-35186.firebasestorage.app/avatars/Assets/SnowLand.svg',
+    url: buildBackgroundUrl('SnowLand.png'),
     assetType: 'wallet_background',
     category: 'christmas',
     rarity: 'legendary'

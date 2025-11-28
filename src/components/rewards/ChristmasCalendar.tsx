@@ -33,7 +33,6 @@ import {
   ChristmasCalendarStatus,
   Gift,
   PointsGift,
-  BadgeGift,
   AssetGift
 } from '../../types/rewards';
 
@@ -223,7 +222,6 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   const [bypassMode, setBypassMode] = useState(false);
   const [countdown, setCountdown] = useState<string>('00 : 00 : 00');
   const [gridWidth, setGridWidth] = useState(0);
-  const [resolvedBadgeUrls, setResolvedBadgeUrls] = useState<Record<string, string>>({});
   const [resolvedTileImageUrls, setResolvedTileImageUrls] = useState<Record<number, string>>({});
 
   const updateCountdown = useCallback(() => {
@@ -256,25 +254,13 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
     const isClaimed = dayData.claimed;
     const gift = isClaimed && dayData.gift_data ? dayData.gift_data : giftConfig.gift;
 
-    // Resolve badge icon URL if needed
-    if (gift.type === 'badge' && gift.iconUrl && !resolvedBadgeUrls[gift.badgeId]) {
-      resolveStorageUrl(gift.iconUrl, { badgeId: gift.badgeId })
-        .then(resolved => {
-          if (resolved) {
-            setResolvedBadgeUrls(prev => ({ ...prev, [gift.badgeId]: resolved }));
-          }
-        })
-        .catch(() => {
-          // Silently fail - will fall back to emoji
-        });
-    }
 
     return {
       giftConfig,
       gift,
       isClaimed
     };
-  }, [selectedDay, status, resolvedBadgeUrls]);
+  }, [selectedDay, status]);
 
 
   useEffect(() => {
@@ -354,68 +340,6 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Resolve all badge icon URLs when status is loaded
-  useEffect(() => {
-    if (!status) return;
-
-    const resolveBadgeUrls = async () => {
-      const urlsToResolve: Array<{ badgeId: string; url: string }> = [];
-      
-      // Collect all badge icon URLs that need resolution
-      for (let day = 1; day <= 24; day++) {
-        const giftConfig = getGiftForDay(day);
-        if (giftConfig?.gift.type === 'badge') {
-          const badgeGift = giftConfig.gift as BadgeGift;
-          if (badgeGift.iconUrl && !resolvedBadgeUrls[badgeGift.badgeId]) {
-            // Check if it's a Firebase Storage URL (gs://)
-            if (badgeGift.iconUrl.startsWith('gs://')) {
-              urlsToResolve.push({ badgeId: badgeGift.badgeId, url: badgeGift.iconUrl });
-            }
-          }
-        }
-        
-        // Also check claimed gifts
-        const dayData = status.days[day - 1];
-        if (dayData?.gift_data?.type === 'badge') {
-          const badgeGift = dayData.gift_data as BadgeGift;
-          if (badgeGift.iconUrl && !resolvedBadgeUrls[badgeGift.badgeId]) {
-            if (badgeGift.iconUrl.startsWith('gs://')) {
-              urlsToResolve.push({ badgeId: badgeGift.badgeId, url: badgeGift.iconUrl });
-            }
-          }
-        }
-      }
-
-      // Resolve all URLs in parallel
-      if (urlsToResolve.length > 0) {
-        const resolutionPromises = urlsToResolve.map(async ({ badgeId, url }) => {
-          try {
-            const resolved = await resolveStorageUrl(url, { badgeId });
-            if (resolved) {
-              return { badgeId, resolvedUrl: resolved };
-            }
-          } catch (error) {
-            console.error(`Failed to resolve badge icon URL for ${badgeId}:`, error);
-          }
-          return null;
-        });
-
-        const results = await Promise.all(resolutionPromises);
-        const newResolvedUrls: Record<string, string> = {};
-        results.forEach(result => {
-          if (result) {
-            newResolvedUrls[result.badgeId] = result.resolvedUrl;
-          }
-        });
-
-        if (Object.keys(newResolvedUrls).length > 0) {
-          setResolvedBadgeUrls(prev => ({ ...prev, ...newResolvedUrls }));
-        }
-      }
-    };
-
-    resolveBadgeUrls();
-  }, [status, resolvedBadgeUrls]);
 
   const toggleBypassMode = () => {
     const newBypassState = !bypassMode;
@@ -571,16 +495,6 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
             details: 'Enjoy your treat and come back tomorrow for more.'
           };
         }
-        if (gift.type === 'badge') {
-          const badgeGift = gift as BadgeGift;
-          return {
-            icon: badgeGift.icon || '🏅',
-            iconUrl: badgeGift.iconUrl,
-            primary: badgeGift.title,
-            secondary: 'Limited badge',
-            details: badgeGift.description || 'Exclusive badge reward'
-          };
-        }
         if (gift.type === 'asset') {
           const assetGift = gift as AssetGift;
           return {
@@ -614,22 +528,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
             <View style={styles.rewardFrame}>
               <View style={styles.rewardBoxContainer}>
                 {(() => {
-                  if (gift.type === 'badge') {
-                    const badgeGift = gift as BadgeGift;
-                    const resolvedUrl = resolvedBadgeUrls[badgeGift.badgeId];
-                    const fallbackUrl = (reward as any).iconUrl;
-                    // Only use URL if it's resolved or if it's already an HTTPS URL (not gs://)
-                    const imageUrl = resolvedUrl || (fallbackUrl && !fallbackUrl.startsWith('gs://') ? fallbackUrl : null);
-                    return imageUrl ? (
-                      <Image
-                        source={{ uri: imageUrl }}
-                        style={styles.rewardBoxImage}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <Text style={styles.rewardBoxEmoji}>{reward.icon}</Text>
-                    );
-                  } else if (gift.type === 'points') {
+                  if (gift.type === 'points') {
                     // Use Christmas icons image for points
                     return (
                       <Image
@@ -678,9 +577,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
       const getSuccessMessage = () => {
         if (claimedGift.type === 'points') {
           return `You have successfully claimed ${(claimedGift as PointsGift).amount} split points!`;
-        } else if (claimedGift.type === 'badge') {
-          return `You have successfully claimed the "${(claimedGift as BadgeGift).title}" badge!`;
-        } else if (claimedGift.type === 'asset') {
+        } else         if (claimedGift.type === 'asset') {
           return `You have successfully claimed ${(claimedGift as AssetGift).name}!`;
         }
         return 'You have successfully claimed your reward!';
