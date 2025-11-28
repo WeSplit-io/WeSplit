@@ -1,6 +1,6 @@
 /**
  * Christmas Calendar Service
- * Manages the advent calendar gift system (December 1-24)
+ * Manages the advent calendar gift system (December 1-25)
  * Handles gift claiming, validation, and distribution
  */
 
@@ -31,7 +31,6 @@ import {
   AssetGift
 } from '../../types/rewards';
 import { 
-  CHRISTMAS_CALENDAR_2024, 
   getGiftForDay, 
   CHRISTMAS_CALENDAR_CONFIG 
 } from './christmasCalendarConfig';
@@ -46,11 +45,11 @@ interface ClaimGiftResult {
 }
 
 class ChristmasCalendarService {
-  private readonly YEAR = 2024;
+  private readonly YEAR = 2025;
   private readonly START_DATE: Date;
   private readonly END_DATE: Date;
   
-  // Development bypass mode - allows access to calendar outside December 1-24
+  // Development bypass mode - allows access to calendar outside December 1-25
   // Set to true to enable development/testing access
   private bypassMode: boolean = false;
 
@@ -61,7 +60,7 @@ class ChristmasCalendarService {
 
   /**
    * Enable/disable development bypass mode
-   * When enabled, allows calendar access and claiming outside December 1-24
+   * When enabled, allows calendar access and claiming outside December 1-25
    */
   setBypassMode(enabled: boolean): void {
     this.bypassMode = enabled;
@@ -77,7 +76,7 @@ class ChristmasCalendarService {
 
   /**
    * Get the current day in the user's local timezone
-   * Returns 1-24 if within calendar period, null otherwise
+   * Returns 1-25 if within calendar period, null otherwise
    * In bypass mode, returns day 1 for testing purposes
    */
   getCurrentDay(userTimezone?: string): number | null {
@@ -107,13 +106,13 @@ class ChristmasCalendarService {
     const month = localDate.getMonth(); // 0-indexed (November = 10, December = 11)
     const day = localDate.getDate();
 
-    // Check if we're in December 2024
+    // Check if we're in December 2025
     if (year !== this.YEAR || month !== 11) { // 11 = December (0-indexed)
       return null;
     }
 
-    // Check if day is between 1 and 24
-    if (day < 1 || day > 24) {
+    // Check if day is between 1 and 25
+    if (day < 1 || day > 25) {
       return null;
     }
 
@@ -123,14 +122,14 @@ class ChristmasCalendarService {
   /**
    * Check if a specific day can be claimed
    * Users can claim:
-   * - Today's gift (if it's Dec 1-24)
+   * - Today's gift (if it's Dec 1-25)
    * - Past days they haven't claimed yet (catch-up)
    * - Cannot claim future days
-   * In bypass mode, any day (1-24) can be claimed
+   * In bypass mode, any day (1-25) can be claimed
    */
   canClaimDay(day: number, userTimezone?: string): { canClaim: boolean; reason?: string } {
-    if (day < 1 || day > 24) {
-      return { canClaim: false, reason: 'Invalid day. Must be between 1 and 24.' };
+    if (day < 1 || day > 25) {
+      return { canClaim: false, reason: 'Invalid day. Must be between 1 and 25.' };
     }
 
     // In bypass mode, allow claiming any day
@@ -142,7 +141,7 @@ class ChristmasCalendarService {
     
     // If we're outside the calendar period
     if (currentDay === null) {
-      return { canClaim: false, reason: 'Christmas calendar is only available December 1-24.' };
+      return { canClaim: false, reason: 'Christmas calendar is only available December 1-25.' };
     }
 
     // Can claim today or any past day (catch-up)
@@ -160,8 +159,8 @@ class ChristmasCalendarService {
    */
   async getUserCalendarStatus(userId: string, userTimezone?: string): Promise<ChristmasCalendarStatus> {
     try {
-      // Initialize all 24 days as unclaimed
-      const days: ChristmasCalendarDay[] = Array.from({ length: 24 }, (_, i) => ({
+      // Initialize all 25 days as unclaimed
+      const days: ChristmasCalendarDay[] = Array.from({ length: 25 }, (_, i) => ({
         day: i + 1,
         claimed: false
       }));
@@ -174,7 +173,7 @@ class ChristmasCalendarService {
       claimsSnapshot.forEach((doc) => {
         const data = doc.data();
         const day = data.day as number;
-        if (day >= 1 && day <= 24) {
+        if (day >= 1 && day <= 25) {
           days[day - 1] = {
             day,
             claimed: true,
@@ -232,12 +231,12 @@ class ChristmasCalendarService {
   ): Promise<ClaimGiftResult> {
     try {
       // Validate day
-      if (day < 1 || day > 24) {
+      if (day < 1 || day > 25) {
         return {
           success: false,
           day,
           gift: { type: 'points', amount: 0 },
-          error: 'Invalid day. Must be between 1 and 24.'
+          error: 'Invalid day. Must be between 1 and 25.'
         };
       }
 

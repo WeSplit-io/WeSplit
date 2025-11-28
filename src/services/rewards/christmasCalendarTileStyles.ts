@@ -45,7 +45,7 @@ export interface TileBackgroundStyle {
 }
 
 /**
- * Background styles for each day (1-24)
+ * Background styles for each day (1-25)
  * 
  * To customize a day's appearance:
  * 1. Set backgroundColor for a solid color (hex, rgb, or named color)
