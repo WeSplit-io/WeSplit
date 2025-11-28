@@ -79,6 +79,7 @@ const ASSET_ID_MAPPING: Record<string, string> = {
   'profile_border_admin': 'profile_border_admin_2025',
   'profile_border_admin_2024': 'profile_border_admin_2025',
   'wallet_biscuit_2024': 'wallet_biscuit_2025',
+  // Map 2024 assets to 2025 versions (user only participated in 2025)
   'profile_border_ice_crystal_2024': 'profile_border_ice_crystal_2025',
   'profile_border_christmas_wreath_2024': 'profile_border_christmas_wreath_2025',
 };
@@ -113,13 +114,12 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
 
     // Check each owned border ID
     ownedBorders.forEach(ownedId => {
-      // If it's a direct match, add it
-      if (allBorders.some(a => a.assetId === ownedId)) {
-        canonicalOwnedBorderIds.add(ownedId);
-      }
-      // If it's mapped to a canonical ID, add the canonical ID
-      else if (ASSET_ID_MAPPING[ownedId] && allBorders.some(a => a.assetId === ASSET_ID_MAPPING[ownedId])) {
-        canonicalOwnedBorderIds.add(ASSET_ID_MAPPING[ownedId]);
+      // If this ID has a mapping, use the canonical (mapped) version
+      const canonicalId = ASSET_ID_MAPPING[ownedId] || ownedId;
+
+      // Only add if the canonical asset exists in our config
+      if (allBorders.some(a => a.assetId === canonicalId)) {
+        canonicalOwnedBorderIds.add(canonicalId);
       }
     });
 
@@ -133,13 +133,12 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
 
     // Check each owned background ID
     ownedBackgrounds.forEach(ownedId => {
-      // If it's a direct match, add it
-      if (allBackgrounds.some(a => a.assetId === ownedId)) {
-        canonicalOwnedBackgroundIds.add(ownedId);
-      }
-      // If it's mapped to a canonical ID, add the canonical ID
-      else if (ASSET_ID_MAPPING[ownedId] && allBackgrounds.some(a => a.assetId === ASSET_ID_MAPPING[ownedId])) {
-        canonicalOwnedBackgroundIds.add(ASSET_ID_MAPPING[ownedId]);
+      // If this ID has a mapping, use the canonical (mapped) version
+      const canonicalId = ASSET_ID_MAPPING[ownedId] || ownedId;
+
+      // Only add if the canonical asset exists in our config
+      if (allBackgrounds.some(a => a.assetId === canonicalId)) {
+        canonicalOwnedBackgroundIds.add(canonicalId);
       }
     });
 

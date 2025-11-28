@@ -120,15 +120,6 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     category: 'special',
     rarity: 'legendary'
   },
-  'profile_border_christmas_wreath_2024': {
-    assetId: 'profile_border_christmas_wreath_2024',
-    name: 'Christmas Wreath',
-    description: 'A festive wreath border with holly and berries',
-    url: buildBorderUrl('ChristmasBorder.png'),
-    assetType: 'profile_border',
-    category: 'christmas',
-    rarity: 'epic'
-  },
   'profile_border_christmas_wreath_2025': {
     assetId: 'profile_border_christmas_wreath_2025',
     name: 'Christmas Wreath',
@@ -137,15 +128,6 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     assetType: 'profile_border',
     category: 'christmas',
     rarity: 'epic'
-  },
-  'profile_border_ice_crystal_2024': {
-    assetId: 'profile_border_ice_crystal_2024',
-    name: 'Ice Crystal',
-    description: 'Sparkling ice crystal border for a frosty look',
-    url: buildBorderUrl('IceBorder.png'),
-    assetType: 'profile_border',
-    category: 'christmas',
-    rarity: 'rare'
   },
   'profile_border_ice_crystal_2025': {
     assetId: 'profile_border_ice_crystal_2025',
@@ -179,16 +161,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
   },
   */
   
-  // Christmas 2024/2025 Wallet Backgrounds (PNG)
-  'wallet_biscuit_2024': {
-    assetId: 'wallet_biscuit_2024',
-    name: 'Biscuit Bliss',
-    description: 'Festive gingerbread cookie background for your balance card',
-    url: buildBackgroundUrl('BiscuitBackground.png'),
-    assetType: 'wallet_background',
-    category: 'christmas',
-    rarity: 'rare'
-  },
+  // Christmas 2025 Wallet Backgrounds (PNG)
   'wallet_biscuit_2025': {
     assetId: 'wallet_biscuit_2025',
     name: 'Biscuit Bliss',
