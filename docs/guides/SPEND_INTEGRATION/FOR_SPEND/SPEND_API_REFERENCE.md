@@ -9,17 +9,20 @@
 ## Table of Contents
 
 1. [Authentication](#authentication)
-2. [Endpoints](#endpoints)
+2. [Data Schemas](#data-schemas)
+   - [SP3ND Order Schema](#sp3nd-order-schema)
+   - [Order Status Values](#order-status-values)
+3. [Endpoints](#endpoints)
    - [Create Split from Payment](#1-create-split-from-payment)
    - [Invite Participants to Split](#2-invite-participants-to-split)
    - [Pay Participant Share](#3-pay-participant-share)
    - [Search Known Users](#4-search-known-users)
    - [Get Split Status](#5-get-split-status)
-3. [Webhooks](#webhooks)
+4. [Webhooks](#webhooks)
    - [WeSplit → SPEND (Outgoing)](#wesplit--spend-outgoing)
    - [SPEND → WeSplit (Incoming)](#spend--wesplit-incoming)
-4. [Error Handling](#error-handling)
-5. [Testing](#testing)
+5. [Error Handling](#error-handling)
+6. [Testing](#testing)
 
 ---
 
@@ -32,6 +35,85 @@ Authorization: Bearer YOUR_API_KEY
 ```
 
 **API Key Status**: Contact `vcharles@dappzy.io` to obtain your API key.
+
+---
+
+## Data Schemas
+
+### SP3ND Order Schema
+
+SP3ND orders are JSON objects containing complete order information. Here's the complete schema:
+
+#### Root Order Object
+```json
+{
+  "id": "string (required)",
+  "order_number": "string (optional)",
+  "user_id": "string (required)",
+  "user_wallet": "string (optional)",
+  "customer_email": "string (optional)",
+  "status": "string (required)",
+  "created_at": "timestamp (optional)",
+  "updated_at": "timestamp (optional)",
+  "store": "string (required)",
+  "items": "array of OrderItem (optional)",
+  "subtotal": "number (optional)",
+  "discount": "number (optional)",
+  "voucher_code": "string (optional)",
+  "voucher_id": "string (optional)",
+  "fx_conversion_fee": "number (optional)",
+  "tax_amount": "number (optional)",
+  "shipping_amount": "number (optional)",
+  "no_kyc_fee": "number (optional)",
+  "total_amount": "number (optional)",
+  "usd_total_at_payment": "number (optional)",
+  "shipping_address": "ShippingAddress (optional)",
+  "shipping_country": "string (optional)",
+  "shipping_option": "string (optional)",
+  "is_international_shipping": "boolean (optional)",
+  "payment_method": "string (optional)",
+  "transaction_signature": "string (optional)",
+  "transaction_state": "string (optional)",
+  "payment_initiated_at": "timestamp (optional)",
+  "payment_confirmed_at": "timestamp (optional)",
+  "payment_verified_at": "timestamp (optional)",
+  "reference_number": "string (optional)",
+  "tracking_number": "string (optional)",
+  "tracking_url": "string (optional)",
+  "additional_notes": "string (optional)"
+}
+```
+
+#### OrderItem Schema
+```json
+{
+  "name": "string (optional)",
+  "product_title": "string (optional)",
+  "product_id": "string (optional)",
+  "product_url": "string (optional)",
+  "price": "number (required)",
+  "quantity": "number (required)",
+  "category": "string (optional)",
+  "image": "string (optional)",
+  "image_url": "string (optional)"
+}
+```
+
+#### Order Status Values
+- `Created` - Order created, awaiting payment
+- `Payment_Pending` - Payment transaction initiated
+- `Funded` - Payment confirmed (Supabase)
+- `Processing` - Order being processed
+- `Paid` - Payment confirmed (Firebase)
+- `Ordered` - Order placed with store
+- `Shipped` - Order shipped
+- `Delivered` - Order delivered
+- `Completed` - Order completed
+- `Canceled` / `Cancelled` - Order canceled
+- `Refunded` - Order refunded
+
+#### Example Order
+See `SP3ND_ORDER_JSON_MODEL.json` for a complete example with sample data.
 
 ---
 

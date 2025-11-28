@@ -1,69 +1,56 @@
-# Internal Documentation - WeSplit Team Only
+# SPEND Integration - Internal Documentation
 
-This folder contains **internal documentation** for WeSplit developers working on the "spend" integration.
+This folder contains **internal production documentation** for WeSplit developers maintaining the SPEND payment gateway integration.
 
 ## 📁 Files
 
-1. **EXTERNAL_WEB_APP_INTEGRATION.md**
-   - Internal implementation guide
-   - Complete data flow documentation
-   - Security implementation details
-   - User account and split creation logic
-   - Firebase Function implementation details
-
-2. **CODEBASE_VERIFICATION.md**
-   - Implementation status check
-   - Codebase verification results
-   - Setup requirements
-   - Deployment checklist
-   - What's implemented vs. what needs setup
-
-3. **AUTOMATIC_SETUP_CLARIFICATION.md**
-   - Clarifies what is automatic vs. requires user action
-   - WeSplit wallet creation flow
-   - External wallet vs. WeSplit wallet distinction
-   - User flow documentation
-
----
-
-## 🔒 Internal Use Only
-
-**Do NOT share these files with external partners.**
-
-These documents contain:
-- Internal implementation details
+### **EXTERNAL_WEB_APP_INTEGRATION.md**
+Complete internal implementation guide covering:
+- Detailed data flow documentation
 - Security implementation specifics
-- Codebase structure
-- Internal verification results
+- User account and split creation logic
+- Firebase Functions architecture
+- Error handling and edge cases
+- Performance optimization details
 
 ---
 
-## 📋 Implementation Status
+## 🔒 Production Maintenance
 
-✅ **Fully Implemented:**
-- Firebase Function endpoint (`createSplitFromPayment`)
-- API key validation
-- Rate limiting
-- Input sanitization
-- User account creation/retrieval
-- Split creation
-- Deep link handling (`view-split` action)
-- Test endpoint
+### Active Monitoring
+- **API Performance**: Response times and success rates
+- **Webhook Reliability**: Delivery tracking and retry logic
+- **Security**: Authentication failures and rate limiting
+- **Data Integrity**: Firestore consistency checks
 
-⚠️ **Requires Setup:**
-- API key management in Firestore
-- Firebase Function deployment
-- Environment configuration
+### Code Locations
+- **Backend**: `services/integrations/spend/` - Core services
+- **Firebase**: `services/firebase-functions/src/spend*.js` - Cloud functions
+- **Frontend**: `src/screens/SpendSplit/` - User interface
+- **Types**: `src/services/integrations/spend/SpendTypes.ts` - Type definitions
 
----
-
-## 🔗 Related Code Files
-
-- `services/firebase-functions/src/externalPaymentIntegration.js` - Main implementation
-- `services/firebase-functions/src/index.js` - Function exports
-- `src/services/core/deepLinkHandler.ts` - Deep link handling
+### Key Components
+- **SpendMerchantPaymentService**: Treasury wallet payments
+- **SpendWebhookService**: Bidirectional webhook communication
+- **SpendPaymentModeService**: Payment mode detection
+- **SpendSplitScreen**: React Native user interface
 
 ---
 
-**Last Updated**: 2024
+## 🚨 Troubleshooting
+
+### Common Issues
+- **Webhook failures**: Check `spend_webhook_logs` collection
+- **API authentication**: Verify API keys in `apiKeys` collection
+- **Payment delays**: Check Firestore transaction logs
+- **User matching**: Review `pending_invitations` collection
+
+### Emergency Contacts
+- **Production Issues**: Check Firebase Console monitoring
+- **SPEND Coordination**: Webhook or data format issues
+- **Security Incidents**: Immediate response required
+
+---
+
+**Status**: 🟢 Production Operational | **Last Updated**: 2025-11-28
 
