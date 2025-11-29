@@ -137,6 +137,7 @@
     "@types/jest": "^29.5.14",
     "@types/node": "^24.10.0",
     "@types/react": "~19.1.10",
+    "baseline-browser-mapping": "^2.8.32",
     "depcheck": "^1.4.7",
     "eslint": "^8.57.0",
     "eslint-config-expo": "^7.0.0",

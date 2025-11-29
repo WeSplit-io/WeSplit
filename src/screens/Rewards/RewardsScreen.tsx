@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
-  Image,
 } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,7 +29,6 @@ import { logger } from '../../services/analytics/loggingService';
 import { userActionSyncService } from '../../services/rewards/userActionSyncService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 import { christmasCalendarService } from '../../services/rewards/christmasCalendarService';
-import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 
 const RewardsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
@@ -41,7 +39,6 @@ const RewardsScreen: React.FC = () => {
   const [pointsHistory, setPointsHistory] = useState<PointsTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [christmasIconUrl, setChristmasIconUrl] = useState<string | null>(null);
   const isLoadingRef = useRef(false);
   const isDevEnvironment = __DEV__ || process.env.EXPO_PUBLIC_ENV === 'development';
 
@@ -104,22 +101,6 @@ const RewardsScreen: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]); // Only depend on currentUser.id to prevent multiple loads
-
-  // Resolve Christmas icon URL on mount
-  useEffect(() => {
-    const resolveChristmasIcon = async () => {
-      try {
-        const resolved = await resolveStorageUrl('gs://wesplit-35186.firebasestorage.app/visuals-app/christmas/Christmas icons.png');
-        if (resolved) {
-          setChristmasIconUrl(resolved);
-        }
-      } catch (error) {
-        console.warn('Failed to resolve Christmas icon URL:', error);
-      }
-    };
-
-    resolveChristmasIcon();
-  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -339,9 +320,7 @@ const RewardsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        </View>
-
-        {/* Christmas Calendar Button */}
+         {/* Christmas Calendar Button */}
         <TouchableOpacity
           style={styles.christmasCalendarButton}
           onPress={() => rewardNav.goToChristmasCalendar()}
@@ -353,15 +332,7 @@ const RewardsScreen: React.FC = () => {
             end={{ x: 1, y: 0 }}
             style={styles.christmasButtonGradient}
           >
-            {christmasIconUrl ? (
-              <Image
-                source={{ uri: christmasIconUrl }}
-                style={styles.christmasIcon}
-                resizeMode="contain"
-              />
-            ) : (
-              <PhosphorIcon name="Calendar" size={24} color={colors.black} weight="fill" />
-            )}
+            <PhosphorIcon name="Gift" size={24} color={colors.black} weight="fill" />
             <View style={styles.christmasButtonContent}>
               <Text style={styles.christmasButtonTitle}>Christmas Calendar</Text>
               <Text style={styles.christmasButtonSubtitle}>
@@ -371,6 +342,11 @@ const RewardsScreen: React.FC = () => {
             <PhosphorIcon name="CaretRight" size={20} color={colors.black} weight="regular" />
           </LinearGradient>
         </TouchableOpacity>
+
+        </View>
+
+       
+        
 
         {/* Points History Section */}
         <View style={styles.historySection}>
@@ -387,7 +363,7 @@ const RewardsScreen: React.FC = () => {
           <View style={styles.historyList}>
             {pointsHistory.length === 0 ? (
               <View style={styles.emptyHistoryContainer}>
-                <PhosphorIcon name="Receipt" size={32} color={colors.whiteSecondary} />
+                <PhosphorIcon name="Receipt" size={32} color={colors.white70} />
                 <Text style={styles.emptyHistoryText}>No points history yet</Text>
               </View>
             ) : (
@@ -531,7 +507,6 @@ const styles = StyleSheet.create({
   featureCardsContainer: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: spacing.xl,
   },
   featureCard: {
     flex: 1,
@@ -643,10 +618,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     gap: spacing.md,
-  },
-  christmasIcon: {
-    width: 24,
-    height: 24,
   },
   christmasButtonContent: {
     flex: 1,
