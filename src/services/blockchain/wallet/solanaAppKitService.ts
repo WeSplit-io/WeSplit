@@ -11,13 +11,13 @@ import {
   TransactionMessage,
   VersionedTransaction
 } from '@solana/web3.js';
-import { 
-  getAssociatedTokenAddress, 
+import {
+  getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
   TOKEN_PROGRAM_ID,
   getAccount
-} from '@solana/spl-token';
+} from '../secureTokenUtils';
 // walletLogoService functionality moved to walletService
 
 // Import shared constants and utilities

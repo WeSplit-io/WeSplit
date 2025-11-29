@@ -22,7 +22,7 @@ import {
   createTransferInstruction,
   createAssociatedTokenAccountInstruction,
   getAccount,
-} from '@solana/spl-token';
+} from '../blockchain/secureTokenUtils';
 import { USDC_CONFIG } from '../shared/walletConstants';
 
 export class SharedWalletFunding {

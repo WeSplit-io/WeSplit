@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
+  Image,
 } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,6 +30,7 @@ import { logger } from '../../services/analytics/loggingService';
 import { userActionSyncService } from '../../services/rewards/userActionSyncService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 import { christmasCalendarService } from '../../services/rewards/christmasCalendarService';
+import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 
 const RewardsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
@@ -39,6 +41,7 @@ const RewardsScreen: React.FC = () => {
   const [pointsHistory, setPointsHistory] = useState<PointsTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [christmasIconUrl, setChristmasIconUrl] = useState<string | null>(null);
   const isLoadingRef = useRef(false);
   const isDevEnvironment = __DEV__ || process.env.EXPO_PUBLIC_ENV === 'development';
 
@@ -101,6 +104,22 @@ const RewardsScreen: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]); // Only depend on currentUser.id to prevent multiple loads
+
+  // Resolve Christmas icon URL on mount
+  useEffect(() => {
+    const resolveChristmasIcon = async () => {
+      try {
+        const resolved = await resolveStorageUrl('gs://wesplit-35186.firebasestorage.app/visuals-app/christmas/Christmas icons.png');
+        if (resolved) {
+          setChristmasIconUrl(resolved);
+        }
+      } catch (error) {
+        console.warn('Failed to resolve Christmas icon URL:', error);
+      }
+    };
+
+    resolveChristmasIcon();
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -321,11 +340,10 @@ const RewardsScreen: React.FC = () => {
         </View>
 
         </View>
-        
 
-        {/* Christmas Calendar Button - Matches Referral Button Style 
+        {/* Christmas Calendar Button */}
         <TouchableOpacity
-          style={styles.inviteButton}
+          style={styles.christmasCalendarButton}
           onPress={() => rewardNav.goToChristmasCalendar()}
           activeOpacity={0.8}
         >
@@ -333,18 +351,26 @@ const RewardsScreen: React.FC = () => {
             colors={[colors.gradientStart, colors.gradientEnd]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={styles.inviteButtonGradient}
+            style={styles.christmasButtonGradient}
           >
-            <PhosphorIcon name="Calendar" size={24} color={colors.black} weight="fill" />
-            <View style={styles.inviteButtonContent}>
-              <Text style={styles.inviteButtonTitle}>Christmas Calendar</Text>
-              <Text style={styles.inviteButtonSubtitle}>
+            {christmasIconUrl ? (
+              <Image
+                source={{ uri: christmasIconUrl }}
+                style={styles.christmasIcon}
+                resizeMode="contain"
+              />
+            ) : (
+              <PhosphorIcon name="Calendar" size={24} color={colors.black} weight="fill" />
+            )}
+            <View style={styles.christmasButtonContent}>
+              <Text style={styles.christmasButtonTitle}>Christmas Calendar</Text>
+              <Text style={styles.christmasButtonSubtitle}>
                 Claim daily gifts and earn rewards.
               </Text>
             </View>
-            <PhosphorIcon name="ArrowRight" size={20} color={colors.black} weight="regular" />
+            <PhosphorIcon name="CaretRight" size={20} color={colors.black} weight="regular" />
           </LinearGradient>
-        </TouchableOpacity>*/}
+        </TouchableOpacity>
 
         {/* Points History Section */}
         <View style={styles.historySection}>
@@ -606,6 +632,35 @@ const styles = StyleSheet.create({
   emptyHistoryText: {
     fontSize: typography.fontSize.sm,
     color: colors.white70,
+  },
+  christmasCalendarButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: spacing.xl,
+  },
+  christmasButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  christmasIcon: {
+    width: 24,
+    height: 24,
+  },
+  christmasButtonContent: {
+    flex: 1,
+  },
+  christmasButtonTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.black,
+    marginBottom: spacing.xs / 2,
+  },
+  christmasButtonSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.black,
+    opacity: 0.8,
   },
 });
 

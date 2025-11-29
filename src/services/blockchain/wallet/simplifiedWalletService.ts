@@ -4,7 +4,7 @@
  */
 
 import { Keypair, PublicKey, Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
+import { getAssociatedTokenAddress, getAccount } from '../secureTokenUtils';
 import { logger, safeLogging } from '../../analytics/loggingService';
 import { firebaseDataService } from '../../data/firebaseDataService';
 import { walletRecoveryService, WalletRecoveryService, WalletRecoveryError } from './walletRecoveryService';

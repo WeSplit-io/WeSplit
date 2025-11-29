@@ -13,14 +13,14 @@ import {
   ComputeBudgetProgram,
   Keypair
 } from '@solana/web3.js';
-import { 
-  getAssociatedTokenAddress, 
-  createTransferInstruction, 
+import {
+  getAssociatedTokenAddress,
+  createTransferInstruction,
   getAccount,
   createAssociatedTokenAccountInstruction,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID
-} from '@solana/spl-token';
+} from '../secureTokenUtils';
 import { getConfig } from '../../../config/unified';
 import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../../../config/constants/feeConfig';
 import { solanaWalletService } from '../wallet';

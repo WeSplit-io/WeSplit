@@ -4,7 +4,7 @@
  */
 
 import { PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
+import { getAssociatedTokenAddress, getAccount } from '../secureTokenUtils';
 import { Connection } from '@solana/web3.js';
 import { USDC_CONFIG } from '../../shared/walletConstants';  
 import { getConfig } from '../../../config/unified';

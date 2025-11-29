@@ -20,7 +20,7 @@ import {
   createTransferInstruction,
   TOKEN_PROGRAM_ID,
   getAccount
-} from '@solana/spl-token';
+} from '../secureTokenUtils';
 import { USDC_CONFIG } from '../../shared/walletConstants';
 import { getConfig } from '../../../config/unified';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';  
