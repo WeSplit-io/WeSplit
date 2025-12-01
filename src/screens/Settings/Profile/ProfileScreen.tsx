@@ -18,6 +18,7 @@ const AvatarComponent = ({ avatar, displayName, style, userId, borderImageUrl }:
       avatarUrl={avatar}
       userName={displayName}
       userId={userId}
+      size={60} // Explicit size to ensure proper border scaling
       style={style}
       borderImageUrl={borderImageUrl}
     />

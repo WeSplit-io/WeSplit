@@ -12,6 +12,7 @@ import { validateAddress, validateKastWalletAddress } from '../utils/network/sen
 // Removed unused imports: colors, typography
 import { spacing } from '../theme/spacing';
 import MWADetectionButton from './wallet/MWADetectionButton';
+import { getPlatformInfo } from '../utils/core/platformDetection';
 import { ExternalCardService } from '../services/integrations/external/ExternalCardService';
 import { logger } from '../services/analytics/loggingService';
 
@@ -256,16 +257,21 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     }
   };
 
-  const renderWalletForm = () => (
-    <View style={styles.formSection}>
-      {/* MWA Detection Button - Only shown in development */}
-      <MWADetectionButton
-        onWalletDetected={handleWalletDetected}
-        disabled={isLoading}
-        style={styles.mwaDetectionButton}
-      />
-      
-      <Input
+  const renderWalletForm = () => {
+    const platformInfo = getPlatformInfo();
+
+    return (
+      <View style={styles.formSection}>
+        {/* MWA Detection Button - Only shown in development builds */}
+        {platformInfo.isDevelopmentBuild && (
+          <MWADetectionButton
+            onWalletDetected={handleWalletDetected}
+            disabled={isLoading}
+            style={styles.mwaDetectionButton}
+          />
+        )}
+
+        <Input
         label="Wallet Address"
         value={address}
         onChangeText={setAddress}
@@ -292,36 +298,39 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
       />
     </View>
   );
+};
 
-  const renderKastForm = () => (
-    <View style={styles.formSection}>
-      <Input
-        label="Solana Wallet Address"
-        value={kastAddress}
-        onChangeText={setKastAddress}
-        placeholder="Enter Solana card wallet address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        error={errors.kastAddress}
-        returnKeyType="done"
-        onSubmitEditing={dismissKeyboard}
-        blurOnSubmit={true}
-      />
+  const renderKastForm = () => {
+    return (
+      <View style={styles.formSection}>
+        <Input
+          label="Solana Wallet Address"
+          value={kastAddress}
+          onChangeText={setKastAddress}
+          placeholder="Enter Solana card wallet address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          error={errors.kastAddress}
+          returnKeyType="done"
+          onSubmitEditing={dismissKeyboard}
+          blurOnSubmit={true}
+        />
 
-      <Input
-        label="Name"
-        value={name}
-        onChangeText={setName}
-        placeholder="e.g., Team Card, Marketing"
-        autoCapitalize="words"
-        autoCorrect={false}
-        error={errors.name}
-        returnKeyType="done"
-        onSubmitEditing={dismissKeyboard}
-        blurOnSubmit={true}
-      />
-    </View>
-  );
+        <Input
+          label="Name"
+          value={name}
+          onChangeText={setName}
+          placeholder="e.g., Team Card, Marketing"
+          autoCapitalize="words"
+          autoCorrect={false}
+          error={errors.name}
+          returnKeyType="done"
+          onSubmitEditing={dismissKeyboard}
+          blurOnSubmit={true}
+        />
+      </View>
+    );
+  };
 
   return (
     <Modal

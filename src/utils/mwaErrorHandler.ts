@@ -16,7 +16,9 @@ export interface MWAErrorInfo {
  * Check if an error is MWA-related
  */
 export const isMWAError = (error: any): boolean => {
-  if (!error) return false;
+  if (!error) {
+    return false;
+  }
   
   const errorMessage = error instanceof Error ? error.message : String(error);
   
@@ -117,22 +119,43 @@ export const safeMWAImport = async (): Promise<{
   error?: string;
 }> => {
   try {
-    const mwaModule = await import('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
-    
-    if (!mwaModule.startRemoteScenario) {
+    // First check platform compatibility before attempting import
+    const { getPlatformInfo } = await import('./core/platformDetection');
+    const platformInfo = getPlatformInfo();
+
+    if (!platformInfo.canUseMWA) {
       return {
         success: false,
-        error: 'startRemoteScenario not available in MWA module'
+        error: 'MWA not supported on this platform'
       };
     }
-    
+
+    // Platform supports MWA, now attempt the import
+    const mwaModule = await import('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+
+    // Check if the essential functions are available
+    if (!mwaModule.startRemoteScenario || typeof mwaModule.startRemoteScenario !== 'function') {
+      return {
+        success: false,
+        error: 'startRemoteScenario not available or not a function in MWA module'
+      };
+    }
+
+    // Try to access transact as well if available
+    if (mwaModule.transact && typeof mwaModule.transact !== 'function') {
+      return {
+        success: false,
+        error: 'transact is available but not a function in MWA module'
+      };
+    }
+
     return {
       success: true,
       module: mwaModule
     };
   } catch (error) {
     const errorInfo = analyzeMWAError(error);
-    
+
     return {
       success: false,
       error: errorInfo.message
@@ -147,7 +170,7 @@ export const isMWAProperlyConfigured = async (): Promise<boolean> => {
   try {
     const result = await safeMWAImport();
     return result.success;
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 };

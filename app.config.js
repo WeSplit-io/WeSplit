@@ -37,7 +37,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      buildNumber: "15",
+      buildNumber: "19",
       deploymentTarget: "15.1",
       infoPlist: {
         LSApplicationQueriesSchemes: [
@@ -67,7 +67,7 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      versionCode: 11215,
+      versionCode: 11219,
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"

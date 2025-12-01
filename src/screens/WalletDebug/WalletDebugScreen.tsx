@@ -15,8 +15,10 @@ import {
   TextInput,
   Switch,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import Icon from '../../components/Icon';
+import Header from '../../components/shared/Header';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { mwaDiscoveryService, MWADiscoveryResult } from '../../services/blockchain/wallet/discovery/mwaDiscoveryService';
@@ -129,6 +131,21 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
     setDiscoveryResults([]);
     loadDiscoveryStats();
     Alert.alert('Cache Cleared', 'Discovery cache has been cleared');
+  };
+
+  const testPlatformDetection = () => {
+    const { getPlatformInfo } = require('../../utils/core/platformDetection');
+    const platformInfo = getPlatformInfo();
+
+    Alert.alert(
+      'Platform Detection Test',
+      `Environment: ${platformInfo.environment}\n` +
+      `Expo Go: ${platformInfo.isExpoGo}\n` +
+      `Dev Build: ${platformInfo.isDevelopmentBuild}\n` +
+      `Can Use MWA: ${platformInfo.canUseMWA}\n` +
+      `Native Modules: ${platformInfo.hasNativeModules}\n` +
+      `Platform: ${Platform.OS}`
+    );
   };
 
   const removeLinkedWallet = async (walletId: string) => {
@@ -321,6 +338,10 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
           
           <TouchableOpacity style={styles.secondaryButton} onPress={clearCache}>
             <Text style={styles.secondaryButtonText}>Clear Cache</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryButton} onPress={testPlatformDetection}>
+            <Text style={styles.secondaryButtonText}>Test Platform Detection</Text>
           </TouchableOpacity>
         </View>
 

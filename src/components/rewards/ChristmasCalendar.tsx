@@ -225,10 +225,15 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [modalView, setModalView] = useState<'preview' | 'claiming' | 'success'>('preview');
   const [claimedGift, setClaimedGift] = useState<Gift | null>(null);
-  const [bypassMode, setBypassMode] = useState(false);
   const [countdown, setCountdown] = useState<string>('00 : 00 : 00');
   const [gridWidth, setGridWidth] = useState(0);
   const [resolvedTileImageUrls, setResolvedTileImageUrls] = useState<Record<number, string>>({});
+  const [calendarActive, setCalendarActive] = useState(() => {
+    // Initialize with correct active state immediately
+    const userTimezone = christmasCalendarService.getUserTimezone();
+    const isActive = christmasCalendarService.isCalendarActive(userTimezone);
+    return isActive;
+  });
 
   const updateCountdown = useCallback(() => {
     const now = new Date();
@@ -314,20 +319,35 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
       setLoading(true);
       const userTimezone = christmasCalendarService.getUserTimezone();
       const status = await christmasCalendarService.getUserCalendarStatus(userId, userTimezone);
+
+      // If status.todayDay is null but calendar should be active, force it
+      if (status && status.todayDay === undefined && calendarActive) {
+        const currentDay = christmasCalendarService.getCurrentDay(userTimezone);
+        if (currentDay) {
+          status.todayDay = currentDay;
+        }
+      }
+
       setStatus(status);
     } catch (error) {
-      console.error('Failed to load calendar status:', error);
+      logger.error('Failed to load calendar status', error, 'ChristmasCalendar');
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, calendarActive]);
 
   useEffect(() => {
-    // Check if bypass mode is enabled
-    const isBypassEnabled = christmasCalendarService.isBypassModeEnabled();
-    setBypassMode(isBypassEnabled);
+    // Double-check calendar active state in case it changed
+    const userTimezone = christmasCalendarService.getUserTimezone();
+    const isActive = christmasCalendarService.isCalendarActive(userTimezone);
+
+    if (calendarActive !== isActive) {
+      setCalendarActive(isActive);
+    }
+
     loadCalendarStatus();
-  }, [loadCalendarStatus]);
+  }, [loadCalendarStatus, calendarActive]);
+
 
   // Resolve Firebase Storage URLs for tile background images
   useEffect(() => {
@@ -380,13 +400,6 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   }, []);
 
 
-  const toggleBypassMode = () => {
-    const newBypassState = !bypassMode;
-    setBypassMode(newBypassState);
-    christmasCalendarService.setBypassMode(newBypassState);
-    // Reload calendar status after toggling bypass
-    loadCalendarStatus();
-  };
 
   const handleDayPress = async (day: number) => {
     if (!status) { return; }
@@ -717,12 +730,11 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
       const isLocked =
         !isClaimed &&
         todayDay !== undefined &&
-        !bypassMode &&
         day > todayDay;
       const isToday = todayDay !== undefined && day === todayDay;
       return { isClaimed, isLocked, isToday };
     },
-    [status, bypassMode]
+    [status]
   );
 
   if (loading) {
@@ -742,10 +754,6 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
       />
     );
   }
-
-  // Check if calendar is active
-  const userTimezone = christmasCalendarService.getUserTimezone();
-  const isActive = christmasCalendarService.isCalendarActive(userTimezone);
 
   const tileWidth =
     gridWidth > 0
@@ -809,7 +817,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
         ]}
         onPress={() => handleDayPress(tile.day)}
         activeOpacity={0.85}
-        disabled={isLocked && !bypassMode}
+        disabled={isLocked}
       >
         {/* Background Image */}
         {backgroundImage && imageUrl && (
@@ -951,38 +959,15 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
               />
               <View style={styles.countdownContent}>
                 <Text style={styles.countdownLabel}>
-                  {isActive ? 'Next reward in' : 'Calendar locked'}
+                  {calendarActive ? 'Next reward in' : 'Calendar locked'}
                 </Text>
-                <Text style={[styles.countdownValue, !isActive && styles.countdownValueLocked]}>
-                  {isActive ? countdown : 'Opens Dec 1'}
+                <Text style={[styles.countdownValue, !calendarActive && styles.countdownValueLocked]}>
+                  {calendarActive ? countdown : 'Opens Dec 1'}
                 </Text>
               </View>
             </View>
           </View>
 
-          {!isActive && (
-            <Button
-              title="Enable development bypass"
-              onPress={toggleBypassMode}
-              variant="secondary"
-              size="small"
-              icon="LockOpen"
-              style={[styles.sectionPadding, styles.secondaryButton]}
-              textStyle={styles.secondaryButtonText}
-            />
-          )}
-
-          {bypassMode && (
-            <Button
-              title="Development bypass enabled"
-              onPress={toggleBypassMode}
-              variant="secondary"
-              size="small"
-              icon="LockOpen"
-              style={[styles.sectionPadding, styles.secondaryButtonActive]}
-              textStyle={styles.secondaryButtonActiveText}
-            />
-          )}
 
           <View
             style={[styles.calendarGrid, { height: gridHeight }]}

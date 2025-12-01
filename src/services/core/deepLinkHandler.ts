@@ -11,16 +11,16 @@
 
 import { Linking, Alert } from 'react-native';
 import { NavigationContainerRef, ParamListBase } from '@react-navigation/native';
-import { FirebaseDataService } from './firebaseDataService';
 import { logger } from '../analytics/loggingService';
 import { User } from '../../types';
 import { pendingInvitationService, PendingInvitation } from './pendingInvitationService';
+import { firebaseDataService } from './index';
 
 // Universal link domains that we recognize
 const UNIVERSAL_LINK_DOMAINS = ['wesplit.io', 'www.wesplit.io'];
 
 export interface DeepLinkData {
-  action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split' | 'view-split';
+  action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split' | 'view-split' | 'wallet-linked' | 'wallet-error';
   inviteId?: string;
   groupId?: string;
   groupName?: string;
@@ -36,6 +36,10 @@ export interface DeepLinkData {
   oauthError?: string;
   splitInvitationData?: string; // JSON string for split invitation data
   splitId?: string; // Split ID for view-split action
+  walletProvider?: string; // Wallet provider (phantom, solflare, etc.)
+  walletAddress?: string; // Connected wallet address
+  signature?: string; // Wallet signature for verification
+  linkingError?: string; // Error message if wallet linking failed
 }
 
 /**
@@ -182,49 +186,88 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
           oauthError: params[2]
         };
       
-      case 'join-split':
+      case 'join-split': {
         // Handle split invitation deep links
         // Format (app-scheme): wesplit://join-split?data=<encoded_invitation_data>
         // Format (universal): https://wesplit.io/join-split?data=<encoded_invitation_data>
-        {
-          const dataParam = urlObj.searchParams.get('data');
-          
-          if (!dataParam) {
-            console.warn('🔥 Join-split action missing data parameter');
-            return null;
-          }
-          
-          logger.debug('Parsed join-split deep link', { 
-            isAppScheme, 
-            hasData: !!dataParam,
-            dataLength: dataParam.length 
-          }, 'deepLinkHandler');
-          
-          return {
-            action: 'join-split',
-            splitInvitationData: dataParam
-          };
+        const dataParam = urlObj.searchParams.get('data');
+
+        if (!dataParam) {
+          console.warn('🔥 Join-split action missing data parameter');
+          return null;
         }
+
+        logger.debug('Parsed join-split deep link', {
+          isAppScheme,
+          hasData: !!dataParam,
+          dataLength: dataParam.length
+        }, 'deepLinkHandler');
+
+        return {
+          action: 'join-split',
+          splitInvitationData: dataParam
+        };
+      }
       
-      case 'view-split':
+      case 'view-split': {
         // Handle viewing a split from external source (e.g., "spend" integration)
         // Format (app-scheme): wesplit://view-split?splitId=xxx&userId=xxx
         // Format (universal): https://wesplit.io/view-split?splitId=xxx&userId=xxx
+        const splitId = urlObj.searchParams.get('splitId');
+        const userId = urlObj.searchParams.get('userId');
+
+        if (!splitId) {
+          console.warn('🔥 View-split action missing splitId parameter');
+          return null;
+        }
+
+        logger.debug('Parsed view-split deep link', { splitId, userId }, 'deepLinkHandler');
+
+        return {
+          action: 'view-split',
+          splitId: splitId,
+          userId: userId || undefined
+        };
+      }
+
+      case 'wallet-linked':
+        // Handle successful wallet linking callback
+        // Format (app-scheme): wesplit://wallet-linked?provider=phantom&address=xxx&signature=xxx
+        // Format (universal): https://wesplit.io/wallet-linked?provider=phantom&address=xxx&signature=xxx
         {
-          const splitId = urlObj.searchParams.get('splitId');
-          const userId = urlObj.searchParams.get('userId');
-          
-          if (!splitId) {
-            console.warn('🔥 View-split action missing splitId parameter');
+          const provider = urlObj.searchParams.get('provider');
+          const address = urlObj.searchParams.get('address');
+          const signature = urlObj.searchParams.get('signature');
+
+          if (!provider || !address) {
+            console.warn('🔥 Wallet-linked action missing required parameters');
             return null;
           }
-          
-          logger.debug('Parsed view-split deep link', { splitId, userId }, 'deepLinkHandler');
-          
+
+          logger.debug('Parsed wallet-linked deep link', { provider, address, hasSignature: !!signature }, 'deepLinkHandler');
+
           return {
-            action: 'view-split',
-            splitId: splitId,
-            userId: userId || undefined
+            action: 'wallet-linked',
+            walletProvider: provider,
+            walletAddress: address,
+            signature: signature || undefined
+          };
+        }
+
+      case 'wallet-error':
+        // Handle wallet linking error callback
+        // Format (app-scheme): wesplit://wallet-error?provider=phantom&error=xxx
+        // Format (universal): https://wesplit.io/wallet-error?provider=phantom&error=xxx
+        {
+          const provider = urlObj.searchParams.get('provider');
+          const error = urlObj.searchParams.get('error');
+
+          logger.debug('Parsed wallet-error deep link', { provider, error }, 'deepLinkHandler');
+
+          return {
+            action: 'wallet-error',
+            walletProvider: provider || undefined,
+            linkingError: error || 'Unknown wallet error'
           };
         }
       
@@ -361,7 +404,7 @@ export function setupDeepLinkListeners(
     logger.debug('Parsed deep link data', { linkData }, 'deepLinkHandler');
 
     switch (linkData.action) {
-      case 'join':
+      case 'join': {
         if (!currentUser?.id) {
           console.warn('🔥 User not authenticated, cannot join group');
           Alert.alert('Authentication Required', 'Please log in to join the group.');
@@ -372,13 +415,13 @@ export function setupDeepLinkListeners(
 
         logger.info('Attempting to join group with inviteId', { inviteId: linkData.inviteId }, 'deepLinkHandler');
         const joinResult = await handleJoinGroupDeepLink(linkData.inviteId!, currentUser.id);
-        
+
         if (joinResult.success) {
           logger.info('Successfully joined group, navigating to GroupDetails', null, 'deepLinkHandler');
           Alert.alert('Success', `Successfully joined ${joinResult.groupName}!`);
           // Navigate to the group details
-          navigation.navigate('GroupDetails', { 
-            groupId: joinResult.groupId 
+          navigation.navigate('GroupDetails', {
+            groupId: joinResult.groupId
           });
         } else {
           // Show error message
@@ -386,8 +429,9 @@ export function setupDeepLinkListeners(
           Alert.alert('Error', joinResult.error || 'Failed to join group. Please try again.');
         }
         break;
+      }
       
-      case 'profile':
+      case 'profile': {
         if (!currentUser?.id) {
           console.warn('🔥 User not authenticated, cannot add contact');
           Alert.alert('Authentication Required', 'Please log in to add contacts.');
@@ -397,7 +441,7 @@ export function setupDeepLinkListeners(
 
         logger.info('Attempting to add contact from profile QR', { linkData }, 'deepLinkHandler');
         const addContactResult = await handleAddContactFromProfile(linkData, currentUser.id);
-        
+
         if (addContactResult.success) {
           logger.info('Successfully added contact, navigating to Contacts', null, 'deepLinkHandler');
           Alert.alert('Contact Added', `Successfully added ${addContactResult.contactName} to your contacts!`);
@@ -408,8 +452,9 @@ export function setupDeepLinkListeners(
           Alert.alert('Error', addContactResult.error || 'Failed to add contact. Please try again.');
         }
         break;
+      }
       
-      case 'send':
+      case 'send': {
         if (!currentUser?.id) {
           console.warn('🔥 User not authenticated, cannot send money');
           Alert.alert('Authentication Required', 'Please log in to send money.');
@@ -418,7 +463,7 @@ export function setupDeepLinkListeners(
         }
 
         logger.info('Attempting to navigate to Send screen with recipient', { recipientWalletAddress: linkData.recipientWalletAddress }, 'deepLinkHandler');
-        
+
         // Navigate to Send screen with recipient wallet address
         navigation.navigate('Send', {
           recipientWalletAddress: linkData.recipientWalletAddress,
@@ -426,8 +471,9 @@ export function setupDeepLinkListeners(
           recipientEmail: linkData.userEmail
         });
         break;
+      }
       
-      case 'transfer':
+      case 'transfer': {
         if (!currentUser?.id) {
           console.warn('🔥 User not authenticated, cannot initiate transfer');
           Alert.alert('Authentication Required', 'Please log in to initiate transfers.');
@@ -436,7 +482,7 @@ export function setupDeepLinkListeners(
         }
 
         logger.info('Attempting to initiate external wallet transfer to', { recipientWalletAddress: linkData.recipientWalletAddress }, 'deepLinkHandler');
-        
+
         // Navigate to CryptoTransfer screen with recipient wallet address
         navigation.navigate('CryptoTransfer', {
           targetWallet: {
@@ -447,6 +493,7 @@ export function setupDeepLinkListeners(
           prefillAmount: linkData.transferAmount ? parseFloat(linkData.transferAmount) : undefined
         });
         break;
+      }
       
       case 'moonpay-success':
         logger.info('MoonPay success, navigating to Dashboard', null, 'deepLinkHandler');
@@ -458,7 +505,7 @@ export function setupDeepLinkListeners(
         navigation.navigate('Dashboard');
         break;
       
-      case 'oauth-callback':
+      case 'oauth-callback': {
         logger.info('OAuth callback received', { linkData }, 'deepLinkHandler');
         // Handle OAuth callback - this will be processed by the OAuth services
         // The OAuth services will handle the code exchange and user authentication
@@ -474,6 +521,7 @@ export function setupDeepLinkListeners(
           // This is just for logging and debugging
         }
         break;
+      }
       
       case 'join-split':
         if (!linkData.splitInvitationData) {
@@ -540,18 +588,63 @@ export function setupDeepLinkListeners(
           Alert.alert('Invalid Link', 'This split link is not valid.');
           return;
         }
-        
-        logger.info('Navigating to split from deep link', { 
+
+        logger.info('Navigating to split from deep link', {
           splitId: linkData.splitId,
           userId: linkData.userId
         }, 'deepLinkHandler');
-        
+
         // Navigate to SplitDetails screen
         navigation.navigate('SplitDetails', {
           splitId: linkData.splitId,
           isFromDeepLink: true,
           isFromExternalSource: true
         });
+        break;
+
+      case 'wallet-linked':
+        // Handle successful wallet linking callback from external wallet
+        logger.info('Wallet linking success callback received', {
+          provider: linkData.walletProvider,
+          address: linkData.walletAddress,
+          hasSignature: !!linkData.signature
+        }, 'deepLinkHandler');
+
+        if (!linkData.walletProvider || !linkData.walletAddress) {
+          console.warn('🔥 Invalid wallet linking callback - missing required data');
+          Alert.alert('Wallet Connection Error', 'Invalid wallet connection data received.');
+          return;
+        }
+
+        // For now, show success message and navigate to wallet settings
+        // In a full implementation, this would trigger the signature verification process
+        Alert.alert(
+          'Wallet Connected',
+          `Successfully connected ${linkData.walletProvider} wallet!\n\nAddress: ${linkData.walletAddress.slice(0, 8)}...${linkData.walletAddress.slice(-8)}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate to wallet settings or wherever wallet management happens
+                navigation.navigate('Settings'); // Adjust route as needed
+              }
+            }
+          ]
+        );
+        break;
+
+      case 'wallet-error':
+        // Handle wallet linking error callback
+        logger.warn('Wallet linking error callback received', {
+          provider: linkData.walletProvider,
+          error: linkData.linkingError
+        }, 'deepLinkHandler');
+
+        Alert.alert(
+          'Wallet Connection Failed',
+          `Failed to connect ${linkData.walletProvider || 'wallet'}: ${linkData.linkingError || 'Unknown error'}`,
+          [{ text: 'OK' }]
+        );
         break;
       
       default:
@@ -636,22 +729,57 @@ export function generateSendLink(walletAddress: string, userName?: string, userE
  */
 export function generateTransferLink(walletAddress: string, userName?: string, userEmail?: string, amount?: string): string {
   const baseUrl = `wesplit://transfer/${encodeURIComponent(walletAddress)}`;
-  
+
   let fullUrl = baseUrl;
-  
+
   if (userName) {
     fullUrl += `/${encodeURIComponent(userName)}`;
   }
-  
+
   if (userEmail) {
     fullUrl += `/${encodeURIComponent(userEmail)}`;
   }
-  
+
   if (amount) {
     fullUrl += `/${encodeURIComponent(amount)}`;
   }
-  
+
   return fullUrl;
+}
+
+/**
+ * Generate a wallet linking success callback link
+ */
+export function generateWalletLinkedLink(provider: string, address: string, signature?: string): string {
+  const baseUrl = 'wesplit://wallet-linked';
+  const params = new URLSearchParams({
+    provider,
+    address
+  });
+
+  if (signature) {
+    params.append('signature', signature);
+  }
+
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
+ * Generate a wallet linking error callback link
+ */
+export function generateWalletErrorLink(provider?: string, error?: string): string {
+  const baseUrl = 'wesplit://wallet-error';
+  const params = new URLSearchParams();
+
+  if (provider) {
+    params.append('provider', provider);
+  }
+
+  if (error) {
+    params.append('error', encodeURIComponent(error));
+  }
+
+  return `${baseUrl}?${params.toString()}`;
 }
 
 /**
@@ -715,5 +843,7 @@ export const deepLinkHandler = {
   generateProfileLink,
   generateSendLink,
   generateTransferLink,
+  generateWalletLinkedLink,
+  generateWalletErrorLink,
   testDeepLinkFlow
 }; 

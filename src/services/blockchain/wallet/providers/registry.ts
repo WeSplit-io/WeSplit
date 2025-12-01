@@ -40,7 +40,7 @@ export const WALLET_PROVIDER_REGISTRY: WalletProviderRegistry = {
     detectionMethod: 'mwa',
     deepLinkScheme: 'phantom://',
     packageName: 'app.phantom',
-    appStoreId: '1598432977',
+    appStoreId: '1598432977', // ✅ Verified correct
     playStoreId: 'app.phantom',
     websiteUrl: 'https://phantom.app',
     mwaSupported: true,
@@ -70,7 +70,7 @@ export const WALLET_PROVIDER_REGISTRY: WalletProviderRegistry = {
     detectionMethod: 'mwa',
     deepLinkScheme: 'backpack://',
     packageName: 'com.backpack.app',
-    appStoreId: '1667191423',
+    // appStoreId: '1667191423', // No iOS app available
     playStoreId: 'com.backpack.app',
     websiteUrl: 'https://backpack.app',
     mwaSupported: true,
@@ -85,7 +85,7 @@ export const WALLET_PROVIDER_REGISTRY: WalletProviderRegistry = {
     detectionMethod: 'deep-link',
     deepLinkScheme: 'slope://',
     packageName: 'com.slope.finance',
-    appStoreId: '1591082281',
+    // appStoreId: '1610840637', // No iOS app available
     playStoreId: 'com.slope.finance',
     websiteUrl: 'https://slope.finance',
     mwaSupported: false,
@@ -100,7 +100,7 @@ export const WALLET_PROVIDER_REGISTRY: WalletProviderRegistry = {
     detectionMethod: 'deep-link',
     deepLinkScheme: 'glow://',
     packageName: 'com.glow.app',
-    appStoreId: '1591082281',
+    // appStoreId: '1599581225', // No iOS app available
     playStoreId: 'com.glow.app',
     websiteUrl: 'https://glow.app',
     mwaSupported: false,

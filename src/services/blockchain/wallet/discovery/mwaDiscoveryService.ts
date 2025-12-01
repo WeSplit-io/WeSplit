@@ -4,11 +4,9 @@
  */
 
 import { Platform, Linking } from 'react-native';
-import { WALLET_PROVIDER_REGISTRY, WalletProviderInfo, getMWASupportedProviders } from '../providers/registry';
-import { startRemoteScenario, transact } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import { SolanaMobileWalletAdapterError, SolanaMobileWalletAdapterErrorCode } from '@solana-mobile/mobile-wallet-adapter-protocol';
+import { WALLET_PROVIDER_REGISTRY, WalletProviderInfo } from '../providers/registry';
 import { logger } from '../../../analytics/loggingService';
-import { getPlatformInfo, isMWAAvailable } from '../../../../utils/core/platformDetection';
+import { getPlatformInfo } from '../../../../utils/core/platformDetection';
 
 export interface MWADiscoveryResult {
   provider: WalletProviderInfo;
@@ -54,17 +52,34 @@ class MWADiscoveryService {
       platform: Platform.OS
     });
 
-    const providers = includeUnsupported 
+    const providers = includeUnsupported
       ? Object.values(WALLET_PROVIDER_REGISTRY)
       : Object.values(WALLET_PROVIDER_REGISTRY); // Show all providers, not just MWA supported ones
 
-    const discoveryPromises = providers.map(provider => 
-      this.discoverProvider(provider, { timeout, useCache })
-    );
+    // Check platform availability first to avoid MWA import crashes
+    const { getPlatformInfo } = await import('../../../../utils/core/platformDetection');
+    const platformInfo = getPlatformInfo();
+
+    // Choose discovery method based on MWA availability
+    let discoveryPromises: Promise<MWADiscoveryResult>[];
+
+    if (!platformInfo.canUseMWA) {
+      // MWA not available, use non-MWA discovery only
+      logger.debug('MWA not available on this platform, using non-MWA discovery only', null, 'mwaDiscoveryService');
+      discoveryPromises = providers.map(provider =>
+        this.discoverProviderNonMWA(provider, { timeout, useCache })
+      );
+    } else {
+      // MWA is available, use full discovery
+      logger.debug('MWA available, using full discovery', null, 'mwaDiscoveryService');
+      discoveryPromises = providers.map(provider =>
+        this.discoverProvider(provider, { timeout, useCache })
+      );
+    }
 
     try {
       const results = await Promise.allSettled(discoveryPromises);
-      
+
       const discoveryResults: MWADiscoveryResult[] = results
         .map((result, index) => {
           if (result.status === 'fulfilled') {
@@ -85,6 +100,7 @@ class MWADiscoveryService {
       logger.info('Discovery completed', {
         totalProviders: providers.length,
         availableProviders: discoveryResults.filter(r => r.isAvailable).length,
+        mwaEnabled: platformInfo.canUseMWA,
         results: discoveryResults.map(r => ({
           name: r.provider.name,
           available: r.isAvailable,
@@ -96,6 +112,92 @@ class MWADiscoveryService {
     } catch (error) {
       console.error('🔍 MWA Discovery: Discovery failed:', error);
       throw new Error(`Provider discovery failed: ${error}`);
+    }
+  }
+
+  /**
+   * Discover a provider using only non-MWA methods (deep links, package detection)
+   * This is used when MWA is not available on the platform
+   */
+  private async discoverProviderNonMWA(
+    provider: WalletProviderInfo,
+    options: MWADiscoveryOptions = {}
+  ): Promise<MWADiscoveryResult> {
+    const { timeout = this.DEFAULT_TIMEOUT, useCache = true } = options;
+    const cacheKey = `${provider.name}_${Platform.OS}_nonmwa`;
+
+    // Check cache first
+    if (useCache) {
+      const cached = this.discoveryCache.get(cacheKey);
+      if (cached && this.isCacheValid(cached.timestamp)) {
+        logger.debug('Using cached non-MWA result for', { providerName: provider.name }, 'mwaDiscoveryService');
+        return cached;
+      }
+    }
+
+    logger.info('Discovering provider (non-MWA only)', { providerName: provider.name }, 'mwaDiscoveryService');
+
+    try {
+      // Only try deep link and package detection, skip MWA entirely
+      let result: MWADiscoveryResult | null = null;
+
+      // Try deep link detection first
+      if (provider.deepLinkScheme) {
+        result = await this.tryDeepLinkDiscovery(provider, timeout);
+        if (result.isAvailable) {
+          if (useCache) {
+            this.discoveryCache.set(cacheKey, result);
+          }
+          return result;
+        }
+      }
+
+      // Try package detection (Android only)
+      if (Platform.OS === 'android' && provider.packageName) {
+        result = await this.tryPackageDiscovery(provider, timeout);
+        if (result.isAvailable) {
+          if (useCache) {
+            this.discoveryCache.set(cacheKey, result);
+          }
+          return result;
+        }
+      }
+
+      // No detection method succeeded
+      result = {
+        provider,
+        isAvailable: false,
+        detectionMethod: 'manual',
+        error: 'No detection method succeeded (non-MWA)',
+        timestamp: Date.now()
+      };
+
+      if (useCache) {
+        this.discoveryCache.set(cacheKey, result);
+      }
+
+      logger.info('Provider discovery completed (non-MWA)', {
+        available: result.isAvailable,
+        method: result.detectionMethod,
+        error: result.error
+      });
+
+      return result;
+    } catch (error) {
+      const result: MWADiscoveryResult = {
+        provider,
+        isAvailable: false,
+        detectionMethod: 'manual',
+        error: error instanceof Error ? error.message : 'Unknown error (non-MWA)',
+        timestamp: Date.now()
+      };
+
+      if (useCache) {
+        this.discoveryCache.set(cacheKey, result);
+      }
+
+      logger.error(`Provider discovery failed (non-MWA):`, error as Record<string, unknown>, 'mwaDiscoveryService');
+      return result;
     }
   }
 
@@ -158,10 +260,9 @@ class MWADiscoveryService {
    * Perform the actual discovery for a provider
    */
   private async performDiscovery(
-    provider: WalletProviderInfo, 
+    provider: WalletProviderInfo,
     timeout: number
   ): Promise<MWADiscoveryResult> {
-    const startTime = Date.now();
 
     try {
       // Try MWA discovery first if supported
@@ -221,20 +322,23 @@ class MWADiscoveryService {
    * Try MWA discovery using the real MWA protocol
    */
   private async tryMWADiscovery(
-    provider: WalletProviderInfo, 
+    provider: WalletProviderInfo,
     timeout: number
   ): Promise<MWADiscoveryResult> {
     logger.info('Trying MWA discovery for', { providerName: provider.name }, 'mwaDiscoveryService');
-    
+
     try {
-      // Check if MWA is available on this platform
-      if (!isMWAAvailable()) {
-        logger.debug('MWA not available on this platform', { providerName: provider.name }, 'mwaDiscoveryService');
+      // Check platform availability - be strict to prevent crashes
+      const { getPlatformInfo } = await import('../../../../utils/core/platformDetection');
+      const platformInfo = getPlatformInfo();
+
+      if (!platformInfo.canUseMWA) {
+        logger.debug('MWA not supported on this platform - skipping discovery', { providerName: provider.name }, 'mwaDiscoveryService');
         return {
           provider,
           isAvailable: false,
           detectionMethod: 'mwa',
-          error: 'MWA not available on this platform',
+          error: 'MWA not supported on this platform',
           timestamp: Date.now()
         };
       }
@@ -252,27 +356,88 @@ class MWADiscoveryService {
       }
 
       logger.debug('Testing MWA availability for', { providerName: provider.name }, 'mwaDiscoveryService');
-      
-      // Try to import MWA module to test availability
+
+      // Try to import MWA module and test actual wallet availability
+      let startRemoteScenario: any;
+      let PublicKey: any;
+      let SystemProgram: any;
+
       try {
+        logger.debug('Attempting MWA module import', { providerName: provider.name }, 'mwaDiscoveryService');
+
+        // Import with error handling to prevent crashes
         const mwaModule = await import('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
-        if (!mwaModule.startRemoteScenario) {
-          throw new Error('MWA startRemoteScenario not available');
+        const web3Module = await import('@solana/web3.js');
+
+        startRemoteScenario = mwaModule.startRemoteScenario;
+        PublicKey = web3Module.PublicKey;
+        SystemProgram = web3Module.SystemProgram;
+
+        logger.debug('MWA modules imported successfully, but checking if startRemoteScenario is available', { providerName: provider.name }, 'mwaDiscoveryService');
+
+        // Check if startRemoteScenario is actually available
+        if (!startRemoteScenario || typeof startRemoteScenario !== 'function') {
+          logger.debug('startRemoteScenario not available, MWA native module not properly linked', { providerName: provider.name }, 'mwaDiscoveryService');
+          return {
+            provider,
+            isAvailable: false,
+            detectionMethod: 'mwa',
+            error: 'MWA native module not available - startRemoteScenario is undefined',
+            timestamp: Date.now()
+          };
         }
-        
-        // MWA module is available, but we can't actually test wallet availability
-        // without user interaction, so we'll return false for now
-        // In a real implementation, this would use the actual MWA protocol
-        logger.debug('MWA module available but wallet detection requires user interaction', { providerName: provider.name }, 'mwaDiscoveryService');
-        
-        return {
-          provider,
-          isAvailable: false, // Set to false since we can't detect without user interaction
-          detectionMethod: 'mwa',
-          error: 'Wallet detection requires user interaction',
-          timestamp: Date.now()
-        };
-        
+
+        // Create a test scenario to check if the wallet is available
+        // We'll use a minimal transaction that just tests wallet connectivity
+        const testScenario = () => ({
+          associationPublicKey: new PublicKey('11111111111111111111111111111112'), // System Program
+          signers: [],
+          commitment: 'confirmed' as const,
+          instructions: [
+            SystemProgram.transfer({
+              fromPubkey: new PublicKey('11111111111111111111111111111112'),
+              toPubkey: new PublicKey('11111111111111111111111111111112'),
+              lamports: 0
+            })
+          ]
+        });
+
+        logger.debug('Created test scenario', { providerName: provider.name }, 'mwaDiscoveryService');
+
+        // Try to start the remote scenario with a short timeout
+        const scenarioPromise = startRemoteScenario(testScenario());
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('MWA discovery timeout')), Math.min(timeout, 3000))
+        );
+
+        try {
+          const scenario = await Promise.race([scenarioPromise, timeoutPromise]);
+          logger.debug('MWA scenario started successfully', { providerName: provider.name, hasScenario: !!scenario }, 'mwaDiscoveryService');
+
+          // If we get here, the scenario was created successfully
+          // This means MWA is working and a wallet responded
+          return {
+            provider,
+            isAvailable: true,
+            detectionMethod: 'mwa',
+            timestamp: Date.now()
+          };
+        } catch (scenarioError) {
+          // If scenario fails, wallet is not available or not responding
+          logger.debug('MWA scenario failed', {
+            providerName: provider.name,
+            error: scenarioError instanceof Error ? scenarioError.message : 'Unknown',
+            errorType: scenarioError instanceof Error ? scenarioError.constructor.name : 'Unknown'
+          }, 'mwaDiscoveryService');
+          return {
+            provider,
+            isAvailable: false,
+            detectionMethod: 'mwa',
+            error: scenarioError instanceof Error ? scenarioError.message : 'Wallet not responding to MWA requests',
+            timestamp: Date.now()
+          };
+        }
+
       } catch (importError) {
         // Handle TurboModuleRegistry errors specifically
         if (importError instanceof Error && (
@@ -288,14 +453,14 @@ class MWADiscoveryService {
             timestamp: Date.now()
           };
         }
-        
+
         throw importError;
       }
-      
+
     } catch (mwaError) {
       const errorMessage = mwaError instanceof Error ? mwaError.message : 'Unknown MWA error';
       logger.warn('Provider not available via MWA', { providerName: provider.name, error: errorMessage }, 'mwaDiscoveryService');
-      
+
       return {
         provider,
         isAvailable: false,

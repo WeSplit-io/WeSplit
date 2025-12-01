@@ -48,59 +48,24 @@ class ChristmasCalendarService {
   private readonly YEAR = 2025;
   private readonly START_DATE: Date;
   private readonly END_DATE: Date;
-  
-  // Development bypass mode - allows access to calendar outside December 1-25
-  // Set to true to enable development/testing access
-  private bypassMode: boolean = false;
 
   constructor() {
     this.START_DATE = CHRISTMAS_CALENDAR_CONFIG.startDate;
     this.END_DATE = CHRISTMAS_CALENDAR_CONFIG.endDate;
   }
 
-  /**
-   * Enable/disable development bypass mode
-   * When enabled, allows calendar access and claiming outside December 1-25
-   */
-  setBypassMode(enabled: boolean): void {
-    this.bypassMode = enabled;
-    logger.info('Christmas calendar bypass mode', { enabled }, 'ChristmasCalendarService');
-  }
-
-  /**
-   * Check if bypass mode is enabled
-   */
-  isBypassModeEnabled(): boolean {
-    return this.bypassMode;
-  }
 
   /**
    * Get the current day in the user's local timezone
    * Returns 1-25 if within calendar period, null otherwise
-   * In bypass mode, returns day 1 for testing purposes
    */
   getCurrentDay(userTimezone?: string): number | null {
-    // If bypass mode is enabled, return day 1 for testing
-    if (this.bypassMode) {
-      return 1;
-    }
-
     const now = new Date();
-    
-    // Convert to user's timezone if provided
-    let localDate: Date;
-    if (userTimezone) {
-      try {
-        // Create date string in user's timezone
-        const dateStr = now.toLocaleString('en-US', { timeZone: userTimezone });
-        localDate = new Date(dateStr);
-      } catch (error) {
-        logger.warn('Invalid timezone, using device timezone', { timezone: userTimezone }, 'ChristmasCalendarService');
-        localDate = now;
-      }
-    } else {
-      localDate = now;
-    }
+
+    // For React Native compatibility, avoid timezone conversion which can cause date parsing errors
+    // Use device local time instead of converting to specific timezones
+    // This prevents "Date value out of bounds" errors in React Native
+    const localDate = now;
 
     const year = localDate.getFullYear();
     const month = localDate.getMonth(); // 0-indexed (November = 10, December = 11)
@@ -108,14 +73,19 @@ class ChristmasCalendarService {
 
     // Check if we're in December 2025
     if (year !== this.YEAR || month !== 11) { // 11 = December (0-indexed)
+      logger.debug('Calendar not active - date check failed', {
+        year, month, day, expectedYear: this.YEAR
+      }, 'ChristmasCalendarService');
       return null;
     }
 
     // Check if day is between 1 and 25
     if (day < 1 || day > 25) {
+      logger.debug('Calendar not active - day out of range', { day }, 'ChristmasCalendarService');
       return null;
     }
 
+    logger.debug('Calendar active - returning day', { day }, 'ChristmasCalendarService');
     return day;
   }
 
@@ -125,16 +95,10 @@ class ChristmasCalendarService {
    * - Today's gift (if it's Dec 1-25)
    * - Past days they haven't claimed yet (catch-up)
    * - Cannot claim future days
-   * In bypass mode, any day (1-25) can be claimed
    */
   canClaimDay(day: number, userTimezone?: string): { canClaim: boolean; reason?: string } {
     if (day < 1 || day > 25) {
       return { canClaim: false, reason: 'Invalid day. Must be between 1 and 25.' };
-    }
-
-    // In bypass mode, allow claiming any day
-    if (this.bypassMode) {
-      return { canClaim: true };
     }
 
     const currentDay = this.getCurrentDay(userTimezone);
@@ -512,12 +476,9 @@ class ChristmasCalendarService {
 
   /**
    * Check if calendar is currently active
-   * In bypass mode, always returns true
+   * Returns true only during December 1-25
    */
   isCalendarActive(userTimezone?: string): boolean {
-    if (this.bypassMode) {
-      return true;
-    }
     return this.getCurrentDay(userTimezone) !== null;
   }
 }

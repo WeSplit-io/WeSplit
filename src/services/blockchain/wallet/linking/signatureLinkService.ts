@@ -3,12 +3,8 @@
  * Handles secure linking of external wallets using signature challenges
  */
 
-import { PublicKey, Keypair } from '@solana/web3.js';
-import { Platform, Linking, Alert } from 'react-native';
+import { Linking } from 'react-native';
 import { WALLET_PROVIDER_REGISTRY, WalletProviderInfo } from '../providers/registry';
-import { walletService } from '../../services/blockchain/wallet';
-import { startRemoteScenario, transact } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import { SolanaMobileWalletAdapterError, SolanaMobileWalletAdapterErrorCode } from '@solana-mobile/mobile-wallet-adapter-protocol';
 import { logger } from '../../../analytics/loggingService';
 
 export interface SignatureChallenge {
@@ -185,7 +181,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
   private async requestWalletSignature(
     provider: WalletProviderInfo,
     challenge: SignatureChallenge,
-    timeout: number
+    _timeout: number
   ): Promise<SignatureLinkResult> {
     logger.info('Requesting signature from wallet', {
       provider: provider.name,
@@ -193,18 +189,84 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
     });
 
     try {
-      // Since MWA requires complex setup, let's use deep link approach directly
-      // This will provide a better user experience with real wallet interaction
-      logger.debug('Using deep link approach for', { providerName: provider.name }, 'signatureLinkService');
-      
+      // Check if MWA is available and try to use it first
+      const { getPlatformInfo } = await import('../../../../utils/core/platformDetection');
+      const platformInfo = getPlatformInfo();
+
+      if (platformInfo.canUseMWA && provider.mwaSupported) {
+        logger.debug('Attempting MWA signature request for', { providerName: provider.name }, 'signatureLinkService');
+
+        try {
+          const { transact } = await import('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+          const { PublicKey, Transaction } = await import('@solana/web3.js');
+
+          // Create a transaction with a memo instruction containing our challenge message
+          // This is a common pattern for signature verification without sending actual transactions
+          const memoInstruction = {
+            keys: [],
+            programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'), // Memo program ID
+            data: Buffer.from(challenge.message)
+          };
+
+          const transaction = new Transaction({
+            feePayer: new PublicKey('11111111111111111111111111111112'), // Will be set by wallet
+            recentBlockhash: '11111111111111111111111111111111' // Placeholder, wallet will update
+          }).add(memoInstruction);
+
+          // Execute the transaction to get signature
+          const signatureResult = await transact(async (wallet) => {
+            // Authorize the transaction (wallet will sign it)
+            const signedTransaction = await wallet.signTransactions({
+              transactions: [transaction]
+            });
+
+            return {
+              publicKey: wallet.accounts[0].publicKey,
+              signedTransaction: signedTransaction[0]
+            };
+          });
+
+          if (signatureResult && signatureResult.signedTransaction) {
+            const publicKey = signatureResult.publicKey;
+            const signature = signatureResult.signedTransaction.signatures[0];
+
+            if (signature && !signature.equals(new Uint8Array(64).fill(0))) {
+              logger.info('MWA signature request successful', {
+                provider: provider.name,
+                publicKey: publicKey.toBase58(),
+                hasSignature: true
+              }, 'signatureLinkService');
+
+              return {
+                success: true,
+                publicKey: publicKey.toBase58(),
+                signature: Buffer.from(signature).toString('base64'),
+                provider: provider.name
+              };
+            }
+          }
+
+          throw new Error('Invalid signature response from wallet');
+
+        } catch (mwaError) {
+          logger.warn('MWA signature request failed, falling back to manual input', {
+            provider: provider.name,
+            error: mwaError instanceof Error ? mwaError.message : 'Unknown MWA error'
+          }, 'signatureLinkService');
+
+          // Fall through to manual input
+        }
+      }
+
+      // Fallback: Use deep link approach for manual signature input
+      logger.debug('Using deep link approach for manual input', { providerName: provider.name }, 'signatureLinkService');
+
       // For now, just open the wallet app with a simple deep link
-      // Most wallets don't support complex signature request deep links
       const simpleDeepLink = provider.deepLinkScheme || `${provider.name}://`;
-      
+
       logger.debug('Attempting to open wallet with simple deep link', { simpleDeepLink }, 'signatureLinkService');
-      
+
       // Always try to open the wallet app, even if canOpenURL returns false
-      // This is because canOpenURL can be unreliable on some devices
       try {
         await Linking.openURL(simpleDeepLink);
         logger.info('Successfully opened wallet app', null, 'signatureLinkService');
@@ -213,46 +275,43 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
         // Continue anyway - user can manually open the app
       }
 
-      // Don't show alert here - let the calling screen handle the user flow
-
-      // Always return manual input required since we can't capture the signature automatically
+      // Return manual input required since MWA failed or is not available
       const result = {
         success: false,
         error: 'MANUAL_INPUT_REQUIRED',
         provider: provider.name,
         challenge: challenge // Include challenge for manual input
       };
-      
-      logger.debug('Returning result', {
+
+      logger.debug('Returning manual input result', {
         success: result.success,
         error: result.error,
         provider: result.provider,
         hasChallenge: !!result.challenge,
         challengeNonce: result.challenge?.nonce
       });
-      
+
       return result;
 
     } catch (error) {
       console.error('🔗 Signature Link: Signature request failed:', error);
-      
-      // Even if deep link fails, we can still provide manual input
 
+      // Even if everything fails, we can still provide manual input
       const result = {
         success: false,
         error: 'MANUAL_INPUT_REQUIRED',
         provider: provider.name,
         challenge: challenge // Include challenge for manual input
       };
-      
-      logger.debug('Returning result from catch block', {
+
+      logger.debug('Returning manual input result from catch block', {
         success: result.success,
         error: result.error,
         provider: result.provider,
         hasChallenge: !!result.challenge,
         challengeNonce: result.challenge?.nonce
       });
-      
+
       return result;
     }
   }
@@ -265,7 +324,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
     
     // Create different deep link formats for different providers
     switch (provider.name.toLowerCase()) {
-      case 'phantom':
+      case 'phantom': {
         // Phantom uses a simpler format that's more likely to work
         const phantomParams = new URLSearchParams({
           dapp: 'WeSplit',
@@ -274,8 +333,9 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
           nonce: challenge.nonce
         });
         return `${baseUrl}sign?${phantomParams.toString()}`;
-        
-      case 'solflare':
+      }
+
+      case 'solflare': {
         // Solflare format
         const solflareParams = new URLSearchParams({
           action: 'sign_message',
@@ -284,8 +344,9 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
           nonce: challenge.nonce
         });
         return `${baseUrl}sign?${solflareParams.toString()}`;
-        
-      case 'backpack':
+      }
+
+      case 'backpack': {
         // Backpack format
         const backpackParams = new URLSearchParams({
           action: 'sign',
@@ -294,8 +355,9 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
           nonce: challenge.nonce
         });
         return `${baseUrl}sign?${backpackParams.toString()}`;
-        
-      default:
+      }
+
+      default: {
         // Generic format for other wallets
         const params = new URLSearchParams({
           action: 'sign_message',
@@ -304,6 +366,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
           nonce: challenge.nonce
         });
         return `${baseUrl}sign?${params.toString()}`;
+      }
     }
   }
 
@@ -392,7 +455,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
     try {
       // Linked wallet retrieval moved to walletService
       // Get linked wallets from walletService
-      const { walletService } = await import('../../services/wallet');
+      const { walletService } = await import('../index');
       return await walletService.getLinkedWallets(userId);
     } catch (error) {
       console.error('🔗 Signature Link: Failed to get linked wallets:', error);

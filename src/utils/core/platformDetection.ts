@@ -80,13 +80,22 @@ const canUseMWA = (): boolean => {
     return false;
   }
 
-  // MWA requires a development build with native modules
-  // Check for both Expo modules and React Native native modules
-  const hasExpoModules = !!(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
-  const hasReactNativeModules = !!(global as any).TurboModuleRegistry;
-  
-  // MWA is available if it's a development build AND we have native module support
-  return isDevelopmentBuild() && (hasExpoModules || hasReactNativeModules);
+  // For development builds, be more conservative with MWA detection
+  // Only claim MWA is available if we can actually verify native modules
+  if (isDevelopmentBuild()) {
+    // Check for various indicators of native module availability
+    const hasExpoModules = !!(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
+    const hasReactNativeModules = !!(global as any).TurboModuleRegistry;
+    const hasExpoNativeModules = !!(global as any).Expo?.modules;
+    const hasNativeModules = hasExpoModules || hasReactNativeModules || hasExpoNativeModules;
+
+    // For dev builds, only claim MWA is available if we have native module indicators
+    // The actual MWA functionality will be tested during import
+    return hasNativeModules;
+  }
+
+  // For production builds, be more strict
+  return false;
 };
 
 /**
@@ -131,7 +140,16 @@ export const getPlatformInfo = (): PlatformInfo => {
     appOwnership: Constants.appOwnership,
     // Logic breakdown
     isExpoGo_result: Constants.appOwnership === 'expo',
-    isDevBuild_result: __DEV__ && Platform.OS !== 'web' && Constants.appOwnership !== 'expo'
+    isDevBuild_result: __DEV__ && Platform.OS !== 'web' && Constants.appOwnership !== 'expo',
+    // MWA logic
+    mwaLogic: {
+      notWeb: Platform.OS !== 'web',
+      notExpoGo: !expoGo,
+      isDevBuild: devBuild,
+      hasNativeModules: hasNativeModules,
+      hasTurboModules: !!(global as any).TurboModuleRegistry,
+      final: mwaAvailable
+    }
   });
 
   return {
@@ -165,20 +183,34 @@ export const isRunningInExpoGo = (): boolean => {
  */
 export const getEnvironmentConfig = () => {
   const platformInfo = getPlatformInfo();
-  
+
+  // Check if MWA is actually functional (not just theoretically available)
+  let mwaActuallyFunctional = false;
+  if (platformInfo.canUseMWA) {
+    try {
+      // Quick test - if we can import without crashing, it's functional
+      // This is synchronous check to avoid async issues
+      mwaActuallyFunctional = !!(global as any).TurboModuleRegistry?.SolanaMobileWalletAdapter;
+    } catch (error) {
+      // If checking causes any error, assume not functional
+      mwaActuallyFunctional = false;
+    }
+  }
+
   return {
-    // MWA Configuration
-    enableMWA: platformInfo.canUseMWA,
+    // MWA Configuration - only enable if actually functional
+    enableMWA: platformInfo.canUseMWA && mwaActuallyFunctional,
     enableMockMWA: platformInfo.isExpoGo,
-    
+    mwaActuallyFunctional,
+
     // Wallet Configuration
     enableExternalWalletLinking: true,
-    enableSignatureVerification: platformInfo.canUseMWA,
-    
+    enableSignatureVerification: platformInfo.canUseMWA && mwaActuallyFunctional,
+
     // UI Configuration
     showMWADetectionButton: true,
     showMockWalletOptions: platformInfo.isExpoGo,
-    
+
     // Debug Configuration
     enableDebugLogging: platformInfo.isDevelopmentBuild || platformInfo.isExpoGo,
     enableMockData: platformInfo.isExpoGo

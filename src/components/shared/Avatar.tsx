@@ -203,7 +203,7 @@ const Avatar: React.FC<AvatarProps> = ({
 
   // Check if style has width/height that should override default size
   const hasCustomDimensions = style && ((style as any).width === '100%' || (style as any).height === '100%');
-  
+
   const avatarStyle: ViewStyle = {
     ...(dynamicSize || hasCustomDimensions ? {
       width: '100%',
@@ -224,6 +224,11 @@ const Avatar: React.FC<AvatarProps> = ({
     ...style,
   };
 
+  // Determine the actual size for border calculations
+  // If dynamicSize or hasCustomDimensions, we need to use a reference size
+  // Otherwise, use the provided size prop
+  const effectiveSize = dynamicSize || hasCustomDimensions ? 60 : size; // Default to 60px for dynamic avatars
+
   const initialsStyle: TextStyle = {
     fontSize: dynamicSize ? 16 : size * 0.4, // Fallback size for dynamic mode
     fontWeight: '600',
@@ -242,13 +247,8 @@ const Avatar: React.FC<AvatarProps> = ({
     borderRadius: size / 2,
   };
 
-  // Responsive border scaling - smaller on mobile devices and for dynamic sizing
-  const borderScale = dynamicSize || hasCustomDimensions
-    ? 1.08
-    : size < 60 ? 1.12 : size < 100 ? 1.14 : 1.15;
-
-  // Compute border size for SVG
-  const borderSize = dynamicSize ? 50 : size; // Fallback size for dynamic mode
+  // Responsive border scaling - smaller on mobile devices
+  const borderScale = effectiveSize < 60 ? 1.12 : effectiveSize < 100 ? 1.14 : 1.15;
 
   return (
     <View style={[avatarStyle, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -258,10 +258,10 @@ const Avatar: React.FC<AvatarProps> = ({
           <View
             style={{
               position: 'absolute',
-              top: -(borderSize * (borderScale - 1)) / 2,
-              left: -(borderSize * (borderScale - 1)) / 2,
-              width: borderSize * borderScale,
-              height: borderSize * borderScale,
+              top: -(effectiveSize * (borderScale - 1)) / 2,
+              left: -(effectiveSize * (borderScale - 1)) / 2,
+              width: effectiveSize * borderScale,
+              height: effectiveSize * borderScale,
               zIndex: 2,
               alignItems: 'center',
               justifyContent: 'center',
@@ -270,8 +270,8 @@ const Avatar: React.FC<AvatarProps> = ({
           >
             <SvgUri
               uri={borderImageUrl}
-              width={borderSize * borderScale}
-              height={borderSize * borderScale}
+              width={effectiveSize * borderScale}
+              height={effectiveSize * borderScale}
               onError={handleBorderError}
             />
           </View>
@@ -280,10 +280,10 @@ const Avatar: React.FC<AvatarProps> = ({
             source={{ uri: borderImageUrl }}
             style={{
               position: 'absolute',
-              top: -(borderSize * (borderScale - 1)) / 2,
-              left: -(borderSize * (borderScale - 1)) / 2,
-              width: borderSize * borderScale,
-              height: borderSize * borderScale,
+              top: -(effectiveSize * (borderScale - 1)) / 2,
+              left: -(effectiveSize * (borderScale - 1)) / 2,
+              width: effectiveSize * borderScale,
+              height: effectiveSize * borderScale,
               zIndex: 2,
             }}
             resizeMode="contain"

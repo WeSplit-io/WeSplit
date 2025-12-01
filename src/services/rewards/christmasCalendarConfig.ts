@@ -22,7 +22,7 @@ const getAssetPreviewUrl = (assetId: string): string | undefined => {
 /**
  * Christmas Calendar Gift Definitions for 2025
  * Each day (1-25) has a gift that users can claim
- * 
+ *
  * To edit gifts, simply modify the gift object for each day below.
  * The structure supports:
  * - Points: { type: 'points', amount: number }
