@@ -192,6 +192,20 @@ export const PRIVY_CONFIG = {
   authProvider: process.env.AUTH_PROVIDER || 'privy',
 };
 
+// Phantom configuration
+export const PHANTOM_CONFIG = {
+  appId: process.env.EXPO_PUBLIC_PHANTOM_APP_ID || (__DEV__ ? 'ws_dev_test_app_001' : undefined),
+  appOrigin: process.env.EXPO_PUBLIC_PHANTOM_APP_ORIGIN || 'https://wesplit.io',
+  redirectUri: process.env.EXPO_PUBLIC_PHANTOM_REDIRECT_URI || 'wesplit://auth/phantom-callback',
+  // Feature flags for gradual rollout - enable in dev by default
+  features: {
+    socialLogin: __DEV__ ? true : (process.env.EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN === 'true'),
+    splitWallets: __DEV__ ? true : (process.env.EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS === 'true'),
+    autoConfirm: __DEV__ ? false : (process.env.EXPO_PUBLIC_PHANTOM_AUTO_CONFIRM === 'true'),
+    multiChain: __DEV__ ? false : (process.env.EXPO_PUBLIC_PHANTOM_MULTI_CHAIN === 'true'),
+  }
+};
+
 // Force mainnet flag
 export const FORCE_MAINNET = process.env.EXPO_PUBLIC_FORCE_MAINNET === 'true';
 

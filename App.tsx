@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { PhantomSDKProvider } from './src/providers/PhantomSDKProvider';
 import NavigationWrapper from './src/components/NavigationWrapper';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { View, StatusBar } from 'react-native';
@@ -99,8 +100,9 @@ export default function App() {
       <ErrorBoundary>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <AppProvider>
-              <WalletProvider>
+            <PhantomSDKProvider theme="dark">
+              <AppProvider>
+                <WalletProvider>
                 <NavigationWrapper>
                   <Stack.Navigator
                     initialRouteName="Splash"
@@ -220,6 +222,7 @@ export default function App() {
                 </NavigationWrapper>
               </WalletProvider>
             </AppProvider>
+            </PhantomSDKProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
       </ErrorBoundary>

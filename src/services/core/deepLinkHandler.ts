@@ -522,6 +522,34 @@ export function setupDeepLinkListeners(
         }
         break;
       }
+
+      case 'phantom-callback': {
+        logger.info('Phantom auth callback received', {
+          linkData,
+          responseType: linkData.response_type,
+          hasWalletId: !!linkData.wallet_id,
+          hasError: !!linkData.error
+        }, 'deepLinkHandler');
+
+        // The Phantom SDK will handle the authentication result internally
+        // The usePhantom hook in AuthMethodsScreen will detect the state change
+        // and process the authenticated user. We just log here for debugging.
+
+        if (linkData.response_type === 'success') {
+          logger.info('Phantom authentication callback successful', {
+            walletId: linkData.wallet_id,
+            authUserId: linkData.authUserId,
+            provider: linkData.provider
+          }, 'deepLinkHandler');
+        } else if (linkData.error) {
+          logger.error('Phantom authentication callback failed', {
+            error: linkData.error,
+            linkData
+          }, 'deepLinkHandler');
+        }
+
+        break;
+      }
       
       case 'join-split':
         if (!linkData.splitInvitationData) {

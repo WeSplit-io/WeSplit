@@ -436,30 +436,65 @@ class AuthService {
     try {
       // Validate phone number format (E.164)
       if (!phoneNumber || !phoneNumber.startsWith('+')) {
-        return { 
-          success: false, 
-          error: 'Phone number must be in E.164 format (e.g., +1234567890)' 
+        return {
+          success: false,
+          error: 'Phone number must be in E.164 format (e.g., +1234567890)'
         };
       }
 
+      // Check if this is a Firebase test phone number (bypasses reCAPTCHA)
+      const testPhoneNumbers = ['+15551234567', '+15559876543', '+15551111111'];
+      const isTestNumber = testPhoneNumbers.includes(phoneNumber);
+
       logger.info('🔄 Starting Phone Sign-In', {
-        phone: phoneNumber.substring(0, 5) + '...'
+        phone: phoneNumber.substring(0, 5) + '...',
+        isTestNumber
       }, 'AuthService');
 
-      // On mobile, recaptchaVerifier is not needed (automatic)
-      // On web, it's required
+      // Handle phone authentication based on environment
       let confirmationResult: ConfirmationResult;
-      
-      if (Platform.OS === 'web' && recaptchaVerifier) {
-        confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-      } else if (Platform.OS !== 'web') {
-        // Mobile - no recaptcha needed
-        confirmationResult = await signInWithPhoneNumber(auth, phoneNumber);
-      } else {
-        return {
-          success: false,
-          error: 'reCAPTCHA verifier is required for web platform'
-        };
+
+      try {
+        if (Platform.OS === 'web' && recaptchaVerifier) {
+          confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+        } else if (Platform.OS !== 'web') {
+          // Mobile - Firebase should handle reCAPTCHA automatically
+          confirmationResult = await signInWithPhoneNumber(auth, phoneNumber);
+        } else {
+          return {
+            success: false,
+            error: 'reCAPTCHA verifier is required for web platform'
+          };
+        }
+      } catch (phoneError: any) {
+        // Handle specific Firebase Phone Auth errors
+        if (phoneError.message?.includes('Unable to load external scripts') ||
+            phoneError.message?.includes('reCAPTCHA') ||
+            phoneError.message?.includes('external scripts')) {
+
+          logger.error('Firebase Phone Auth reCAPTCHA issue', {
+            error: phoneError.message,
+            phone: phoneNumber.substring(0, 5) + '...',
+            platform: Platform.OS,
+            isDevMode: __DEV__
+          }, 'AuthService');
+
+          // Provide helpful guidance based on environment
+          if (__DEV__) {
+            return {
+              success: false,
+              error: 'Phone authentication requires reCAPTCHA setup. For testing: +15551234567, +15559876543, +15551111111 (code: 123456). For production: Configure reCAPTCHA site key in Firebase Console.'
+            };
+          } else {
+            return {
+              success: false,
+              error: 'Phone authentication requires configuration. Please contact support or use email authentication.'
+            };
+          }
+        }
+
+        // Re-throw other errors
+        throw phoneError;
       }
 
       logger.info('✅ SMS code sent successfully', {
@@ -470,11 +505,30 @@ class AuthService {
         success: true,
         verificationId: confirmationResult.verificationId
       };
-    } catch (error) {
+    } catch (error: any) {
       logger.error('❌ Phone Sign-In failed', error, 'AuthService');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Phone authentication failed' 
+
+      // Handle other Firebase Phone Auth errors
+      if (error.code === 'auth/invalid-phone-number') {
+        return {
+          success: false,
+          error: 'Invalid phone number. Please enter a valid phone number in international format (e.g., +1234567890).'
+        };
+      } else if (error.code === 'auth/too-many-requests') {
+        return {
+          success: false,
+          error: 'Too many requests. Please wait a few minutes before trying again.'
+        };
+      } else if (error.code === 'auth/missing-client-identifier') {
+        return {
+          success: false,
+          error: 'Phone authentication is not properly configured. Please contact support.'
+        };
+      }
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Phone authentication failed'
       };
     }
   }

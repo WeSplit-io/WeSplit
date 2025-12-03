@@ -15,94 +15,60 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Social Login Buttons ================================
+
+  // Social Login Section ================================
   socialSection: {
     marginBottom: spacing.xl,
   },
-  socialButtonLight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    justifyContent: 'center',
-  },
-  socialImageIcon: {
-    width: 24,
-    height: 24,
-    objectFit: 'contain',
-    marginRight: spacing.sm,
-  },
-  socialButtonTextDark: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.black,
-  },
-  socialButtonLightDisabled: {
-    opacity: 0.6,
-  },
-  socialOptions: {
-    gap: spacing.md,
-  },
   socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white70,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderRadius: spacing.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.white10,
-  },
-  socialButtonDisabled: {
-    opacity: 0.6,
-  },
-  socialIconContainer: {
-    marginRight: spacing.sm,
+    backgroundColor: colors.white5,
   },
   socialEmoji: {
     fontSize: 20,
+    marginRight: spacing.md,
   },
   socialButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     color: colors.white,
   },
-  separator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.lg,
+  socialButtonDisabled: {
+    opacity: 0.6,
   },
-  separatorLine: {
+  socialButtonDisabledText: {
+    color: colors.white50,
+  },
+  divider: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginVertical: spacing.lg,
+    marginHorizontal: spacing.xl,
+  },
+  dividerLine: {
     flex: 1,
     height: 1,
     backgroundColor: colors.white10,
   },
-  separatorText: {
+  dividerText: {
     fontSize: typography.fontSize.sm,
-    color: colors.white70,
+    color: colors.white50,
     marginHorizontal: spacing.md,
+    fontWeight: typography.fontWeight.medium,
   },
 
-  // Email Authentication ================================
-  emailSection: {
+
+  // Email/Phone Authentication ================================
+  inputSection: {
     marginBottom: spacing.lg,
-  },
-  emailLabel: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white,
-    marginBottom: spacing.sm,
-  },
-  emailInput: {
-    backgroundColor: colors.white,
-    borderRadius: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    fontSize: typography.fontSize.md,
-    color: colors.black,
   },
   nextButton: {
     borderRadius: 16,
