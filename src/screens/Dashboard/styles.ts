@@ -54,11 +54,16 @@ export const styles = StyleSheet.create({
   
   // === USER PROFILE SECTION ===
   // Circular profile image
+  profileImageContainer: {
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'visible',
+  },
   profileImage: {
     width: 50,
     height: 50,
-    borderRadius: 100,
-    backgroundColor: colors.white10,
   },
   
   // Welcome text above user name

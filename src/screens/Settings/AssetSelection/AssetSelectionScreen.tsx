@@ -22,11 +22,12 @@ import { typography } from '../../../theme/typography';
 import PhosphorIcon from '../../../components/shared/PhosphorIcon';
 import { useApp } from '../../../context/AppContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { getAssetInfo, getAssetsByType, AssetInfo } from '../../../services/rewards/assetConfig';
+import { getAssetInfo, getAssetsByType } from '../../../services/rewards/assetConfig';
+import { getCanonicalAssetId } from '../../../services/rewards/assetIdMapping';
 import { resolveStorageUrl } from '../../../services/shared/storageUrlService';
 import { firebaseDataService } from '../../../services/data/firebaseDataService';
 import { logger } from '../../../services/analytics/loggingService';
-import UserAvatar from '../../../components/UserAvatar';
+import Avatar from '../../../components/shared/Avatar';
 
 // Helper to check if URL is an SVG
 const isSvgUrl = (url: string): boolean => {
@@ -74,14 +75,37 @@ interface AssetSelectionScreenProps {
 // Stable empty array to prevent re-renders
 const EMPTY_ARRAY: string[] = [];
 
-// Asset ID mapping for backward compatibility (old IDs -> canonical IDs)
-const ASSET_ID_MAPPING: Record<string, string> = {
-  'profile_border_admin': 'profile_border_admin_2025',
-  'profile_border_admin_2024': 'profile_border_admin_2025',
-  'wallet_biscuit_2024': 'wallet_biscuit_2025',
-  // Map 2024 assets to 2025 versions (user only participated in 2025)
-  'profile_border_ice_crystal_2024': 'profile_border_ice_crystal_2025',
-  'profile_border_christmas_wreath_2024': 'profile_border_christmas_wreath_2025',
+const getBorderScaleForSize = (assetId?: string | null, sizeValue = 100): number | undefined => {
+  if (!assetId) {
+    return undefined;
+  }
+
+  const asset = getAssetInfo(assetId);
+  if (!asset) {
+    return undefined;
+  }
+
+  const config = asset.borderScaleConfig;
+  if (config) {
+    if (sizeValue > 200 && config.gt200) {
+      return config.gt200;
+    }
+    if (sizeValue > 150 && config.gt150) {
+      return config.gt150;
+    }
+    if (sizeValue > 100 && config.gt100) {
+      return config.gt100;
+    }
+    if (sizeValue > 80 && config.gt80) {
+      return config.gt80;
+    }
+    if (sizeValue > 60 && config.gt60) {
+      return config.gt60;
+    }
+    return config.base ?? asset.borderScale;
+  }
+
+  return asset.borderScale;
 };
 
 const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) => {
@@ -102,6 +126,19 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
   // Get user's owned assets - use stable empty array to prevent infinite loops
   const ownedBorders = currentUser?.profile_borders ?? EMPTY_ARRAY;
   const ownedBackgrounds = currentUser?.wallet_backgrounds ?? EMPTY_ARRAY;
+
+  const currentUserDisplayName =
+    currentUser?.name || currentUser?.email?.split('@')[0] || 'User';
+
+  const canonicalActiveProfileBorder = useMemo(
+    () => getCanonicalAssetId(currentUser?.active_profile_border) || currentUser?.active_profile_border,
+    [currentUser?.active_profile_border]
+  );
+
+  const canonicalActiveWalletBackground = useMemo(
+    () => getCanonicalAssetId(currentUser?.active_wallet_background) || currentUser?.active_wallet_background,
+    [currentUser?.active_wallet_background]
+  );
   
   // Get all available assets from config
   const allBorders = useMemo(() => getAssetsByType('profile_border'), []);
@@ -115,7 +152,7 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
     // Check each owned border ID
     ownedBorders.forEach(ownedId => {
       // If this ID has a mapping, use the canonical (mapped) version
-      const canonicalId = ASSET_ID_MAPPING[ownedId] || ownedId;
+      const canonicalId = getCanonicalAssetId(ownedId) || ownedId;
 
       // Only add if the canonical asset exists in our config
       if (allBorders.some(a => a.assetId === canonicalId)) {
@@ -134,7 +171,7 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
     // Check each owned background ID
     ownedBackgrounds.forEach(ownedId => {
       // If this ID has a mapping, use the canonical (mapped) version
-      const canonicalId = ASSET_ID_MAPPING[ownedId] || ownedId;
+      const canonicalId = getCanonicalAssetId(ownedId) || ownedId;
 
       // Only add if the canonical asset exists in our config
       if (allBackgrounds.some(a => a.assetId === canonicalId)) {
@@ -272,9 +309,13 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
         active_profile_border: assetId || undefined
       });
 
+      // Invalidate AvatarService cache to force all Avatar components to reload the border
+      const { AvatarService } = await import('../../../services/core/avatarService');
+      AvatarService.getInstance().clearUserCache(currentUser.id);
+
       Alert.alert('Success', assetId ? 'Profile border applied!' : 'Profile border removed!');
     } catch (error) {
-      logger.error('Failed to apply profile border', error, 'AssetSelectionScreen');
+      logger.error('Failed to apply profile border', error as Record<string, unknown>, 'AssetSelectionScreen');
       Alert.alert('Error', 'Failed to apply profile border');
     } finally {
       setLoading(null);
@@ -303,7 +344,7 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
 
       Alert.alert('Success', assetId ? 'Wallet background applied!' : 'Wallet background reset to default!');
     } catch (error) {
-      logger.error('Failed to apply wallet background', error, 'AssetSelectionScreen');
+      logger.error('Failed to apply wallet background', error as Record<string, unknown>, 'AssetSelectionScreen');
       Alert.alert('Error', 'Failed to apply wallet background');
     } finally {
       setLoading(null);
@@ -319,6 +360,9 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
     }
   };
 
+  const avatarPreviewSize = 100;
+  const activeBorderScaleOverride = getBorderScaleForSize(canonicalActiveProfileBorder, avatarPreviewSize);
+
   const renderBordersTab = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Profile Borders</Text>
@@ -328,23 +372,18 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
       
       {/* Current Avatar Preview */}
       <View style={styles.avatarPreview}>
-        <UserAvatar
-          userId={currentUser?.id || ''}
-          userName={currentUser?.name || currentUser?.display_name || undefined}
-          displayName={currentUser?.name || currentUser?.display_name || 'User'}
+        <Avatar
+          userId={currentUser?.id}
+          userName={currentUser?.name || currentUserDisplayName}
           avatarUrl={currentUser?.avatar}
-          size={100}
-          borderImageUrl={currentUser?.active_profile_border
-            ? resolvedUrls[currentUser.active_profile_border] ||
-              resolvedUrls[ASSET_ID_MAPPING[currentUser.active_profile_border] || ''] || undefined
-            : undefined}
+          size={avatarPreviewSize}
+          showProfileBorder
+          borderScaleOverride={activeBorderScaleOverride}
         />
         <Text style={styles.previewLabel}>Current Preview</Text>
-        {currentUser?.active_profile_border && (
+        {canonicalActiveProfileBorder && (
           <Text style={styles.previewAssetName}>
-            {getAssetInfo(currentUser.active_profile_border)?.name ||
-             getAssetInfo(ASSET_ID_MAPPING[currentUser.active_profile_border] || '')?.name ||
-             'Custom Border'}
+            {getAssetInfo(canonicalActiveProfileBorder)?.name || 'Custom Border'}
           </Text>
         )}
       </View>
@@ -379,13 +418,12 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
           </TouchableOpacity>
 
           {/* User's owned borders */}
-          {userBorders.map((asset) => {
+        {userBorders.map((asset) => {
             // Check if this asset is active (including mapped old IDs)
-            const isActive = currentUser?.active_profile_border === asset.assetId ||
-              (currentUser?.active_profile_border && ASSET_ID_MAPPING[currentUser.active_profile_border] === asset.assetId);
+            const isActive = canonicalActiveProfileBorder === asset.assetId;
             const isLoading = loading === asset.assetId;
             const imageUrl = resolvedUrls[asset.assetId];
-            const hasImage = isSafeUrl(imageUrl);
+            const hasImage = !!(imageUrl && isSafeUrl(imageUrl));
             
             return (
               <TouchableOpacity
@@ -397,7 +435,7 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
                 <View style={styles.assetRowIcon}>
                   {hasImage ? (
                     <AssetImage
-                      uri={imageUrl}
+                      uri={imageUrl!}
                       style={styles.assetRowImage}
                       resizeMode="contain"
                     />
@@ -469,11 +507,10 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
           {/* User's owned backgrounds */}
           {userBackgrounds.map((asset) => {
             // Check if this asset is active (including mapped old IDs)
-            const isActive = currentUser?.active_wallet_background === asset.assetId ||
-              (currentUser?.active_wallet_background && ASSET_ID_MAPPING[currentUser.active_wallet_background] === asset.assetId);
+            const isActive = canonicalActiveWalletBackground === asset.assetId;
             const isLoading = loading === asset.assetId;
             const imageUrl = resolvedUrls[asset.assetId];
-            const hasImage = isSafeUrl(imageUrl);
+            const hasImage = !!(imageUrl && isSafeUrl(imageUrl));
             
             return (
               <TouchableOpacity
@@ -485,7 +522,7 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
                 <View style={styles.assetRowIcon}>
                   {hasImage ? (
                     <AssetImage
-                      uri={imageUrl}
+                      uri={imageUrl!}
                       style={styles.backgroundThumbnail}
                       resizeMode="cover"
                     />

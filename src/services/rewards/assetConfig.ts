@@ -23,6 +23,15 @@ export interface NFTMetadata {
   metadataUrl?: string; // IPFS or other metadata URL
 }
 
+export interface BorderScaleConfig {
+  base?: number;
+  gt60?: number;
+  gt80?: number;
+  gt100?: number;
+  gt150?: number;
+  gt200?: number;
+}
+
 export interface AssetInfo {
   assetId: string;
   name: string;
@@ -33,6 +42,9 @@ export interface AssetInfo {
   assetType: 'profile_image' | 'wallet_background' | 'profile_border';
   category?: string;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
+  // Optional visual tweaks (mostly for profile borders)
+  borderScale?: number;
+  borderScaleConfig?: BorderScaleConfig;
 }
 
 /**
@@ -118,7 +130,16 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     url: buildBorderUrl('AdminBorder.png'),
     assetType: 'profile_border',
     category: 'special',
-    rarity: 'legendary'
+    rarity: 'legendary',
+    borderScale: 1.5,
+    borderScaleConfig: {
+      base: 1.3,
+      gt60: 1.4,
+      gt80: 1.3,
+      gt100: 1.3,
+      gt150: 1.3,
+      gt200: 1.6,
+    },
   },
   'profile_border_christmas_wreath_2025': {
     assetId: 'profile_border_christmas_wreath_2025',
@@ -127,7 +148,16 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     url: buildBorderUrl('ChristmasBorder.png'),
     assetType: 'profile_border',
     category: 'christmas',
-    rarity: 'epic'
+    rarity: 'epic',
+    borderScale: 1.4,
+    borderScaleConfig: {
+      base: 1.5,
+      gt60: 1.6,
+      gt80: 1.7,
+      gt100: 1.8,
+      gt150: 1.9,
+      gt200: 2.0,
+    },
   },
   'profile_border_ice_crystal_2025': {
     assetId: 'profile_border_ice_crystal_2025',
@@ -136,7 +166,16 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
     url: buildBorderUrl('IceBorder.png'),
     assetType: 'profile_border',
     category: 'christmas',
-    rarity: 'rare'
+    rarity: 'rare',
+    borderScale: 1.4,
+    borderScaleConfig: {
+      base: 1.4,
+      gt60: 1.45,
+      gt80: 1.5,
+      gt100: 1.55,
+      gt150: 1.7,
+      gt200: 1.8,
+    },
   },
   
   // Christmas Calendar 2025 Wallet Backgrounds (PNG - not uploaded)

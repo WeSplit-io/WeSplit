@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  ScrollView, 
-  Alert, 
-  Image,
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
   Platform,
   ActionSheetIOS,
   StatusBar,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +22,7 @@ import { logger } from '../../../services/analytics/loggingService';
 import styles from './styles';
 import { Container, Button, Input, PhosphorIcon } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
+import Avatar from '../../../components/shared/Avatar';
 import { authService } from '../../../services/auth/AuthService';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../../utils/validation/phone';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -464,12 +464,21 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           {/* Profile Picture */}
           <View style={styles.profilePictureContainer}>
             <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
-              {avatar ? (
-                <Image source={{ uri: avatar }} style={styles.avatarImage} />
-              ) : currentUser?.avatar ? (
-                <Image source={{ uri: currentUser.avatar }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
+              <Avatar
+                userId={currentUser?.id?.toString()}
+                userName={displayName}
+                avatarUrl={avatar || currentUser?.avatar || undefined}
+                size={140}
+                style={styles.avatarImage}
+                showProfileBorder
+              />
+              {!(avatar || currentUser?.avatar) && (
+                <View
+                  style={[
+                    styles.avatarPlaceholder,
+                    { position: 'absolute', top: 0, left: 0 },
+                  ]}
+                >
                   <PhosphorIcon name="Camera" size={48} color={colors.white70} />
                 </View>
               )}

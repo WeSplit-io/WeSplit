@@ -12,7 +12,7 @@ import { colors } from '../../../theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Avatar component wrapper for backward compatibility
-const AvatarComponent = ({ avatar, displayName, style, userId, borderImageUrl }: { avatar?: string, displayName: string, style: any, userId?: string, borderImageUrl?: string }) => {
+const AvatarComponent = ({ avatar, displayName, style, userId }: { avatar?: string, displayName: string, style: any, userId?: string }) => {
   return (
     <Avatar
       avatarUrl={avatar}
@@ -20,7 +20,7 @@ const AvatarComponent = ({ avatar, displayName, style, userId, borderImageUrl }:
       userId={userId}
       size={60} // Explicit size to ensure proper border scaling
       style={style}
-      borderImageUrl={borderImageUrl}
+      showProfileBorder={true}
     />
   );
 };
@@ -36,7 +36,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   // Phone reminder badge state
   const [needsPhoneReminder, setNeedsPhoneReminder] = useState(false);
-  const [profileBorderUrl, setProfileBorderUrl] = useState<string | null>(null);
 
   // Check phone prompt status
   useEffect(() => {
@@ -71,46 +70,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
     checkPhonePromptStatus();
   }, [currentUser?.id, currentUser?.email, currentUser?.phone, isAuthenticated]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadProfileBorder = async () => {
-      if (!currentUser?.id || !currentUser.active_profile_border) {
-        if (isMounted) {
-          setProfileBorderUrl(null);
-        }
-        return;
-      }
-
-      try {
-        // Get asset info from config
-        const { getAssetInfo } = await import('../../../services/rewards/assetConfig');
-        const { resolveStorageUrl } = await import('../../../services/shared/storageUrlService');
-        
-        const assetInfo = getAssetInfo(currentUser.active_profile_border);
-        if (assetInfo?.url) {
-          const resolvedUrl = await resolveStorageUrl(assetInfo.url, { assetId: currentUser.active_profile_border });
-          if (isMounted && resolvedUrl) {
-            setProfileBorderUrl(resolvedUrl);
-          }
-        } else {
-          if (isMounted) {
-            setProfileBorderUrl(null);
-          }
-        }
-      } catch (error) {
-        if (isMounted) {
-          setProfileBorderUrl(null);
-        }
-      }
-    };
-
-    loadProfileBorder();
-    return () => {
-      isMounted = false;
-    };
-  }, [currentUser?.id, currentUser?.active_profile_border]);
 
   // Early return if no current user
   if (!currentUser) {
@@ -275,7 +234,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               displayName={displayName}
               userId={currentUser?.id}
               style={{ width: '100%', height: '100%' }}
-              borderImageUrl={profileBorderUrl || undefined}
             />
           </View>
           <View style={styles.profileInfo}>

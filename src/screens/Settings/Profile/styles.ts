@@ -51,11 +51,10 @@ export const styles = StyleSheet.create({
   profileAvatar: {
     width: 60,
     height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
+    overflow: 'visible',
   },
   avatarImage: {
     width: 60,

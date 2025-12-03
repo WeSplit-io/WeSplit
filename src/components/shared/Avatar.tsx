@@ -4,7 +4,7 @@
  * Handles both local file URLs and Firebase Storage URLs
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,12 +12,15 @@ import {
   ViewStyle,
   TextStyle,
   ActivityIndicator,
+  ImageStyle,
+  DimensionValue,
 } from 'react-native';
 import { SvgUri } from 'react-native-svg';
 import { colors } from '../../theme/colors';
 import { logger } from '../../services/analytics/loggingService';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import { AvatarService } from '../../services/core/avatarService';
+import type { BorderScaleConfig } from '../../services/rewards/assetConfig';
 import { isSvgUrl, isSafeUrl } from '../../utils/ui/format/formatUtils';
 
 interface AvatarProps {
@@ -37,14 +40,10 @@ interface AvatarProps {
   showLoading?: boolean;
   // Whether to use dynamic sizing (flex: 1 with aspectRatio: 1)
   dynamicSize?: boolean;
-}
-
-interface AvatarState {
-  imageUrl: string | null;
-  isLoading: boolean;
-  hasError: boolean;
-  initials: string;
-  borderError: boolean;
+  // Override automatic profile border rendering per usage
+  showProfileBorder?: boolean;
+  // Override the multiplier applied to border size
+  borderScaleOverride?: number;
 }
 
 const Avatar: React.FC<AvatarProps> = ({
@@ -60,12 +59,20 @@ const Avatar: React.FC<AvatarProps> = ({
   loadingTimeout: _loadingTimeout = 5000,
   showLoading = true,
   dynamicSize = false,
+  showProfileBorder = true,
+  borderScaleOverride,
 }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [initials, setInitials] = useState<string>('');
   const [borderError, setBorderError] = useState(false);
+  const [resolvedBorderUrl, setResolvedBorderUrl] = useState<string | null>(
+    showProfileBorder ? borderImageUrl ?? null : null
+  );
+  const [assetBorderScale, setAssetBorderScale] = useState<number | undefined>(undefined);
+  const [assetBorderScaleConfig, setAssetBorderScaleConfig] = useState<BorderScaleConfig | undefined>(undefined);
+  const [borderRefreshKey, setBorderRefreshKey] = useState<number>(0);
 
   // Generate initials from name
   const generateInitials = useCallback((name: string): string => {
@@ -119,6 +126,34 @@ const Avatar: React.FC<AvatarProps> = ({
     }
   }, [userId]);
 
+  const loadBorderImage = useCallback(async () => {
+    if (!showProfileBorder || !userId || borderImageUrl) {
+      return;
+    }
+
+    try {
+      const avatarService = AvatarService.getInstance();
+      const details = await avatarService.getProfileBorderDetails(userId);
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      setResolvedBorderUrl(details?.url ?? null);
+      setAssetBorderScale(details?.scale ?? undefined);
+      setAssetBorderScaleConfig(details?.scaleConfig);
+      setBorderError(false);
+    } catch (error) {
+      logger.warn('Failed to load border image', { userId, error }, 'Avatar');
+      if (isMountedRef.current) {
+        setResolvedBorderUrl(null);
+        setAssetBorderScale(undefined);
+        setAssetBorderScaleConfig(undefined);
+        setBorderError(true);
+      }
+    }
+  }, [userId, borderImageUrl, showProfileBorder]);
+
   // Initialize component
   useEffect(() => {
     isMountedRef.current = true;
@@ -149,6 +184,82 @@ const Avatar: React.FC<AvatarProps> = ({
     // generateInitials is stable (useCallback with empty deps), loadAvatarUrl is stable (useCallback with userId deps)
   }, [userId, userName, avatarUrl, loadAvatarUrl, generateInitials]);
 
+  // Monitor border refresh timestamp to detect when border changes
+  useEffect(() => {
+    if (!userId || !showProfileBorder || borderImageUrl) {
+      return;
+    }
+
+    const checkRefresh = () => {
+      if (!isMountedRef.current) {
+        return;
+      }
+      const avatarService = AvatarService.getInstance();
+      const refreshTimestamp = avatarService.getBorderRefreshTimestamp(userId);
+      if (refreshTimestamp > borderRefreshKey) {
+        setBorderRefreshKey(refreshTimestamp);
+        // Force reload by calling loadBorderImage
+        loadBorderImage();
+      }
+    };
+
+    // Check immediately
+    checkRefresh();
+
+    // Poll periodically to detect changes (every 1 second - balance between responsiveness and performance)
+    const interval = setInterval(checkRefresh, 1000);
+
+    return () => clearInterval(interval);
+  }, [userId, showProfileBorder, borderImageUrl, borderRefreshKey, loadBorderImage]);
+
+  useEffect(() => {
+    if (!showProfileBorder) {
+      setResolvedBorderUrl(null);
+      setAssetBorderScale(undefined);
+      setAssetBorderScaleConfig(undefined);
+      setBorderError(false);
+      return;
+    }
+
+    if (borderImageUrl) {
+      setResolvedBorderUrl(borderImageUrl);
+      setBorderError(false);
+      // Still load the asset config for proper scaling even if URL is provided
+      if (userId) {
+        const loadAssetConfig = async () => {
+          try {
+            const avatarService = AvatarService.getInstance();
+            const details = await avatarService.getProfileBorderDetails(userId);
+            if (isMountedRef.current) {
+              setAssetBorderScale(details?.scale ?? undefined);
+              setAssetBorderScaleConfig(details?.scaleConfig);
+            }
+          } catch (error) {
+            // Silently fail - we have the URL, just won't have custom scaling
+            if (isMountedRef.current) {
+              setAssetBorderScale(undefined);
+              setAssetBorderScaleConfig(undefined);
+            }
+          }
+        };
+        loadAssetConfig();
+      } else {
+        setAssetBorderScale(undefined);
+        setAssetBorderScaleConfig(undefined);
+      }
+      return;
+    }
+
+    if (!userId) {
+      setResolvedBorderUrl(null);
+      setAssetBorderScale(undefined);
+      setAssetBorderScaleConfig(undefined);
+      return;
+    }
+
+    loadBorderImage();
+  }, [borderImageUrl, userId, loadBorderImage, showProfileBorder, borderRefreshKey]);
+
   // Handle image load error
   const handleImageError = useCallback(() => {
     logger.warn('Avatar image failed to load', { userId }, 'Avatar');
@@ -163,9 +274,16 @@ const Avatar: React.FC<AvatarProps> = ({
 
   // Handle border image error
   const handleBorderError = useCallback(() => {
-    logger.warn('Border image failed to load', { userId, borderImageUrl }, 'Avatar');
+    logger.warn(
+      'Border image failed to load',
+      { userId, borderImageUrl: borderImageUrl ?? resolvedBorderUrl },
+      'Avatar'
+    );
     setBorderError(true);
-  }, [userId, borderImageUrl]);
+    setResolvedBorderUrl(null);
+    setAssetBorderScale(undefined);
+    setAssetBorderScaleConfig(undefined);
+  }, [userId, borderImageUrl, resolvedBorderUrl]);
 
   // Determine what to display
   const getDisplayContent = () => {
@@ -204,24 +322,34 @@ const Avatar: React.FC<AvatarProps> = ({
   // Check if style has width/height that should override default size
   const hasCustomDimensions = style && ((style as any).width === '100%' || (style as any).height === '100%');
 
-  const avatarStyle: ViewStyle = {
-    ...(dynamicSize || hasCustomDimensions ? {
-      width: '100%',
-      height: '100%',
-      aspectRatio: 1,
-      borderRadius: 999, // Large value to ensure circular shape
-    } : {
-      width: size,
-      height: size,
-      borderRadius: size / 2,
-    }),
-    backgroundColor: colors.surface,
+  const wrapperStyle: ViewStyle = {
+    ...(dynamicSize || hasCustomDimensions
+      ? {
+          width: '100%',
+          height: '100%',
+          aspectRatio: 1,
+        }
+      : {
+          width: size,
+          height: size,
+        }),
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...style,
+  };
+
+  const circleStyle: ViewStyle = {
+    width: '100%',
+    height: '100%',
+    borderRadius: dynamicSize || hasCustomDimensions ? 999 : size / 2,
+    backgroundColor: colors.blackWhite5,
     overflow: 'hidden',
     ...(showBorder && {
       borderWidth: 2,
       borderColor: borderColor,
     }),
-    ...style,
+    justifyContent: 'center',
+    alignItems: 'center',
   };
 
   // Determine the actual size for border calculations
@@ -236,25 +364,53 @@ const Avatar: React.FC<AvatarProps> = ({
     ...textStyle,
   };
 
-  const imageStyle = dynamicSize ? {
+  const fullSize: DimensionValue = '100%';
+  const imageStyle: ImageStyle = dynamicSize ? {
     flex: 1,
-    width: '100%',
-    height: '100%',
+    width: fullSize,
+    height: fullSize,
     borderRadius: 999, // Large value to ensure circular shape
   } : {
-    width: '100%',
-    height: '100%',
+    width: fullSize,
+    height: fullSize,
     borderRadius: size / 2,
   };
 
+  const configScale = useMemo(() => {
+    if (!assetBorderScaleConfig) {
+      return undefined;
+    }
+
+    if (effectiveSize > 200 && assetBorderScaleConfig.gt200) {
+      return assetBorderScaleConfig.gt200;
+    }
+    if (effectiveSize > 150 && assetBorderScaleConfig.gt150) {
+      return assetBorderScaleConfig.gt150;
+    }
+    if (effectiveSize > 100 && assetBorderScaleConfig.gt100) {
+      return assetBorderScaleConfig.gt100;
+    }
+    if (effectiveSize > 80 && assetBorderScaleConfig.gt80) {
+      return assetBorderScaleConfig.gt80;
+    }
+    if (effectiveSize > 60 && assetBorderScaleConfig.gt60) {
+      return assetBorderScaleConfig.gt60;
+    }
+    return assetBorderScaleConfig.base ?? undefined;
+  }, [assetBorderScaleConfig, effectiveSize]);
+
   // Responsive border scaling - smaller on mobile devices
-  const borderScale = effectiveSize < 60 ? 1.12 : effectiveSize < 100 ? 1.14 : 1.15;
+  const borderScale =
+    borderScaleOverride ??
+    configScale ??
+    assetBorderScale ??
+    (effectiveSize < 60 ? 1.12 : effectiveSize < 100 ? 1.14 : 1.15);
 
   return (
-    <View style={[avatarStyle, { justifyContent: 'center', alignItems: 'center' }]}>
-      {getDisplayContent()}
-      {borderImageUrl && !borderError && isSafeUrl(borderImageUrl) && (
-        isSvgUrl(borderImageUrl) ? (
+    <View style={wrapperStyle}>
+      <View style={circleStyle}>{getDisplayContent()}</View>
+      {showProfileBorder && resolvedBorderUrl && !borderError && isSafeUrl(resolvedBorderUrl) && (
+        isSvgUrl(resolvedBorderUrl) ? (
           <View
             style={{
               position: 'absolute',
@@ -269,15 +425,14 @@ const Avatar: React.FC<AvatarProps> = ({
             pointerEvents="none"
           >
             <SvgUri
-              uri={borderImageUrl}
+              uri={resolvedBorderUrl}
               width={effectiveSize * borderScale}
               height={effectiveSize * borderScale}
               onError={handleBorderError}
             />
           </View>
         ) : (
-          <Image
-            source={{ uri: borderImageUrl }}
+          <View
             style={{
               position: 'absolute',
               top: -(effectiveSize * (borderScale - 1)) / 2,
@@ -286,10 +441,15 @@ const Avatar: React.FC<AvatarProps> = ({
               height: effectiveSize * borderScale,
               zIndex: 2,
             }}
-            resizeMode="contain"
             pointerEvents="none"
-            onError={handleBorderError}
-          />
+          >
+            <Image
+              source={{ uri: resolvedBorderUrl }}
+              style={{ width: fullSize, height: fullSize }}
+              resizeMode="contain"
+              onError={handleBorderError}
+            />
+          </View>
         )
       )}
     </View>

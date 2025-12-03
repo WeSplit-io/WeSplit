@@ -8,6 +8,7 @@ import {
 import { Transaction } from '../../types';
 import { colors, spacing, typography } from '../../theme';
 import { PhosphorIcon } from '../shared';
+import Avatar from '../shared/Avatar';
 import { formatBalance } from '../../utils/ui/format/formatUtils';
 import {
   getTransactionIconName,
@@ -61,7 +62,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
     // formatBalance already includes currency, so we just add the sign
     return {
       amount: `${isIncome ? '+' : '-'}${formattedAmount}`,
-      color: isIncome ? colors.green : colors.text
+      color: isIncome ? colors.green : colors.white
     };
   };
 
@@ -73,6 +74,25 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
     }
   };
 
+  // Determine which user to display (sender for outgoing, recipient for incoming)
+  const getDisplayUser = () => {
+    const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
+    if (isIncome) {
+      return {
+        userId: transaction.from_user,
+        userName: senderName || transaction.sender_name,
+      };
+    } else {
+      return {
+        userId: transaction.to_user,
+        userName: recipientName || transaction.recipient_name,
+      };
+    }
+  };
+
+  const displayUser = getDisplayUser();
+  const hasUser = !!displayUser.userId;
+
   return (
     <TouchableOpacity
       style={styles.transactionItem}
@@ -83,7 +103,17 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       accessibilityHint={onPress ? "Opens transaction details" : undefined}
     >
       <View style={styles.transactionIconContainer}>
-        {getTransactionIcon()}
+        {hasUser ? (
+          <Avatar
+            userId={displayUser.userId}
+            userName={displayUser.userName}
+            size={40}
+            showProfileBorder={false}
+            style={styles.avatarStyle}
+          />
+        ) : (
+          getTransactionIcon()
+        )}
       </View>
       <View style={styles.transactionContent}>
         <Text style={styles.transactionTitle}>
@@ -116,10 +146,13 @@ const styles = StyleSheet.create({
   transactionIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 30,
-    backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'visible',
+  },
+  avatarStyle: {
+    width: 40,
+    height: 40,
   },
   transactionIcon: {
     width: 20,

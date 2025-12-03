@@ -15,10 +15,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SvgUri } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from '@react-navigation/native';
-import { 
-  PaperPlaneTilt, 
-  HandCoins, 
-  ArrowLineDown, 
+import {
+  PaperPlaneTilt,
+  HandCoins,
+  ArrowLineDown,
   Link,
   QrCode,
   Bell,
@@ -72,7 +72,7 @@ const DEFAULT_WALLET_BACKGROUND = 'https://firebasestorage.googleapis.com/v0/b/w
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) => {
   const { state, notifications, loadNotifications, refreshNotifications, updateUser } = useApp();
   const { currentUser, isAuthenticated } = state;
-  
+
   // Biometric authentication state
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authenticationError, setAuthenticationError] = useState<string | null>(null);
@@ -98,7 +98,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     } catch (error) {
       logger.error('Error fetching user data', error, 'DashboardScreen');
     }
-    
+
     // Return fallback data if user not found
     return {
       id: userId,
@@ -126,19 +126,18 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [userNames, setUserNames] = useState<Map<string, string>>(new Map());
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [walletBackgroundUrl, setWalletBackgroundUrl] = useState<string | null>(null);
-  const [profileBorderUrl, setProfileBorderUrl] = useState<string | null>(null);
   const [backgroundError, setBackgroundError] = useState(false);
-  
+
   // Loading States
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [loadingPaymentRequests, setLoadingPaymentRequests] = useState(false);
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [initialRequestsLoaded, setInitialRequestsLoaded] = useState(false);
-  
+
   // Unified wallet state
-  const { 
-    address: walletAddress, 
-    totalUSD: walletBalance, 
+  const {
+    address: walletAddress,
+    totalUSD: walletBalance,
     isConnected: walletConnected,
     isLoading: walletLoading,
     error: walletError,
@@ -184,7 +183,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       try {
         setIsAuthenticating(true);
         setAuthenticationError(null);
-        
+
         // Pre-authenticate to trigger Face ID/Touch ID/Knox OR device passcode once before any vault access
         // Note: This will use biometrics if available, otherwise fall back to device passcode
         // In simulators, Keychain won't work, but SecureStore fallback will still work
@@ -196,7 +195,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           note: 'Primary authentication point. User may be prompted for Face ID/Touch ID/fingerprint.'
         }, 'DashboardScreen');
         const authenticated = await secureVault.preAuthenticate();
-        
+
         if (authenticated) {
           logger.info('✅ [FACE_ID] DashboardScreen: Authentication successful - user verified with Face ID', {
             userId: currentUser.id,
@@ -245,13 +244,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       try {
         const { pendingInvitationService } = await import('../../services/core/pendingInvitationService');
         const result = await pendingInvitationService.processPendingInvitationAfterAuth();
-        
+
         if (result.shouldNavigate && result.navigationParams) {
           logger.info('Processing pending invitation after authentication', {
             screen: result.navigationParams.screen,
             splitId: result.navigationParams.params?.splitId,
           }, 'DashboardScreen');
-          
+
           // Small delay to ensure Dashboard is fully loaded
           setTimeout(() => {
             navigation.navigate(
@@ -334,16 +333,16 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         if (assetInfo?.url) {
           // Resolve the URL (handles gs:// to https:// conversion)
           const resolvedUrl = await resolveStorageUrl(assetInfo.url, { assetId: currentUser.active_wallet_background });
-        logger.info('Resolved background URL', {
-          assetId: currentUser.active_wallet_background,
+          logger.info('Resolved background URL', {
+            assetId: currentUser.active_wallet_background,
             resolvedUrl,
             originalUrl: assetInfo.url,
             assetInfoFound: !!assetInfo
-        }, 'DashboardScreen');
+          }, 'DashboardScreen');
 
-        if (isMounted) {
+          if (isMounted) {
             setWalletBackgroundUrl(resolvedUrl || null);
-          setBackgroundError(false);
+            setBackgroundError(false);
           }
         } else {
           logger.warn('No URL found for wallet background', {
@@ -375,56 +374,18 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     };
   }, [currentUser?.id, currentUser?.active_wallet_background]);
 
-  // Load profile border URL
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadProfileBorder = async () => {
-      if (!currentUser?.active_profile_border) {
-        if (isMounted) {
-          setProfileBorderUrl(null);
-        }
-        return;
-      }
-
-      try {
-        // Get asset info from config
-        const assetInfo = getAssetInfo(currentUser.active_profile_border);
-        
-        if (assetInfo?.url) {
-          // Resolve the URL (handles gs:// to https:// conversion)
-          const resolvedUrl = await resolveStorageUrl(assetInfo.url, { assetId: currentUser.active_profile_border });
-          if (isMounted && resolvedUrl) {
-            setProfileBorderUrl(resolvedUrl);
-          }
-        }
-      } catch (error) {
-        logger.warn('Failed to load profile border', { error }, 'DashboardScreen');
-        if (isMounted) {
-          setProfileBorderUrl(null);
-        }
-      }
-    };
-
-    loadProfileBorder();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentUser?.id, currentUser?.active_profile_border]);
-
   // Handle phone prompt actions
   const handleAddPhone = async (phone: string) => {
     try {
       setShowPhonePrompt(false);
-      
+
       // Normalize phone number
       const normalizedPhone = normalizePhoneNumber(phone);
-      
+
       // Link phone to existing user account (not create new account)
       // Pass userId and email to help with auth state verification
       const result = await authService.linkPhoneNumberToUser(normalizedPhone, undefined, currentUser?.id, currentUser?.email);
-      
+
       if (result.success && result.verificationId) {
         // Navigate to verification screen with linking context
         navigation.navigate('Verification', {
@@ -457,7 +418,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
-    if (!address || address.length < 8) {return address;}
+    if (!address || address.length < 8) { return address; }
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
@@ -492,64 +453,64 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     currentUser,
     setShowQRCodeScreen
   }) => (
-    <>
-      <View style={styles.balanceHeader}>
-        <View style={styles.balanceHeaderContent}>
-          <Text style={styles.balanceLabel}>
-            WeSplit Balance
-          </Text>
-          <TouchableOpacity
-            onPress={() => setIsBalanceHidden(!isBalanceHidden)}
-            style={{ padding: 4, marginLeft: 8 }}
-          >
-            {isBalanceHidden ? (
-              <EyeSlash size={20} color={colors.white} />
-            ) : (
-              <Eye size={20} color={colors.white} />
-            )}
-          </TouchableOpacity>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {/* QR Code Button for Profile Sharing */}
-          <TouchableOpacity
-            style={styles.qrCodeIcon}
-            onPress={() => setShowQRCodeScreen(true)}
-          >
-            <QrCode size={30} color={colors.white} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.balanceContainer}>
-        <View style={{ flex: 1, alignItems: 'flex-start' }}>
-          {walletLoading || liveBalanceLoading ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <ActivityIndicator size="small" color={colors.white} style={{ marginRight: 8 }} />
-            </View>
-          ) : (
-            <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-              {isBalanceHidden ? '$--.--' : `$ ${effectiveBalance.toFixed(2)}`}
+      <>
+        <View style={styles.balanceHeader}>
+          <View style={styles.balanceHeaderContent}>
+            <Text style={styles.balanceLabel}>
+              WeSplit Balance
             </Text>
-          )}
+            <TouchableOpacity
+              onPress={() => setIsBalanceHidden(!isBalanceHidden)}
+              style={{ padding: 4, marginLeft: 8 }}
+            >
+              {isBalanceHidden ? (
+                <EyeSlash size={20} color={colors.white} />
+              ) : (
+                <Eye size={20} color={colors.white} />
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* QR Code Button for Profile Sharing */}
+            <TouchableOpacity
+              style={styles.qrCodeIcon}
+              onPress={() => setShowQRCodeScreen(true)}
+            >
+              <QrCode size={30} color={colors.white} />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
-      {/* Wallet Address with Copy Button */}
-      <TouchableOpacity
-        style={styles.walletAddressContainer}
-        onPress={() => copyWalletAddress(walletAddress || currentUser?.wallet_address || '')}
-      >
-        <Text style={styles.balanceLimitText}>
-          {hashWalletAddress(walletAddress || currentUser?.wallet_address || '')}
-        </Text>
-        <Copy
-          size={20}
-          color={colors.white}
-          style={styles.copyIcon}
-        />
-      </TouchableOpacity>
-    </>
-  );
+        <View style={styles.balanceContainer}>
+          <View style={{ flex: 1, alignItems: 'flex-start' }}>
+            {walletLoading || liveBalanceLoading ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={colors.white} style={{ marginRight: 8 }} />
+              </View>
+            ) : (
+              <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
+                {isBalanceHidden ? '$--.--' : `$ ${effectiveBalance.toFixed(2)}`}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Wallet Address with Copy Button */}
+        <TouchableOpacity
+          style={styles.walletAddressContainer}
+          onPress={() => copyWalletAddress(walletAddress || currentUser?.wallet_address || '')}
+        >
+          <Text style={styles.balanceLimitText}>
+            {hashWalletAddress(walletAddress || currentUser?.wallet_address || '')}
+          </Text>
+          <Copy
+            size={20}
+            color={colors.white}
+            style={styles.copyIcon}
+          />
+        </TouchableOpacity>
+      </>
+    );
 
   // Helper functions for split status
   const getSplitStatusColor = (status: string) => {
@@ -618,10 +579,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       }
 
       logger.debug('Fetching user data for sender ID', { senderId }, 'DashboardScreen');
-      
+
       // Fetch user data to get wallet address and other details
       const contact = await fetchUserData(senderId);
-      
+
       logger.debug('Fetched contact data', {
         id: contact.id,
         name: contact.name,
@@ -634,12 +595,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         Alert.alert('Error', 'Recipient wallet address not found. Please ask them to set up their wallet.');
         return;
       }
-      
+
       // Get the original message from the request
       const requestDescription = request.data?.description || request.data?.note || '';
       const hasValidDescription = requestDescription && requestDescription.trim().length > 0;
-      const prefilledNote = hasValidDescription 
-        ? `"${requestDescription.trim()}"` 
+      const prefilledNote = hasValidDescription
+        ? `"${requestDescription.trim()}"`
         : `Payment request from ${contact.name}`;
 
       logger.info('Navigating to SendAmount with data', {
@@ -675,12 +636,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           AsyncStorage.getItem('deletedNotificationIds'),
           AsyncStorage.getItem('lastNotificationsViewTimestamp')
         ]);
-        
+
         if (deletedIdsStored) {
           const ids = JSON.parse(deletedIdsStored);
           setDeletedNotificationIds(new Set(ids));
         }
-        
+
         if (lastViewStored) {
           setLastNotificationsViewTimestamp(lastViewStored);
         }
@@ -695,11 +656,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Only count notifications that are NEW (created after last view timestamp)
   const calculateUnreadNotifications = useCallback(async () => {
     let unreadCount = 0;
-    
+
     // If user has never viewed notifications, show all unread notifications
     // Otherwise, only show notifications created after last view
     const lastViewDate = lastNotificationsViewTimestamp ? new Date(lastNotificationsViewTimestamp) : null;
-    
+
     // Count unread notifications from context (excluding deleted ones and old ones)
     if (notifications) {
       unreadCount += notifications.filter(n => {
@@ -721,7 +682,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         return true;
       }).length;
     }
-    
+
     // Count unread payment requests from Firebase
     // Only count those that don't have a corresponding notification marked as read
     if (currentUser?.id && notifications) {
@@ -733,12 +694,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           if (deletedNotificationIds.has(firebaseRequestId)) {
             return false;
           }
-          
+
           // Only count if not completed
           if (req.amount <= 0 || req.status === 'completed') {
             return false;
           }
-          
+
           // If we have a last view timestamp, only count requests created after it
           if (lastViewDate && req.created_at) {
             const requestDate = new Date(req.created_at);
@@ -746,7 +707,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               return false; // Request is older than last view
             }
           }
-          
+
           // Check if there's a corresponding notification that's already marked as read
           const correspondingNotification = notifications.find(
             n => n.type === 'payment_request' && n.data?.requestId === req.id
@@ -778,7 +739,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         logger.error('Error loading payment requests for notification count', error, 'DashboardScreen');
       }
     }
-    
+
     setUnreadNotifications(unreadCount);
   }, [notifications, currentUser?.id, deletedNotificationIds, lastNotificationsViewTimestamp]);
 
@@ -816,7 +777,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           usdcBalance: update.usdcBalance,
           solBalance: update.solBalance
         }, 'DashboardScreen');
-        
+
         // Live balance updates are handled by useWalletState hook
         // No need to update local state here
       }
@@ -830,17 +791,17 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       logger.debug('Using wallet balance', { walletBalance }, 'DashboardScreen');
       return walletBalance;
     }
-    
+
     // If wallet state failed but we have live balance data, use it
     if (liveBalance && liveBalance.usdcBalance !== undefined) {
-      logger.debug('Using live balance as fallback', { 
-        liveBalance: liveBalance.usdcBalance, 
+      logger.debug('Using live balance as fallback', {
+        liveBalance: liveBalance.usdcBalance,
         walletBalance,
-        walletError 
+        walletError
       }, 'DashboardScreen');
       return liveBalance.usdcBalance;
     }
-    
+
     // Fallback to 0
     logger.debug('Using fallback balance of 0', { walletBalance, liveBalance }, 'DashboardScreen');
     return 0;
@@ -854,15 +815,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Load payment requests
   const loadPaymentRequests = useCallback(async () => {
-    if (!currentUser?.id || loadingPaymentRequests) {return;}
+    if (!currentUser?.id || loadingPaymentRequests) { return; }
 
     setLoadingPaymentRequests(true);
     try {
       logger.debug('Loading payment requests', null, 'DashboardScreen');
-      
+
       // Get payment requests from Firebase
       const firebaseRequests = await getReceivedPaymentRequests(currentUser.id, 10);
-      
+
       // Get notification requests (exclude completed ones)
       const notificationRequests = notifications?.filter(n =>
         n.type === 'payment_request' &&
@@ -939,7 +900,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           profiles.forEach(p => { idToAvatar[p.id] = p.avatar; });
 
           allRequests.forEach(r => {
-            if (!r.data) {r.data = {};}
+            if (!r.data) { r.data = {}; }
             const sid = r.data.senderId ? String(r.data.senderId) : undefined;
             const existing = r.data.senderAvatar && r.data.senderAvatar.trim() !== '';
             if (!existing && sid && idToAvatar[sid]) {
@@ -955,7 +916,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       if (!initialRequestsLoaded) {
         setInitialRequestsLoaded(true);
       }
-      
+
       logger.info('Payment requests loaded successfully', { count: allRequests.length }, 'DashboardScreen');
     } catch (error) {
       logger.error('Error loading payment requests', error, 'DashboardScreen');
@@ -987,23 +948,23 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Load transactions
   const loadTransactions = useCallback(async () => {
-    if (!currentUser?.id) {return;}
+    if (!currentUser?.id) { return; }
 
     try {
       setLoadingTransactions(true);
       const userTransactions = await firebaseDataService.transaction.getUserTransactions(currentUser.id.toString());
-      
+
       // Preload user data for all transaction participants
       const userIds = new Set<string>();
       userTransactions.forEach(transaction => {
-        if (transaction.from_user) {userIds.add(transaction.from_user);}
-        if (transaction.to_user) {userIds.add(transaction.to_user);}
+        if (transaction.from_user) { userIds.add(transaction.from_user); }
+        if (transaction.to_user) { userIds.add(transaction.to_user); }
       });
-      
+
       if (userIds.size > 0) {
         await preloadUserData(Array.from(userIds));
       }
-      
+
       setRealTransactions(userTransactions);
     } catch (error) {
       logger.error('Error loading transactions', error, 'DashboardScreen');
@@ -1022,42 +983,42 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   useFocusEffect(
     React.useCallback(() => {
       const currentUserId = currentUser?.id;
-      
-      logger.debug('useFocusEffect triggered', { 
-        isAuthenticated, 
-        userId: currentUserId, 
-        hasInitialLoad, 
+
+      logger.debug('useFocusEffect triggered', {
+        isAuthenticated,
+        userId: currentUserId,
+        hasInitialLoad,
         isInitialLoading: isInitialLoadingRef.current,
         lastUserId: lastUserIdRef.current,
         refreshBalance: route?.params?.refreshBalance,
         refreshRequests: route?.params?.refreshRequests
       }, 'DashboardScreen');
-      
+
       // Check if user changed (login/logout)
       const userChanged = lastUserIdRef.current !== currentUserId;
       if (userChanged) {
         hasLoadedRef.current = false;
         setHasInitialLoad(false);
         lastUserIdRef.current = currentUserId || null;
-        logger.info('User changed, resetting load state', { 
-          previousUserId: lastUserIdRef.current, 
-          currentUserId 
+        logger.info('User changed, resetting load state', {
+          previousUserId: lastUserIdRef.current,
+          currentUserId
         }, 'DashboardScreen');
       }
-      
+
       if (isAuthenticated && currentUserId && !isInitialLoadingRef.current) {
         // Only load data if it hasn't been loaded yet or if explicitly requested
         const shouldRefreshBalance = route?.params?.refreshBalance;
         const shouldRefreshRequests = route?.params?.refreshRequests;
-        
+
         if (!hasLoadedRef.current || shouldRefreshBalance || shouldRefreshRequests) {
           // Only log if actually loading for the first time
           if (!hasLoadedRef.current && __DEV__) {
             logger.debug('Starting initial data load', null, 'DashboardScreen');
           }
-          
+
           isInitialLoadingRef.current = true;
-          
+
           // Load all data once when screen comes into focus
           if (!hasLoadedRef.current) {
             Promise.allSettled([
@@ -1074,17 +1035,17 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             // Handle navigation refresh parameters
             if (shouldRefreshBalance || shouldRefreshRequests) {
               // Clear the parameters to prevent infinite loops
-              navigation.setParams({ 
+              navigation.setParams({
                 refreshBalance: undefined,
-                refreshRequests: undefined 
+                refreshRequests: undefined
               });
-              
+
               // Trigger appropriate refreshes
               if (shouldRefreshBalance) {
                 walletService.clearUserCache(currentUserId);
                 refreshWallet();
               }
-              
+
               if (shouldRefreshRequests) {
                 loadPaymentRequests();
                 refreshNotifications();
@@ -1108,10 +1069,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
     try {
       logger.info('Manual refresh triggered', null, 'DashboardScreen');
-      
+
       // Clear cache before refresh to ensure fresh data
       walletService.clearUserCache(currentUser.id);
-      
+
       // Use Promise.allSettled to prevent one failure from stopping others
       const results = await Promise.allSettled([
         refreshWallet(),
@@ -1136,14 +1097,14 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Load user names for transactions
   const loadUserNames = async (transactions: Transaction[]) => {
     const userIds = new Set<string>();
-    
+
     transactions.forEach(transaction => {
-      if (transaction.from_user) {userIds.add(transaction.from_user);}
-      if (transaction.to_user) {userIds.add(transaction.to_user);}
+      if (transaction.from_user) { userIds.add(transaction.from_user); }
+      if (transaction.to_user) { userIds.add(transaction.to_user); }
     });
 
     const newUserNames = new Map(userNames);
-    
+
     for (const userId of userIds) {
       if (!newUserNames.has(userId)) {
         try {
@@ -1154,7 +1115,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         }
       }
     }
-    
+
     setUserNames(newUserNames);
   };
 
@@ -1170,12 +1131,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     // Add payment requests
     paymentRequests.forEach((request) => {
       // Try different timestamp fields for requests
-      const timestamp = request.data?.created_at || 
-                       request.data?.timestamp || 
-                       request.created_at || 
-                       request.timestamp ||
-                       new Date(); // fallback to current time
-      
+      const timestamp = request.data?.created_at ||
+        request.data?.timestamp ||
+        request.created_at ||
+        request.timestamp ||
+        new Date(); // fallback to current time
+
       activities.push({
         id: request.id || `request-${Math.random()}`,
         type: 'request',
@@ -1189,7 +1150,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       // Only show transactions from the user's perspective
       // For 'send' transactions: show only if current user is the sender
       // For 'receive' transactions: show only if current user is the recipient
-      const shouldShowTransaction = 
+      const shouldShowTransaction =
         (transaction.type === 'send' && transaction.from_user === currentUser?.id) ||
         (transaction.type === 'receive' && transaction.to_user === currentUser?.id) ||
         (transaction.type === 'deposit') ||
@@ -1217,10 +1178,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   if (isAuthenticating) {
     return (
       <Container>
-      <ModernLoader
-        size="large"
-        text="Authenticating..."
-      />
+        <ModernLoader
+          size="large"
+          text="Authenticating..."
+        />
       </Container>
     );
   }
@@ -1232,25 +1193,25 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         title="Authentication Required"
         message={authenticationError}
         onRetry={async () => {
-              setIsAuthenticating(true);
-              setAuthenticationError(null);
-              vaultAuthSession.hasAuthenticated = false; // Reset to allow retry
-              try {
-                // Force re-authentication on retry
-                const authenticated = await secureVault.preAuthenticate(true);
-                if (authenticated) {
-                  vaultAuthSession.hasAuthenticated = true;
-                  setIsAuthenticating(false);
-                } else {
-                  setAuthenticationError('Authentication failed. Please try again.');
-                  setIsAuthenticating(false);
-                }
-              } catch (error) {
-                setAuthenticationError('Failed to authenticate. Please try again.');
-                vaultAuthSession.hasAuthenticated = false;
-                setIsAuthenticating(false);
-              }
-            }}
+          setIsAuthenticating(true);
+          setAuthenticationError(null);
+          vaultAuthSession.hasAuthenticated = false; // Reset to allow retry
+          try {
+            // Force re-authentication on retry
+            const authenticated = await secureVault.preAuthenticate(true);
+            if (authenticated) {
+              vaultAuthSession.hasAuthenticated = true;
+              setIsAuthenticating(false);
+            } else {
+              setAuthenticationError('Authentication failed. Please try again.');
+              setIsAuthenticating(false);
+            }
+          } catch (error) {
+            setAuthenticationError('Failed to authenticate. Please try again.');
+            vaultAuthSession.hasAuthenticated = false;
+            setIsAuthenticating(false);
+          }
+        }}
         retryText="Try Again"
       />
     );
@@ -1279,14 +1240,17 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             style={styles.headerLeft}
             onPress={() => navigation.navigate('Profile')}
           >
-            <Avatar
-              userId={currentUser?.id}
-              userName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
-              avatarUrl={currentUser?.avatar}
-              borderImageUrl={profileBorderUrl || undefined}
-              style={styles.profileImage}
-              size={50}
-            />
+            <View style={styles.profileImageContainer}>
+              <Avatar
+                userId={currentUser?.id}
+                userName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
+                avatarUrl={currentUser?.avatar}
+                style={styles.profileImage}
+                size={50}
+                showProfileBorder={true}
+              />
+            </View>
+
             <View style={{ marginLeft: spacing.md }}>
               <Text style={styles.welcomeText}>Welcome back,</Text>
               <Text style={styles.userName}>
@@ -1373,17 +1337,17 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                           const { WalletPersistenceTester } = await import('../../utils/testing/walletPersistenceTester');
                           const userId = currentUser?.id || '';
                           const userEmail = currentUser?.email || '';
-                          
+
                           if (!userId) {
                             Alert.alert('Error', 'User not logged in');
                             return;
                           }
 
                           const result = await WalletPersistenceTester.testCompleteDataClear(userId, userEmail);
-                          
+
                           Alert.alert(
                             result.success ? '✅ All Data Cleared' : '⚠️ Partial Clear',
-                            result.message + '\n\n' + 
+                            result.message + '\n\n' +
                             'Now:\n' +
                             '1. Close the app completely\n' +
                             '2. Reopen the app\n' +
@@ -1470,14 +1434,14 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           } else {
             // Regular image background for PNG/JPG assets
             return (
-        <ImageBackground
+              <ImageBackground
                 source={{
                   uri: backgroundError
                     ? DEFAULT_WALLET_BACKGROUND
                     : (walletBackgroundUrl || DEFAULT_WALLET_BACKGROUND)
                 }}
-          style={[styles.balanceCard, { alignItems: 'flex-start' }]}
-          resizeMode="cover"
+                style={[styles.balanceCard, { alignItems: 'flex-start' }]}
+                resizeMode="cover"
                 onError={() => {
                   logger.warn('Balance background image failed to load', {
                     userId: currentUser?.id,
@@ -1499,13 +1463,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                   walletAddress={walletAddress}
                   currentUser={currentUser}
                   setShowQRCodeScreen={setShowQRCodeScreen}
-            />
+                />
               </ImageBackground>
             );
           }
         })()}
 
-          {/* {!walletConnected && userCreatedWalletBalance && (
+        {/* {!walletConnected && userCreatedWalletBalance && (
             <TouchableOpacity
               style={[
                 styles.connectWalletButton,
@@ -1536,7 +1500,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               </Text>
             </TouchableOpacity>
           )}*/}
-        
+
 
         {/* Action Buttons */}
         <View style={styles.actionsGrid}>
@@ -1586,7 +1550,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         </View>
 
 
-        
+
 
 
         {/* Combined Activities Section */}

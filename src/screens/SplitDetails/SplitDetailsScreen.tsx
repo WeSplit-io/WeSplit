@@ -2126,6 +2126,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                         userName={participant.name}
                         size={32}
                         avatarUrl={participant.avatar}
+                        showProfileBorder={false}
                         style={{
                           width: 32,
                           height: 32,
@@ -2170,6 +2171,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 userName={participant.name}
                 avatarUrl={participant.avatar}
                 size={40}
+                showProfileBorder={false}
                 style={{
                   width: 40,
                   height: 40,

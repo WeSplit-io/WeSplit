@@ -7,6 +7,10 @@
 import { logger } from '../analytics/loggingService';
 import { firebaseDataService } from '../data/firebaseDataService';
 import { AvatarUploadService } from './avatarUploadService';
+import { getAssetInfo, BorderScaleConfig } from '../rewards/assetConfig';
+import { resolveStorageUrl } from '../shared/storageUrlService';
+import { getCanonicalAssetId } from '../rewards/assetIdMapping';
+import { User } from '../../types';
 
 interface AvatarCacheEntry {
   url: string | null;
@@ -14,11 +18,35 @@ interface AvatarCacheEntry {
   isLocal: boolean;
 }
 
+interface UserCacheEntry {
+  user: User | null;
+  timestamp: number;
+}
+
+interface ProfileBorderCacheEntry {
+  url: string | null;
+  assetId?: string | null;
+  scale?: number;
+  scaleConfig?: BorderScaleConfig;
+  timestamp: number;
+}
+
+interface ProfileBorderDetails {
+  url: string | null;
+  scale?: number;
+  assetId?: string | null;
+  scaleConfig?: BorderScaleConfig;
+}
+
 class AvatarService {
   private static instance: AvatarService;
   private cache: Map<string, AvatarCacheEntry> = new Map();
+  private userCache: Map<string, UserCacheEntry> = new Map();
+  private borderCache: Map<string, ProfileBorderCacheEntry> = new Map();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
   private readonly MAX_CACHE_SIZE = 100;
+  // Track refresh timestamps per user to force component updates
+  private borderRefreshTimestamps: Map<string, number> = new Map();
 
   private constructor() {}
 
@@ -44,8 +72,8 @@ class AvatarService {
 
       logger.debug('Fetching avatar from database', { userId }, 'AvatarService');
 
-      // Get user data from Firebase
-      const user = await firebaseDataService.user.getCurrentUser(userId);
+      // Get user data from Firebase (with caching)
+      const user = await this.getUserData(userId);
       
       if (!user) {
         logger.warn('User not found', { userId }, 'AvatarService');
@@ -76,6 +104,10 @@ class AvatarService {
             });
             
             logger.info('Avatar uploaded to Firebase Storage', { userId, newUrl: uploadResult.avatarUrl }, 'AvatarService');
+            this.setCachedUserData(userId, {
+              ...user,
+              avatar: uploadResult.avatarUrl
+            });
             this.setCachedAvatar(userId, uploadResult.avatarUrl, false);
             return uploadResult.avatarUrl;
           } else {
@@ -149,6 +181,62 @@ class AvatarService {
   }
 
   /**
+   * Get resolved profile border URL for a user (if any)
+   */
+  public async getProfileBorderUrl(userId: string): Promise<string | null> {
+    const details = await this.getProfileBorderDetails(userId);
+    return details?.url ?? null;
+  }
+
+  public async getProfileBorderDetails(userId: string): Promise<ProfileBorderDetails> {
+    const cached = this.getCachedBorder(userId);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const user = await this.getUserData(userId);
+      if (!user?.active_profile_border) {
+        this.setCachedBorder(userId, null);
+        return { url: null };
+      }
+
+      const canonicalAssetId = getCanonicalAssetId(user.active_profile_border) || user.active_profile_border;
+      if (!canonicalAssetId) {
+        this.setCachedBorder(userId, null);
+        return { url: null };
+      }
+
+      const assetInfo = getAssetInfo(canonicalAssetId);
+      if (!assetInfo?.url) {
+        logger.debug('Profile border asset missing URL', { userId, assetId: canonicalAssetId }, 'AvatarService');
+        this.setCachedBorder(userId, null, canonicalAssetId, assetInfo?.borderScale, assetInfo?.borderScaleConfig);
+        return { url: null, assetId: canonicalAssetId, scale: assetInfo?.borderScale, scaleConfig: assetInfo?.borderScaleConfig };
+      }
+
+      const resolvedUrl = await resolveStorageUrl(assetInfo.url, {
+        assetId: canonicalAssetId,
+        userId,
+        source: 'AvatarService.getProfileBorderUrl'
+      });
+
+    const payload: ProfileBorderDetails = {
+      url: resolvedUrl ?? null,
+      assetId: canonicalAssetId,
+      scale: assetInfo?.borderScale,
+      scaleConfig: assetInfo?.borderScaleConfig
+    };
+
+      this.setCachedBorder(userId, payload.url, payload.assetId, payload.scale, payload.scaleConfig);
+      return payload;
+    } catch (error) {
+      logger.warn('Failed to resolve profile border URL', { userId, error }, 'AvatarService');
+      this.setCachedBorder(userId, null);
+      return { url: null };
+    }
+  }
+
+  /**
    * Get cached avatar URL
    */
   private getCachedAvatar(userId: string): string | null {
@@ -171,14 +259,7 @@ class AvatarService {
    * Set cached avatar URL
    */
   private setCachedAvatar(userId: string, url: string | null, isLocal: boolean): void {
-    // Clean up cache if it's getting too large
-    if (this.cache.size >= this.MAX_CACHE_SIZE) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey) {
-        this.cache.delete(oldestKey);
-      }
-    }
-
+    this.trimCache(this.cache);
     this.cache.set(userId, {
       url,
       timestamp: Date.now(),
@@ -186,12 +267,96 @@ class AvatarService {
     });
   }
 
+  private getCachedUserData(userId: string): User | null | undefined {
+    const entry = this.userCache.get(userId);
+    if (!entry) {
+      return undefined;
+    }
+
+    if (Date.now() - entry.timestamp > this.CACHE_DURATION) {
+      this.userCache.delete(userId);
+      return undefined;
+    }
+
+    return entry.user;
+  }
+
+  private setCachedUserData(userId: string, user: User | null): void {
+    this.trimCache(this.userCache);
+    this.userCache.set(userId, {
+      user,
+      timestamp: Date.now()
+    });
+  }
+
+  private async getUserData(userId: string): Promise<User | null> {
+    const cached = this.getCachedUserData(userId);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    try {
+      const user = await firebaseDataService.user.getCurrentUser(userId);
+      this.setCachedUserData(userId, user ?? null);
+      return user ?? null;
+    } catch (error) {
+      logger.error('Failed to fetch user data', { userId, error }, 'AvatarService');
+      this.setCachedUserData(userId, null);
+      return null;
+    }
+  }
+
+  private getCachedBorder(userId: string): ProfileBorderCacheEntry | undefined {
+    const entry = this.borderCache.get(userId);
+    if (!entry) {
+      return undefined;
+    }
+
+    if (Date.now() - entry.timestamp > this.CACHE_DURATION) {
+      this.borderCache.delete(userId);
+      return undefined;
+    }
+
+    return entry;
+  }
+
+  private setCachedBorder(userId: string, url: string | null, assetId?: string | null, scale?: number, scaleConfig?: BorderScaleConfig): void {
+    this.trimCache(this.borderCache);
+    this.borderCache.set(userId, {
+      url,
+      scale,
+      scaleConfig,
+      assetId,
+      timestamp: Date.now()
+    });
+  }
+
+  private trimCache<T>(cache: Map<string, T>): void {
+    if (cache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey) {
+        cache.delete(oldestKey);
+      }
+    }
+  }
+
   /**
    * Clear avatar cache for a specific user
    */
   public clearUserCache(userId: string): void {
     this.cache.delete(userId);
+    this.borderCache.delete(userId);
+    this.userCache.delete(userId);
+    // Update refresh timestamp to force components to reload
+    this.borderRefreshTimestamps.set(userId, Date.now());
     logger.debug('Cleared avatar cache for user', { userId }, 'AvatarService');
+  }
+
+  /**
+   * Get the refresh timestamp for a user's border (used to force component updates)
+   */
+  public getBorderRefreshTimestamp(userId: string): number {
+    return this.borderRefreshTimestamps.get(userId) || 0;
   }
 
   /**
@@ -199,6 +364,8 @@ class AvatarService {
    */
   public clearAllCache(): void {
     this.cache.clear();
+    this.borderCache.clear();
+    this.userCache.clear();
     logger.debug('Cleared all avatar cache', null, 'AvatarService');
   }
 

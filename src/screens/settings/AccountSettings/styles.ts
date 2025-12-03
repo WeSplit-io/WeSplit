@@ -28,20 +28,17 @@ export default StyleSheet.create({
     position: 'relative',
   },
   avatarContainer: {
-    width: 140,
-    height: 140,
+    width: 160,
+    height: 160,
     borderRadius: 170,
-    backgroundColor: colors.white5,
-    borderWidth: 1,
-    borderColor: colors.white50,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'visible',
   },
   avatarImage: {
     width: 140,
     height: 140,
-    borderRadius: 170,
   },
   avatarPlaceholder: {
     width: 140,
