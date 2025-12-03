@@ -38,28 +38,28 @@ function createTransporter() {
 // Email template for verification codes
 function generateEmailTemplate(code) {
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; text-align: center; color: white;">
-        <h1 style="margin: 0; font-size: 32px;">WeSplit</h1>
-        <p style="margin: 10px 0 0 0; font-size: 18px;">Your verification code</p>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #A5EA15 0%, #53EF97 100%); padding: 48px; text-align: center; color: #061113;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 600; letter-spacing: -0.5px;">WeSplit</h1>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 400;">Your verification code</p>
       </div>
-      
-      <div style="padding: 40px; background: #f9f9f9;">
-        <h2 style="color: #333; margin-bottom: 20px;">Hello!</h2>
-        <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
+
+      <div style="padding: 48px; background: #061113;">
+        <h2 style="color: #FFFFFF; margin-bottom: 24px; font-size: 32px; font-weight: 600; line-height: 40px; letter-spacing: -0.5px;">Hello!</h2>
+        <p style="color: rgba(255, 255, 255, 0.70); line-height: 24px; margin-bottom: 32px; font-size: 16px; font-weight: 400;">
           You requested a verification code for your WeSplit account. Use the code below to complete your verification:
         </p>
-        
-        <div style="background: white; border: 2px solid #667eea; border-radius: 10px; padding: 30px; text-align: center; margin: 30px 0;">
-          <h1 style="color: #667eea; font-size: 48px; margin: 0; letter-spacing: 10px; font-family: 'Courier New', monospace;">${code}</h1>
+
+        <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.10); border-radius: 16px; padding: 32px; text-align: center; margin: 32px 0;">
+          <h1 style="color: #A5EA15; font-size: 48px; margin: 0; letter-spacing: 8px; font-family: 'Courier New', monospace; font-weight: 400;">${code}</h1>
         </div>
-        
-        <p style="color: #666; font-size: 14px; margin-top: 30px;">
+
+        <p style="color: rgba(255, 255, 255, 0.50); font-size: 14px; margin-top: 32px; font-weight: 400;">
           This code will expire in 10 minutes. If you didn't request this code, please ignore this email.
         </p>
-        
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
-          <p style="color: #999; font-size: 12px;">
+
+        <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.10); text-align: center;">
+          <p style="color: rgba(255, 255, 255, 0.30); font-size: 12px; font-weight: 400;">
             © 2024 WeSplit. All rights reserved.
           </p>
         </div>

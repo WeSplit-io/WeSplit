@@ -16,6 +16,7 @@ import { typography } from '../../theme/typography';
 interface Member {
   userId: string;
   name: string;
+  walletAddress: string;
   role: 'creator' | 'member';
   totalContributed: number;
   totalWithdrawn: number;
@@ -70,28 +71,29 @@ const MembersList: React.FC<MembersListProps> = ({
                 style={styles.memberAvatar}
               />
               <View style={styles.memberInfo}>
-                <View style={styles.memberHeader}>
-                  <UserNameWithBadges
-                    userId={member.userId}
-                    userName={member.name}
-                    textStyle={styles.memberName}
-                    showBadges={true}
-                  />
-                  {member.role === 'creator' && (
-                    <View style={styles.creatorBadge}>
-                      <PhosphorIcon name="Crown" size={12} color={colors.green} weight="fill" />
-                      <Text style={styles.creatorText}>Creator</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.memberStatsRow}>
-                  <Text style={styles.memberStats}>
-                    {formatBalance(member.totalContributed, currency)} contributed
-                  </Text>
-                  <Text style={styles.memberPercentage}>
-                    {memberPercentage.toFixed(1)}%
-                  </Text>
-                </View>
+                <UserNameWithBadges
+                  userId={member.userId}
+                  userName={member.name}
+                  textStyle={styles.memberName}
+                  showBadges={true}
+                />
+                <Text style={styles.memberWalletAddress}>
+                  {member.walletAddress && member.walletAddress.length > 10
+                    ? `${member.walletAddress.slice(0, 4)}...${member.walletAddress.slice(-4)}`
+                    : member.walletAddress || 'No wallet address'
+                  }
+                </Text>
+              </View>
+              <View style={styles.roleContainer}>
+                {member.role === 'creator' ? (
+                  <View style={[styles.roleBadge, styles.creatorBadge]}>
+                    <Text style={[styles.roleText, { color: colors.green }]}>Admin</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.roleBadge, styles.memberBadge]}>
+                    <Text style={[styles.roleText, { color: colors.white70 }]}>Member</Text>
+                  </View>
+                )}
               </View>
             </View>
           );
@@ -136,49 +138,37 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xs / 2,
   },
-  memberHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xs / 2,
-  },
   memberName: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
     lineHeight: typography.fontSize.md * 1.3,
   },
-  creatorBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs / 2,
+  memberWalletAddress: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+    fontFamily: 'monospace',
+  },
+  roleContainer: {
+    alignItems: 'flex-end',
+  },
+  roleBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs / 2,
-    backgroundColor: colors.greenBlue20,
     borderRadius: spacing.xs,
     borderWidth: 1,
+  },
+  creatorBadge: {
+    backgroundColor: colors.greenBlue20,
     borderColor: colors.green + '40',
   },
-  creatorText: {
+  memberBadge: {
+    backgroundColor: colors.white10,
+    borderColor: colors.white20,
+  },
+  roleText: {
     fontSize: typography.fontSize.xs,
-    color: colors.green,
     fontWeight: typography.fontWeight.semibold,
-    letterSpacing: 0.2,
-  },
-  memberStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  memberStats: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white70,
-    lineHeight: typography.fontSize.xs * 1.3,
-  },
-  memberPercentage: {
-    fontSize: typography.fontSize.sm,
-    color: colors.green,
-    fontWeight: typography.fontWeight.bold,
     letterSpacing: 0.2,
   },
 });
