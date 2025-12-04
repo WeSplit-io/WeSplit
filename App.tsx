@@ -73,10 +73,8 @@ import TransactionHistoryScreen from './src/screens/TransactionHistory/Transacti
 import ExternalWalletConnectionScreen from './src/screens/ExternalWalletConnection/ExternalWalletConnectionScreen';
 import ManualSignatureInputScreen from './src/screens/ExternalWalletConnection/ManualSignatureInputScreen';
 import ManualBillCreationScreen from './src/screens/Billing/ManualBillCreation/ManualBillCreationScreen';
-import CreateSharedWalletScreen from './src/screens/SharedWallet/CreateSharedWalletScreen';
 import SharedWalletNameScreen from './src/screens/SharedWallet/SharedWalletNameScreen';
 import SharedWalletMembersScreen from './src/screens/SharedWallet/SharedWalletMembersScreen';
-import SharedWalletCreationScreen from './src/screens/SharedWallet/SharedWalletCreationScreen';
 import SharedWalletDetailsScreen from './src/screens/SharedWallet/SharedWalletDetailsScreen';
 import SharedWalletSettingsScreen from './src/screens/SharedWallet/SharedWalletSettingsScreen';
 // import AuthDebugScreen from './src/screens/Debug/AuthDebugScreen';
@@ -214,10 +212,28 @@ export default function App() {
                     <Stack.Screen name="ExternalWalletConnection" component={ExternalWalletConnectionScreen} />
                     <Stack.Screen name="ManualSignatureInput" component={ManualSignatureInputScreen} />
                     <Stack.Screen name="ManualBillCreation" component={ManualBillCreationScreen} />
-                    <Stack.Screen name="CreateSharedWallet" component={CreateSharedWalletScreen} />
-                    <Stack.Screen name="SharedWalletName" component={SharedWalletNameScreen} />
-                    <Stack.Screen name="SharedWalletMembers" component={SharedWalletMembersScreen} />
-                    <Stack.Screen name="SharedWalletCreation" component={SharedWalletCreationScreen} />
+                    <Stack.Screen
+                      name="SharedWalletName"
+                      component={SharedWalletNameScreen}
+                      options={{
+                        headerShown: false,
+                        cardStyle: { backgroundColor: 'transparent' },
+                        cardOverlayEnabled: true,
+                        gestureEnabled: false,
+                        presentation: 'transparentModal',
+                      }}
+                    />
+                    <Stack.Screen
+                      name="SharedWalletMembers"
+                      component={SharedWalletMembersScreen}
+                      options={{
+                        headerShown: false,
+                        cardStyle: { backgroundColor: 'transparent' },
+                        cardOverlayEnabled: true,
+                        gestureEnabled: false,
+                        presentation: 'transparentModal',
+                      }}
+                    />
                     <Stack.Screen name="SharedWalletDetails" component={SharedWalletDetailsScreen} />
                     <Stack.Screen name="SharedWalletSettings" component={SharedWalletSettingsScreen} />
                     {/* <Stack.Screen name="AuthDebug" component={AuthDebugScreen} /> */}

@@ -13,10 +13,10 @@ import {
   Animated,
   Dimensions,
   StyleSheet,
-  ScrollView,
   Keyboard,
   ViewStyle,
   StyleProp,
+  DimensionValue,
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 
@@ -36,6 +36,7 @@ interface ModalProps {
   title?: string;
   description?: string;
   maxHeight?: string | number;
+  enableSwipe?: boolean;
 }
 
 const ModalComponent: React.FC<ModalProps> = ({
@@ -52,6 +53,7 @@ const ModalComponent: React.FC<ModalProps> = ({
   title,
   description,
   maxHeight,
+  enableSwipe = true,
 }) => {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -151,6 +153,18 @@ const ModalComponent: React.FC<ModalProps> = ({
     // opacity and translateY are Animated.Value objects that shouldn't be in dependencies
   }, [visible]);
 
+  const resolvedMaxHeight = maxHeight || SCREEN_HEIGHT * 0.8;
+  const resolvedHeight =
+    typeof maxHeight === 'number'
+      ? maxHeight
+      : maxHeight
+        ? undefined
+        : SCREEN_HEIGHT * 0.8;
+  const keyboardAdjustedHeight =
+    keyboardHeight > 0
+      ? Math.max(200, SCREEN_HEIGHT - keyboardHeight - spacing.xl)
+      : undefined;
+
   return (
     <Modal
       visible={visible}
@@ -169,50 +183,99 @@ const ModalComponent: React.FC<ModalProps> = ({
             />
           )}
           
+          {enableSwipe ? (
           <PanGestureHandler
             onGestureEvent={handleGestureEvent}
             onHandlerStateChange={handleStateChange}
           >
-            <Animated.View
-              style={[
-                styles.modalContent,
-                { 
-                  transform: [{ translateY }],
-                  height: keyboardHeight > 0 ? '100%' : (maxHeight || SCREEN_HEIGHT * 0.8),
-                  maxHeight: maxHeight || SCREEN_HEIGHT * 0.8,
-                },
-                style,
-              ]}
-            >
-              {showHandle && (
-                <View style={styles.handleContainer}>
-                  <View style={styles.handle} />
-                </View>
-              )}
-              
-              {/* Header avec titre et description */}
-              {(title || description) && (
-                <View style={styles.modalHeader}>
-                  {title && (
-                    <Text style={styles.modalTitle}>{title}</Text>
+            {(() => {
+              const contentStyle: ViewStyle = {
+                transform: [{ translateY }],
+                marginBottom: keyboardHeight > 0 ? keyboardHeight : 0,
+              };
+              if (keyboardAdjustedHeight ?? resolvedHeight) {
+                contentStyle.height = keyboardAdjustedHeight ?? resolvedHeight;
+              }
+              if (resolvedMaxHeight !== undefined && resolvedMaxHeight !== null) {
+                contentStyle.maxHeight = resolvedMaxHeight as DimensionValue;
+              }
+
+              return (
+                <Animated.View
+                  style={[styles.modalContent, contentStyle, style]}
+                >
+                  {showHandle && (
+                    <View style={styles.handleContainer}>
+                      <View style={styles.handle} />
+                    </View>
                   )}
-                  {description && (
-                    <Text style={styles.modalDescription}>{description}</Text>
+                  
+                  {/* Header avec titre et description */}
+                  {(title || description) && (
+                    <View style={styles.modalHeader}>
+                      {title && (
+                        <Text style={styles.modalTitle}>{title}</Text>
+                      )}
+                      {description && (
+                        <Text style={styles.modalDescription}>{description}</Text>
+                      )}
+                    </View>
                   )}
-                </View>
-              )}
-              
-              {/* Contenu principal */}
-              <View 
-                style={[
-                  styles.modalBody,
-                  keyboardHeight > 0 && styles.modalBodyKeyboardVisible
-                ]}
-              >
-                {children}
-              </View>
-            </Animated.View>
+                  
+                  {/* Contenu principal */}
+                  <View 
+                    style={[
+                      styles.modalBody,
+                      keyboardHeight > 0 && styles.modalBodyKeyboardVisible
+                    ]}
+                  >
+                    {children}
+                  </View>
+                </Animated.View>
+              );
+            })()}
           </PanGestureHandler>
+          ) : (
+            (() => {
+              const contentStyle: ViewStyle = {
+                marginBottom: keyboardHeight > 0 ? keyboardHeight : 0,
+              };
+              if (keyboardAdjustedHeight ?? resolvedHeight) {
+                contentStyle.height = keyboardAdjustedHeight ?? resolvedHeight;
+              }
+              if (resolvedMaxHeight !== undefined && resolvedMaxHeight !== null) {
+                contentStyle.maxHeight = resolvedMaxHeight as DimensionValue;
+              }
+
+              return (
+                <Animated.View style={[styles.modalContent, contentStyle, style]}>
+                  {showHandle && (
+                    <View style={styles.handleContainer}>
+                      <View style={styles.handle} />
+                    </View>
+                  )}
+                  {(title || description) && (
+                    <View style={styles.modalHeader}>
+                      {title && (
+                        <Text style={styles.modalTitle}>{title}</Text>
+                      )}
+                      {description && (
+                        <Text style={styles.modalDescription}>{description}</Text>
+                      )}
+                    </View>
+                  )}
+                  <View 
+                    style={[
+                      styles.modalBody,
+                      keyboardHeight > 0 && styles.modalBodyKeyboardVisible
+                    ]}
+                  >
+                    {children}
+                  </View>
+                </Animated.View>
+              );
+            })()
+          )}
         </View>
       </Animated.View>
     </Modal>

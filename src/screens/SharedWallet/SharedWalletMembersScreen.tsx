@@ -3,26 +3,25 @@
  * Second step in shared wallet creation - direct contact selection
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Container, Header, Button } from '../../components/shared';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Button, Input, PhosphorIcon } from '../../components/shared';
+import Modal from '../../components/shared/Modal';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { logger } from '../../services/analytics/loggingService';
+import { logger, LogData } from '../../services/analytics/loggingService';
+import { SharedWalletService } from '../../services/sharedWallet';
 import ContactsList from '../../components/ContactsList';
 import type { UserContact } from '../../types';
 
-interface SharedWalletMembersScreenProps {
-  navigation: any;
-  route: any;
-}
-
-const SharedWalletMembersScreen: React.FC<SharedWalletMembersScreenProps> = () => {
-  const navigation = useNavigation();
-  const route = useRoute();
+const SharedWalletMembersScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { state } = useApp();
   const { currentUser } = state;
   const { appWalletAddress, ensureAppWallet } = useWallet();
@@ -33,6 +32,8 @@ const SharedWalletMembersScreen: React.FC<SharedWalletMembersScreenProps> = () =
   const walletAddress = appWalletAddress || currentUser?.wallet_address || '';
 
   const [selectedMembers, setSelectedMembers] = useState<UserContact[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<TextInput>(null);
 
   // Ensure app wallet is initialized
   useEffect(() => {
@@ -40,6 +41,19 @@ const SharedWalletMembersScreen: React.FC<SharedWalletMembersScreenProps> = () =
       ensureAppWallet(currentUser.id.toString());
     }
   }, [currentUser?.id, appWalletAddress, ensureAppWallet]);
+
+  const [visible, setVisible] = useState(true);
+
+  const closeSheet = useCallback(() => {
+    setVisible(false);
+    navigation.goBack();
+  }, [navigation]);
+
+  const handleBackToName = useCallback(() => {
+    navigation.replace('SharedWalletName', {
+      walletName,
+    });
+  }, [navigation, walletName]);
 
   const handleContactSelect = useCallback((contact: UserContact) => {
     // Don't allow selecting the creator
@@ -59,100 +73,166 @@ const SharedWalletMembersScreen: React.FC<SharedWalletMembersScreenProps> = () =
     });
   }, [currentUser?.id]);
 
-  const handleNext = useCallback(() => {
-    if (!currentUser || !walletAddress) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleNext = useCallback(async () => {
+    if (!currentUser || !walletAddress || isSubmitting) {
       return;
     }
 
-    logger.info('Proceeding to wallet creation', {
-      name: walletName,
-      selectedMembersCount: selectedMembers.length,
-      totalMembers: selectedMembers.length + 1
-    }, 'SharedWalletMembersScreen');
+    setIsSubmitting(true);
 
-    // Build initialMembers array - service will ensure creator is included
-    const initialMembers = selectedMembers.map(member => ({
-      userId: member.id.toString(),
-      name: member.name,
-      walletAddress: member.wallet_address || '',
-      role: 'member' as const,
-    }));
+    try {
+      logger.info('Proceeding to wallet creation', {
+        name: walletName,
+        selectedMembersCount: selectedMembers.length,
+        totalMembers: selectedMembers.length + 1
+      }, 'SharedWalletMembersScreen');
 
-    // Navigate to creation screen
-    navigation.navigate('SharedWalletCreation', {
-      walletName,
-      initialMembers: [
-        // Add creator as first member (service will validate this)
+      // Build initialMembers array - service will ensure creator is included
+      const initialMembers = [
         {
           userId: currentUser.id.toString(),
           name: currentUser.name || 'You',
           walletAddress: walletAddress,
           role: 'creator' as const,
         },
-        ...initialMembers
-      ],
-      creatorId: currentUser.id.toString(),
-      creatorName: currentUser.name || 'Unknown',
-      creatorWalletAddress: walletAddress,
-    });
-  }, [currentUser, walletAddress, walletName, selectedMembers, navigation]);
+        ...selectedMembers.map(member => ({
+          userId: member.id.toString(),
+          name: member.name,
+          walletAddress: member.wallet_address || '',
+          role: 'member' as const,
+        }))
+      ];
+
+      const result = await SharedWalletService.createSharedWallet({
+        name: walletName,
+        creatorId: currentUser.id.toString(),
+        creatorName: currentUser.name || 'Unknown',
+        creatorWalletAddress: walletAddress,
+        initialMembers,
+        currency: 'USDC',
+        settings: {
+          allowMemberInvites: true,
+          requireApprovalForWithdrawals: false,
+        },
+      });
+
+      if (result.success && result.wallet) {
+        navigation.replace('SharedWalletDetails', {
+          walletId: result.wallet.id,
+          wallet: result.wallet,
+          newlyCreated: true,
+        });
+      } else {
+        Alert.alert('Error', result.error || 'Failed to create shared wallet');
+      }
+    } catch (error) {
+      logger.error('Error creating shared wallet', error as LogData, 'SharedWalletMembersScreen');
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [currentUser, walletAddress, walletName, selectedMembers, navigation, isSubmitting]);
 
   return (
-    <Container>
-      <Header
-        title={`Add Members to "${walletName}"`}
-        subtitle={`${selectedMembers.length + 1} total members`}
-        onBackPress={() => navigation.goBack()}
-        showBackButton={true}
-        rightElement={
-          selectedMembers.length > 0 ? (
-            <TouchableOpacity
-              onPress={handleNext}
-              style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.green + '20', borderRadius: 8 }}
-            >
-              <Text style={{ color: colors.green, fontWeight: '600' }}>Continue</Text>
-            </TouchableOpacity>
-          ) : (
-            <Text style={{ color: colors.white50, fontSize: 14 }}>
-              Select members to continue
-            </Text>
-          )
-        }
-      />
-      <ContactsList
-        onContactSelect={handleContactSelect}
-        showAddButton={true}
-        showSearch={true}
-        showTabs={true}
-        multiSelect={true}
-        selectedContacts={selectedMembers}
-        placeholder="Search friends to add to your wallet..."
-      />
-
-      {/* Bottom Continue Button */}
-      {selectedMembers.length > 0 && (
-        <View style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: colors.black,
-          paddingHorizontal: spacing.md,
-          paddingBottom: spacing.lg + 20, // Extra padding for safe area
-          borderTopWidth: 1,
-          borderTopColor: colors.white10,
-        }}>
-          <Button
-            title={`Continue with ${selectedMembers.length} member${selectedMembers.length === 1 ? '' : 's'}`}
-            onPress={handleNext}
-            variant="primary"
-            size="large"
-            fullWidth
-          />
+    <Modal
+      visible={visible}
+      onClose={closeSheet}
+      showHandle
+      closeOnBackdrop
+      style={styles.modalContent}
+      maxHeight={800}
+      enableSwipe={false}
+    >
+      <SafeAreaView edges={['bottom']} style={styles.sheet}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.iconButtonTransparent} onPress={handleBackToName}>
+            <PhosphorIcon name="CaretLeft" size={22} color={colors.white} />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <Text style={styles.title}>Add Contact</Text>
+          </View>
+          <View style={styles.headerSpacer} />
         </View>
-      )}
-    </Container>
+
+        <Input
+          placeholder="Search"
+          leftIcon="MagnifyingGlass"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          containerStyle={styles.searchContainer}
+          inputRef={searchInputRef}
+        />
+
+        <ContactsList
+          onContactSelect={handleContactSelect}
+          showAddButton={false}
+          showSearch={false}
+          hideToggleBar
+          multiSelect
+          selectedContacts={selectedMembers}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          placeholder="Search contacts"
+        />
+
+        <Button
+          title="Continue"
+          onPress={handleNext}
+          variant="primary"
+          size="large"
+          fullWidth
+          disabled={selectedMembers.length === 0 || isSubmitting}
+          loading={isSubmitting}
+        />
+      </SafeAreaView>
+    </Modal>
   );
 };
+
+const styles = StyleSheet.create({
+  modalContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  sheet: {
+    flex: 1,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  iconButtonTransparent: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  title: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
+  },
+  searchContainer: {
+    marginTop: spacing.sm,
+  },
+  membersMeta: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  metaText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+  },
+});
 
 export default SharedWalletMembersScreen;

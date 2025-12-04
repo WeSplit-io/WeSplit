@@ -365,7 +365,7 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl + spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   // Shared Wallet Empty State - Clean and Minimalist
   sharedWalletEmptyState: {

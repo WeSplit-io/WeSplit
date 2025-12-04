@@ -358,7 +358,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     }
   }, [currentUser?.id]);
 
-  // Handle route params to set active tab (e.g., when navigating from CreateSharedWallet or SharedWalletDetails)
+  // Handle route params to set active tab (e.g., when navigating from SharedWalletName or SharedWalletDetails)
   // Only apply if user hasn't manually changed the tab and route params have changed
   // Also ensure sharedWallets tab is only available in dev mode
   useEffect(() => {
@@ -834,7 +834,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
 
   const handleCreateSharedWallet = useCallback(() => {
     try {
-      navigation.navigate('CreateSharedWallet');
+      navigation.navigate('SharedWalletName');
     } catch (err) {
       console.error('❌ SplitsListScreen: Error navigating to create shared wallet:', err);
       Alert.alert('Navigation Error', 'Failed to open create shared wallet screen');

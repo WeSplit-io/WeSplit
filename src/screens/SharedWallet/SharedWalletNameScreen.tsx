@@ -3,38 +3,38 @@
  * First step in shared wallet creation - name input with validation
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  View,
   Text,
-  ScrollView,
-  TouchableOpacity,
   Alert,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  TextInput,
+  Keyboard,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import {
-  Container,
   Button,
   Input,
-  Header,
 } from '../../components/shared';
+import Modal from '../../components/shared/Modal';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { logger } from '../../services/analytics/loggingService';
+import { logger, LogData } from '../../services/analytics/loggingService';
 
-interface SharedWalletNameScreenProps {
-  navigation: any;
-  route: any;
-}
+const SharedWalletNameScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
 
-const SharedWalletNameScreen: React.FC<SharedWalletNameScreenProps> = () => {
-  const navigation = useNavigation();
-
-  const [name, setName] = useState('');
+  const initialValue = route?.params?.walletName || '';
+  const [name, setName] = useState(initialValue);
   const [errors, setErrors] = useState<{ name?: string }>({});
   const [isValidating, setIsValidating] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const inputRef = useRef<TextInput>(null);
 
   const validateForm = useCallback((): boolean => {
     const newErrors: { name?: string } = {};
@@ -48,6 +48,26 @@ const SharedWalletNameScreen: React.FC<SharedWalletNameScreenProps> = () => {
     return Object.keys(newErrors).length === 0;
   }, [name]);
 
+  const handleClose = useCallback(() => {
+    setVisible(false);
+    navigation.goBack();
+  }, [navigation]);
+
+  useEffect(() => {
+    if (route?.params?.walletName) {
+      setName(route.params.walletName);
+    }
+  }, [route?.params?.walletName]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }, [])
+  );
+
   const handleNext = useCallback(async () => {
     if (!validateForm()) {
       return;
@@ -58,17 +78,23 @@ const SharedWalletNameScreen: React.FC<SharedWalletNameScreenProps> = () => {
     try {
       const trimmedName = name.trim();
 
-      logger.info('Shared wallet name validated', {
-        name: trimmedName
-      }, 'SharedWalletNameScreen');
+      logger.info(
+        'Shared wallet name validated',
+        { name: trimmedName } as LogData,
+        'SharedWalletNameScreen'
+      );
 
-      // Navigate to members screen with validated data
-      navigation.navigate('SharedWalletMembers', {
-        walletName: trimmedName,
+      Keyboard.dismiss();
+      setVisible(false);
+
+      requestAnimationFrame(() => {
+        navigation.navigate('SharedWalletMembers', {
+          walletName: trimmedName,
+        });
       });
 
     } catch (error) {
-      logger.error('Error validating shared wallet name', error, 'SharedWalletNameScreen');
+      logger.error('Error validating shared wallet name', error as LogData, 'SharedWalletNameScreen');
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setIsValidating(false);
@@ -76,171 +102,92 @@ const SharedWalletNameScreen: React.FC<SharedWalletNameScreenProps> = () => {
   }, [validateForm, name, navigation]);
 
   return (
-    <Container>
-      <Header
-        title="Create Shared Wallet"
-        subtitle="Step 1 of 3: Basic Information"
-        onBackPress={() => navigation.goBack()}
-        showBackButton={true}
-      />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollViewContent}
-        showsVerticalScrollIndicator={false}
+    <Modal
+      visible={visible}
+      onClose={handleClose}
+      showHandle
+      closeOnBackdrop
+      style={styles.modalContent}
+      maxHeight={350}
+      enableSwipe={false}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+        style={styles.keyboardAvoider}
       >
-        {/* Progress Indicator */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: '33%' }]} />
-          </View>
-          <View style={styles.stepIndicators}>
-            <View style={[styles.stepIndicator, styles.stepActive]}>
-              <Text style={[styles.stepText, styles.stepTextActive]}>1</Text>
-            </View>
-            <View style={styles.stepIndicator}>
-              <Text style={styles.stepText}>2</Text>
-            </View>
-            <View style={styles.stepIndicator}>
-              <Text style={styles.stepText}>3</Text>
-            </View>
-          </View>
-        </View>
+        <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+          <Text style={styles.title}>Shared wallet name</Text>
 
-        {/* Wallet Name Input */}
-        <Input
-          label="Wallet Name"
-          placeholder="Enter your wallet name"
-          value={name}
-          onChangeText={(text) => {
-            setName(text);
-            if (errors.name) {
-              setErrors(prev => ({ ...prev, name: undefined }));
-            }
-          }}
-          error={errors.name}
-          leftIcon="Wallet"
-          required
-          containerStyle={styles.inputContainer}
-          maxLength={100}
-        />
+          <Input
+            placeholder="Search"
+            value={name}
+            inputRef={inputRef}
+            onChangeText={(text) => {
+              setName(text);
+              if (errors.name) {
+                setErrors(prev => ({ ...prev, name: undefined }));
+              }
+            }}
+            error={errors.name}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleNext}
+            containerStyle={styles.inputContainer}
+            maxLength={100}
+          />
 
-        {/* Example Suggestions */}
-        <View style={styles.examplesContainer}>
-          <Text style={styles.examplesLabel}>Examples:</Text>
-          <View style={styles.examplesList}>
-            {['Trip to Bali', 'Apartment Rent', 'Party Fund', 'Family Vacation', 'Business Trip', 'Concert Tickets'].map((example, index) => (
-              <TouchableOpacity
-                key={example}
-                style={styles.exampleChip}
-                onPress={() => setName(example)}
-              >
-                <Text style={styles.exampleText}>{example}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+          <Text style={styles.examplesText}>
+            E.g "Trip", "Breakpoint", "Secret Project", ...
+          </Text>
 
-        {/* Next Button */}
-        <Button
-          title="Next: Add Members"
-          onPress={handleNext}
-          variant="primary"
-          size="large"
-          disabled={isValidating || !name.trim()}
-          loading={isValidating}
-          fullWidth
-          style={styles.nextButton}
-          icon="ArrowRight"
-          iconPosition="right"
-        />
-      </ScrollView>
-    </Container>
+          <Button
+            title="Continue"
+            onPress={handleNext}
+            variant="primary"
+            size="large"
+            disabled={isValidating || !name.trim()}
+            loading={isValidating}
+            fullWidth
+            style={styles.button}
+          />
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    padding: spacing.md,
+  modalContent: {
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
+    minHeight: undefined,
+  },
+  safeArea: {
+    justifyContent: 'flex-start',
     gap: spacing.md,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.lg,
   },
-  progressContainer: {
-    marginBottom: spacing.lg,
+  keyboardAvoider: {
+    width: '100%',
   },
-  progressBar: {
-    height: 4,
-    backgroundColor: colors.white10,
-    borderRadius: 2,
-    marginBottom: spacing.sm,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.green,
-    borderRadius: 2,
-  },
-  stepIndicators: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  stepIndicator: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.white10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.white20,
-  },
-  stepActive: {
-    backgroundColor: colors.green,
-    borderColor: colors.green,
-  },
-  stepText: {
-    fontSize: typography.fontSize.sm,
+  title: {
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.white70,
-  },
-  stepTextActive: {
     color: colors.white,
+    textAlign: 'center',
   },
   inputContainer: {
-    marginBottom: spacing.sm,
-  },
-  nextButton: {
-    marginTop: spacing.md,
-  },
-  examplesContainer: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  examplesLabel: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white70,
     marginBottom: spacing.xs,
   },
-  examplesList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  exampleChip: {
-    backgroundColor: colors.white10,
-    borderRadius: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
-    borderWidth: 1,
-    borderColor: colors.white20,
-  },
-  exampleText: {
+  examplesText: {
     fontSize: typography.fontSize.sm,
-    color: colors.white,
-    fontWeight: typography.fontWeight.medium,
+    color: colors.white70,
+    textAlign: 'left',
+  },
+  button: {
+    marginTop: spacing.lg,
   },
 });
 

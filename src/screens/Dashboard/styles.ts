@@ -534,6 +534,19 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   
+  // Shared Wallets Section
+  sharedWalletsSection: {
+    marginTop: spacing.lg,
+  },
+  
+  sharedWalletsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingBottom: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+  },
   
 }); 
 

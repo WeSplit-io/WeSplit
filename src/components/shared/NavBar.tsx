@@ -178,10 +178,9 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
   const handleCreateSharedWallet = () => {
     if (!navigation) return;
     try {
-      // Navigate to CreateSharedWallet screen (to be created)
-      navigation.navigate('CreateSharedWallet' as never, {} as never);
+      navigation.navigate('SharedWalletName' as never, {} as never);
     } catch (error) {
-      logger.error('NavBar: Error navigating to CreateSharedWallet', { error: error as Record<string, unknown> }, 'NavBar');
+      logger.error('NavBar: Error navigating to SharedWalletName', { error: error as Record<string, unknown> }, 'NavBar');
     }
   };
 

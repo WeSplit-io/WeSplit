@@ -54,6 +54,8 @@ import { authService } from '../../services/auth/AuthService';
 import { normalizePhoneNumber } from '../../utils/validation/phone';
 import { getAssetInfo } from '../../services/rewards/assetConfig';
 import { resolveStorageUrl } from '../../services/shared/storageUrlService';
+import SharedWalletGridCard from '../../components/SharedWalletGridCard';
+import { SharedWalletService, SharedWallet } from '../../services/sharedWallet';
 
 
 
@@ -127,6 +129,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [walletBackgroundUrl, setWalletBackgroundUrl] = useState<string | null>(null);
   const [backgroundError, setBackgroundError] = useState(false);
+  const [sharedWallets, setSharedWallets] = useState<SharedWallet[]>([]);
+  const [isLoadingSharedWallets, setIsLoadingSharedWallets] = useState(false);
 
   // Loading States
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -815,6 +819,34 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Removed group amount conversion logic
 
+  // Load shared wallets
+  const loadSharedWallets = useCallback(async () => {
+    if (!currentUser?.id || isLoadingSharedWallets) { return; }
+
+    setIsLoadingSharedWallets(true);
+    try {
+      const result = await SharedWalletService.getUserSharedWallets(currentUser.id.toString());
+      if (result.success && result.wallets) {
+        // Sort by updatedAt (most recently used) and take the 2 most recent
+        const sortedWallets = result.wallets
+          .sort((a, b) => {
+            const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+            const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+            return dateB - dateA; // Most recent first
+          })
+          .slice(0, 2); // Only take the 2 most recent
+        setSharedWallets(sortedWallets);
+      } else {
+        setSharedWallets([]);
+      }
+    } catch (error) {
+      logger.error('Error loading shared wallets', error, 'DashboardScreen');
+      setSharedWallets([]);
+    } finally {
+      setIsLoadingSharedWallets(false);
+    }
+  }, [currentUser?.id, isLoadingSharedWallets]);
+
   // Load payment requests
   const loadPaymentRequests = useCallback(async () => {
     if (!currentUser?.id || loadingPaymentRequests) { return; }
@@ -1026,7 +1058,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             Promise.allSettled([
               loadTransactions(),
               loadPaymentRequests(),
-              loadNotifications()
+              loadNotifications(),
+              loadSharedWallets()
             ]).finally(() => {
               setHasInitialLoad(true);
               hasLoadedRef.current = true;
@@ -1080,7 +1113,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         refreshWallet(),
         refreshNotifications(),
         loadTransactions(),
-        loadPaymentRequests()
+        loadPaymentRequests(),
+        loadSharedWallets()
       ]);
 
       // Log any failures
@@ -1561,6 +1595,32 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
 
 
+
+        {/* Shared Wallets Section */}
+        {sharedWallets.length > 0 && (
+          <View style={styles.sharedWalletsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Shared Wallets</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('SplitsList', { activeTab: 'sharedWallets' })}
+              >
+                <Text style={styles.seeAllText}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.sharedWalletsGrid}>
+              {sharedWallets.map((wallet, index) => (
+                <SharedWalletGridCard
+                  key={wallet.id}
+                  wallet={wallet}
+                  onPress={(wallet) => {
+                    navigation.navigate('SharedWalletDetails', { sharedWalletId: wallet.id });
+                  }}
+                  colorIndex={index}
+                />
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Combined Activities Section */}
         <View style={styles.requestsSection}>

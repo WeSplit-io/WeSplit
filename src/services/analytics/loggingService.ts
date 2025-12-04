@@ -11,7 +11,7 @@ export interface LogLevel {
 }
 
 // Log data can be any serializable object
-type LogData = Record<string, unknown> | unknown[] | string | number | boolean | null | undefined;
+export type LogData = Record<string, unknown> | unknown[] | string | number | boolean | null | undefined;
 
 export interface LogEntry {
   level: string;

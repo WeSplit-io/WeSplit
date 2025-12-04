@@ -34,6 +34,7 @@ interface InputProps extends Omit<TextInputProps, 'style'> {
   disabled?: boolean;
   required?: boolean;
   variant?: 'default' | 'filled';
+  inputRef?: React.RefObject<TextInput | null>;
 }
 
 const Input: React.FC<InputProps> = ({
@@ -50,10 +51,12 @@ const Input: React.FC<InputProps> = ({
   disabled = false,
   required: _required = false,
   variant = 'default',
+  inputRef,
   ...textInputProps
 }) => {
   const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const internalRef = useRef<TextInput>(null);
+  const textInputRef = inputRef || internalRef;
 
   const handleFocus = (event: Parameters<NonNullable<TextInputProps['onFocus']>>[0]) => {
     setIsFocused(true);
@@ -66,8 +69,8 @@ const Input: React.FC<InputProps> = ({
   };
 
   const handlePressOutside = () => {
-    if (inputRef.current && isFocused) {
-      inputRef.current.blur();
+    if (textInputRef.current && isFocused) {
+      textInputRef.current.blur();
     }
   };
 
@@ -166,7 +169,7 @@ const Input: React.FC<InputProps> = ({
 
           {/* Text Input */}
           <TextInput
-            ref={inputRef}
+            ref={textInputRef}
             style={[getInputStyle(), inputStyle]}
             placeholder={placeholder}
             placeholderTextColor={colors.white50}

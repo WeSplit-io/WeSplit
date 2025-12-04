@@ -14,12 +14,15 @@ import { typography } from '../theme/typography';
 import type { SharedWallet } from '../services/sharedWallet';
 
 // Calculate card width for 2 columns
-// Use percentage-based width to ensure 2 cards per row
+// Account for container padding and gap between cards
 const getCardWidth = () => {
   const { width: SCREEN_WIDTH } = Dimensions.get('window');
-  // Use 48% width per card to ensure 2 fit per row with margins
-  // This accounts for all padding and gaps automatically
-  return SCREEN_WIDTH * 0.42;
+  // Container has paddingHorizontal: spacing.md (16px each side = 32px total)
+  // Gap between cards: spacing.xs (4px)
+  // Formula: (screen width - container padding - gap) / 2
+  const containerPadding = spacing.md * 2; // left + right padding
+  const gap = spacing.sm; // gap between cards
+  return (SCREEN_WIDTH - containerPadding - (gap * 2)) / 2;
 };
 
 interface SharedWalletGridCardProps {
@@ -45,9 +48,6 @@ const SharedWalletGridCard: React.FC<SharedWalletGridCardProps> = ({
 }) => {
   // Calculate card width dynamically
   const cardWidth = useMemo(() => getCardWidth(), []);
-  
-  // Determine if this is an odd-indexed card (left column) - add marginRight
-  const isLeftColumn = useMemo(() => colorIndex % 2 === 0, [colorIndex]);
   
   // Get wallet color - use customColor if available, otherwise cycle through default colors
   const walletColor = useMemo(() => {
@@ -94,9 +94,8 @@ const SharedWalletGridCard: React.FC<SharedWalletGridCardProps> = ({
     ...styles.card,
     backgroundColor: walletColor,
     width: cardWidth,
-    marginRight: isLeftColumn ? spacing.md : 0,
     marginBottom: spacing.md,
-  }), [walletColor, cardWidth, isLeftColumn]);
+  }), [walletColor, cardWidth]);
 
   return (
     <TouchableOpacity
@@ -155,6 +154,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.white10,
+    alignSelf: 'center',
 
 
   },
