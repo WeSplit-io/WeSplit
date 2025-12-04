@@ -443,6 +443,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     walletAddress: string | null;
     currentUser: any;
     setShowQRCodeScreen: (show: boolean) => void;
+    textColor: string;
   }> = ({
     isBalanceHidden,
     setIsBalanceHidden,
@@ -451,12 +452,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     effectiveBalance,
     walletAddress,
     currentUser,
-    setShowQRCodeScreen
+    setShowQRCodeScreen,
+    textColor
   }) => (
       <>
         <View style={styles.balanceHeader}>
           <View style={styles.balanceHeaderContent}>
-            <Text style={styles.balanceLabel}>
+            <Text style={[styles.balanceLabel, { color: textColor }]}>
               WeSplit Balance
             </Text>
             <TouchableOpacity
@@ -464,9 +466,9 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               style={{ padding: 4, marginLeft: 8 }}
             >
               {isBalanceHidden ? (
-                <EyeSlash size={20} color={colors.white} />
+                <EyeSlash size={20} color={textColor} />
               ) : (
-                <Eye size={20} color={colors.white} />
+                <Eye size={20} color={textColor} />
               )}
             </TouchableOpacity>
           </View>
@@ -476,7 +478,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               style={styles.qrCodeIcon}
               onPress={() => setShowQRCodeScreen(true)}
             >
-              <QrCode size={30} color={colors.white} />
+              <QrCode size={30} color={textColor} />
             </TouchableOpacity>
           </View>
         </View>
@@ -485,10 +487,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           <View style={{ flex: 1, alignItems: 'flex-start' }}>
             {walletLoading || liveBalanceLoading ? (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <ActivityIndicator size="small" color={colors.white} style={{ marginRight: 8 }} />
+                <ActivityIndicator size="small" color={textColor} style={{ marginRight: 8 }} />
               </View>
             ) : (
-              <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
+              <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start', color: textColor }]}>
                 {isBalanceHidden ? '$--.--' : `$ ${effectiveBalance.toFixed(2)}`}
               </Text>
             )}
@@ -500,12 +502,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           style={styles.walletAddressContainer}
           onPress={() => copyWalletAddress(walletAddress || currentUser?.wallet_address || '')}
         >
-          <Text style={styles.balanceLimitText}>
+          <Text style={[styles.balanceLimitText, { color: textColor }]}>
             {hashWalletAddress(walletAddress || currentUser?.wallet_address || '')}
           </Text>
           <Copy
             size={20}
-            color={colors.white}
+            color={textColor}
             style={styles.copyIcon}
           />
         </TouchableOpacity>
@@ -1389,6 +1391,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           // Handle SVG backgrounds with special styling
           const isSvgBackground = walletBackgroundUrl && walletBackgroundUrl.includes('.svg') && !backgroundError;
           const backgroundAssetId = currentUser?.active_wallet_background;
+          
+          // Get text color from asset config
+          const assetInfo = backgroundAssetId ? getAssetInfo(backgroundAssetId) : null;
+          const textColorValue = assetInfo?.textColor || 'white';
+          const textColor = textColorValue === 'black' ? colors.black : colors.white;
 
           if (isSvgBackground) {
             // Render SVG as background using SvgUri
@@ -1428,6 +1435,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                   walletAddress={walletAddress}
                   currentUser={currentUser}
                   setShowQRCodeScreen={setShowQRCodeScreen}
+                  textColor={textColor}
                 />
               </View>
             );
@@ -1463,6 +1471,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                   walletAddress={walletAddress}
                   currentUser={currentUser}
                   setShowQRCodeScreen={setShowQRCodeScreen}
+                  textColor={textColor}
                 />
               </ImageBackground>
             );

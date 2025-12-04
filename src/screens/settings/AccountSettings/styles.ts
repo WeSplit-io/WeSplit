@@ -125,4 +125,47 @@ export default StyleSheet.create({
   saveButtonTextDisabled: {
     color: colors.white50,
   },
+  updateProfileText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  tabsContainer: {
+    marginBottom: spacing.lg,
+  },
+  tabsWrapper: {
+    flexDirection: 'row',
+    width: '100%',
+  },
+  tabItem: {
+    flex: 1,
+    position: 'relative',
+    paddingBottom: spacing.sm,
+    alignItems: 'center',
+  },
+  tabItemActive: {
+    // Active state handled by indicator
+  },
+  tabText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white70,
+  },
+  tabTextActive: {
+    color: colors.white,
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: -spacing.xs - 1,
+    left: 0,
+    right: 0,
+    height: 2,
+  },
+  tabUnderline: {
+    width: '100%',
+    height: 1,
+    backgroundColor: colors.white10,
+    marginTop: spacing.xs,
+  },
 }); 

@@ -256,6 +256,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   modalHeader: {
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
   },
   modalTitle: {
