@@ -4,9 +4,11 @@
  * Uses thin, minimalist Phosphor icons with improved UX/UI
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
-import { PhosphorIcon, PhosphorIconName } from '../shared';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import type { ImagePickerSuccessResult } from 'expo-image-picker';
+import { Button, PhosphorIcon, PhosphorIconName } from '../shared';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -74,7 +76,7 @@ const LOGO_CATEGORIES: Array<{
       { name: 'Sparkle', label: 'Sparkle' },
       { name: 'Lightning', label: 'Energy' },
       { name: 'Target', label: 'Target' },
-      { name: 'Circle', label: 'Circle' },
+      { name: 'Record', label: 'Record' },
     ],
   },
 ];
@@ -83,121 +85,86 @@ const LogoPicker: React.FC<LogoPickerProps> = ({
   selectedLogo,
   onSelectLogo,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set([LOGO_CATEGORIES[0].name]) // Expand first category by default
+  const [uploadedImage, setUploadedImage] = useState<string | null>(
+    selectedLogo && selectedLogo.startsWith('http') ? selectedLogo : null
   );
 
-  // Filter icons based on search query
-  const filteredCategories = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return LOGO_CATEGORIES;
-    }
+  const iconOptions = useMemo(
+    () => LOGO_CATEGORIES.flatMap((category) => category.icons),
+    []
+  );
 
-    const query = searchQuery.toLowerCase();
-    return LOGO_CATEGORIES.map(category => ({
-      ...category,
-      icons: category.icons.filter(icon => 
-        icon.label.toLowerCase().includes(query) ||
-        icon.name.toLowerCase().includes(query)
-      ),
-    })).filter(category => category.icons.length > 0);
-  }, [searchQuery]);
-
-  // Auto-expand categories when searching
   useEffect(() => {
-    if (searchQuery.trim()) {
-      const matchingCategories = new Set(
-        filteredCategories.map(cat => cat.name)
-      );
-      setExpandedCategories(matchingCategories);
+    if (!selectedLogo || selectedLogo.startsWith('http')) {
+      setUploadedImage(selectedLogo ?? null);
+    } else {
+      setUploadedImage(null);
     }
-  }, [searchQuery, filteredCategories]);
+  }, [selectedLogo]);
 
-  const toggleCategory = (categoryName: string) => {
-    setExpandedCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(categoryName)) {
-        next.delete(categoryName);
-      } else {
-        next.add(categoryName);
-      }
-      return next;
+  const handlePickImage = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow access to your photo library to upload an icon.');
+      return;
+    }
+
+    const pickerMediaTypes =
+      (ImagePicker as any).MediaType?.Image
+        ? [(ImagePicker as any).MediaType.Image]
+        : ImagePicker.MediaTypeOptions.Images;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: pickerMediaTypes as any,
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1],
     });
-  };
 
-  const expandAll = () => {
-    setExpandedCategories(new Set(filteredCategories.map(cat => cat.name)));
-  };
+    if (result.canceled) {
+      return;
+    }
 
-  const collapseAll = () => {
-    setExpandedCategories(new Set());
-  };
+    const successResult = result as ImagePickerSuccessResult;
+    if (!successResult.assets.length) {
+      return;
+    }
+
+    const [asset] = successResult.assets;
+    if (!asset?.uri) {
+      return;
+    }
+
+    const uri = asset.uri;
+    setUploadedImage(uri);
+    onSelectLogo(uri);
+  }, [onSelectLogo]);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.label}>Select Logo</Text>
-        {selectedLogo && (
-          <View style={styles.selectedBadge}>
-            <PhosphorIcon
-              name={selectedLogo as PhosphorIconName}
-              size={14}
-              color={colors.green}
-              weight="bold"
-            />
-            <Text style={styles.selectedBadgeText}>Selected</Text>
-          </View>
-        )}
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <PhosphorIcon
-          name="Circle"
-          size={16}
-          color={colors.white50}
-          weight="regular"
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search icons..."
-          placeholderTextColor={colors.white50}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
+      <Button
+        title={uploadedImage ? 'Change uploaded icon' : 'Upload custom image'}
+        onPress={handlePickImage}
+        variant="secondary"
+        icon="ImageSquare"
+        fullWidth={false}
+        style={styles.uploadButton}
+      />
+
+      {uploadedImage && (
+        <View style={styles.uploadPreview}>
+          <Image source={{ uri: uploadedImage }} style={styles.uploadPreviewImage} resizeMode="contain" />
           <TouchableOpacity
-            onPress={() => setSearchQuery('')}
-            style={styles.clearButton}
-            activeOpacity={0.7}
+            style={styles.uploadPreviewRemove}
+            onPress={() => {
+              setUploadedImage(null);
+              onSelectLogo('');
+            }}
           >
-            <PhosphorIcon
-              name="X"
-              size={14}
-              color={colors.white50}
-              weight="bold"
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-      
-      {/* Expand/Collapse Controls */}
-      {filteredCategories.length > 0 && !searchQuery && (
-        <View style={styles.controlsRow}>
-          <TouchableOpacity
-            onPress={expandAll}
-            style={styles.controlButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.controlButtonText}>Expand All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={collapseAll}
-            style={styles.controlButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.controlButtonText}>Collapse All</Text>
+            <PhosphorIcon name="Trash" size={14} color={colors.red} weight="bold" />
           </TouchableOpacity>
         </View>
       )}
@@ -207,10 +174,10 @@ const LogoPicker: React.FC<LogoPickerProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {filteredCategories.length === 0 ? (
+        {iconOptions.length === 0 ? (
           <View style={styles.emptyState}>
             <PhosphorIcon
-              name="Circle"
+              name="MagnifyingGlass"
               size={32}
               color={colors.white50}
               weight="thin"
@@ -219,65 +186,32 @@ const LogoPicker: React.FC<LogoPickerProps> = ({
             <Text style={styles.emptyStateSubtext}>Try a different search term</Text>
           </View>
         ) : (
-          filteredCategories.map((category) => {
-            const isExpanded = expandedCategories.has(category.name);
-            return (
-              <View key={category.name} style={styles.categorySection}>
+          <View style={styles.iconCloud}>
+            {iconOptions.map((iconOption) => {
+              const isSelected = selectedLogo === iconOption.name;
+              return (
                 <TouchableOpacity
-                  style={styles.categoryHeader}
-                  onPress={() => toggleCategory(category.name)}
-                  activeOpacity={0.7}
+                  key={iconOption.name}
+                  style={[
+                    styles.iconChip,
+                    isSelected && styles.iconChipSelected,
+                  ]}
+                  onPress={() => {
+                    setUploadedImage(null);
+                    onSelectLogo(iconOption.name);
+                  }}
+                  activeOpacity={0.6}
                 >
-                  <View style={styles.categoryHeaderLeft}>
-                    <PhosphorIcon
-                      name={isExpanded ? "ChevronDown" : "ChevronRight"}
-                      size={14}
-                      color={colors.white70}
-                      weight="bold"
-                    />
-                    <Text style={styles.categoryName}>{category.name}</Text>
-                  </View>
-                  <Text style={styles.categoryCount}>{category.icons.length}</Text>
+                  <PhosphorIcon
+                    name={iconOption.name}
+                    size={32}
+                    color={isSelected ? colors.green : colors.white}
+                    weight='regular'
+                  />
                 </TouchableOpacity>
-                
-                {isExpanded && (
-                  <View style={styles.iconGrid}>
-                    {category.icons.map((iconOption, index) => {
-                      const isSelected = selectedLogo === iconOption.name;
-                      return (
-                        <TouchableOpacity
-                          key={`${category.name}-${index}`}
-                          style={[
-                            styles.iconOption,
-                            isSelected && styles.iconOptionSelected,
-                          ]}
-                          onPress={() => onSelectLogo(iconOption.name)}
-                          activeOpacity={0.6}
-                        >
-                          <PhosphorIcon
-                            name={iconOption.name}
-                            size={24}
-                            color={isSelected ? colors.green : colors.white70}
-                            weight={isSelected ? 'bold' : 'thin'}
-                          />
-                          {isSelected && (
-                            <View style={styles.selectedIndicator}>
-                              <PhosphorIcon
-                                name="Check"
-                                size={12}
-                                color={colors.green}
-                                weight="bold"
-                              />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            );
-          })
+              );
+            })}
+          </View>
         )}
       </ScrollView>
     </View>
@@ -287,6 +221,31 @@ const LogoPicker: React.FC<LogoPickerProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: spacing.md,
+  },
+  uploadButton: {
+    alignSelf: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  uploadPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.md,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.white10,
+  },
+  uploadPreviewImage: {
+    width: 100,
+    height: 100,
+    borderRadius: spacing.sm,
+  },
+  uploadPreviewRemove: {
+    padding: spacing.xs,
+    backgroundColor: colors.white10,
+    borderRadius: spacing.sm,
   },
   header: {
     flexDirection: 'row',
@@ -299,62 +258,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
   },
-  selectedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs / 2,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
-    backgroundColor: colors.greenBlue20,
-    borderRadius: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.green + '40',
-  },
-  selectedBadgeText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.green,
-    fontWeight: typography.fontWeight.medium,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white5,
-    borderRadius: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white10,
-    gap: spacing.xs,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: typography.fontSize.sm,
-    color: colors.white,
-    paddingVertical: spacing.xs / 2,
-  },
-  clearButton: {
-    padding: spacing.xs / 2,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-    justifyContent: 'flex-end',
-  },
-  controlButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
-    backgroundColor: colors.white5,
-    borderRadius: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.white10,
-  },
-  controlButtonText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white70,
-    fontWeight: typography.fontWeight.medium,
-  },
   scrollView: {
     maxHeight: 400,
   },
@@ -362,72 +265,30 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingBottom: spacing.sm,
   },
-  categorySection: {
-    marginBottom: spacing.sm,
-    backgroundColor: colors.white5,
-    borderRadius: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.white10,
-    overflow: 'hidden',
-  },
-  categoryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-  },
-  categoryHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    flex: 1,
-  },
-  categoryName: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.white70,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  categoryCount: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white50,
-    fontWeight: typography.fontWeight.medium,
-  },
-  iconGrid: {
+  iconCloud: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.md,
   },
-  iconOption: {
-    width: 64,
-    height: 64,
+  iconChip: {
+    width: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
     borderRadius: spacing.sm,
-    backgroundColor: colors.white10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: colors.white5,
+    gap: spacing.xs,
+  },
+  iconChipSelected: {
+    backgroundColor: colors.white5,
     borderWidth: 1,
-    borderColor: colors.white10,
-    position: 'relative',
-  },
-  iconOptionSelected: {
-    backgroundColor: colors.greenBlue20,
     borderColor: colors.green,
-    borderWidth: 2,
   },
-  selectedIndicator: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: colors.green,
-    justifyContent: 'center',
-    alignItems: 'center',
+  iconLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+    textAlign: 'center',
   },
   emptyState: {
     alignItems: 'center',

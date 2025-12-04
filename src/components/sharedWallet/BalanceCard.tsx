@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { PhosphorIcon, PhosphorIconName } from '../shared';
 import { formatBalance } from '../../utils/ui/format/formatUtils';
 import { colors } from '../../theme/colors';
@@ -31,27 +31,27 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
   customLogo,
 }) => {
   // Check if customLogo is a URL (starts with http) or a Phosphor icon name
-  const isLogoUrl = customLogo?.startsWith('http');
+  const isLogoUrl = customLogo?.startsWith('http') || customLogo?.startsWith('file:');
   const isPhosphorIcon = customLogo && !isLogoUrl;
 
   return (
     <View style={[styles.balanceCard, customColor && { backgroundColor: customColor + '20' }]}>
-      {customLogo && (
-        <View style={styles.logoContainer}>
-          {isLogoUrl ? (
-            // Custom URL logo (future support)
-            <Text style={styles.logoText}>{customLogo}</Text>
+      <View style={styles.logoContainer}>
+        {customLogo ? (
+          isLogoUrl ? (
+            <Image source={{ uri: customLogo }} style={styles.logoImage} resizeMode="contain" />
           ) : isPhosphorIcon ? (
-            // Phosphor icon
             <PhosphorIcon
               name={customLogo as PhosphorIconName}
               size={28}
               color={customColor || colors.green}
               weight="bold"
             />
-          ) : null}
-        </View>
-      )}
+          ) : null
+        ) : (
+          <PhosphorIcon name="Cards" size={28} color={customColor || colors.green} weight="bold" />
+        )}
+      </View>
       <Text style={styles.balanceLabel}>Total Balance</Text>
       <Text style={styles.balanceValue}>
         {formatBalance(balance, currency)}
@@ -83,8 +83,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoText: {
-    fontSize: 32,
+  logoImage: {
+    width: 48,
+    height: 48,
   },
   balanceLabel: {
     fontSize: typography.fontSize.xs,

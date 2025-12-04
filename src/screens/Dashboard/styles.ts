@@ -544,7 +544,7 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   
 }); 

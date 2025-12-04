@@ -14,25 +14,28 @@ interface TabSecondaryProps {
   tabs: TabSecondaryItem[];
   activeTab: string;
   onTabChange: (tab: string) => void;
+  fullWidthTabs?: boolean;
 }
 
 const TabSecondary: React.FC<TabSecondaryProps> = ({
   tabs,
   activeTab,
   onTabChange,
+  fullWidthTabs = false,
 }) => {
   return (
     <View style={styles.wrapper}>
-      <View style={styles.container}>
+      <View style={[styles.container, fullWidthTabs && styles.containerFullWidth]}>
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.value}
-            style={styles.tab}
+            style={[styles.tab, fullWidthTabs && styles.tabFullWidth]}
             onPress={() => onTabChange(tab.value)}
           >
             <Text
               style={[
                 styles.text,
+                fullWidthTabs && styles.textCentered,
                 activeTab === tab.value && styles.textActive,
               ]}
             >
@@ -64,15 +67,26 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     gap: spacing.lg,
   },
+  containerFullWidth: {
+    gap: spacing.sm,
+  },
   tab: {
     position: 'relative',
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
   },
+  tabFullWidth: {
+    flex: 1,
+    alignItems: 'center',
+  },
   text: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     color: colors.white70,
+  },
+  textCentered: {
+    textAlign: 'center',
+    width: '100%',
   },
   textActive: {
     color: colors.white,

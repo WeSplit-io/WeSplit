@@ -11,4 +11,5 @@ export type { UnifiedTransaction } from './TransactionHistoryItem';
 export { default as MembersList } from './MembersList';
 export { default as LogoPicker } from './LogoPicker';
 export { default as ColorPicker } from './ColorPicker';
+export { default as GoalProgress } from './GoalProgress';
 

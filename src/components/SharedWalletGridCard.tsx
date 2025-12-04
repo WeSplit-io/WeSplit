@@ -5,7 +5,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PhosphorIcon } from './shared';
@@ -19,7 +19,7 @@ const CARD_ASPECT_RATIO = 0.8; // shorter cards
 const CARD_WIDTH_SCALE = 1; // make cards slightly narrower than their column
 const getCardDimensions = () => {
   const { width: SCREEN_WIDTH } = Dimensions.get('window');
-  const containerPadding = spacing.screenPaddingHorizontal * 2;
+  const containerPadding = spacing.lg * 2;
   const interCardGap = spacing.sm; // single gap between 2 columns
   const baseWidth = (SCREEN_WIDTH - containerPadding - interCardGap) / 2;
   const cardWidth = baseWidth * CARD_WIDTH_SCALE;
@@ -34,6 +34,8 @@ interface SharedWalletGridCardProps {
   onPress?: (wallet: SharedWallet) => void;
   colorIndex?: number;
   style?: StyleProp<ViewStyle>;
+  variant?: 'grid' | 'hero';
+  heroSubtitle?: string;
 }
 
 // Array of wallet colors for customization
@@ -51,6 +53,8 @@ const SharedWalletGridCard: React.FC<SharedWalletGridCardProps> = ({
   onPress,
   colorIndex = 0,
   style,
+  variant = 'grid',
+  heroSubtitle = 'Total Balance',
 }) => {
   // Calculate card size dynamically to avoid vertical stretching
   const cardDimensions = useMemo(() => getCardDimensions(), []);
@@ -85,11 +89,14 @@ const SharedWalletGridCard: React.FC<SharedWalletGridCardProps> = ({
   const formattedBalance = useMemo(() => formatBalance(wallet.totalBalance), [formatBalance, wallet.totalBalance]);
 
   // Get wallet icon
+  const isLogoImage =
+    typeof wallet.customLogo === 'string' &&
+    (wallet.customLogo.startsWith('http') || wallet.customLogo.startsWith('file:'));
   const walletIcon = useMemo(() => {
     if (wallet.customLogo && !wallet.customLogo.startsWith('http')) {
       return wallet.customLogo as any;
     }
-    return 'House';
+    return 'Cards';
   }, [wallet.customLogo]);
 
   const handlePress = useCallback(() => {
@@ -112,6 +119,8 @@ const SharedWalletGridCard: React.FC<SharedWalletGridCardProps> = ({
     [walletColor, cardDimensions.height, cardDimensions.width, style]
   );
 
+  const isHero = variant === 'hero';
+
   return (
     <TouchableOpacity
       style={cardStyle}
@@ -133,27 +142,49 @@ const SharedWalletGridCard: React.FC<SharedWalletGridCardProps> = ({
           ]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
-          style={styles.gradientOverlay}
+          style={[styles.gradientOverlay, isHero && styles.heroGradientOverlay]}
         >
         {/* Icon */}
-        <View style={styles.iconContainer}>
-          <PhosphorIcon
-            name={walletIcon}
-            size={24}
-            color={colors.white}
-            weight="regular"
-          />
+        <View style={[styles.iconContainer, isHero && styles.heroIconContainer]}>
+          {isLogoImage && wallet.customLogo ? (
+            <Image
+              source={{ uri: wallet.customLogo }}
+              style={styles.iconImageFill}
+            />
+          ) : (
+            <View style={[styles.iconFallback, isHero && styles.iconFallbackHero]}>
+              <PhosphorIcon
+                name={walletIcon}
+                size={isHero ? 32 : 20}
+                color={colors.white}
+                weight={isHero ? 'fill' : 'regular'}
+              />
+            </View>
+          )}
         </View>
 
-        {/* Wallet Name */}
-        <Text style={styles.walletName} numberOfLines={1}>
-          {wallet.name}
-        </Text>
+        {isHero ? (
+          <>
+            <Text style={styles.heroBalance} numberOfLines={1}>
+              {formattedBalance}
+            </Text>
+            <Text style={styles.heroSubtitle} numberOfLines={1}>
+              {heroSubtitle}
+            </Text>
+          </>
+        ) : (
+          <>
+            {/* Wallet Name */}
+            <Text style={styles.walletName} numberOfLines={1}>
+              {wallet.name}
+            </Text>
 
-        {/* Balance */}
-        <Text style={styles.balance} numberOfLines={1}>
-          {formattedBalance}
-        </Text>
+            {/* Balance */}
+            <Text style={styles.balance} numberOfLines={1}>
+              {formattedBalance}
+            </Text>
+          </>
+        )}
         </LinearGradient>
       </View>
     </TouchableOpacity>
@@ -205,14 +236,37 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     padding: spacing.md,
   },
+  heroGradientOverlay: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   iconContainer: {
     marginBottom: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: colors.black15,
     borderRadius: spacing.sm,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-start',
+    width: 40,
+    height: 40,
+    backgroundColor: colors.black15,
+  },
+  heroIconContainer: {
+    alignSelf: 'center',
+  },
+  iconImageFill: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  iconFallback: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconFallbackHero: {
+    backgroundColor: colors.black20,
   },
   walletName: {
     fontSize: typography.fontSize.md,
@@ -224,6 +278,18 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
+  },
+  heroBalance: {
+    fontSize: typography.fontSize.xxl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    textAlign: 'center',
+    marginBottom: spacing.xs / 2,
+  },
+  heroSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white80,
+    textAlign: 'center',
   },
 });
 

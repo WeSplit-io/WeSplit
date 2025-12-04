@@ -38,7 +38,7 @@ export interface SharedWalletMember {
   userId: string;
   name: string;
   walletAddress: string; // User's personal wallet address
-  role: 'creator' | 'member';
+  role: 'creator' | 'admin' | 'member';
   totalContributed: number; // Total amount this member has contributed
   totalWithdrawn: number; // Total amount this member has withdrawn
   joinedAt: string;
@@ -56,6 +56,7 @@ export interface SharedWalletSettings {
   autoTopUpEnabled?: boolean; // Whether to enable automatic top-up
   autoTopUpThreshold?: number; // Balance threshold for auto top-up
   autoTopUpAmount?: number; // Amount to top up when threshold is reached
+  goalAmount?: number; // Target amount for shared wallet goal
 }
 
 /**

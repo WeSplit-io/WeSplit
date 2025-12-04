@@ -25,6 +25,7 @@ interface TransactionHistoryProps {
   title?: string; // Custom title
   emptyMessage?: string; // Custom empty message
   emptySubtext?: string; // Custom empty subtext
+  hideChrome?: boolean; // Hide container + header for minimal display
 }
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({
@@ -37,6 +38,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   title = 'Transaction History',
   emptyMessage = 'No transactions yet',
   emptySubtext,
+  hideChrome = false,
 }) => {
   const { state } = useApp();
   const { currentUser } = state;
@@ -67,6 +69,13 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     : 'Transactions will appear here when payments are made';
 
   if (isLoading) {
+    if (hideChrome) {
+      return (
+        <View style={styles.loadingInline}>
+          <ModernLoader size="small" text="Loading transactions..." />
+        </View>
+      );
+    }
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{title}</Text>
@@ -75,6 +84,26 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
         </View>
       </View>
     );
+  }
+
+  const renderTransactions = () => (
+    <View style={[styles.transactionsList, hideChrome && styles.transactionsListMinimal]}>
+      {enrichedTransactions.map((tx) => (
+        <TransactionHistoryItem
+          key={tx.id || tx.firebaseDocId}
+          transaction={tx}
+          variant={variant}
+          onPress={onTransactionPress ? () => onTransactionPress(tx) : undefined}
+        />
+      ))}
+    </View>
+  );
+
+  if (hideChrome) {
+    if (enrichedTransactions.length === 0) {
+      return null;
+    }
+    return renderTransactions();
   }
 
   return (
@@ -98,16 +127,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
           )}
         </View>
       ) : (
-        <View style={styles.transactionsList}>
-          {enrichedTransactions.map((tx) => (
-            <TransactionHistoryItem
-              key={tx.id || tx.firebaseDocId}
-              transaction={tx}
-              variant={variant}
-              onPress={onTransactionPress ? () => onTransactionPress(tx) : undefined}
-            />
-          ))}
-        </View>
+        renderTransactions()
       )}
     </View>
   );
@@ -150,6 +170,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xl,
   },
+  loadingInline: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+  },
   emptyContainer: {
     alignItems: 'center',
     padding: spacing.xl,
@@ -169,6 +194,9 @@ const styles = StyleSheet.create({
   },
   transactionsList: {
     gap: spacing.xs,
+  },
+  transactionsListMinimal: {
+    gap: spacing.md,
   },
 });
 

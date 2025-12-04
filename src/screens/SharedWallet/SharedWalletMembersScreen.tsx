@@ -4,10 +4,10 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input, PhosphorIcon } from '../../components/shared';
+import { Button, Input } from '../../components/shared';
 import Modal from '../../components/shared/Modal';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -48,12 +48,6 @@ const SharedWalletMembersScreen: React.FC = () => {
     setVisible(false);
     navigation.goBack();
   }, [navigation]);
-
-  const handleBackToName = useCallback(() => {
-    navigation.replace('SharedWalletName', {
-      walletName,
-    });
-  }, [navigation, walletName]);
 
   const handleContactSelect = useCallback((contact: UserContact) => {
     // Don't allow selecting the creator
@@ -143,17 +137,11 @@ const SharedWalletMembersScreen: React.FC = () => {
       closeOnBackdrop
       style={styles.modalContent}
       maxHeight={800}
-      enableSwipe={false}
+      enableSwipe
     >
       <SafeAreaView edges={['bottom']} style={styles.sheet}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.iconButtonTransparent} onPress={handleBackToName}>
-            <PhosphorIcon name="CaretLeft" size={22} color={colors.white} />
-          </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Text style={styles.title}>Add Contact</Text>
-          </View>
-          <View style={styles.headerSpacer} />
+        <View style={styles.headerCenter}>
+          <Text style={styles.title}>Add Members</Text>
         </View>
 
         <Input
@@ -199,23 +187,10 @@ const styles = StyleSheet.create({
   sheet: {
     flex: 1,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  iconButtonTransparent: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   headerCenter: {
     flex: 1,
     alignItems: 'center',
-  },
-  headerSpacer: {
-    width: 40,
+    marginBottom: spacing.md,
   },
   title: {
     fontSize: typography.fontSize.lg,

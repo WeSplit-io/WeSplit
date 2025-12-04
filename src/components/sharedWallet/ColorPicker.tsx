@@ -16,14 +16,14 @@ interface ColorPickerProps {
 
 // Predefined color palette - reduced selection of vibrant colors
 const COLOR_PALETTE = [
-  { name: 'Green', value: '#A5EA15' },
-  { name: 'Teal', value: '#53EF97' },
-  { name: 'Blue', value: '#4A90E2' },
-  { name: 'Purple', value: '#BD10E0' },
-  { name: 'Pink', value: '#FF6B9D' },
-  { name: 'Orange', value: '#F5A623' },
-  { name: 'Yellow', value: '#F8E71C' },
-  { name: 'Cyan', value: '#50E3C2' },
+  { name: 'Purple', value: '#9668FE' },
+  { name: 'Green', value: '#01B84E' },
+  { name: 'Orange', value: '#FF7302' },
+  { name: 'Blue', value: '#219EFB' },
+  { name: 'Red', value: '#DC3434' },
+  { name: 'Pink', value: '#F5A623' },
+  { name: 'Grey', value: '#7E7E7E' },
+  { name: 'Yellow', value: '#CDB800' },
 ];
 
 const ColorPicker: React.FC<ColorPickerProps> = ({
@@ -32,14 +32,16 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Select Color</Text>
       <View style={styles.colorGrid}>
         {COLOR_PALETTE.map((color) => {
           const isSelected = selectedColor === color.value;
           return (
             <TouchableOpacity
               key={color.value}
-              style={styles.colorWrapper}
+              style={[
+                styles.colorWrapper,
+                isSelected && styles.colorOptionSelected,
+              ]}
               onPress={() => onSelectColor(color.value)}
               activeOpacity={0.7}
             >
@@ -47,7 +49,6 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
                 style={[
                   styles.colorOption,
                   { backgroundColor: color.value },
-                  isSelected && styles.colorOptionSelected,
                 ]}
               />
               <Text style={styles.colorName} numberOfLines={1}>
@@ -57,13 +58,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
           );
         })}
       </View>
-      {selectedColor && (
-        <View style={styles.previewContainer}>
-          <Text style={styles.previewLabel}>Preview:</Text>
-          <View style={[styles.previewBox, { backgroundColor: selectedColor }]} />
-          <Text style={styles.previewValue}>{selectedColor}</Text>
-        </View>
-      )}
+    
     </View>
   );
 };
@@ -82,58 +77,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+    paddingTop: spacing.md,
   },
   colorWrapper: {
     alignItems: 'center',
     width: '23%',
     marginBottom: spacing.sm,
+    padding: spacing.sm,
   },
   colorOption: {
-    width: 44,
-    height: 44,
+    width: 56,
+    height: 56,
     borderRadius: spacing.sm,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.xs / 2,
+    marginBottom: spacing.xs,
   },
   colorOptionSelected: {
-    borderColor: colors.green,
-    borderWidth: 2,
-  },
-  colorName: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white70,
-    textAlign: 'center',
-  },
-  previewContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-    padding: spacing.sm,
     backgroundColor: colors.white5,
     borderRadius: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.white10,
+    borderColor: colors.green,
   },
-  previewLabel: {
+  colorName: {
     fontSize: typography.fontSize.sm,
     color: colors.white70,
+    textAlign: 'center',
   },
-  previewBox: {
-    width: 30,
-    height: 30,
-    borderRadius: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.white10,
-  },
-  previewValue: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white50,
-    fontFamily: 'monospace',
-  },
+
 });
 
 export default ColorPicker;

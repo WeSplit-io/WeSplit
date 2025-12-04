@@ -78,33 +78,34 @@ const SharedWalletCard: React.FC<SharedWalletCardProps> = ({
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
           {/* Wallet Icon/Logo - smaller, similar to split cards */}
-          <View style={[
-            styles.iconContainer,
-            wallet.customColor && { backgroundColor: wallet.customColor + '20' }
-          ]}>
-            {wallet.customLogo ? (
-              // Check if customLogo is a URL (starts with http) or a Phosphor icon name
-              wallet.customLogo.startsWith('http') ? (
-                // Custom URL logo (future support)
-                <Text style={styles.logoText}>{wallet.customLogo}</Text>
-              ) : (
-                // Phosphor icon
-                <PhosphorIcon
-                  name={wallet.customLogo as any}
-                  size={24}
-                  color={wallet.customColor || colors.green}
-                  weight="bold"
-                />
-              )
+        <View style={[
+          styles.iconContainer,
+          wallet.customColor && { backgroundColor: wallet.customColor + '20' }
+        ]}>
+          {wallet.customLogo ? (
+            wallet.customLogo.startsWith('http') || wallet.customLogo.startsWith('file:') ? (
+              <Image
+                source={{ uri: wallet.customLogo }}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             ) : (
               <PhosphorIcon
-                name="Wallet"
+                name={wallet.customLogo as any}
                 size={24}
                 color={wallet.customColor || colors.green}
-                weight="fill"
+                weight="bold"
               />
-            )}
-          </View>
+            )
+          ) : (
+            <PhosphorIcon
+              name="Cards"
+              size={24}
+              color={wallet.customColor || colors.green}
+              weight="fill"
+            />
+          )}
+        </View>
 
           <View style={styles.cardTitleContainer}>
             <Text style={styles.cardTitle} numberOfLines={1}>
@@ -213,8 +214,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.white10,
   },
-  logoText: {
-    fontSize: 24,
+  logoImage: {
+    width: 24,
+    height: 24,
   },
   cardTitleContainer: {
     flex: 1,

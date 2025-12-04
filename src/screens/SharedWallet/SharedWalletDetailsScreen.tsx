@@ -17,7 +17,6 @@ import {
   Container, 
   Header, 
   ModernLoader, 
-  Button, 
   ErrorScreen,
   PhosphorIcon,
   TabSecondary,
@@ -26,12 +25,13 @@ import {
   TransactionHistory,
   MembersList,
   UnifiedTransaction,
+  GoalProgress,
 } from '../../components/sharedWallet';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { SharedWalletService, SharedWallet } from '../../services/sharedWallet';
-import SharedWalletGridCard from '../../components/SharedWalletGridCard';
+import SharedWalletHeroCard from '../../components/SharedWalletHeroCard';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import CentralizedTransactionModal, { type TransactionModalConfig } from '../../components/shared/CentralizedTransactionModal';
@@ -67,8 +67,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
 
     setIsLoadingTransactions(true);
     try {
-      // For now, we'll show empty transactions
-      // In a real implementation, this would load from blockchain/API
+      // TODO: Replace with real transactions fetch when backend is ready
       setTransactions([]);
     } catch (error) {
       logger.error('Error loading transactions', { error: String(error) }, 'SharedWalletDetailsScreen');
@@ -153,6 +152,11 @@ const SharedWalletDetailsScreen: React.FC = () => {
   }
 
   const isCreator = wallet.creatorId === currentUser?.id?.toString();
+  const goalAmount = wallet.settings?.goalAmount;
+  const hasGoal = typeof goalAmount === 'number' && goalAmount > 0;
+  const goalTargetAmount = goalAmount ?? 0;
+  const goalCollectedAmount = wallet.totalBalance;
+  const shouldShowGoalProgress = hasGoal;
 
   return (
     <Container>
@@ -167,8 +171,9 @@ const SharedWalletDetailsScreen: React.FC = () => {
               wallet: wallet,
             })}
             activeOpacity={0.7}
+            style={styles.headerIconButton}
           >
-            <PhosphorIcon name="Gear" size={18} color={colors.white} weight="regular" />
+            <PhosphorIcon name="Gear" size={22} color={colors.white} weight="regular" />
           </TouchableOpacity>
         }
       />
@@ -180,16 +185,14 @@ const SharedWalletDetailsScreen: React.FC = () => {
       >
         {/* Wallet Balance Display - Real Wallet Style */}
         <View style={styles.walletBalanceContainer}>
-          <SharedWalletGridCard
-            wallet={wallet}
-            style={styles.walletCardFullWidth}
-          />
+          <SharedWalletHeroCard wallet={wallet} />
         </View>
 
         {/* Action Buttons - Withdraw and Top Up */}
         <View style={styles.actionButtonsContainer}>
-          <Button
-            title="Withdraw"
+          <TouchableOpacity
+            style={styles.dashboardActionButton}
+            activeOpacity={0.8}
             onPress={() => {
               if (!currentUser?.id) return;
 
@@ -231,15 +234,14 @@ const SharedWalletDetailsScreen: React.FC = () => {
 
               setTransactionModalConfig(modalConfig);
             }}
-            variant="secondary"
-            size="medium"
-            icon="ArrowUp"
-            iconPosition="left"
-            fullWidth={false}
-            style={styles.actionButton}
-          />
-          <Button
-            title="Top Up"
+          >
+            <PhosphorIcon name="ArrowLineUp" size={22} color={colors.white} weight="bold" />
+            <Text style={styles.dashboardActionButtonLabel}>Withdraw</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.dashboardActionButton}
+            activeOpacity={0.8}
             onPress={() => {
               if (!currentUser?.id) return;
 
@@ -280,14 +282,20 @@ const SharedWalletDetailsScreen: React.FC = () => {
 
               setTransactionModalConfig(modalConfig);
             }}
-            variant="primary"
-            size="medium"
-            icon="Plus"
-            iconPosition="left"
-            fullWidth={false}
-            style={styles.actionButton}
-          />
+          >
+            <PhosphorIcon name="ArrowLineDown" size={22} color={colors.white} weight="bold" />
+            <Text style={styles.dashboardActionButtonLabel}>Top Up</Text>
+          </TouchableOpacity>
         </View>
+
+        {shouldShowGoalProgress ? (
+          <GoalProgress
+            targetAmount={goalTargetAmount}
+            currentAmount={goalCollectedAmount}
+            currency={wallet.currency}
+            color={wallet.customColor}
+          />
+        ) : null}
 
         {/* Tabs - Transactions and Members */}
         <View style={styles.tabsContainer}>
@@ -298,6 +306,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
             ]}
             activeTab={activeTab}
             onTabChange={(tabValue) => setActiveTab(tabValue as 'transactions' | 'members')}
+            fullWidthTabs
           />
         </View>
 
@@ -309,19 +318,19 @@ const SharedWalletDetailsScreen: React.FC = () => {
                 <ModernLoader size="medium" text="Loading transactions..." />
               </View>
             ) : transactions.length > 0 ? (
-          <TransactionHistory
-            transactions={transactions}
-            isLoading={isLoadingTransactions}
-            variant="sharedWallet"
+              <TransactionHistory
+                transactions={transactions}
+                isLoading={isLoadingTransactions}
+                variant="sharedWallet"
+                hideChrome
               />
             ) : (
-              <View style={styles.emptyStateContainer}>
-                <PhosphorIcon name="Receipt" size={32} color={colors.white50} weight="regular" />
-                <Text style={styles.emptyStateTitle}>No transactions yet</Text>
-                <Text style={styles.emptyStateText}>
-                  Transactions will appear here once members start using the shared wallet.
-            </Text>
-        </View>
+              <View style={styles.emptyTransactions}>
+                <View style={styles.emptyTransactionsIcon}>
+                  <PhosphorIcon name="Receipt" size={24} color={colors.white70} weight="regular" />
+                </View>
+                <Text style={styles.emptyTransactionsTitle}>No transactions yet</Text>
+              </View>
             )}
             </View>
             )}
@@ -331,38 +340,33 @@ const SharedWalletDetailsScreen: React.FC = () => {
             {/* Add Member Button for Creator */}
             {isCreator && (
               <View style={styles.memberManagementContainer}>
-                <Button
-                  title="Add Member"
+                <TouchableOpacity
+                  style={styles.manageRightsButton}
+                  onPress={() => {
+                    Alert.alert('Coming Soon', 'Member rights management will be available soon.');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <PhosphorIcon name="SlidersHorizontal" size={18} color={colors.white} weight="bold" />
+                  <Text style={styles.manageRightsLabel}>Manage rights</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.addMemberButton}
                   onPress={() => (navigation as any).navigate('SharedWalletMembers', {
                     walletId: wallet.id,
                     walletName: wallet.name,
                   })}
-                  variant="secondary"
-                  size="small"
-                  icon="UserPlus"
-                  iconPosition="left"
-                  fullWidth={false}
-                  style={styles.managementButton}
-                />
-                <Button
-                  title="Manage Rights"
-                  onPress={() => {
-                    Alert.alert('Coming Soon', 'Member rights management will be available soon.');
-                  }}
-                  variant="secondary"
-                  size="small"
-                  icon="Shield"
-                  iconPosition="left"
-                  fullWidth={false}
-                  style={styles.managementButton}
-                />
+                  activeOpacity={0.8}
+                >
+                  <PhosphorIcon name="Plus" size={18} color={colors.white} weight="bold" />
+                  <Text style={styles.addMemberLabel}>Add</Text>
+                </TouchableOpacity>
                 </View>
             )}
 
             <MembersList
               members={wallet.members}
-              currency={wallet.currency}
-              showParticipationCircle={true}
+              currentUserId={currentUser?.id?.toString()}
             />
                     </View>
         )}
@@ -385,7 +389,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollViewContent: {
-    padding: spacing.sm,
     paddingBottom: spacing.md,
   },
   loadingContainer: {
@@ -396,19 +399,34 @@ const styles = StyleSheet.create({
   },
   walletBalanceContainer: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  walletCardFullWidth: {
-    width: '100%',
-    alignSelf: 'center',
+    marginBottom: spacing.md,
   },
   actionButtonsContainer: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
-  actionButton: {
+  dashboardActionButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: spacing.md,
+    backgroundColor: colors.white5,
+    borderWidth: 1,
+    borderTopColor: colors.white10,
+    borderLeftColor: colors.white10,
+    borderRightColor: 'rgba(10, 138, 90, 0.15)',
+    borderBottomColor: 'rgba(10, 138, 90, 0.15)',
+  },
+  dashboardActionButtonLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
+    textAlign: 'center',
   },
   tabsContainer: {
     marginBottom: spacing.md,
@@ -418,11 +436,68 @@ const styles = StyleSheet.create({
   },
   memberManagementContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  managementButton: {
-    flex: 1,
+  managementPillBase: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.lg,
+    backgroundColor: colors.white5,
+    borderWidth: 1,
+    borderColor: colors.white10,
+  },
+  addMemberButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.lg,
+    backgroundColor: colors.white5,
+    borderWidth: 1,
+    borderColor: colors.white10,
+  },
+  addMemberLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
+  },
+  emptyTransactions: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.sm,
+  },
+  emptyTransactionsIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTransactionsTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white70,
+  },
+  manageRightsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.lg,
+    backgroundColor: colors.white5,
+    borderWidth: 1,
+    borderColor: colors.white10,
+  },
+  manageRightsLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
   },
   emptyStateContainer: {
     alignItems: 'center',
@@ -441,6 +516,12 @@ const styles = StyleSheet.create({
     color: colors.white70,
     textAlign: 'center',
     lineHeight: typography.fontSize.sm * 1.4,
+  },
+  headerIconButton: {
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

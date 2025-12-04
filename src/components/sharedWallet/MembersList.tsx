@@ -3,12 +3,9 @@
  * Displays the list of members in a shared wallet
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { formatBalance } from '../../utils/ui/format/formatUtils';
-import { Avatar, PhosphorIcon } from '../shared';
-import { ParticipationCircle } from '../shared/ParticipationCircle';
-import UserNameWithBadges from '../profile/UserNameWithBadges';
+import { Avatar } from '../shared';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -17,129 +14,95 @@ interface Member {
   userId: string;
   name: string;
   walletAddress: string;
-  role: 'creator' | 'member';
+  role: 'creator' | 'admin' | 'member';
   totalContributed: number;
   totalWithdrawn: number;
 }
 
 interface MembersListProps {
-  members: Member[];
-  currency: string;
-  showParticipationCircle?: boolean;
+  members?: Member[];
+  currentUserId?: string;
 }
 
 const MembersList: React.FC<MembersListProps> = ({
-  members,
-  currency,
-  showParticipationCircle = true,
+  members = [],
+  currentUserId,
 }) => {
-  const totalContributed = useMemo(() => {
-    return members.reduce((sum, m) => sum + m.totalContributed, 0);
-  }, [members]);
+  const formatWalletAddress = (address?: string) => {
+    if (!address) return 'No wallet address';
+    if (address.length <= 10) return address;
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
+  };
+
+  const getRoleLabel = (role?: Member['role']) => {
+    switch (role) {
+      case 'creator':
+        return 'Owner';
+      case 'admin':
+        return 'Admin';
+      default:
+        return 'Member';
+    }
+  };
 
   return (
-    <>
-      {/* Participation Visualization */}
-      {showParticipationCircle && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Participation ({members.length} members)
-          </Text>
-          <ParticipationCircle
-            members={members}
-            totalContributed={totalContributed}
-            size={80}
-            strokeWidth={6}
-          />
-        </View>
-      )}
+    <View style={styles.listContainer}>
+      {members.map((member) => {
+        const roleLabel = getRoleLabel(member.role);
+        const isCurrentUser = currentUserId && member.userId === currentUserId;
 
-      {/* Members List */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Members</Text>
-        {members.map((member) => {
-          const memberPercentage = totalContributed > 0
-            ? (member.totalContributed / totalContributed) * 100
-            : 0;
-          
-          return (
-            <View key={member.userId} style={styles.memberRow}>
-              <Avatar
-                userId={member.userId}
-                userName={member.name}
-                size={40}
-                style={styles.memberAvatar}
-              />
-              <View style={styles.memberInfo}>
-                <UserNameWithBadges
-                  userId={member.userId}
-                  userName={member.name}
-                  textStyle={styles.memberName}
-                  showBadges={true}
-                />
-                <Text style={styles.memberWalletAddress}>
-                  {member.walletAddress && member.walletAddress.length > 10
-                    ? `${member.walletAddress.slice(0, 4)}...${member.walletAddress.slice(-4)}`
-                    : member.walletAddress || 'No wallet address'
-                  }
-                </Text>
-              </View>
-              <View style={styles.roleContainer}>
-                {member.role === 'creator' ? (
-                  <View style={[styles.roleBadge, styles.creatorBadge]}>
-                    <Text style={[styles.roleText, { color: colors.green }]}>Admin</Text>
-                  </View>
-                ) : (
-                  <View style={[styles.roleBadge, styles.memberBadge]}>
-                    <Text style={[styles.roleText, { color: colors.white70 }]}>Member</Text>
-                  </View>
-                )}
-              </View>
+        return (
+          <View key={member.userId} style={styles.memberCard}>
+            <Avatar
+              userId={member.userId}
+              userName={member.name}
+              size={48}
+              style={styles.memberAvatar}
+            />
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberName}>{member.name}</Text>
+              <Text style={styles.memberWalletAddress}>
+                {formatWalletAddress(member.walletAddress)}
+              </Text>
             </View>
-          );
-        })}
-      </View>
-    </>
+            <Text style={styles.memberRole}>
+              {roleLabel}
+              {isCurrentUser ? ' (You)' : ''}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  section: {
-    backgroundColor: colors.white5,
-    borderRadius: spacing.sm,
-    padding: spacing.md,
+  listContainer: {
+    paddingTop: spacing.md,
     gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white10,
-    marginBottom: spacing.sm,
   },
-  sectionTitle: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.white,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginBottom: spacing.xs,
-  },
-  memberRow: {
+  memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.white10,
+    padding: spacing.md,
+    gap: spacing.md,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.md,
   },
   memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.white5,
+    borderWidth: 1,
+    borderColor: colors.white10,
   },
   memberInfo: {
     flex: 1,
     gap: spacing.xs / 2,
   },
   memberName: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
     lineHeight: typography.fontSize.md * 1.3,
@@ -147,29 +110,12 @@ const styles = StyleSheet.create({
   memberWalletAddress: {
     fontSize: typography.fontSize.sm,
     color: colors.white70,
-    fontFamily: 'monospace',
+    fontFamily: typography.fontFamily.mono,
   },
-  roleContainer: {
-    alignItems: 'flex-end',
-  },
-  roleBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
-    borderRadius: spacing.xs,
-    borderWidth: 1,
-  },
-  creatorBadge: {
-    backgroundColor: colors.greenBlue20,
-    borderColor: colors.green + '40',
-  },
-  memberBadge: {
-    backgroundColor: colors.white10,
-    borderColor: colors.white20,
-  },
-  roleText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    letterSpacing: 0.2,
+  memberRole: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+    fontWeight: typography.fontWeight.regular,
   },
 });
 

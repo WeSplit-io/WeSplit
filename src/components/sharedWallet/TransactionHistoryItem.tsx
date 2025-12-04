@@ -6,12 +6,11 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { formatBalance } from '../../utils/ui/format/formatUtils';
-import { PhosphorIcon } from '../shared';
+import { PhosphorIcon, PhosphorIconName } from '../shared';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import {
-  getTransactionIconName,
   getTransactionTypeLabel,
   isIncomeTransaction,
   isExpenseTransaction,
@@ -92,61 +91,6 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
   }, [transaction, variant]);
 
   // Get the display subtitle (destination/source info)
-  const getDisplaySubtitle = useMemo(() => {
-    // For withdrawals, show destination type or split name if withdrawing from split
-    if (transaction.type === 'withdrawal') {
-      // If withdrawing FROM a split wallet, show split name
-      if (transaction.splitName) {
-        return transaction.splitName;
-      }
-      // Otherwise show destination type
-      if (transaction.isExternalCard) {
-        return 'External Card';
-      } else if (transaction.isExternalWallet) {
-        return 'External Wallet';
-      }
-      return 'Wallet';
-    }
-    
-    // For sends/payments, show destination or source
-    if (transaction.type === 'send' || transaction.type === 'payment') {
-      // If sending TO a split wallet (funding), show split name
-      if (transaction.splitName && transaction.to_wallet) {
-        // Check if the split wallet is the destination
-        const isFundingSplit = transaction.to_wallet && transaction.splitWalletId;
-        if (isFundingSplit) {
-          return transaction.splitName;
-        }
-      }
-      // If withdrawing FROM a split wallet, show split name
-      if (transaction.splitName && transaction.from_wallet) {
-        const isWithdrawingFromSplit = transaction.from_wallet && transaction.splitWalletId;
-        if (isWithdrawingFromSplit) {
-          return transaction.splitName;
-        }
-      }
-      // If we have external destination info, show it
-      if (transaction.isExternalCard) {
-        return 'External Card';
-      } else if (transaction.isExternalWallet) {
-        return 'External Wallet';
-      }
-      // Fallback to recipient name or "Unknown User"
-      return transaction.recipientName || 'Unknown User';
-    }
-    
-    // For receives/deposits, show source (receiving FROM split wallet)
-    if (transaction.type === 'receive' || transaction.type === 'deposit') {
-      if (transaction.splitName) {
-        return transaction.splitName;
-      }
-      return transaction.senderName || 'Unknown User';
-    }
-    
-    // Default: show memo/note if available
-    return transaction.memo || transaction.note || '';
-  }, [transaction]);
-
   // Get the memo/note text
   const getMemoText = useMemo(() => {
     return transaction.memo || transaction.note;
@@ -157,21 +101,30 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
     return transaction.createdAt || transaction.created_at;
   }, [transaction.createdAt, transaction.created_at]);
 
-  const getIconName = () => {
+  const getIconName = (): PhosphorIconName => {
+    if (transaction.type === 'funding') {
+      return 'ArrowLineDown';
+    }
+    if (transaction.type === 'withdrawal') {
+      return 'ArrowLineUp';
+    }
     // Map to Phosphor icon names used in this component
     const iconMap: Record<string, string> = {
-      funding: 'ArrowDown',
-      deposit: 'ArrowDown',
-      receive: 'ArrowDown',
-      withdrawal: 'ArrowUp',
-      send: 'ArrowUp',
-      payment: 'ArrowUp',
+      funding: 'ArrowLineDown',
+      deposit: 'ArrowLineDown',
+      receive: 'ArrowLineDown',
+      withdrawal: 'ArrowLineUp',
+      send: 'ArrowLineUp',
+      payment: 'ArrowLineUp',
       refund: 'ArrowCounterClockwise',
     };
-    return iconMap[transaction.type] || 'ArrowsClockwise';
+    return (iconMap[transaction.type] || 'ArrowsClockwise') as PhosphorIconName;
   };
 
   const getIconColor = () => {
+    if (transaction.type === 'funding' || transaction.type === 'withdrawal') {
+      return colors.white;
+    }
     if (isIncomeTransaction(transaction.type)) {
       return colors.green;
     } else if (isExpenseTransaction(transaction.type)) {
@@ -184,45 +137,8 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
     return getTransactionTypeLabel(transaction.type);
   };
 
-  const getStatusStyle = () => {
-    switch (transaction.status) {
-      case 'confirmed':
-        return styles.transactionStatusConfirmed;
-      case 'pending':
-        return styles.transactionStatusPending;
-      default:
-        return styles.transactionStatusFailed;
-    }
-  };
-
-  const getStatusText = () => {
-    switch (transaction.status) {
-      case 'confirmed':
-        return 'Confirmed';
-      case 'pending':
-        return 'Pending';
-      default:
-        return 'Failed';
-    }
-  };
-
-  const amountColor = useMemo(() => {
-    if (isIncomeTransaction(transaction.type)) {
-      return colors.green;
-    } else if (isExpenseTransaction(transaction.type)) {
-      return colors.red;
-    }
-    return colors.white;
-  }, [transaction.type]);
-
-  const amountPrefix = useMemo(() => {
-    if (isIncomeTransaction(transaction.type)) {
-      return '+';
-    } else if (isExpenseTransaction(transaction.type)) {
-      return '-';
-    }
-    return '';
-  }, [transaction.type]);
+  const amountColor = colors.white;
+  const amountPrefix = '';
 
   const Component = onPress ? TouchableOpacity : View;
 
@@ -240,26 +156,23 @@ const TransactionHistoryItem: React.FC<TransactionHistoryItemProps> = ({
           weight="bold"
         />
       </View>
-      <View style={styles.transactionInfo}>
-        <Text style={styles.transactionType}>{getTypeLabel()}</Text>
-        <Text style={styles.transactionUser}>{getDisplaySubtitle}</Text>
-        {getMemoText && getDisplaySubtitle !== getMemoText && (
-          <Text style={styles.transactionMemo} numberOfLines={1}>
-            {getMemoText}
+      <View style={styles.transactionMain}>
+        <View style={styles.transactionInfo}>
+          <Text style={styles.transactionType}>{getTypeLabel()}</Text>
+          <Text style={styles.transactionUser}>From {getUserDisplayName}</Text>
+          {getMemoText && (
+            <Text style={styles.transactionMemo} numberOfLines={1}>
+              {getMemoText}
+            </Text>
+          )}
+        </View>
+        <View style={styles.transactionAmountContainer}>
+          <Text style={[styles.transactionAmount, { color: amountColor }]}>
+            {amountPrefix}
+            {formatBalance(transaction.amount, transaction.currency)}
           </Text>
-        )}
-        <Text style={styles.transactionDate}>
-          {formatDate(getDate)}
-        </Text>
-      </View>
-      <View style={styles.transactionAmountContainer}>
-        <Text style={[styles.transactionAmount, { color: amountColor }]}>
-          {amountPrefix}
-          {formatBalance(transaction.amount, transaction.currency)}
-        </Text>
-        <View style={[styles.transactionStatusBadge, getStatusStyle()]}>
-          <Text style={styles.transactionStatusText}>
-            {getStatusText()}
+          <Text style={styles.transactionDate}>
+            {formatDate(getDate)}
           </Text>
         </View>
       </View>
@@ -271,13 +184,11 @@ const styles = StyleSheet.create({
   transactionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.sm,
-    backgroundColor: colors.white10,
-    borderRadius: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.md,
     marginBottom: spacing.xs,
     gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.white10,
   },
   transactionIconContainer: {
     width: 36,
@@ -287,21 +198,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  transactionMain: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
   transactionInfo: {
     flex: 1,
-    gap: 2,
+    gap: spacing.xs / 2,
   },
   transactionType: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
   },
   transactionUser: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     color: colors.white70,
   },
   transactionMemo: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     color: colors.white50,
     fontStyle: 'italic',
   },
@@ -312,31 +229,18 @@ const styles = StyleSheet.create({
   },
   transactionAmountContainer: {
     alignItems: 'flex-end',
+    justifyContent: 'center',
     gap: spacing.xs / 2,
   },
   transactionAmount: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
   },
-  transactionStatusBadge: {
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: spacing.xs / 2,
-  },
-  transactionStatusConfirmed: {
-    backgroundColor: colors.greenBlue20,
-  },
-  transactionStatusPending: {
-    backgroundColor: colors.white10,
-  },
-  transactionStatusFailed: {
-    backgroundColor: colors.red + '20',
-  },
-  transactionStatusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white70,
-  },
+  transactionStatusBadge: {},
+  transactionStatusConfirmed: {},
+  transactionStatusPending: {},
+  transactionStatusFailed: {},
+  transactionStatusText: {},
 });
 
 export default TransactionHistoryItem;
