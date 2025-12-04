@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SvgUri } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Modal } from '../../../components/shared';
 import { colors, spacing } from '../../../theme';
 import { typography } from '../../../theme/typography';
@@ -357,9 +358,14 @@ const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({ visible, onCl
                 <Text style={styles.assetCardDescription}>Display your avatar without a border</Text>
               </View>
               {!currentUser?.active_profile_border && (
-                <View style={styles.activeBadge}>
+                <LinearGradient
+                  colors={[colors.green, colors.greenBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.activeBadge}
+                >
                   <Text style={styles.activeBadgeText}>Actual</Text>
-                </View>
+                </LinearGradient>
               )}
               {loading === 'none' && <ActivityIndicator size="small" color={colors.green} />}
             </TouchableOpacity>
@@ -397,9 +403,14 @@ const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({ visible, onCl
                     </Text>
                   </View>
                   {isActive && (
-                    <View style={styles.activeBadge}>
+                    <LinearGradient
+                      colors={[colors.green, colors.greenBlue]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.activeBadge}
+                    >
                       <Text style={styles.activeBadgeText}>Actual</Text>
-                    </View>
+                    </LinearGradient>
                   )}
                   {isLoading && <ActivityIndicator size="small" color={colors.green} />}
                 </TouchableOpacity>
@@ -460,9 +471,14 @@ const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({ visible, onCl
                     </Text>
                   </View>
                   {isActive && (
-                    <View style={styles.activeBadge}>
+                    <LinearGradient
+                      colors={[colors.green, colors.greenBlue]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.activeBadge}
+                    >
                       <Text style={styles.activeBadgeText}>Actual</Text>
-                    </View>
+                    </LinearGradient>
                   )}
                   {isLoading && <ActivityIndicator size="small" color={colors.green} />}
                 </TouchableOpacity>
@@ -540,13 +556,12 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: colors.white5,
     borderRadius: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white10,
     position: 'relative',
   },
   assetCardActive: {
-    borderColor: colors.green,
-    backgroundColor: colors.greenBlue20,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    backgroundColor: colors.white10,
   },
   assetCardImage: {
     width: 64,
@@ -581,11 +596,12 @@ const styles = StyleSheet.create({
     color: colors.white50,
   },
   activeBadge: {
-    backgroundColor: colors.green,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: spacing.xs,
     marginLeft: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activeBadgeText: {
     color: colors.black,

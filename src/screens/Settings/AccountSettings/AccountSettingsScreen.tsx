@@ -757,16 +757,16 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
               {/* Profile Border Section */}
               <View style={{ marginBottom: spacing.lg }}>
                 <Text style={{
-                  fontSize: typography.fontSize.md,
-                  fontWeight: typography.fontWeight.regular,
-                  color: colors.white80,
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.medium,
+                  color: colors.white,
                   marginBottom: spacing.xs,
                 }}>
                   Profile Border
                 </Text>
                 <Text style={{
                   fontSize: typography.fontSize.sm,
-                  color: colors.white50,
+                  color: colors.white70,
                   marginBottom: spacing.md,
                 }}>
                   Select a border to display around your avatar
@@ -843,16 +843,17 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
               {/* Wallet Background Section */}
               <View>
                 <Text style={{
-                  fontSize: typography.fontSize.md,
-                  fontWeight: typography.fontWeight.regular,
-                  color: colors.white80,
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.medium,
+                  color: colors.white,
                   marginBottom: spacing.xs,
+                  marginTop: spacing.md,
                 }}>
                   Wallet Background
                 </Text>
                 <Text style={{
                   fontSize: typography.fontSize.sm,
-                  color: colors.white50,
+                  color: colors.white70,
                   marginBottom: spacing.md,
                 }}>
                   Select a background for your balance card
@@ -918,18 +919,20 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
         </ScrollView>
       </View>
 
-      {/* Fixed Save Button at Bottom */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <Button
-          title="Save"
-          onPress={handleSaveProfile}
-          variant="primary"
-          disabled={!hasChanges || isUploadingAvatar}
-          loading={isUploadingAvatar}
-          fullWidth={true}
-          style={styles.gradientButton}
-        />
-      </View>
+      {/* Fixed Save Button at Bottom - Only show on Infos tab */}
+      {activeTab === 'infos' && (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+          <Button
+            title="Save"
+            onPress={handleSaveProfile}
+            variant="primary"
+            disabled={!hasChanges || isUploadingAvatar}
+            loading={isUploadingAvatar}
+            fullWidth={true}
+            style={styles.gradientButton}
+          />
+        </View>
+      )}
 
       {/* Asset Selection Modal */}
       {showAssetSelectionModal && assetSelectionType && (
