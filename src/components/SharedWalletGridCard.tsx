@@ -6,6 +6,7 @@
 
 import React, { useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PhosphorIcon } from './shared';
 import { colors } from '../theme/colors';
@@ -13,22 +14,26 @@ import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import type { SharedWallet } from '../services/sharedWallet';
 
-// Calculate card width for 2 columns
-// Account for container padding and gap between cards
-const getCardWidth = () => {
+// Calculate card width + height for 2-column layout without stretching
+const CARD_ASPECT_RATIO = 0.8; // shorter cards
+const CARD_WIDTH_SCALE = 1; // make cards slightly narrower than their column
+const getCardDimensions = () => {
   const { width: SCREEN_WIDTH } = Dimensions.get('window');
-  // Container has paddingHorizontal: spacing.md (16px each side = 32px total)
-  // Gap between cards: spacing.xs (4px)
-  // Formula: (screen width - container padding - gap) / 2
-  const containerPadding = spacing.md * 2; // left + right padding
-  const gap = spacing.sm; // gap between cards
-  return (SCREEN_WIDTH - containerPadding - (gap * 2)) / 2;
+  const containerPadding = spacing.screenPaddingHorizontal * 2;
+  const interCardGap = spacing.sm; // single gap between 2 columns
+  const baseWidth = (SCREEN_WIDTH - containerPadding - interCardGap) / 2;
+  const cardWidth = baseWidth * CARD_WIDTH_SCALE;
+  return {
+    width: cardWidth,
+    height: cardWidth * CARD_ASPECT_RATIO,
+  };
 };
 
 interface SharedWalletGridCardProps {
   wallet: SharedWallet;
-  onPress: (wallet: SharedWallet) => void;
+  onPress?: (wallet: SharedWallet) => void;
   colorIndex?: number;
+  style?: StyleProp<ViewStyle>;
 }
 
 // Array of wallet colors for customization
@@ -45,9 +50,10 @@ const SharedWalletGridCard: React.FC<SharedWalletGridCardProps> = ({
   wallet,
   onPress,
   colorIndex = 0,
+  style,
 }) => {
-  // Calculate card width dynamically
-  const cardWidth = useMemo(() => getCardWidth(), []);
+  // Calculate card size dynamically to avoid vertical stretching
+  const cardDimensions = useMemo(() => getCardDimensions(), []);
   
   // Get wallet color - use customColor if available, otherwise cycle through default colors
   const walletColor = useMemo(() => {
@@ -87,21 +93,31 @@ const SharedWalletGridCard: React.FC<SharedWalletGridCardProps> = ({
   }, [wallet.customLogo]);
 
   const handlePress = useCallback(() => {
-    onPress(wallet);
+    if (onPress) {
+      onPress(wallet);
+    }
   }, [onPress, wallet]);
 
-  const cardStyle = useMemo(() => ({
-    ...styles.card,
-    backgroundColor: walletColor,
-    width: cardWidth,
-    marginBottom: spacing.md,
-  }), [walletColor, cardWidth]);
+  const cardStyle = useMemo<StyleProp<ViewStyle>>(
+    () => ([
+      styles.card,
+      {
+        backgroundColor: walletColor,
+        width: cardDimensions.width,
+        height: cardDimensions.height,
+        marginBottom: spacing.md,
+      },
+      style,
+    ]),
+    [walletColor, cardDimensions.height, cardDimensions.width, style]
+  );
 
   return (
     <TouchableOpacity
       style={cardStyle}
       onPress={handlePress}
-      activeOpacity={0.8}
+      activeOpacity={onPress ? 0.8 : 1}
+      disabled={!onPress}
     >
       {/* Black20 overlay on top of the card color */}
       <View style={styles.cardOverlay} />

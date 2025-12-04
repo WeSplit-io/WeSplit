@@ -536,7 +536,6 @@ export const styles = StyleSheet.create({
   
   // Shared Wallets Section
   sharedWalletsSection: {
-    marginTop: spacing.lg,
   },
   
   sharedWalletsGrid: {

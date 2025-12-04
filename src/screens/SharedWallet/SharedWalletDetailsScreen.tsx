@@ -13,7 +13,6 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { 
   Container, 
   Header, 
@@ -28,11 +27,11 @@ import {
   MembersList,
   UnifiedTransaction,
 } from '../../components/sharedWallet';
-import { formatBalance } from '../../utils/ui/format/formatUtils';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { SharedWalletService, SharedWallet } from '../../services/sharedWallet';
+import SharedWalletGridCard from '../../components/SharedWalletGridCard';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 
@@ -178,28 +177,11 @@ const SharedWalletDetailsScreen: React.FC = () => {
       >
         {/* Wallet Balance Display - Real Wallet Style */}
         <View style={styles.walletBalanceContainer}>
-          <LinearGradient
-            colors={wallet.customColor ? [wallet.customColor, wallet.customColor + '80'] : [colors.green, colors.greenBlue]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.walletCard}
-          >
-            <View style={styles.walletIconContainer}>
-              <PhosphorIcon
-                name="Wallet"
-                size={36}
-                color={colors.white}
-                weight="fill"
-              />
-            </View>
-            <Text style={styles.walletBalanceText}>
-              {formatBalance(wallet.totalBalance, wallet.currency)}
-              </Text>
-            <Text style={styles.walletBalanceLabel}>
-              Total Balance
-                </Text>
-          </LinearGradient>
-            </View>
+          <SharedWalletGridCard
+            wallet={wallet}
+            style={styles.walletCardFullWidth}
+          />
+        </View>
 
         {/* Action Buttons - Withdraw and Top Up */}
         <View style={styles.actionButtonsContainer}>
@@ -329,27 +311,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
-  walletCard: {
-    borderRadius: spacing.md,
-    padding: spacing.md,
-    alignItems: 'center',
-    minWidth: 180,
-    overflow: 'hidden',
-  },
-  walletIconContainer: {
-    marginBottom: spacing.sm,
-  },
-  walletBalanceText: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: spacing.xs / 2,
-  },
-  walletBalanceLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-    textAlign: 'center',
+  walletCardFullWidth: {
+    width: '100%',
+    alignSelf: 'center',
   },
   actionButtonsContainer: {
     flexDirection: 'row',
