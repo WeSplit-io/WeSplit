@@ -618,7 +618,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         prefilledNote
       });
 
-      navigation.navigate('SendAmount', {
+      navigation.navigate('CentralizedTransaction', {
+        context: 'send_1to1',
         destinationType: 'friend',
         contact: contact,
         prefilledAmount: amount,

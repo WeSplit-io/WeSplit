@@ -193,12 +193,12 @@ class UnifiedTransactionService {
   private async buildUsdcTransaction(params: UsdcTransactionParams): Promise<any> {
     // This would use the existing transaction building logic
     // Extracted from ConsolidatedTransactionService.sendUSDCTransaction
-    const { optimizedTransactionUtils } = await import('../shared/transactionUtilsOptimized');
+    const { transactionUtils } = await import('../shared/transactionUtils');
     const { getConfig } = await import('../../../config/unified');
     const { PublicKey } = await import('@solana/web3.js');
 
     // Build transaction using existing logic
-    const connection = await optimizedTransactionUtils.getConnection();
+    const connection = await transactionUtils.getConnection();
     const config = getConfig();
 
     // Create USDC transfer transaction
@@ -212,8 +212,8 @@ class UnifiedTransactionService {
    */
   private async submitSignedTransaction(signedTransaction: Uint8Array): Promise<TransactionResult> {
     try {
-      const { optimizedTransactionUtils } = await import('../shared/transactionUtilsOptimized');
-      const connection = await optimizedTransactionUtils.getConnection();
+      const { transactionUtils } = await import('../shared/transactionUtils');
+      const connection = await transactionUtils.getConnection();
 
       // Deserialize and submit
       const { Transaction } = await import('@solana/web3.js');

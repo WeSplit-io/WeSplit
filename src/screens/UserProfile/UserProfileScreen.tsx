@@ -249,8 +249,9 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
     }
     
     // Pass the full contact object with all necessary fields
-    // This matches the structure expected by SendAmountScreen
-    navigation.navigate('SendAmount', {
+    // This matches the structure expected by CentralizedTransactionScreen
+    navigation.navigate('CentralizedTransaction', {
+      context: 'send_1to1',
       destinationType: 'friend',
       contact: {
         id: profileUser.id,

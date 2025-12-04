@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { formatAmountWithComma } from '../../utils/spend/formatUtils';
+import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 
 interface SpendPaymentSuccessModalProps {
   amount: number;

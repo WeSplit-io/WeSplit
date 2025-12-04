@@ -41,9 +41,8 @@ import ChristmasCalendarScreen from './src/screens/Rewards/ChristmasCalendarScre
 import ChristmasCalendarHistoryScreen from './src/screens/Rewards/ChristmasCalendarHistoryScreen';
 import DevAssetPreviewScreen from './src/screens/Rewards/DevAssetPreviewScreen';
 import SendScreen from './src/screens/Send/SendScreen';
-import SendAmountScreen from './src/screens/Send/SendAmountScreen';
-import SendConfirmationScreen from './src/screens/Send/SendConfirmationScreen';
 import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
+import CentralizedTransactionScreen from './src/screens/Transaction/CentralizedTransactionScreen';
 import LinkedCardsScreen from './src/screens/Settings/LinkedCards/LinkedCardsScreen';
 import { AssetSelectionScreen } from './src/screens/Settings/AssetSelection';
 import RequestContactsScreen from './src/screens/Request/RequestContactsScreen';
@@ -173,9 +172,8 @@ export default function App() {
                     <Stack.Screen name="UserProfile" component={UserProfileScreen} />
                     <Stack.Screen name="Contacts" component={ContactsScreen} />
                     <Stack.Screen name="Send" component={SendScreen} />
-                    <Stack.Screen name="SendAmount" component={SendAmountScreen} />
-                    <Stack.Screen name="SendConfirmation" component={SendConfirmationScreen} />
                     <Stack.Screen name="SendSuccess" component={SendSuccessScreen} />
+                    <Stack.Screen name="CentralizedTransaction" component={CentralizedTransactionScreen} />
                     <Stack.Screen name="LinkedCards" component={LinkedCardsScreen} />
                     <Stack.Screen name="RequestContacts" component={RequestContactsScreen} />
                     <Stack.Screen name="RequestAmount" component={RequestAmountScreen} />

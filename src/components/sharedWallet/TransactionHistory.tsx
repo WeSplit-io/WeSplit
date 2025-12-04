@@ -10,7 +10,7 @@ import TransactionHistoryItem, { UnifiedTransaction } from './TransactionHistory
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { enrichTransactions } from '../../utils/transactionEnrichment';
+import { enrichTransactions } from '../../utils/transactionDisplayUtils';
 import { deduplicateTransactions } from '../../utils/transactionDisplayUtils';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';

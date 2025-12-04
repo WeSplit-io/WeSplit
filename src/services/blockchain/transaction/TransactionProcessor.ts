@@ -25,7 +25,7 @@ import { USDC_CONFIG } from '../../shared/walletConstants';
 import { getConfig } from '../../../config/unified';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';  
 import { FeeService, COMPANY_WALLET_CONFIG } from '../../../config/constants/feeConfig';
-import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimized';
+import { transactionUtils } from '../../shared/transactionUtils';
 import { logger } from '../../analytics/loggingService';
 import { TransactionParams, TransactionResult } from './types';
 import { processUsdcTransfer } from './transactionSigningService';
@@ -35,17 +35,17 @@ import {
   BLOCKHASH_MAX_AGE_MS, 
   shouldRebuildTransaction 
 } from '../../shared/blockhashUtils';
-import { verifyTransactionOnBlockchain } from '../../shared/transactionVerificationUtils';
+import { verifyTransactionOnBlockchain } from '../../shared/transactionUtils';
 import { 
   rebuildTransactionBeforeFirebase, 
   rebuildTransactionWithFreshBlockhash 
-} from '../../shared/transactionRebuildUtils';
+} from '../../shared/transactionUtils';
 
 export class TransactionProcessor {
   private isProduction: boolean;
 
   constructor() {
-    // Connection management now handled by optimizedTransactionUtils
+    // Connection management now handled by transactionUtils
     // This ensures we use optimized RPC endpoints with rotation and rate limit handling
     this.isProduction = !__DEV__;
   }
@@ -54,7 +54,7 @@ export class TransactionProcessor {
    * Get optimized connection with RPC endpoint rotation
    */
   private async getConnection(): Promise<Connection> {
-    return await optimizedTransactionUtils.getConnection();
+    return await transactionUtils.getConnection();
   }
 
   /**
@@ -680,7 +680,7 @@ export class TransactionProcessor {
       } else {
         // On devnet, use faster confirmation
       try {
-        const confirmed = await optimizedTransactionUtils.confirmTransactionWithTimeout(signature);
+        const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature);
         if (!confirmed) {
           logger.warn('Transaction confirmation timed out, but transaction was sent', { 
             signature,

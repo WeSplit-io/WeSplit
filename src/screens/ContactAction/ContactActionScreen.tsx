@@ -85,12 +85,13 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
     }
 
     if (activeAction === 'send') {
-      // Navigate directly to SendConfirmation screen
-      navigation.navigate('SendConfirmation', {
+      // Navigate to CentralizedTransaction screen
+      navigation.navigate('CentralizedTransaction', {
+        context: 'send_1to1',
         destinationType: 'friend',
         contact: selectedContact,
-        amount: numAmount,
-        description: note.trim(),
+        prefilledAmount: numAmount,
+        prefilledNote: note.trim(),
         isSettlement: false,
       });
     } else {

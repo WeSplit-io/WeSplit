@@ -34,6 +34,7 @@ import { SharedWalletService, SharedWallet } from '../../services/sharedWallet';
 import SharedWalletGridCard from '../../components/SharedWalletGridCard';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
+import CentralizedTransactionModal, { type TransactionModalConfig } from '../../components/shared/CentralizedTransactionModal';
 
 const SharedWalletDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -47,6 +48,8 @@ const SharedWalletDetailsScreen: React.FC = () => {
   const [isLoadingWallet, setIsLoadingWallet] = useState(!routeWallet);
   const [transactions, setTransactions] = useState<UnifiedTransaction[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [transactionModalConfig, setTransactionModalConfig] = useState<TransactionModalConfig | null>(null);
+  const [userWalletAddress, setUserWalletAddress] = useState<string | null>(null);
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'transactions' | 'members'>('transactions');
@@ -188,7 +191,45 @@ const SharedWalletDetailsScreen: React.FC = () => {
           <Button
             title="Withdraw"
             onPress={() => {
-              Alert.alert('Coming Soon', 'Withdrawal functionality will be available soon.');
+              if (!currentUser?.id) return;
+
+              const modalConfig: TransactionModalConfig = {
+                title: 'Withdraw from Shared Wallet',
+                subtitle: 'Transfer funds from the shared wallet to your personal wallet',
+                transactionType: 'shared_wallet_withdrawal',
+                recipientInfo: {
+                  name: 'Your Personal Wallet',
+                  address: userWalletAddress || 'Your Wallet',
+                  type: 'personal'
+                },
+                allowExternalDestinations: false,
+                allowFriendDestinations: false,
+                context: 'shared_wallet_withdrawal',
+                prefilledAmount: wallet.totalBalance || 0,
+                customRecipientInfo: {
+                  name: 'Your Personal Wallet',
+                  address: userWalletAddress || 'Your Wallet',
+                  type: 'personal'
+                },
+                onSuccess: (result) => {
+                  logger.info('Shared wallet withdrawal successful', { result });
+                  setTransactionModalConfig(null);
+                  // Refresh wallet data
+                  loadTransactions();
+                  // Reload wallet data by triggering a re-render
+                  setWallet(prev => prev ? {...prev} : prev);
+                },
+                onError: (error) => {
+                  logger.error('Shared wallet withdrawal failed', { error });
+                  Alert.alert('Withdrawal Failed', error);
+                  setTransactionModalConfig(null);
+                },
+                onClose: () => {
+                  setTransactionModalConfig(null);
+                }
+              };
+
+              setTransactionModalConfig(modalConfig);
             }}
             variant="secondary"
             size="medium"
@@ -200,7 +241,44 @@ const SharedWalletDetailsScreen: React.FC = () => {
           <Button
             title="Top Up"
             onPress={() => {
-              Alert.alert('Coming Soon', 'Top up functionality will be available soon.');
+              if (!currentUser?.id) return;
+
+              const modalConfig: TransactionModalConfig = {
+                title: 'Top Up Shared Wallet',
+                subtitle: 'Add funds to the shared wallet from your personal wallet',
+                transactionType: 'shared_wallet_funding',
+                recipientInfo: {
+                  name: wallet.name || 'Shared Wallet',
+                  address: wallet.id,
+                  type: 'shared_wallet'
+                },
+                allowExternalDestinations: false,
+                allowFriendDestinations: false,
+                context: 'shared_wallet_funding',
+                customRecipientInfo: {
+                  name: wallet.name || 'Shared Wallet',
+                  address: wallet.id,
+                  type: 'shared_wallet'
+                },
+                onSuccess: (result) => {
+                  logger.info('Shared wallet funding successful', { result });
+                  setTransactionModalConfig(null);
+                  // Refresh wallet data
+                  loadTransactions();
+                  // Reload wallet data by triggering a re-render
+                  setWallet(prev => prev ? {...prev} : prev);
+                },
+                onError: (error) => {
+                  logger.error('Shared wallet funding failed', { error });
+                  Alert.alert('Top Up Failed', error);
+                  setTransactionModalConfig(null);
+                },
+                onClose: () => {
+                  setTransactionModalConfig(null);
+                }
+              };
+
+              setTransactionModalConfig(modalConfig);
             }}
             variant="primary"
             size="medium"
@@ -289,6 +367,15 @@ const SharedWalletDetailsScreen: React.FC = () => {
                     </View>
         )}
       </ScrollView>
+
+      {/* Centralized Transaction Modal */}
+      {transactionModalConfig && (
+        <CentralizedTransactionModal
+          visible={!!transactionModalConfig}
+          config={transactionModalConfig}
+          sharedWalletId={wallet.id}
+        />
+      )}
     </Container>
   );
 };

@@ -78,8 +78,8 @@ class SimplifiedWalletService {
    * Get connection using optimized transaction utils (with endpoint rotation)
    */
   private async getConnection(): Promise<Connection> {
-    const { optimizedTransactionUtils } = await import('../../shared/transactionUtilsOptimized');
-    return await optimizedTransactionUtils.getConnection();
+    const { transactionUtils } = await import('../../shared/transactionUtils');
+    return await transactionUtils.getConnection();
   }
 
   /**
@@ -582,8 +582,8 @@ class SimplifiedWalletService {
               }, 'SimplifiedWalletService');
               
               try {
-                const { optimizedTransactionUtils } = await import('../../shared/transactionUtilsOptimized');
-                await optimizedTransactionUtils.switchToNextEndpoint();
+                const { transactionUtils } = await import('../../shared/transactionUtils');
+                await transactionUtils.switchToNextEndpoint();
                 // Wait a bit before retry to avoid immediate rate limit
                 await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
               } catch (rotateError) {

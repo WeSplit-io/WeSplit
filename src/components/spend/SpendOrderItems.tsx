@@ -10,7 +10,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { Split } from '../../services/splits/splitStorageService';
 import PhosphorIcon from '../shared/PhosphorIcon';
-import { formatAmountWithComma } from '../../utils/spend/formatUtils';
+import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 
 interface SpendOrderItemsProps {
   split: Split;

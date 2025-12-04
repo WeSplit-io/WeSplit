@@ -15,8 +15,8 @@ import { BalanceUtils } from '../shared/balanceUtils';
 // Helper function to verify transaction on blockchain
 async function verifyTransactionOnBlockchain(transactionSignature: string): Promise<boolean> {
   try {
-    const { optimizedTransactionUtils } = await import('../shared/transactionUtilsOptimized');
-    const connection = await optimizedTransactionUtils.getConnection();
+    const { transactionUtils } = await import('../shared/transactionUtils');
+    const connection = await transactionUtils.getConnection();
     
     const transactionStatus = await connection.getSignatureStatus(transactionSignature, { 
       searchTransactionHistory: true 
@@ -74,8 +74,8 @@ export class SplitWalletPayments {
       const wallet = walletResult.wallet;
       
       // Get connection
-      const { optimizedTransactionUtils } = await import('../shared/transactionUtilsOptimized');
-      const connection = await optimizedTransactionUtils.getConnection();
+      const { transactionUtils } = await import('../shared/transactionUtils');
+      const connection = await transactionUtils.getConnection();
 
       // Get balance from blockchain
       try {
@@ -298,17 +298,17 @@ export class SplitWalletPayments {
         };
       }
 
-      // Execute transaction using internal transfer service for proper deduplication protection
-      // This ensures degen split funding is protected against race conditions
-      const { internalTransferService } = await import('../blockchain/transaction');
-      const transactionResult = await internalTransferService.instance.sendInternalTransfer({
+      // Execute transaction using centralized transaction handler for proper validation and deduplication
+      // This ensures degen split funding goes through the centralized system
+      const { CentralizedTransactionHandler } = await import('../transactions/CentralizedTransactionHandler');
+      const transactionResult = await CentralizedTransactionHandler.executeTransaction({
         userId: participantId,
-        to: wallet.walletAddress,
+        context: 'degen_split_lock',
         amount: roundedAmount,
         currency: 'USDC',
-        memo: `Degen Split fund locking - ${wallet.id}`,
-        transactionType: 'split_payment',
-        groupId: wallet.id
+        splitWalletId: wallet.id,
+        splitId: wallet.id,
+        memo: `Degen Split fund locking - ${wallet.id}`
       });
 
       logger.info('Degen split fund locking transaction result', {
@@ -570,17 +570,18 @@ export class SplitWalletPayments {
         // Continue with transaction - balance check is not critical
       }
 
-      // Execute transaction using internal transfer service with deduplication protection
-      // This ensures proper race condition prevention and duplicate transaction handling
-      const { internalTransferService } = await import('../blockchain/transaction');
-      const transactionResult = await internalTransferService.instance.sendInternalTransfer({
+      // Execute transaction using centralized transaction handler for proper validation and deduplication
+      // This ensures fair split payments go through the centralized system
+      const { CentralizedTransactionHandler } = await import('../transactions/CentralizedTransactionHandler');
+      const transactionResult = await CentralizedTransactionHandler.executeTransaction({
         userId: participantId,
-        to: wallet.walletAddress,
+        context: 'fair_split_contribution',
         amount: roundedAmount,
         currency: 'USDC',
-        memo: `Fair Split participant payment - ${wallet.id}`,
-        transactionType: 'split_payment',
-        groupId: wallet.id
+        splitWalletId: wallet.id,
+        splitId: wallet.id,
+        billId: billId,
+        memo: `Fair Split participant payment - ${wallet.id}`
       });
           
           if (!transactionResult.success) {
@@ -815,16 +816,21 @@ export class SplitWalletPayments {
         walletAddress: wallet.walletAddress
       }, 'SplitWalletPayments');
 
-      // Execute transaction using external transfer service for proper deduplication protection
+      // Execute transaction using centralized handler for proper deduplication and validation
       // This ensures split wallet withdrawals are protected against race conditions
-      const { externalTransferService } = await import('../blockchain/transaction');
-      const transactionResult = await externalTransferService.instance.sendExternalTransfer({
-        userId: creatorId, // Use creator ID for deduplication key
-        to: recipientAddress,
+      const { CentralizedTransactionHandler } = await import('../transactions/CentralizedTransactionHandler');
+      const transactionResult = await CentralizedTransactionHandler.executeTransaction({
+        context: 'fair_split_withdrawal',
+        userId: creatorId.toString(),
         amount: withdrawalAmount,
         currency: wallet.currency,
-        memo: description || `Fair Split funds extraction for bill ${wallet.billId}`,
-        transactionType: 'split_wallet_withdrawal'
+        sourceType: 'split_wallet',
+        destinationType: 'external',
+        splitWalletId,
+        destinationAddress: recipientAddress,
+        splitId: wallet.splitId,
+        billId: wallet.billId,
+        memo: description || `Fair Split funds extraction for bill ${wallet.billId}`
       });
       
       logger.info('💸 Fair split transaction result', {
@@ -1082,16 +1088,20 @@ export class SplitWalletPayments {
         };
       }
 
-      // Execute transaction using external transfer service for proper deduplication protection
+      // Execute transaction using centralized handler for proper deduplication and validation
       // This ensures degen split payouts are protected against race conditions
-      const { externalTransferService } = await import('../blockchain/transaction');
-      const transactionResult = await externalTransferService.instance.sendExternalTransfer({
-        userId: winnerUserId, // Use winner ID for deduplication key
-        to: winnerAddress,
+      const { CentralizedTransactionHandler } = await import('../transactions/CentralizedTransactionHandler');
+      const transactionResult = await CentralizedTransactionHandler.executeTransaction({
+        context: 'shared_wallet_withdrawal',
+        userId: winnerUserId.toString(),
         amount: actualTotalAmount,
         currency: wallet.currency,
-        memo: description || `Degen Split winner payout for ${winnerUserId}`,
-        transactionType: 'split_wallet_withdrawal'
+        sourceType: 'shared_wallet',
+        destinationType: 'external',
+        sharedWalletId: splitWalletId,
+        destinationAddress: winnerAddress,
+        destinationId: winnerUserId.toString(),
+        memo: description || `Degen Split winner payout for ${winnerUserId}`
       });
       
       logger.info('💸 Degen winner payout transaction result', {
@@ -1414,16 +1424,20 @@ export class SplitWalletPayments {
         };
       }
 
-      // Execute transaction using external transfer service for proper deduplication protection
+      // Execute transaction using centralized handler for proper deduplication and validation
       // This ensures degen split loser payments are protected against race conditions
-      const { externalTransferService } = await import('../blockchain/transaction');
-      const transactionResult = await externalTransferService.instance.sendExternalTransfer({
-        userId: loserUserId, // Use loser ID for deduplication key
-        to: destinationAddress,
+      const { CentralizedTransactionHandler } = await import('../transactions/CentralizedTransactionHandler');
+      const transactionResult = await CentralizedTransactionHandler.executeTransaction({
+        context: 'shared_wallet_withdrawal',
+        userId: loserUserId.toString(),
         amount: loserLockedAmount,
         currency: wallet.currency,
-        memo: description || `Degen Split loser transfer to external card/wallet for ${loserUserId}`,
-        transactionType: 'split_wallet_withdrawal'
+        sourceType: 'shared_wallet',
+        destinationType: 'external',
+        sharedWalletId: splitWalletId,
+        destinationAddress: destinationAddress,
+        destinationId: loserUserId.toString(),
+        memo: description || `Degen Split loser transfer to external card/wallet for ${loserUserId}`
       });
       
       logger.info('💸 Degen loser payment transaction result', {
@@ -1637,16 +1651,21 @@ export class SplitWalletPayments {
         };
       }
 
-      // Execute transaction using external transfer service for proper deduplication protection
+      // Execute transaction using centralized handler for proper deduplication and validation
       // This ensures split wallet transfers are protected against race conditions
-      const { externalTransferService } = await import('../blockchain/transaction');
-      const transactionResult = await externalTransferService.instance.sendExternalTransfer({
-        userId: wallet.creatorId, // Use creator ID for deduplication key
-        to: castAccountAddress,
+      const { CentralizedTransactionHandler } = await import('../transactions/CentralizedTransactionHandler');
+      const transactionResult = await CentralizedTransactionHandler.executeTransaction({
+        context: 'fair_split_withdrawal',
+        userId: wallet.creatorId.toString(),
         amount: availableBalance,
         currency: wallet.currency,
-        memo: description || `Cast account transfer for ${wallet.id}`,
-        transactionType: 'split_wallet_withdrawal'
+        sourceType: 'split_wallet',
+        destinationType: 'external',
+        splitWalletId,
+        destinationAddress: castAccountAddress,
+        splitId: wallet.splitId,
+        billId: wallet.billId,
+        memo: description || `Cast account transfer for ${wallet.id}`
       });
 
       if (!transactionResult.success) {
@@ -1751,16 +1770,21 @@ export class SplitWalletPayments {
         };
       }
 
-      // Execute transaction using external transfer service for proper deduplication protection
+      // Execute transaction using centralized handler for proper deduplication and validation
       // This ensures split wallet transfers are protected against race conditions
-      const { externalTransferService } = await import('../blockchain/transaction');
-      const transactionResult = await externalTransferService.instance.sendExternalTransfer({
-        userId: userId, // Use the target user ID for deduplication key
-        to: userWallet.address,
+      const { CentralizedTransactionHandler } = await import('../transactions/CentralizedTransactionHandler');
+      const transactionResult = await CentralizedTransactionHandler.executeTransaction({
+        context: 'fair_split_withdrawal',
+        userId: userId.toString(),
         amount: amount,
         currency: wallet.currency,
-        memo: `User wallet transfer for ${wallet.id}`,
-        transactionType: 'split_wallet_withdrawal'
+        sourceType: 'split_wallet',
+        destinationType: 'external',
+        splitWalletId,
+        destinationAddress: userWallet.address,
+        splitId: wallet.splitId,
+        billId: wallet.billId,
+        memo: `User wallet transfer for ${wallet.id}`
       });
 
       if (!transactionResult.success) {

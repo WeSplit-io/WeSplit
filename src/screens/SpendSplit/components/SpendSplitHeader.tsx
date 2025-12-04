@@ -14,7 +14,7 @@ import { SpendOrderBadge } from '../../../components/spend';
 import PhosphorIcon from '../../../components/shared/PhosphorIcon';
 import { StyleSheet } from 'react-native';
 import { Split } from '../../../services/splits/splitStorageService';
-import { formatAmountWithComma } from '../../../utils/spend/formatUtils';
+import { formatAmountWithComma } from '../../../utils/ui/format/formatUtils';
 import { extractOrderData } from '../../../utils/spend/spendDataUtils';
 
 interface SpendSplitHeaderProps {

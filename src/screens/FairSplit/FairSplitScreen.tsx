@@ -28,11 +28,15 @@ import { logger } from '../../services/analytics/loggingService';
 import { debugSplitData, validateSplitData, clearSplitCaches } from '../../services/shared/splitDataUtils';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
+import { useSplitWallet } from '../../hooks/useSplitWallet';
+import { useSplitRealtime } from '../../hooks/useSplitRealtime';
+import { splitUtils } from '../../utils/performance/splitUtils';
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
 import { Container, Button, AppleSlider, ErrorScreen, ModernLoader } from '../../components/shared';
 import Modal from '../../components/shared/Modal';
+import CentralizedTransactionModal, { type TransactionModalConfig } from '../../components/shared/CentralizedTransactionModal';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { 
   getParticipantStatusDisplayText
@@ -51,26 +55,39 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const { currentUser } = state;
   
   // Subscribe to live balance updates as a fallback when direct balance fetch fails
-  // This ensures we get the correct balance even when network requests fail initially
-  const [balanceCheckError, setBalanceCheckError] = useState<string | null>(null); // Track balance check errors
-  const { balance: liveBalance } = useLiveBalance(
-    currentUser?.wallet_address || null,
-    {
-      enabled: !!currentUser?.wallet_address,
-      onBalanceChange: (update) => {
-        // Clear balance check error if live balance shows sufficient funds
-        // This handles cases where initial balance check failed but live balance succeeds
-        if (update.usdcBalance !== null && update.usdcBalance !== undefined && balanceCheckError) {
-          logger.info('Live balance update received, clearing balance check error if sufficient', {
-            usdcBalance: update.usdcBalance,
-            address: update.address,
-            hasError: !!balanceCheckError
-          }, 'FairSplitScreen');
-          
-          // Clear error if balance is now available (we'll re-check when user tries to pay)
-          // The actual balance check will use live balance as fallback
-          setBalanceCheckError(null);
+  // Get wallet address for balance checking (same as transaction validation)
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  // Load wallet address on mount
+  useEffect(() => {
+    const loadWalletAddress = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        const { simplifiedWalletService } = await import('../../services/blockchain/wallet/simplifiedWalletService');
+        const walletInfo = await simplifiedWalletService.getWalletInfo(currentUser.id.toString());
+        if (walletInfo) {
+          setWalletAddress(walletInfo.address);
         }
+      } catch (error) {
+        logger.error('Failed to load wallet address for balance', { userId: currentUser.id, error }, 'FairSplitScreen');
+      }
+    };
+
+    loadWalletAddress();
+  }, [currentUser?.id]);
+
+  // This ensures we get the correct balance even when network requests fail initially
+  const { balance: liveBalance } = useLiveBalance(
+    walletAddress,
+    {
+      enabled: !!walletAddress,
+      onBalanceChange: (update) => {
+        // Live balance updates are now handled by the centralized transaction modal
+        logger.debug('Live balance update received', {
+          usdcBalance: update.usdcBalance,
+          address: update.address
+        }, 'FairSplitScreen');
       }
     }
   );
@@ -79,19 +96,21 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const [isCreatingWallet, setIsCreatingWallet] = useState(false);
   const [splitWallet, setSplitWallet] = useState<SplitWallet | null>((existingSplitWallet as SplitWallet) || null);
   const [isSplitConfirmed, setIsSplitConfirmed] = useState(false); // Track if split has been confirmed
-  const [isSendingPayment, setIsSendingPayment] = useState(false); // Track if user is sending payment
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null); // Track which participant is being edited
   const [editAmount, setEditAmount] = useState(''); // Track the amount being edited
   const [showEditModal, setShowEditModal] = useState(false); // Track if edit modal is shown
   const [showPaymentModal, setShowPaymentModal] = useState(false); // Track if payment modal is shown
-  const [paymentAmount, setPaymentAmount] = useState(''); // Track the payment amount
-  const [isCheckingBalance, setIsCheckingBalance] = useState(false); // Track if balance check is in progress
+  const [transactionModalConfig, setTransactionModalConfig] = useState<TransactionModalConfig | null>(null);
   const [isInitializing, setIsInitializing] = useState(true); // Track if initialization is in progress - start as true to show loader immediately
   const [showSplitModal, setShowSplitModal] = useState(false); // Track if split modal is shown
   const [selectedTransferMethod, setSelectedTransferMethod] = useState<'external-wallet' | 'in-app-wallet' | null>(null);
   const [showSignatureStep, setShowSignatureStep] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
-  
+
+  // Balance checking state
+  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+  const [balanceCheckError, setBalanceCheckError] = useState<string | null>(null);
+
   // Error state management
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -221,6 +240,58 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   }, []);
 
+  // Balance checking function
+  const checkUserBalance = useCallback(async (requiredAmount: number) => {
+    if (!currentUser) return;
+
+    try {
+      setIsCheckingBalance(true);
+      setBalanceCheckError(null);
+
+      // Use live balance if available and recent (avoid unnecessary API calls)
+      if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined) {
+        const userUsdcBalance = liveBalance.usdcBalance;
+
+        if (userUsdcBalance < requiredAmount) {
+          setBalanceCheckError(
+            `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
+          );
+        } else {
+          setBalanceCheckError(null);
+        }
+        setIsCheckingBalance(false);
+        return;
+      }
+
+      // Fallback to balance check utility only if live balance unavailable
+      const { getUserBalanceWithFallback } = await import('../../services/shared/balanceCheckUtils');
+      const balanceResult = await getUserBalanceWithFallback(currentUser.id.toString(), {
+        useLiveBalance: true
+      });
+
+      const userUsdcBalance = balanceResult.usdcBalance;
+
+      if (userUsdcBalance < requiredAmount) {
+        setBalanceCheckError(
+          `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
+        );
+      } else {
+        setBalanceCheckError(null);
+      }
+
+      setIsCheckingBalance(false);
+    } catch (error) {
+      logger.error('Balance check failed', {
+        error: error instanceof Error ? error.message : String(error),
+        userId: currentUser?.id,
+        requiredAmount
+      }, 'FairSplitScreen');
+
+      setBalanceCheckError('Failed to check balance. Please try again.');
+      setIsCheckingBalance(false);
+    }
+  }, [currentUser, liveBalance]);
+
   const handleShowPrivateKey = async () => {
     if (splitWallet?.id && currentUser?.id) {
       try {
@@ -262,8 +333,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     return participants.reduce((sum, p) => sum + p.amountLocked, 0);
   }, [participants]);
 
+  // Use centralized split utilities for calculations
   const calculateTotalAssigned = useCallback(() => {
-    return participants.reduce((sum, p) => sum + (p.amountOwed || 0), 0);
+    return splitUtils.calculation.calculateTotalRemaining(participants.map(p => ({
+      id: p.id,
+      name: p.name || '',
+      amountOwed: p.amountOwed || 0,
+      amountPaid: p.amountPaid || 0
+    }))) + participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
   }, [participants]);
 
   const calculateTotalPaid = useCallback((walletParticipants: any[]) => {
@@ -271,7 +348,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   }, []);
 
   const hasInvalidAmounts = useCallback(() => {
-    return participants.some(p => !p.amountOwed || p.amountOwed <= 0);
+    const validation = splitUtils.validation.validateParticipants(participants.map(p => ({
+      id: p.id,
+      name: p.name || '',
+      amountOwed: p.amountOwed || 0,
+      amountPaid: p.amountPaid || 0
+    })));
+    return !validation.isValid;
   }, [participants]);
 
   const hasZeroAmounts = useCallback(() => {
@@ -1629,7 +1712,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     logger.error(`${context}`, error as Record<string, unknown>, 'FairSplitScreen');
     setError(error instanceof Error ? error.message : 'An unexpected error occurred');
     setIsLoading(false);
-    setIsSendingPayment(false);
     setIsCreatingWallet(false);
     if (showAlert) {
       Alert.alert('Error', `Failed to ${context.toLowerCase()}. Please try again.`);
@@ -2129,14 +2211,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     setEditAmount('');
   };
 
-  // Handle payment modal close
-  const handlePaymentModalClose = () => {
-    setShowPaymentModal(false);
-    setPaymentAmount('');
-    setIsSendingPayment(false);
-    setIsCheckingBalance(false);
-    setBalanceCheckError(null);
-  };
 
   // Phase 2: User sends their payment
   const handleSendMyShares = async () => {
@@ -2166,11 +2240,39 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     const { roundUsdcAmount } = await import('../../utils/ui/format/formatUtils');
     const remainingAmount = roundUsdcAmount(userParticipant.amountOwed - userParticipant.amountPaid);
     
-    // Show modal immediately for better UX
-    setPaymentAmount(remainingAmount.toString());
-    setBalanceCheckError(null);
-    setIsCheckingBalance(true);
-    setShowPaymentModal(true);
+    // Show centralized transaction modal
+    const modalConfig: TransactionModalConfig = {
+      title: 'Contribute to Split',
+      subtitle: `Pay your share to the fair split`,
+      showAmountInput: true,
+      showMemoInput: false,
+      showQuickAmounts: false,
+      allowExternalDestinations: false,
+      allowFriendDestinations: false,
+      context: 'fair_split_contribution',
+      prefilledAmount: remainingAmount,
+      customRecipientInfo: {
+        name: 'Fair Split Wallet',
+        address: splitWallet.walletAddress,
+        type: 'split'
+      },
+      onSuccess: (result) => {
+        logger.info('Fair split contribution successful', { result });
+        setTransactionModalConfig(null);
+        // Reload data to reflect the payment
+        loadSplitWalletData();
+      },
+      onError: (error) => {
+        logger.error('Fair split contribution failed', { error });
+        Alert.alert('Payment Failed', error);
+        setTransactionModalConfig(null);
+      },
+      onClose: () => {
+        setTransactionModalConfig(null);
+      }
+    };
+
+    setTransactionModalConfig(modalConfig);
 
     // Check balance in the background (non-blocking)
     checkUserBalance(remainingAmount).catch(error => {
@@ -2180,100 +2282,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     });
   };
 
-  // Separate function to check balance (runs in background)
-  const checkUserBalance = async (requiredAmount: number) => {
-    if (!currentUser) return;
-
-    try {
-      setIsCheckingBalance(true);
-      setBalanceCheckError(null);
-      
-      // Get wallet address for live balance fallback
-      const { walletService } = await import('../../services/blockchain/wallet');
-      const userWallet = await walletService.getWalletInfo(currentUser.id.toString());
-      
-      if (!userWallet) {
-        setBalanceCheckError('Could not load wallet information');
-        setIsCheckingBalance(false);
-        return;
-      }
-
-      // PRIORITY 1: Use live balance if already available (from useLiveBalance hook)
-      // This is the most reliable source since it's already polling
-      if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined && liveBalance.usdcBalance > 0) {
-        const userUsdcBalance = liveBalance.usdcBalance;
-        
-        logger.info('User balance check completed using live balance', {
-          userUsdcBalance,
-          requiredAmount,
-          userAddress: userWallet.address,
-          source: 'live'
-        }, 'FairSplitScreen');
-        
-        if (userUsdcBalance < requiredAmount) {
-          setBalanceCheckError(
-            `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
-          );
-        } else {
-          setBalanceCheckError(null);
-        }
-        setIsCheckingBalance(false);
-        return;
-      }
-
-      // PRIORITY 2: Use centralized balance check utility with live balance fallback
-      const { getUserBalanceWithFallback } = await import('../../services/shared/balanceCheckUtils');
-      const balanceResult = await getUserBalanceWithFallback(currentUser.id.toString(), {
-        useLiveBalance: true,
-        walletAddress: userWallet.address || currentUser.wallet_address
-      });
-      
-      const userUsdcBalance = balanceResult.usdcBalance;
-      
-      logger.info('User balance check completed', {
-        userUsdcBalance,
-        requiredAmount,
-        userAddress: userWallet.address,
-        source: balanceResult.source,
-        isReliable: balanceResult.isReliable
-      }, 'FairSplitScreen');
-      
-      // Only show error if we have a reliable balance check and it's insufficient
-      if (balanceResult.isReliable && userUsdcBalance < requiredAmount) {
-        setBalanceCheckError(
-          `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
-        );
-      } else if (!balanceResult.isReliable && userUsdcBalance > 0 && userUsdcBalance < requiredAmount) {
-        // If balance check is unreliable but we got a balance, still warn if insufficient
-        setBalanceCheckError(
-          `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
-        );
-      } else {
-        // Clear any previous error if balance is sufficient or check unavailable
-        setBalanceCheckError(null);
-      }
-    } catch (error) {
-      logger.warn('Could not check user balance', {
-        error: error instanceof Error ? error.message : String(error)
-      }, 'FairSplitScreen');
-      
-      // If error occurs but we have live balance, use it as fallback
-      if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined) {
-        const userUsdcBalance = liveBalance.usdcBalance;
-        if (userUsdcBalance < requiredAmount) {
-          setBalanceCheckError(
-            `Insufficient balance: You have ${userUsdcBalance.toFixed(6)} USDC but need ${requiredAmount.toFixed(6)} USDC`
-          );
-        } else {
-          setBalanceCheckError(null);
-        }
-      } else {
-        // Don't set error - allow user to proceed (they'll see error when trying to pay)
-      }
-    } finally {
-      setIsCheckingBalance(false);
-    }
-  };
 
   // Handle split funds action
   const handleSplitFunds = () => {
@@ -3262,286 +3270,9 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
   };
 
-
-  const handlePaymentModalConfirm = async () => {
-    if (!splitWallet || !currentUser) {
-      Alert.alert('Error', 'Unable to process payment');
-      return;
-    }
-
-    const userParticipant = participants.find(p => p.id === currentUser.id.toString());
-    if (!userParticipant) {
-      Alert.alert('Error', 'You are not a participant in this split');
-      return;
-    }
-
-    // Check if user has already paid their full share using centralized helper
-    if (hasParticipantPaidFully(userParticipant)) {
-      Alert.alert('Already Paid', 'You have already paid your full share for this split');
-      return;
-    }
-
-    const { roundUsdcAmount } = await import('../../utils/ui/format/formatUtils');
-    const remainingAmount = userParticipant.amountOwed - userParticipant.amountPaid;
-    const roundedRemainingAmount = roundUsdcAmount(remainingAmount);
-    
-    // Use the remaining amount as the payment amount
-    const amount = roundedRemainingAmount;
-    
-    if (amount <= 0) {
-      Alert.alert('Invalid Amount', 'You have no remaining balance to pay');
-      return;
-    }
-
-    // CRITICAL: Capture split wallet balance before payment for verification
-    let splitWalletBalanceBefore = 0;
-    try {
-      const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
-      const balanceResult = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
-      if (balanceResult.success) {
-        splitWalletBalanceBefore = balanceResult.balance;
-        logger.info('Captured split wallet balance before payment', {
-          splitWalletAddress: splitWallet.walletAddress,
-          balanceBefore: splitWalletBalanceBefore,
-          expectedIncrease: amount
-        }, 'FairSplitScreen');
-      }
-    } catch (balanceError) {
-      logger.warn('Failed to capture split wallet balance before payment', {
-        error: balanceError instanceof Error ? balanceError.message : String(balanceError)
-      }, 'FairSplitScreen');
-      // Continue anyway - we'll try to verify later
-    }
-
-    try {
-      // CRITICAL: Set checking balance to false first, then set sending payment
-      // This ensures the slider text updates correctly
-      setIsCheckingBalance(false);
-      setIsSendingPayment(true);
-      setShowPaymentModal(false);
-      
-      // Ensure user has a wallet before attempting payment
-      const { walletService } = await import('../../services/blockchain/wallet');
-      const userWallet = await walletService.getWalletInfo(currentUser.id.toString());
-      if (!userWallet || !userWallet.secretKey) {
-        Alert.alert(
-          'Wallet Required',
-          'You need to set up a wallet before making payments. Would you like to create one now?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Create Wallet', 
-              onPress: async () => {
-                try {
-                  const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
-                  if (walletResult.success) {
-                    Alert.alert('Wallet Created', 'Your wallet has been created successfully. You can now make payments.');
-                  } else {
-                    Alert.alert('Error', walletResult.error || 'Failed to create wallet');
-                  }
-                } catch (error) {
-                  Alert.alert('Error', 'Failed to create wallet. Please try again.');
-                }
-              }
-            }
-          ]
-        );
-        return;
-      }
-      
-      // Process payment using SplitWalletService
-      const { SplitWalletService } = await import('../../services/split');
-      const result = await SplitWalletService.payParticipantShare(
-        splitWallet.id,
-        currentUser.id.toString(),
-        amount
-      );
-      
-      if (result.success) {
-        logger.info('Payment transaction submitted successfully', {
-          amount: amount,
-          transactionSignature: result.transactionSignature
-        }, 'FairSplitScreen');
-        
-        // Wait for blockchain confirmation before updating UI
-        try {
-          const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
-          
-          // Wait up to 30 seconds for blockchain confirmation
-          let confirmed = false;
-          let attempts = 0;
-          const maxAttempts = 30; // 30 seconds
-          
-          logger.info('Waiting for blockchain confirmation', {
-            splitWalletId: splitWallet.id,
-            maxAttempts
-          }, 'FairSplitScreen');
-          
-          while (!confirmed && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-            
-            const balanceResult = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
-            if (balanceResult.success && balanceResult.balance > 0) {
-              confirmed = true;
-              logger.info('Blockchain confirmation received', {
-                splitWalletId: splitWallet.id,
-                onChainBalance: balanceResult.balance,
-                attempts
-              }, 'FairSplitScreen');
-            }
-            attempts++;
-          }
-          
-          // CRITICAL: Always reload data after payment, regardless of confirmation status
-          // The payment service updates the database immediately, so we should refresh the UI
-          // Wait a moment for the database to be updated
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Force reload split wallet data to get updated participant status
-          await loadSplitWalletData();
-          await loadCompletionData();
-          
-          if (confirmed) {
-            // Show success message
-            Alert.alert(
-              '✅ Payment Confirmed!',
-              `Your payment of ${amount.toFixed(2)} USDC has been confirmed on the blockchain.`,
-              [{ text: 'OK' }]
-            );
-          } else {
-            // Show warning about pending confirmation but data is refreshed
-            Alert.alert(
-              'Payment Submitted',
-              `Your payment of ${amount.toFixed(2)} USDC has been submitted. It may take a few minutes to confirm on the blockchain. Your payment status has been updated.`,
-              [{ text: 'OK' }]
-            );
-          }
-        } catch (confirmationError) {
-          logger.error('Failed to confirm payment on blockchain', {
-            splitWalletId: splitWallet.id,
-            error: confirmationError instanceof Error ? confirmationError.message : String(confirmationError)
-          }, 'FairSplitScreen');
-          
-          // CRITICAL: Still reload data even if confirmation check fails
-          // The payment might have succeeded even if we couldn't verify it
-          try {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await loadSplitWalletData();
-            await loadCompletionData();
-          } catch (reloadError) {
-            logger.error('Failed to reload data after payment', {
-              error: reloadError instanceof Error ? reloadError.message : String(reloadError)
-            }, 'FairSplitScreen');
-          }
-          
-          // Fallback: show success but warn about confirmation
-          Alert.alert(
-            'Payment Submitted',
-            `Your payment of ${amount.toFixed(2)} USDC has been submitted. Please check back in a few minutes to confirm it's processed. Your payment status has been updated.`,
-            [{ text: 'OK' }]
-          );
-        }
-      } else {
-        const errorMessage = result.error || 'Failed to process payment';
-        
-        // Check if this is a verification timeout - transaction might have succeeded on-chain
-        const isVerificationTimeout = errorMessage.includes('Transaction verification failed') ||
-                                      errorMessage.includes('Transaction confirmation timed out') ||
-                                      errorMessage.includes('confirmation failed') ||
-                                      errorMessage.includes('transaction was not found on-chain');
-        
-        // If verification timed out and we captured balance before, verify on-chain
-        if (isVerificationTimeout && splitWalletBalanceBefore > 0) {
-          // CRITICAL: Check on-chain balance to verify if transaction actually succeeded
-          // Even if verification timed out, the transaction might have gone through
-          logger.info('Verification timeout detected for payment, checking on-chain balance to verify transaction', {
-            splitWalletId: splitWallet.id,
-            splitWalletAddress: splitWallet.walletAddress,
-            expectedAmount: amount,
-            balanceBefore: splitWalletBalanceBefore,
-            hasTransactionSignature: !!result.transactionSignature,
-            transactionSignature: result.transactionSignature
-          }, 'FairSplitScreen');
-          
-          try {
-            const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
-            
-            // Wait a moment for blockchain to update
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            
-            // Check split wallet balance
-            const balanceResult = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
-            const actualBalance = balanceResult.balance;
-            const balanceIncrease = actualBalance - splitWalletBalanceBefore;
-            
-            logger.info('On-chain balance verification after payment timeout', {
-              splitWalletBalanceBefore,
-              splitWalletBalanceAfter: actualBalance,
-              balanceIncrease,
-              expectedAmount: amount,
-              transactionSucceeded: balanceIncrease >= (amount - 0.01) // Allow small tolerance
-            }, 'FairSplitScreen');
-            
-            // If split wallet balance increased by the expected amount, transaction succeeded
-            if (balanceIncrease >= (amount - 0.01)) {
-              logger.info('Payment verified on-chain despite timeout - treating as success', {
-                splitWalletId: splitWallet.id,
-                balanceIncrease,
-                expectedAmount: amount
-              }, 'FairSplitScreen');
-              
-              // CRITICAL: Reload data to update participant status
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              await loadSplitWalletData();
-              await loadCompletionData();
-              
-              // Show success message with transaction signature if available
-              const transactionSignature = result.transactionSignature;
-              const successMessage = transactionSignature
-                ? `Your payment of ${amount.toFixed(2)} USDC has been verified on the blockchain!\n\nTransaction: ${transactionSignature.slice(0, 8)}...\n\nAlthough the initial verification timed out, we confirmed the transaction succeeded.`
-                : `Your payment of ${amount.toFixed(2)} USDC has been verified on the blockchain!\n\nAlthough the initial verification timed out, we confirmed the transaction succeeded.`;
-              
-              Alert.alert(
-                '✅ Payment Verified!',
-                successMessage,
-                [{ text: 'OK' }]
-              );
-              return; // Exit early - payment succeeded
-            }
-          } catch (balanceCheckError) {
-            logger.warn('Failed to verify on-chain balance after payment timeout', {
-              error: balanceCheckError instanceof Error ? balanceCheckError.message : String(balanceCheckError)
-            }, 'FairSplitScreen');
-            // Continue with normal error handling if balance check fails
-          }
-        }
-        
-        // Provide user-friendly error messages
-        let userFriendlyMessage = errorMessage;
-        if (errorMessage.includes('could not be confirmed')) {
-          userFriendlyMessage = 'Your payment was submitted but could not be confirmed on the blockchain. Please check your transaction history or try again.';
-        } else if (errorMessage.includes('Insufficient')) {
-          userFriendlyMessage = 'Insufficient USDC balance. Please add USDC to your wallet before making this payment.';
-        } else if (errorMessage.includes('Transaction failed')) {
-          userFriendlyMessage = 'Transaction failed. This could be due to network issues or insufficient balance. Please try again.';
-        } else if (errorMessage.includes('User wallet not found')) {
-          userFriendlyMessage = 'Wallet not found. Please ensure you have a wallet set up and try again.';
-        } else if (isVerificationTimeout) {
-          userFriendlyMessage = 'Your payment was submitted but verification timed out. The transaction may still be processing. Please check back in a few moments or check your transaction history.';
-        }
-        
-        Alert.alert('Payment Failed', userFriendlyMessage, [{ text: 'OK' }]);
-      }
-    } catch (error) {
-      handleError(error, 'process payment');
-    } finally {
-      setIsSendingPayment(false);
-      setPaymentAmount('');
-    }
-  };
-
   // Status functions now use shared utilities
 
+  // Show loader while split is initializing or if splitData is missing
   // Show error state if there's an error
   if (error) {
     return (
@@ -3772,20 +3503,16 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             
             case 'pay-share': {
               const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
-              const buttonTitle = isSendingPayment 
-                ? 'Sending...' 
-                : (currentUserParticipant && currentUserParticipant.amountPaid > 0)
-                  ? 'Pay Remaining'
-                  : 'Pay My Share';
-              
+              const buttonTitle = (currentUserParticipant && currentUserParticipant.amountPaid > 0)
+                ? 'Pay Remaining'
+                : 'Pay My Share';
+
               return (
                 <View style={styles.buttonContainer}>
                   <Button
                     title={buttonTitle}
                     onPress={handleSendMyShares}
                     variant="primary"
-                    disabled={isSendingPayment}
-                    loading={isSendingPayment}
                     fullWidth={true}
                   />
                 </View>
@@ -3844,70 +3571,16 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         </View>
       </Modal>
 
-      {/* Payment Modal */}
-      <Modal
-        visible={showPaymentModal}
-        onClose={handlePaymentModalClose}
-        title="Pay Your Share"
-        showHandle={true}
-        closeOnBackdrop={true}
-      >
-        <View style={styles.modalInputContainer}>
-          <Text style={styles.modalHelperText}>
-            {(() => {
-              const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
-              if (!currentUserParticipant) {return 'Slide to pay 0.00 USDC';}
-              
-              const totalOwed = currentUserParticipant.amountOwed || 0;
-              const amountPaid = currentUserParticipant.amountPaid || 0;
-              const remaining = totalOwed - amountPaid;
-              const billName = processedBillData?.title || billData?.title || 'this bill';
-              
-              return `Slide to pay ${remaining.toFixed(2)} USDC for ${billName}`;
-            })()}
-          </Text>
-        </View>
-
-        <View style={styles.modalButtonsContainer}>
-          {balanceCheckError && !isCheckingBalance ? (
-            <View style={styles.balanceErrorContainer}>
-              <Text style={styles.balanceErrorText}>
-                {balanceCheckError}
-              </Text>
-              <Text style={styles.balanceErrorSubtext}>
-                You can still attempt to pay, but the transaction may fail.
-              </Text>
-            </View>
-          ) : null}
-          
-          <AppleSlider
-            onSlideComplete={handlePaymentModalConfirm}
-            disabled={isSendingPayment || isCheckingBalance}
-            loading={isSendingPayment || isCheckingBalance}
-            text={(() => {
-              // CRITICAL: Check balance state first - this takes priority over sending payment
-              if (isCheckingBalance && !isSendingPayment) {
-                return 'Checking balance...';
-              }
-              
-              // If sending payment, show sending text
-              if (isSendingPayment) {
-                return 'Processing payment...';
-              }
-              
-              const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
-              if (!currentUserParticipant) {return 'Slide to Pay';}
-              
-              const totalOwed = currentUserParticipant.amountOwed || 0;
-              const amountPaid = currentUserParticipant.amountPaid || 0;
-              const remaining = totalOwed - amountPaid;
-              
-              return `Slide to Pay ${remaining.toFixed(2)} USDC`;
-            })()}
-            style={{flex: 1}}
-          />
-        </View>
-      </Modal>
+      {/* Centralized Transaction Modal */}
+      {transactionModalConfig && (
+        <CentralizedTransactionModal
+          visible={!!transactionModalConfig}
+          config={transactionModalConfig}
+          splitWalletId={splitWallet?.id}
+          splitId={splitData?.id}
+          billId={splitData?.billId}
+        />
+      )}
 
       {/* Split Modal */}
       <Modal

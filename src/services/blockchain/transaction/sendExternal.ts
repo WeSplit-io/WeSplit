@@ -26,11 +26,11 @@ import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig'
 import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType } from '../../../config/constants/feeConfig';
 import { solanaWalletService } from '../wallet';
 import { logger } from '../../analytics/loggingService';
-import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimized';
+import { transactionUtils } from '../../shared/transactionUtils';
 import type { LinkedWallet } from '../wallet/LinkedWalletService';
 import { processUsdcTransfer } from './transactionSigningService';
 import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS, type BlockhashWithTimestamp } from '../../shared/blockhashUtils';
-import { verifyTransactionOnBlockchain } from '../../shared/transactionVerificationUtils';
+import { verifyTransactionOnBlockchain } from '../../shared/transactionUtils';
 
 export interface ExternalTransferParams {
   to: string;
@@ -40,6 +40,10 @@ export interface ExternalTransferParams {
   userId: string;
   priority?: 'low' | 'medium' | 'high';
   transactionType?: TransactionType; // Add transaction type for fee calculation
+  // Pre-calculated fee information (when called from CentralizedTransactionHandler)
+  preCalculatedFee?: number;
+  preCalculatedTotal?: number;
+  preCalculatedRecipient?: number;
 }
 
 export interface ExternalTransferResult {
@@ -136,8 +140,33 @@ class ExternalTransferService {
       }
 
       // Calculate company fee using centralized service with transaction type
-      const transactionType = params.transactionType || 'external_payment';
-      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
+      // Use pre-calculated fees if provided (from CentralizedTransactionHandler)
+      let companyFee: number;
+      let totalAmount: number;
+      let recipientAmount: number;
+
+      if (params.preCalculatedFee !== undefined &&
+          params.preCalculatedTotal !== undefined &&
+          params.preCalculatedRecipient !== undefined) {
+        // Use pre-calculated fees to prevent double calculation
+        companyFee = params.preCalculatedFee;
+        totalAmount = params.preCalculatedTotal;
+        recipientAmount = params.preCalculatedRecipient;
+
+        logger.info('Using pre-calculated fees', {
+          companyFee,
+          totalAmount,
+          recipientAmount,
+          originalAmount: params.amount
+        }, 'ExternalTransferService');
+      } else {
+        // Calculate fees normally
+        const transactionType = params.transactionType || 'external_payment';
+        const feeCalculation = FeeService.calculateCompanyFee(params.amount, transactionType);
+        companyFee = feeCalculation.fee;
+        totalAmount = feeCalculation.totalAmount;
+        recipientAmount = feeCalculation.recipientAmount;
+      }
 
       // Ensure user's wallet is loaded
       const { walletService } = await import('../wallet');
@@ -477,7 +506,7 @@ class ExternalTransferService {
 
       // Check if recipient has USDC token account, create if needed
       let needsTokenAccountCreation = false;
-      const connection = await optimizedTransactionUtils.getConnection();
+      const connection = await transactionUtils.getConnection();
       try {
         await getAccount(connection, toTokenAccount);
         logger.info('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'ExternalTransferService');
@@ -707,7 +736,7 @@ class ExternalTransferService {
       // Even if age is OK, the blockhash might have expired based on slot height
       if (!needsRebuild) {
         try {
-          const isValid = await (await optimizedTransactionUtils.getConnection()).isBlockhashValid(blockhash, { commitment: 'confirmed' });
+          const isValid = await (await transactionUtils.getConnection()).isBlockhashValid(blockhash, { commitment: 'confirmed' });
           const isValidValue = isValid && (typeof isValid === 'boolean' ? isValid : isValid.value === true);
           
           if (!isValidValue) {
@@ -740,7 +769,7 @@ class ExternalTransferService {
         }, 'ExternalTransferService');
         
         // Get fresh blockhash
-        const freshBlockhashData = await getFreshBlockhash(await optimizedTransactionUtils.getConnection(), 'confirmed');
+        const freshBlockhashData = await getFreshBlockhash(await transactionUtils.getConnection(), 'confirmed');
         const freshBlockhash = freshBlockhashData.blockhash;
         currentBlockhashTimestamp = freshBlockhashData.timestamp;
         
@@ -864,7 +893,7 @@ class ExternalTransferService {
       
       while (submissionAttempts < maxSubmissionAttempts) {
         try {
-          const currentConnection = await optimizedTransactionUtils.getConnection();
+          const currentConnection = await transactionUtils.getConnection();
           logger.info('Processing USDC transfer (sign and submit)', {
             connectionEndpoint: currentConnection.rpcEndpoint,
             commitment: getConfig().blockchain.commitment,
@@ -896,7 +925,7 @@ class ExternalTransferService {
             try {
               // Get fresh blockhash RIGHT before rebuilding using shared utility
               // Best practice: Use shared utility for consistent blockhash handling
-              const rebuildConnection = await optimizedTransactionUtils.getConnection();
+              const rebuildConnection = await transactionUtils.getConnection();
               const freshBlockhashData = await getFreshBlockhash(rebuildConnection, 'confirmed');
               const freshBlockhash = freshBlockhashData.blockhash;
               const freshBlockhashTimestamp = freshBlockhashData.timestamp;
@@ -1031,7 +1060,7 @@ class ExternalTransferService {
       // Enhanced verification using shared utility
       // CRITICAL: Don't return success until transaction is actually confirmed
       // Best practice: Use shared verification utility for consistent behavior
-      const verificationResult = await verifyTransactionOnBlockchain(await optimizedTransactionUtils.getConnection(), signature);
+      const verificationResult = await verifyTransactionOnBlockchain(await transactionUtils.getConnection(), signature);
       if (!verificationResult.success) {
         const errorMessage = verificationResult.error || '';
         const isTimeout = 
@@ -1211,7 +1240,7 @@ class ExternalTransferService {
    */
   private async verifyTransactionOnBlockchain(signature: string): Promise<{ success: boolean; error?: string }> {
     // Use shared verification utility for consistent behavior
-    const result = await verifyTransactionOnBlockchain(await optimizedTransactionUtils.getConnection(), signature);
+    const result = await verifyTransactionOnBlockchain(await transactionUtils.getConnection(), signature);
               return {
       success: result.success,
       error: result.error
@@ -1227,7 +1256,7 @@ class ExternalTransferService {
     error?: string;
   }> {
     try {
-      const connection = await optimizedTransactionUtils.getConnection();
+      const connection = await transactionUtils.getConnection();
       const status = await connection.getSignatureStatus(signature, {
         searchTransactionHistory: true
       });

@@ -4,16 +4,16 @@
  * Uses modular components for better maintainability
  */
 
-import { TransactionWalletManager } from './TransactionWalletManager';
 import { TransactionProcessor } from './TransactionProcessor';
 import { PaymentRequestManager } from './PaymentRequestManager';
-import { BalanceManager } from './BalanceManager';
 import { logger } from '../../analytics/loggingService';
 import { transactionDeduplicationService } from './TransactionDeduplicationService'; // ✅ CRITICAL: Static import for singleton
-import { 
-  TransactionParams, 
-  TransactionResult, 
-  PaymentRequest, 
+import { FeeService, TransactionType } from '../../../config/constants/feeConfig';
+import { USDC_CONFIG } from '../../shared/walletConstants';
+import {
+  TransactionParams,
+  TransactionResult,
+  PaymentRequest,
   PaymentRequestResult,
   WalletInfo,
   WalletBalance,
@@ -21,18 +21,23 @@ import {
   GasCheckResult
 } from './types';
 
+// Import centralized transaction types
+import {
+  TransactionParams as CentralizedTransactionParams,
+  TransactionResult as CentralizedTransactionResult
+} from '../../transactions/types';
+
+// Re-export for backward compatibility
+export type { CentralizedTransactionParams as TransactionContextParams, CentralizedTransactionResult as ContextTransactionResult };
+
 class ConsolidatedTransactionService {
   private static instance: ConsolidatedTransactionService;
-  private walletManager: TransactionWalletManager;
   private transactionProcessor: TransactionProcessor;
   private paymentRequestManager: PaymentRequestManager;
-  private balanceManager: BalanceManager;
 
   private constructor() {
-    this.walletManager = new TransactionWalletManager();
     this.transactionProcessor = new TransactionProcessor();
     this.paymentRequestManager = new PaymentRequestManager();
-    this.balanceManager = new BalanceManager();
   }
 
   public static getInstance(): ConsolidatedTransactionService {
@@ -47,15 +52,47 @@ class ConsolidatedTransactionService {
   /**
    * Load wallet from secure storage
    */
-  async loadWallet(): Promise<boolean> {
-    return this.walletManager.loadWallet();
+  async loadWallet(userId?: string): Promise<boolean> {
+    try {
+      if (!userId) {
+        logger.warn('No userId provided for wallet loading', null, 'ConsolidatedTransactionService');
+        return false;
+      }
+
+      // Use the walletService to ensure user wallet
+      const { walletService } = await import('../wallet');
+      const walletResult = await walletService.ensureUserWallet(userId);
+
+      return walletResult.success && !!walletResult.wallet?.secretKey;
+    } catch (error) {
+      logger.error('Failed to load wallet', { userId, error }, 'ConsolidatedTransactionService');
+      return false;
+    }
   }
 
   /**
    * Get wallet info
    */
-  async getWalletInfo(): Promise<WalletInfo | null> {
-    return this.walletManager.getWalletInfo();
+  async getWalletInfo(userId?: string): Promise<WalletInfo | null> {
+    try {
+      if (!userId) return null;
+
+      // Use the walletService to get wallet info
+      const { walletService } = await import('../wallet');
+      const walletResult = await walletService.ensureUserWallet(userId);
+
+      if (walletResult.success && walletResult.wallet) {
+        return {
+          address: walletResult.wallet.address,
+          publicKey: walletResult.wallet.address // Assuming address is the public key
+        };
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('Failed to get wallet info', { userId, error }, 'ConsolidatedTransactionService');
+      return null;
+    }
   }
 
   // ===== TRANSACTION METHODS =====
@@ -447,21 +484,88 @@ class ConsolidatedTransactionService {
    * Get user wallet balance
    */
   async getUserWalletBalance(userId: string): Promise<WalletBalance> {
-    return this.balanceManager.getUserWalletBalance(userId);
+    try {
+      logger.debug('Getting wallet balance for user', { userId }, 'ConsolidatedTransactionService');
+
+      const walletAddress = await this.getUserWalletAddress(userId);
+      if (!walletAddress) {
+        logger.warn('No wallet address found for user', { userId }, 'ConsolidatedTransactionService');
+        return { usdc: 0, sol: 0 };
+      }
+
+      logger.debug('Retrieved wallet address', { userId, walletAddress }, 'ConsolidatedTransactionService');
+
+      // Use balanceUtils for balance checking
+      const { BalanceUtils } = await import('../../shared/balanceUtils');
+      const usdcResult = await BalanceUtils.getUsdcBalance(walletAddress, USDC_CONFIG.mintAddress);
+      const solBalance = await BalanceUtils.getSolBalance(walletAddress);
+
+      logger.debug('Balance check completed', {
+        userId,
+        walletAddress,
+        usdcBalance: usdcResult.balance,
+        solBalance,
+        usdcAccountExists: usdcResult.accountExists
+      }, 'ConsolidatedTransactionService');
+
+      return {
+        usdc: usdcResult.balance,
+        sol: solBalance
+      };
+    } catch (error) {
+      logger.error('Failed to get user wallet balance', { userId, error }, 'ConsolidatedTransactionService');
+      return { usdc: 0, sol: 0 };
+    }
   }
 
   /**
    * Get USDC balance for a wallet address
    */
   async getUsdcBalance(walletAddress: string): Promise<UsdcBalanceResult> {
-    return this.balanceManager.getUsdcBalance(walletAddress);
+    try {
+      const { BalanceUtils } = await import('../../shared/balanceUtils');
+      const usdcMintAddress = USDC_CONFIG.mintAddress;
+
+      const result = await BalanceUtils.getUsdcBalance(walletAddress, usdcMintAddress);
+      return {
+        success: result.accountExists,
+        balance: result.balance,
+        error: undefined
+      };
+    } catch (error) {
+      logger.error('Failed to get USDC balance', {
+        walletAddress,
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined
+      }, 'ConsolidatedTransactionService');
+      return { success: false, balance: 0, error: 'Failed to get balance' };
+    }
   }
 
   /**
    * Check if user has sufficient SOL for gas fees
    */
   async hasSufficientSolForGas(userId: string): Promise<GasCheckResult> {
-    return this.balanceManager.hasSufficientSolForGas(userId);
+    try {
+      const walletAddress = await this.getUserWalletAddress(userId);
+      if (!walletAddress) {
+        return { hasSufficient: false, currentSol: 0, requiredSol: 0.001 };
+      }
+
+      const { BalanceUtils } = await import('../../shared/balanceUtils');
+      const solBalance = await BalanceUtils.getSolBalance(walletAddress);
+      const requiredAmount = 0.001; // Minimum SOL for gas
+
+      return {
+        hasSufficient: solBalance >= requiredAmount,
+        currentSol: solBalance,
+        requiredSol: requiredAmount
+      };
+    } catch (error) {
+      logger.error('Failed to check SOL balance for gas', { userId, error }, 'ConsolidatedTransactionService');
+      return { hasSufficient: false, currentSol: 0, requiredSol: 0.001 };
+    }
   }
 
   /**
@@ -482,6 +586,382 @@ class ConsolidatedTransactionService {
     } catch (error) {
       logger.error('Failed to get user wallet address', { userId, error }, 'ConsolidatedTransactionService');
       return null;
+    }
+  }
+
+  // ===== CONTEXT-BASED TRANSACTION METHODS =====
+  // (Merged from CentralizedTransactionHandler)
+
+  /**
+   * Execute transaction by context type (unified interface)
+   */
+  async executeTransactionByContext(params: CentralizedTransactionParams): Promise<CentralizedTransactionResult> {
+    try {
+      logger.info('Executing transaction by context', {
+        context: params.context,
+        userId: params.userId,
+        amount: params.amount,
+        currency: params.currency || 'USDC'
+      }, 'ConsolidatedTransactionService');
+
+      // Route to appropriate handler based on context
+      switch (params.context) {
+        case 'send_1to1':
+          return this.handleSendTransaction(params as any);
+
+        case 'fair_split_contribution':
+          return this.handleFairSplitContribution(params as any);
+
+        case 'fair_split_withdrawal':
+          return this.handleFairSplitWithdrawal(params as any);
+
+        case 'degen_split_lock':
+          return this.handleDegenSplitLock(params as any);
+
+        case 'spend_split_payment':
+          return this.handleSpendSplitPayment(params as any);
+
+        case 'shared_wallet_funding':
+          return this.handleSharedWalletFunding(params as any);
+
+        case 'shared_wallet_withdrawal':
+          return this.handleSharedWalletWithdrawal(params as any);
+
+        default:
+          return {
+            success: false,
+            error: `Unsupported transaction context: ${(params as any).context}`
+          };
+      }
+    } catch (error) {
+      logger.error('Transaction execution failed', {
+        context: params.context,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'ConsolidatedTransactionService');
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Transaction failed'
+      };
+    }
+  }
+
+  /**
+   * Handle 1/1 send transactions
+   */
+  private async handleSendTransaction(params: any): Promise<CentralizedTransactionResult> {
+    const { userId, amount, destinationType, recipientAddress, memo, requestId, isSettlement } = params;
+
+    // Determine transaction type for fees
+    const transactionType: TransactionType = isSettlement ? 'settlement' : (requestId ? 'payment_request' : 'send');
+
+    // Calculate fees
+    const feeCalculation = FeeService.calculateCompanyFee(amount, transactionType);
+    const totalAmount = feeCalculation.totalAmount;
+
+    // Check balance
+    const balance = await this.getUserWalletBalance(userId);
+    if (balance.usdc < totalAmount) {
+      return {
+        success: false,
+        error: `Insufficient balance: ${balance.usdc.toFixed(6)} USDC available, ${totalAmount.toFixed(6)} USDC required`,
+        transactionSignature: '',
+        transactionId: '',
+        txId: ''
+      };
+    }
+
+    // Execute transaction based on destination type
+    if (destinationType === 'external') {
+      // External wallet transfer
+      const { externalTransferService } = await import('./sendExternal');
+      const result = await externalTransferService.instance.sendExternalTransfer({
+        to: recipientAddress,
+        amount: amount,
+        currency: 'USDC',
+        memo: memo || 'External wallet transfer',
+        userId: userId,
+        priority: 'medium',
+        transactionType: 'external_payment',
+        // Pass pre-calculated fees to prevent double calculation
+        preCalculatedFee: feeCalculation.fee,
+        preCalculatedTotal: feeCalculation.totalAmount,
+        preCalculatedRecipient: feeCalculation.recipientAmount
+      });
+
+      if (result.success) {
+        return {
+          success: true,
+          transactionSignature: result.signature || '',
+          transactionId: result.txId || '',
+          txId: result.txId || '',
+          fee: feeCalculation.fee,
+          netAmount: feeCalculation.recipientAmount,
+          blockchainFee: result.blockchainFee || 0,
+          message: `Successfully sent ${amount.toFixed(6)} USDC to external wallet`
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error || 'External transfer failed'
+        };
+      }
+    } else {
+      // Friend/internal transfer
+      const result = await this.sendUSDCTransaction({
+        to: recipientAddress,
+        amount: amount,
+        currency: 'USDC',
+        userId: userId,
+        memo: memo || (isSettlement ? 'Settlement payment' : 'Payment'),
+        priority: 'medium',
+        transactionType: transactionType,
+        requestId: requestId || null
+      });
+
+      if (result.success) {
+        return {
+          success: true,
+          transactionSignature: result.signature,
+          transactionId: result.txId,
+          txId: result.txId,
+          fee: feeCalculation.fee,
+          netAmount: feeCalculation.recipientAmount,
+          blockchainFee: result.companyFee || 0,
+          message: `Successfully contributed ${amount.toFixed(6)} USDC to fair split`
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Internal transfer failed'
+        };
+      }
+    }
+  }
+
+  /**
+   * Handle Fair Split contribution (participant payment)
+   */
+  private async handleFairSplitContribution(params: any): Promise<CentralizedTransactionResult> {
+    const { userId, amount, splitWalletId, splitId, billId, memo } = params;
+
+    // Use internal transfer service for split contributions with company fees
+    const result = await this.sendUSDCTransaction({
+      to: splitWalletId, // Send to split wallet
+      amount: amount,
+      currency: 'USDC',
+      userId: userId,
+      memo: memo || `Fair split contribution - ${splitId}`,
+      priority: 'medium',
+      transactionType: 'split_payment'
+    });
+
+    if (result.success) {
+        return {
+          success: true,
+          transactionSignature: result.signature,
+          transactionId: result.txId,
+          txId: result.txId,
+          message: `Successfully contributed ${amount.toFixed(6)} USDC to fair split`
+        };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Fair split contribution failed'
+      };
+    }
+  }
+
+  /**
+   * Handle Fair Split withdrawal (creator withdrawal)
+   */
+  private async handleFairSplitWithdrawal(params: any): Promise<CentralizedTransactionResult> {
+    const { userId, amount, splitWalletId, splitId, billId, memo } = params;
+
+    // Get user's wallet address for the withdrawal destination
+    const userWalletAddress = await this.getUserWalletAddress(userId);
+    if (!userWalletAddress) {
+      return {
+        success: false,
+        error: 'User wallet address not found'
+      };
+    }
+
+    // Use external transfer service for split withdrawals (may have fees)
+    const { externalTransferService } = await import('./sendExternal');
+    const result = await externalTransferService.instance.sendExternalTransfer({
+      to: userWalletAddress, // Send to user's personal wallet
+      amount: amount,
+      currency: 'USDC',
+      userId: userId,
+      memo: memo || `Fair split withdrawal - ${splitId}`,
+      priority: 'medium',
+      transactionType: 'withdraw'
+    });
+
+    if (result.success) {
+        return {
+          success: true,
+          transactionSignature: result.signature || '',
+          transactionId: result.txId || '',
+          txId: result.txId || '',
+          fee: result.companyFee || 0,
+          netAmount: result.netAmount || amount,
+          blockchainFee: result.blockchainFee || 0,
+          message: `Successfully withdrew ${amount.toFixed(6)} USDC from fair split`
+        };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Fair split withdrawal failed'
+      };
+    }
+  }
+
+  /**
+   * Handle Degen Split fund locking
+   */
+  private async handleDegenSplitLock(params: any): Promise<CentralizedTransactionResult> {
+    const { userId, amount, splitWalletId, splitId, billId, memo } = params;
+
+    // Use internal transfer service for degen split funding
+    const result = await this.sendUSDCTransaction({
+      to: splitWalletId, // Send to split wallet
+      amount: amount,
+      currency: 'USDC',
+      userId: userId,
+      memo: memo || `Degen split fund locking - ${splitId}`,
+      priority: 'medium',
+      transactionType: 'split_payment'
+    });
+
+    if (result.success) {
+        return {
+          success: true,
+          transactionSignature: result.signature,
+          transactionId: result.txId,
+          txId: result.txId,
+          message: `Successfully locked ${amount.toFixed(6)} USDC in degen split`
+        };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Degen split lock failed'
+      };
+    }
+  }
+
+  /**
+   * Handle Spend Split merchant payment
+   */
+  private async handleSpendSplitPayment(params: any): Promise<CentralizedTransactionResult> {
+    const { userId, amount, splitId, splitWalletId, merchantAddress, memo } = params;
+
+    if (!merchantAddress) {
+      return {
+        success: false,
+        error: 'Merchant address is required for spend split payments'
+      };
+    }
+
+    // Use external transfer service for merchant payments
+    const { externalTransferService } = await import('./sendExternal');
+    const result = await externalTransferService.instance.sendExternalTransfer({
+      to: merchantAddress,
+      amount: amount,
+      currency: 'USDC',
+      userId: userId,
+      memo: memo || `Spend split payment - ${splitId}`,
+      priority: 'medium',
+      transactionType: 'external_payment'
+    });
+
+    if (result.success) {
+        return {
+          success: true,
+          transactionSignature: result.signature || '',
+          transactionId: result.txId || '',
+          txId: result.txId || '',
+          fee: result.companyFee || 0,
+          netAmount: result.netAmount || amount,
+          blockchainFee: result.blockchainFee || 0,
+          message: `Successfully paid ${amount.toFixed(6)} USDC to merchant`
+        };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Merchant payment failed'
+      };
+    }
+  }
+
+  /**
+   * Handle Shared Wallet funding
+   */
+  private async handleSharedWalletFunding(params: any): Promise<CentralizedTransactionResult> {
+    const { userId, amount, sharedWalletId, memo } = params;
+
+    // Use internal transfer service for shared wallet funding
+    const result = await this.sendUSDCTransaction({
+      to: sharedWalletId, // Send to shared wallet
+      amount: amount,
+      currency: 'USDC',
+      userId: userId,
+      memo: memo || `Shared wallet funding`,
+      priority: 'medium',
+      transactionType: 'send'
+    });
+
+    if (result.success) {
+        return {
+          success: true,
+          transactionSignature: result.signature,
+          transactionId: result.txId,
+          txId: result.txId,
+          message: `Successfully funded shared wallet with ${amount.toFixed(6)} USDC`
+        };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Shared wallet funding failed'
+      };
+    }
+  }
+
+  /**
+   * Handle Shared Wallet withdrawal
+   */
+  private async handleSharedWalletWithdrawal(params: any): Promise<CentralizedTransactionResult> {
+    const { userId, amount, sharedWalletId, destinationAddress, memo } = params;
+
+    // Use external transfer service for shared wallet withdrawals
+    const { externalTransferService } = await import('./sendExternal');
+    const result = await externalTransferService.instance.sendExternalTransfer({
+      to: destinationAddress,
+      amount: amount,
+      currency: 'USDC',
+      userId: userId,
+      memo: memo || `Shared wallet withdrawal`,
+      priority: 'medium',
+      transactionType: 'withdraw'
+    });
+
+    if (result.success) {
+        return {
+          success: true,
+          transactionSignature: result.signature || '',
+          transactionId: result.txId || '',
+          txId: result.txId || '',
+          fee: result.companyFee || 0,
+          netAmount: result.netAmount || amount,
+          blockchainFee: result.blockchainFee || 0,
+          message: `Successfully withdrew ${amount.toFixed(6)} USDC from shared wallet`
+        };
+    } else {
+      return {
+        success: false,
+        error: result.error || 'Shared wallet withdrawal failed'
+      };
     }
   }
 }

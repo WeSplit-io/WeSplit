@@ -23,7 +23,7 @@ import {
 // Import shared constants and utilities
 import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from '../../../services/shared/walletConstants';
 import { FeeService, TransactionType, COMPANY_WALLET_CONFIG } from '../../../config/constants/feeConfig';
-import { optimizedTransactionUtils } from '../../../services/shared/transactionUtilsOptimized';
+import { transactionUtils } from '../../../services/shared/transactionUtils';
 import { balanceUtils } from '../../../services/shared/balanceUtils';
 import { logger } from '../../../services/analytics/loggingService';
 import { processUsdcTransfer } from '../../blockchain/transaction/transactionSigningService';
@@ -677,12 +677,12 @@ export class SolanaAppKitService {
     }
 
     try {
-      const signature = await (await optimizedTransactionUtils.getConnection()).requestAirdrop(
+      const signature = await (await transactionUtils.getConnection()).requestAirdrop(
         this.keypair.publicKey,
         amount * LAMPORTS_PER_SOL
       );
       
-      await optimizedTransactionUtils.confirmTransactionWithTimeout(signature);
+      await transactionUtils.confirmTransactionWithTimeout(signature);
       return signature;
     } catch (error) {
       console.error('Error requesting airdrop:', error);
@@ -714,7 +714,7 @@ export class SolanaAppKitService {
       const companyFeeRaw = PriceUtils.convertUsdcToRawUnits(companyFee);
 
       // Get fresh blockhash using shared utility for consistent handling
-      const connection = await optimizedTransactionUtils.getConnection();
+      const connection = await transactionUtils.getConnection();
       const blockhashData = await getFreshBlockhash(connection, 'confirmed');
       const blockhash = blockhashData.blockhash;
       const blockhashTimestamp = blockhashData.timestamp;
@@ -1125,7 +1125,7 @@ export class SolanaAppKitService {
       }
 
       // Get fresh blockhash using shared utility for consistent handling
-      const connection = await optimizedTransactionUtils.getConnection();
+      const connection = await transactionUtils.getConnection();
       const blockhashData = await getFreshBlockhash(connection, 'confirmed');
       const blockhash = blockhashData.blockhash;
 

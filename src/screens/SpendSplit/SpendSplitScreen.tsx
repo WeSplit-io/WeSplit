@@ -42,7 +42,7 @@ import { SplitParticipantInvitationService } from '../../services/splits/SplitPa
 import { extractOrderData, findUserParticipant, calculatePaymentTotals } from '../../utils/spend/spendDataUtils';
 import { createSpendSplitWallet } from '../../utils/spend/spendWalletUtils';
 import { createMockSpendOrderData } from '../../services/integrations/spend/SpendMockData';
-import { formatAmountWithComma } from '../../utils/spend/formatUtils';
+import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 import { SplitInvitationShare } from '../../components/split';
 import { SplitInvitationService, SplitInvitationData } from '../../services/splits/splitInvitationService';
 
@@ -100,7 +100,28 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   
   // ===== EXTERNAL HOOKS =====
   // Live balance hook - always called with stable parameters
-  const walletAddress = useMemo(() => currentUser?.wallet_address || null, [currentUser?.wallet_address]);
+  // Get wallet address for balance checking (same as transaction validation)
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  // Load wallet address on mount
+  useEffect(() => {
+    const loadWalletAddress = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        const { simplifiedWalletService } = await import('../../services/blockchain/wallet/simplifiedWalletService');
+        const walletInfo = await simplifiedWalletService.getWalletInfo(currentUser.id.toString());
+        if (walletInfo) {
+          setWalletAddress(walletInfo.address);
+        }
+      } catch (error) {
+        logger.error('Failed to load wallet address for balance', { userId: currentUser.id, error }, 'SpendSplitScreen');
+      }
+    };
+
+    loadWalletAddress();
+  }, [currentUser?.id]);
+
   const { balance: liveBalance } = useLiveBalance(walletAddress, {
     enabled: true,
     onBalanceChange: useCallback((update: BalanceUpdate) => {
@@ -486,11 +507,17 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             [{ text: 'OK' }]
           );
 
-          // Trigger automatic payment
-          const paymentResult = await SpendMerchantPaymentService.processMerchantPayment(
-            splitData.id,
-            wallet.id
-          );
+          // Trigger automatic payment using centralized transaction handler
+          const { centralizedTransactionHandler } = await import('../../services/transactions/CentralizedTransactionHandler');
+          const paymentResult = await centralizedTransactionHandler.executeTransaction({
+            context: 'spend_split_payment',
+            userId: currentUser?.id || '',
+            amount: wallet.totalAmount,
+            currency: 'USDC',
+            destinationType: 'merchant',
+            splitId: splitData.id,
+            splitWalletId: wallet.id
+          });
 
           if (paymentResult.success) {
             logger.info('SPEND merchant payment processed successfully', {
@@ -524,10 +551,16 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
                 {
                   text: 'Retry',
                   onPress: async () => {
-                    const retryResult = await SpendMerchantPaymentService.processMerchantPayment(
-                      splitData.id,
-                      wallet.id
-                    );
+                    const { centralizedTransactionHandler } = await import('../../services/transactions/CentralizedTransactionHandler');
+                    const retryResult = await centralizedTransactionHandler.executeTransaction({
+                      context: 'spend_split_payment',
+                      userId: currentUser?.id || '',
+                      amount: wallet.totalAmount,
+                      currency: 'USDC',
+                      destinationType: 'merchant',
+                      splitId: splitData.id,
+                      splitWalletId: wallet.id
+                    });
                     if (!retryResult.success) {
                       Alert.alert('Retry Failed', retryResult.error || 'Unknown error');
                     }

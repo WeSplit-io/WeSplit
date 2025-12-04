@@ -29,6 +29,7 @@ import { FallbackDataService } from '../../services/data/mockupData';
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenSplitProgress, DegenSplitParticipants } from './components';
 import { Container, Button, Modal, AppleSlider, PhosphorIcon, ModernLoader } from '../../components/shared';
+import CentralizedTransactionModal, { type TransactionModalConfig } from '../../components/shared/CentralizedTransactionModal';
 import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
 import { getSplitStatusDisplayText } from '../../utils/statusUtils';
 
@@ -64,6 +65,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   
   // Extract participants from splitData if not provided directly
   const [participants, setParticipants] = useState(routeParticipants || splitData?.participants || []);
+  const [transactionModalConfig, setTransactionModalConfig] = useState<TransactionModalConfig | null>(null);
   
   // Use route params if available, otherwise fallback to split data
   const totalAmount = routeTotalAmount || splitData?.totalAmount || 0;
@@ -315,15 +317,43 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     }
   };
 
-  const handleSendMyShare = async () => {
-    const success = await degenLogic.handleSendMyShare(splitData, currentUser, totalAmount, participants);
-    if (success) {
-      // Update progress immediately
-      updateCircleProgress();
-      // Show success message and stay on current screen
-      Alert.alert('Success', 'Your funds have been locked! Waiting for other participants...');
-      // The screen will automatically update to show the roulette button when all participants are locked
-    }
+  const handleSendMyShare = () => {
+    // Show centralized transaction modal
+    const modalConfig: TransactionModalConfig = {
+      title: `Lock ${formatUsdcForDisplay(totalAmount)} USDC to split the Bill`,
+      subtitle: 'Lock your funds to participate in the degen split roulette!',
+      showAmountInput: false, // Amount is fixed for degen split
+      showMemoInput: false,
+      showQuickAmounts: false,
+      allowExternalDestinations: false,
+      allowFriendDestinations: false,
+      context: 'degen_split_lock',
+      prefilledAmount: totalAmount,
+      customRecipientInfo: {
+        name: 'Degen Split Wallet',
+        address: degenState.splitWallet?.walletAddress || '',
+        type: 'split'
+      },
+      onSuccess: (result) => {
+        logger.info('Degen split lock successful', { result });
+        setTransactionModalConfig(null);
+        // Update progress immediately
+        updateCircleProgress();
+        // Show success message and stay on current screen
+        Alert.alert('Success', 'Your funds have been locked! Waiting for other participants...');
+        // The screen will automatically update to show the roulette button when all participants are locked
+      },
+      onError: (error) => {
+        logger.error('Degen split lock failed', { error });
+        Alert.alert('Lock Failed', error);
+        setTransactionModalConfig(null);
+      },
+      onClose: () => {
+        setTransactionModalConfig(null);
+      }
+    };
+
+    setTransactionModalConfig(modalConfig);
   };
 
   const handleRollRoulette = () => {
@@ -690,30 +720,16 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         )}
       </View>
 
-      {/* Lock Confirmation Modal */}
-      <Modal
-        visible={degenState.showLockModal}
-        onClose={() => degenState.setShowLockModal(false)}
-        showHandle={true}
-        title={`Lock ${formatUsdcForDisplay(totalAmount)} USDC to split the Bill`}
-        description="Lock your funds to participate in the degen split roulette!"
-      >
-        <View style={styles.modalIconContainer}>
-          <PhosphorIcon 
-            name="Lock" 
-            size={32} 
-            color={colors.white} 
-            weight="fill"
-          />
-        </View>
-        
-        <AppleSlider
-          onSlideComplete={handleSendMyShare}
-          disabled={degenState.isLocking}
-          loading={degenState.isLocking}
-          text="Slide to Send My Share"
+      {/* Centralized Transaction Modal */}
+      {transactionModalConfig && (
+        <CentralizedTransactionModal
+          visible={!!transactionModalConfig}
+          config={transactionModalConfig}
+          splitWalletId={degenState.splitWallet?.id}
+          splitId={splitData?.id}
+          billId={splitData?.billId}
         />
-      </Modal>
+      )}
 
       {/* Wallet Recap Modal */}
       <Modal

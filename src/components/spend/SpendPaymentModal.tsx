@@ -16,7 +16,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import PhosphorIcon from '../shared/PhosphorIcon';
 import { AppleSlider } from '../shared';
-import { formatAmountWithComma } from '../../utils/spend/formatUtils';
+import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 import { formatWalletAddress } from '../../utils/spend/spendDataUtils';
 // Network fee is 3% as per mockup
 

@@ -25,13 +25,13 @@ import { getConfig } from '../../../config/unified';
 import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../../../config/constants/feeConfig';
 import { solanaWalletService } from '../wallet';
 import { logger } from '../../analytics/loggingService';
-import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimized';
+import { transactionUtils } from '../../shared/transactionUtils';
 import { notificationUtils } from '../../shared/notificationUtils';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';
 import { processUsdcTransfer } from './transactionSigningService';
 import { VersionedTransaction } from '@solana/web3.js';
 import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS, shouldRebuildTransaction } from '../../shared/blockhashUtils';
-import { rebuildTransactionBeforeFirebase, rebuildTransactionWithFreshBlockhash } from '../../shared/transactionRebuildUtils';
+import { rebuildTransactionBeforeFirebase, rebuildTransactionWithFreshBlockhash } from '../../shared/transactionUtils';
 
 export interface InternalTransferParams {
   to: string;
@@ -483,7 +483,7 @@ class InternalTransferService {
       // CRITICAL: Get fresh blockhash FIRST, then do async operations
       // This ensures blockhash is as fresh as possible when we send to Firebase
       // Best practice: Get blockhash before any async operations that might delay
-      const connection = await optimizedTransactionUtils.getConnection();
+      const connection = await transactionUtils.getConnection();
       const blockhashData = await getFreshBlockhash(connection, 'confirmed');
       
       // Check if recipient has USDC token account, create if needed
@@ -795,7 +795,7 @@ class InternalTransferService {
       while (submissionAttempts < maxSubmissionAttempts) {
         try {
           logger.info('Processing USDC transfer (sign and submit)', {
-            connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
+            connectionEndpoint: (await transactionUtils.getConnection()).rpcEndpoint,
             commitment: getConfig().blockchain.commitment,
             priority: params.priority || 'medium',
             transactionSize: currentTxArray.length,
@@ -849,7 +849,7 @@ class InternalTransferService {
             try {
               // Rebuild transaction with fresh blockhash using shared utility
               // Fallback if function not available (Metro cache issue)
-              const rebuildConnection = await optimizedTransactionUtils.getConnection();
+              const rebuildConnection = await transactionUtils.getConnection();
               if (typeof rebuildTransactionWithFreshBlockhash === 'function') {
                 const retryRebuild = await rebuildTransactionWithFreshBlockhash(
                   transaction,
@@ -908,7 +908,7 @@ class InternalTransferService {
       logger.info('Transaction sent successfully', { signature }, 'InternalTransferService');
 
       // Confirm transaction with optimized timeout handling
-      const confirmed = await optimizedTransactionUtils.confirmTransactionWithTimeout(signature);
+      const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature);
       
       if (!confirmed) {
         logger.warn('Transaction confirmation timed out, but transaction was sent', { 
@@ -1023,7 +1023,7 @@ class InternalTransferService {
     error?: string;
   }> {
     try {
-      const status = await (await optimizedTransactionUtils.getConnection()).getSignatureStatus(signature, {
+      const status = await (await transactionUtils.getConnection()).getSignatureStatus(signature, {
         searchTransactionHistory: true
       });
 
@@ -1050,15 +1050,15 @@ class InternalTransferService {
       logger.warn('Failed to get transaction status, trying next RPC endpoint', { 
         signature,
         error: error instanceof Error ? error.message : 'Unknown error',
-        endpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint
+        endpoint: (await transactionUtils.getConnection()).rpcEndpoint
       }, 'InternalTransferService');
       
       // Switch to next RPC endpoint if available
-      if ((await optimizedTransactionUtils.getConnection())) {
-        await optimizedTransactionUtils.switchToNextEndpoint();
+      if ((await transactionUtils.getConnection())) {
+        await transactionUtils.switchToNextEndpoint();
         // Retry once with new endpoint
         try {
-          const retryStatus = await (await optimizedTransactionUtils.getConnection()).getSignatureStatus(signature, {
+          const retryStatus = await (await transactionUtils.getConnection()).getSignatureStatus(signature, {
             searchTransactionHistory: true
           });
           

@@ -550,12 +550,17 @@ export const useDegenSplitLogic = (
         userWalletAddress: currentUser.wallet_address
       }, 'DegenSplitLogic');
       
-      const { SplitWalletService } = await import('../../../services/split');
-      const paymentResult = await SplitWalletService.processDegenFundLocking(
-        walletToUse.id,
-        currentUser.id.toString(),
-        totalAmount // Full bill amount for each participant in degen split
-      );
+      const { centralizedTransactionHandler } = await import('../../../services/transactions/CentralizedTransactionHandler');
+      const paymentResult = await centralizedTransactionHandler.executeTransaction({
+        context: 'degen_split_lock',
+        userId: currentUser.id.toString(),
+        amount: totalAmount, // Full bill amount for each participant in degen split
+        currency: 'USDC',
+        destinationType: 'split_wallet',
+        splitWalletId: walletToUse.id,
+        splitId: splitData?.id,
+        billId: splitData?.billId
+      });
       
       logger.info('Degen split fund locking result', {
         success: paymentResult.success,

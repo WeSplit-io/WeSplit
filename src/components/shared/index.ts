@@ -24,3 +24,4 @@ export { default as SendComponent } from './SendComponent';
 export type { RecipientInfo, WalletInfo } from './SendComponent';
 export { default as SendConfirmation } from './SendConfirmation';
 export type { SendConfirmationProps } from './SendConfirmation';
+export { TransactionAmountInput } from './TransactionAmountInput';

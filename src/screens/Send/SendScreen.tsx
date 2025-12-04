@@ -84,18 +84,19 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     }, [currentUser?.id, activeTab, loadLinkedDestinations])
   );
 
-  // Auto-navigate to SendAmount if we have pre-filled data from notification
+  // Auto-navigate to CentralizedTransaction if we have pre-filled data from notification
   useEffect(() => {
     if (contact && prefilledAmount && currentUser?.id) {
-      logger.info('Auto-navigating to SendAmount with pre-filled data from notification', {
+      logger.info('Auto-navigating to CentralizedTransaction with pre-filled data from notification', {
         contactName: contact.name,
         prefilledAmount,
         prefilledNote,
         requestId
       }, 'SendScreen');
-      
-      // Navigate directly to SendAmount with pre-filled data
-      navigation.navigate('SendAmount', {
+
+      // Navigate directly to CentralizedTransaction with pre-filled data
+      navigation.navigate('CentralizedTransaction', {
+        context: 'send_1to1',
         destinationType: destinationType || 'friend',
         contact: contact,
         groupId,
@@ -116,8 +117,9 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
       avatar: contact.avatar,
       hasAvatar: !!contact.avatar
     });
-    
-    navigation.navigate('SendAmount', {
+
+    navigation.navigate('CentralizedTransaction', {
+      context: 'send_1to1',
       destinationType: 'friend',
       contact: contact,
       groupId,
@@ -131,10 +133,11 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
       id: destination.id,
       type: destination.type
     });
-    
-    navigation.navigate('SendAmount', {
+
+    navigation.navigate('CentralizedTransaction', {
+      context: 'send_1to1',
       destinationType: 'external',
-      wallet: destination, // Pass as 'wallet' parameter to match SendAmountScreen expectations
+      wallet: destination, // Pass as 'wallet' parameter to match CentralizedTransactionScreen expectations
       groupId,
     });
   };

@@ -13,7 +13,7 @@ import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 import { SplitParticipant } from '../../../services/splits/splitStorageService';
 import { SplitWalletParticipant } from '../../../services/split/types';
-import { formatAmountWithComma } from '../../../utils/spend/formatUtils';
+import { formatAmountWithComma } from '../../../utils/ui/format/formatUtils';
 import { formatWalletAddress } from '../../../utils/spend/spendDataUtils';
 
 // Union type for participants from either Split or SplitWallet

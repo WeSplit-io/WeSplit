@@ -15,7 +15,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import Modal from './Modal';
 import AppleSlider from './AppleSlider';
-import { formatAmountWithComma } from '../../utils/spend/formatUtils';
+import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 
 export interface SendConfirmationProps {
   visible: boolean;

@@ -4,7 +4,7 @@
  */
 
 // Lazy imports to reduce memory usage
-import { optimizedTransactionUtils } from './transactionUtilsOptimized';
+import { transactionUtils } from './transactionUtils';
 import { logger } from '../core';
 
 export interface BalanceInfo {
@@ -32,7 +32,7 @@ export class BalanceUtils {
       // Ensure publicKey is a PublicKey instance
       const pubKey = publicKey instanceof PublicKey ? publicKey : new PublicKey(publicKey);
       
-      const connection = await optimizedTransactionUtils.getConnection();
+      const connection = await transactionUtils.getConnection();
       const balance = await connection.getBalance(pubKey);
       const { LAMPORTS_PER_SOL } = await memoryManager.loadModule('solana-web3');
       const solBalance = balance / LAMPORTS_PER_SOL;
@@ -40,7 +40,7 @@ export class BalanceUtils {
       // Add debugging for very small balances
       if (balance > 0 && solBalance === 0) {
         logger.warn('BalanceUtils: Very small SOL balance detected', {
-          publicKey: publicKey.toBase58(),
+          publicKey: pubKey.toBase58(),
           balanceLamports: balance,
           solBalance: solBalance,
           note: 'Balance is too small to be represented accurately'
@@ -48,7 +48,7 @@ export class BalanceUtils {
       }
       
       logger.debug('BalanceUtils: SOL balance calculation', {
-        publicKey: publicKey.toBase58(),
+        publicKey: pubKey.toBase58(),
         balanceLamports: balance,
         solBalance: solBalance,
         lamportsPerSol: LAMPORTS_PER_SOL
@@ -63,33 +63,33 @@ export class BalanceUtils {
           errorMessage.includes('403') ||
           errorMessage.includes('json-rpc code: -32052')) {
         logger.error('BalanceUtils: RPC API key permission error - switching to fallback endpoint', {
-          publicKey: publicKey.toBase58(),
+          publicKey: pubKey.toBase58(),
           error: errorMessage
         }, 'BalanceUtils');
         
         // Try to switch to next RPC endpoint
         try {
-          await optimizedTransactionUtils.switchToNextEndpoint();
-          const connection = await optimizedTransactionUtils.getConnection();
+          await transactionUtils.switchToNextEndpoint();
+          const connection = await transactionUtils.getConnection();
           const balance = await connection.getBalance(publicKey);
           const solBalance = balance / LAMPORTS_PER_SOL;
           
           logger.info('BalanceUtils: Successfully retrieved balance using fallback endpoint', {
-            publicKey: publicKey.toBase58(),
+            publicKey: pubKey.toBase58(),
             solBalance: solBalance
           }, 'BalanceUtils');
           
           return solBalance;
         } catch (fallbackError) {
           logger.error('BalanceUtils: Fallback endpoint also failed', {
-            publicKey: publicKey.toBase58(),
+            publicKey: pubKey.toBase58(),
             fallbackError: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
           }, 'BalanceUtils');
         }
       }
       
       logger.error('BalanceUtils: Failed to get SOL balance', {
-        publicKey: publicKey.toBase58(),
+        publicKey: pubKey.toBase58(),
         error: errorMessage
       }, 'BalanceUtils');
       return 0;
@@ -105,24 +105,31 @@ export class BalanceUtils {
       const { memoryManager } = await import('./memoryManager');
       const { PublicKey } = await memoryManager.loadModule('solana-web3');
       const { getAssociatedTokenAddress, getAccount } = await memoryManager.loadModule('solana-spl-token');
-      
+
       // Ensure parameters are PublicKey instances
+      if (!publicKey) {
+        throw new Error('publicKey parameter is required');
+      }
+      if (!usdcMint) {
+        throw new Error('usdcMint parameter is required');
+      }
+
       const pubKey = publicKey instanceof PublicKey ? publicKey : new PublicKey(publicKey);
       const mintKey = usdcMint instanceof PublicKey ? usdcMint : new PublicKey(usdcMint);
       
       const usdcTokenAccount = await getAssociatedTokenAddress(mintKey, pubKey);
       
       logger.debug('BalanceUtils: USDC token account derivation', {
-        publicKey: publicKey.toBase58(),
-        usdcMint: usdcMint.toBase58(),
+        publicKey: pubKey.toBase58(),
+        usdcMint: mintKey.toBase58(),
         usdcTokenAccount: usdcTokenAccount.toBase58()
       }, 'BalanceUtils');
       
-      const connection = await optimizedTransactionUtils.getConnection();
+      const connection = await transactionUtils.getConnection();
       const accountInfo = await getAccount(connection, usdcTokenAccount);
       
       logger.debug('BalanceUtils: USDC balance retrieved successfully', {
-        publicKey: publicKey.toBase58(),
+        publicKey: pubKey.toBase58(),
         balance: Number(accountInfo.amount) / 1000000,
         rawAmount: accountInfo.amount.toString()
       }, 'BalanceUtils');
@@ -139,19 +146,19 @@ export class BalanceUtils {
           errorMessage.includes('403') ||
           errorMessage.includes('json-rpc code: -32052')) {
         logger.error('BalanceUtils: RPC API key permission error for USDC balance - switching to fallback endpoint', {
-          publicKey: publicKey.toBase58(),
-          usdcMint: usdcMint.toBase58(),
+          publicKey: pubKey.toBase58(),
+          usdcMint: mintKey.toBase58(),
           error: errorMessage
         }, 'BalanceUtils');
         
         // Try to switch to next RPC endpoint
         try {
-          await optimizedTransactionUtils.switchToNextEndpoint();
-          const connection = await optimizedTransactionUtils.getConnection();
+          await transactionUtils.switchToNextEndpoint();
+          const connection = await transactionUtils.getConnection();
           const accountInfo = await getAccount(connection, usdcTokenAccount);
           
           logger.info('BalanceUtils: Successfully retrieved USDC balance using fallback endpoint', {
-            publicKey: publicKey.toBase58(),
+            publicKey: pubKey.toBase58(),
             balance: Number(accountInfo.amount) / 1000000
           }, 'BalanceUtils');
           
@@ -161,7 +168,7 @@ export class BalanceUtils {
           };
         } catch (fallbackError) {
           logger.error('BalanceUtils: Fallback endpoint also failed for USDC balance', {
-            publicKey: publicKey.toBase58(),
+            publicKey: pubKey.toBase58(),
             fallbackError: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
           }, 'BalanceUtils');
         }
@@ -169,8 +176,8 @@ export class BalanceUtils {
       
       // Token account doesn't exist, balance is 0 - this is normal for new wallets
       logger.info('BalanceUtils: USDC token account does not exist (normal for new wallets)', {
-        publicKey: publicKey.toBase58(),
-        usdcMint: usdcMint.toBase58(),
+        publicKey: pubKey.toBase58(),
+        usdcMint: mintKey.toBase58(),
         error: errorMessage
       }, 'BalanceUtils');
       
