@@ -19,25 +19,3 @@ export const getEnvVar = (key: string): string => {
   return '';
 };
 
-/**
- * Get platform-specific Google Client ID
- */
-export const getPlatformGoogleClientId = (): string => {
-  switch (Platform.OS) {
-    case 'android':
-      return getEnvVar('ANDROID_GOOGLE_CLIENT_ID') || getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID') || getEnvVar('GOOGLE_CLIENT_ID');
-    case 'ios':
-      return getEnvVar('IOS_GOOGLE_CLIENT_ID') || getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID') || getEnvVar('GOOGLE_CLIENT_ID');
-    case 'web':
-      return getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID') || getEnvVar('GOOGLE_CLIENT_ID');
-    default:
-      return getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID') || getEnvVar('GOOGLE_CLIENT_ID');
-  }
-};
-
-/**
- * Get OAuth redirect URI
- */
-export const getOAuthRedirectUri = (): string => {
-  return 'wesplit://auth';
-};

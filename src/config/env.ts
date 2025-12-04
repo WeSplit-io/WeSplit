@@ -194,7 +194,7 @@ export const PRIVY_CONFIG = {
 
 // Phantom configuration
 export const PHANTOM_CONFIG = {
-  appId: process.env.EXPO_PUBLIC_PHANTOM_APP_ID || (__DEV__ ? 'ws_dev_test_app_001' : undefined),
+  appId: process.env.EXPO_PUBLIC_PHANTOM_APP_ID,
   appOrigin: process.env.EXPO_PUBLIC_PHANTOM_APP_ORIGIN || 'https://wesplit.io',
   redirectUri: process.env.EXPO_PUBLIC_PHANTOM_REDIRECT_URI || 'wesplit://auth/phantom-callback',
   // Feature flags for gradual rollout - enable in dev by default

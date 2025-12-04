@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "483370851807",
+    "project_id": "wesplit-35186",
+    "storage_bucket": "wesplit-35186.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:483370851807:android:300e7b8e6b2877a382386a",
+        "android_client_info": {
+          "package_name": "com.wesplit.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "483370851807-jsjsg5brt5dcsoit0pop981af60m75r4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wesplit.app",
+            "certificate_hash": "95efa3eb8b707dce0654abe320c6f6091e2dc6f3"
+          }
+        },
+        {
+          "client_id": "483370851807-q8ucda9vb3q8qplc1537ci4qk1roivdl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wesplit.app",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "483370851807-t7hci1n7g1klo0dig0q9mqnfqsi6p7ms.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCF_uvSR0Oj53qgi8OFs8JYKZv2ph-DASI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "483370851807-e1tenddn1ihlrp5r3jfo8gj0lfvvpoii.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "483370851807-ldm3rb2soog5lpor5at12nvet9cr9gvm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.wesplit.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

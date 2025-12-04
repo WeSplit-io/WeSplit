@@ -30,7 +30,7 @@ export const PhantomAuthButton: React.FC<PhantomAuthButtonProps> = ({
 }) => {
   const { isConnected, user } = usePhantom();
   const { open, isOpened } = useModal();
-  const { connect, isConnecting } = useConnect();
+  const { isConnecting } = useConnect();
   const [processing, setProcessing] = useState(false);
   const [hasProcessedConnection, setHasProcessedConnection] = useState(false);
 

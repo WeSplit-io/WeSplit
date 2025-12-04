@@ -77,6 +77,86 @@ const AuthMethodsScreen: React.FC = () => {
     loadPersistedEmail();
   }, []);
 
+  // Helper function to process phantom authentication success
+  const processPhantomAuthSuccess = async (phantomUser: any) => {
+    logger.info('Processing phantom auth success', {
+      phantomUserId: phantomUser.id,
+      socialProvider: phantomUser.socialProvider,
+      hasFirebaseUserId: !!phantomUser.firebaseUserId,
+      firebaseUserId: phantomUser.firebaseUserId
+    }, 'AuthMethodsScreen');
+
+    // Handle Google auth with Firebase users
+    if (phantomUser.socialProvider === 'google' && phantomUser.firebaseUserId) {
+      try {
+        // Wait for Firebase Auth to settle
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const { auth } = await import('../../config/firebase/firebase');
+        const currentFirebaseUser = auth.currentUser;
+
+        if (currentFirebaseUser && currentFirebaseUser.uid === phantomUser.firebaseUserId) {
+          logger.info('Using Firebase user data for Google Phantom auth', {
+            firebaseUserId: currentFirebaseUser.uid,
+            phantomUserId: phantomUser.id
+          }, 'AuthMethodsScreen');
+
+          // Ensure user has a wallet and create user object
+          const walletInfo = await authService.ensureUserWallet(currentFirebaseUser.uid);
+          const appUser = {
+            id: currentFirebaseUser.uid,
+            name: currentFirebaseUser.displayName || phantomUser.name || '',
+            email: currentFirebaseUser.email || phantomUser.email || '',
+            wallet_address: walletInfo?.walletAddress || '',
+            wallet_public_key: walletInfo?.walletPublicKey || '',
+            created_at: currentFirebaseUser.metadata.creationTime || new Date().toISOString(),
+            avatar: currentFirebaseUser.photoURL || phantomUser.avatar || '',
+            emailVerified: currentFirebaseUser.emailVerified,
+            lastLoginAt: currentFirebaseUser.metadata.lastSignInTime || new Date().toISOString(),
+            hasCompletedOnboarding: true
+          };
+
+          updateUser(appUser);
+          authenticateUser(appUser, 'social');
+
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Dashboard' }],
+          });
+          return;
+        }
+      } catch (error) {
+        logger.warn('Failed to get Firebase user for Google Phantom auth, falling back to phantom user', error, 'AuthMethodsScreen');
+      }
+    }
+
+    // Fallback: handle phantom users (Apple auth or when Firebase user not available)
+    const walletInfo = await authService.ensureUserWallet(phantomUser.id);
+    const walletAddress = walletInfo?.walletAddress || phantomUser.phantomWalletAddress;
+    const walletPublicKey = walletInfo?.walletPublicKey || phantomUser.phantomWalletAddress;
+
+    const appUser = {
+      id: phantomUser.id,
+      name: phantomUser.name || '',
+      email: phantomUser.email || '',
+      wallet_address: walletAddress,
+      wallet_public_key: walletPublicKey,
+      created_at: typeof phantomUser.createdAt === 'number'
+        ? new Date(phantomUser.createdAt).toISOString()
+        : phantomUser.createdAt || new Date().toISOString(),
+      avatar: phantomUser.avatar || '',
+      hasCompletedOnboarding: true
+    };
+
+    updateUser(appUser);
+    authenticateUser(appUser, 'social');
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Dashboard' }],
+    });
+  };
+
   // Handle email authentication
   const handleEmailAuth = async () => {
     if (!email.trim()) {
@@ -208,36 +288,28 @@ const AuthMethodsScreen: React.FC = () => {
             <View style={styles.socialSection}>
               <PhantomAuthButton
                 fullWidth={true}
-                onSuccess={(phantomUser) => {
+                onSuccess={async (phantomUser) => {
                   logger.info('Phantom authentication successful', { userId: phantomUser?.id }, 'AuthMethodsScreen');
 
-                  // Process the authenticated user and navigate to dashboard
                   if (phantomUser) {
-                    const appUser = {
-                      id: phantomUser.id,
-                      name: phantomUser.name || '',
-                      email: phantomUser.email || '',
-                      wallet_address: phantomUser.phantomWalletAddress,
-                      wallet_public_key: phantomUser.phantomWalletAddress,
-                      created_at: typeof phantomUser.createdAt === 'number'
-                        ? new Date(phantomUser.createdAt).toISOString()
-                        : phantomUser.createdAt || new Date().toISOString(),
-                      avatar: phantomUser.avatar || '',
-                      hasCompletedOnboarding: true
-                    };
-
-                    updateUser(appUser);
-                    authenticateUser(appUser, 'social');
-
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Dashboard' }],
-                    });
+                    await processPhantomAuthSuccess(phantomUser);
                   }
                 }}
                 onError={(error) => {
                   logger.error('Phantom authentication failed', { error }, 'AuthMethodsScreen');
-                  Alert.alert('Authentication Failed', error || 'Failed to authenticate with Phantom');
+
+                  // Provide more specific error messages for common issues
+                  let errorMessage = 'Failed to authenticate with Phantom';
+                  let errorTitle = 'Authentication Failed';
+
+                  if (error?.includes('check team status') || error?.includes('not allowed to proceed') || error?.includes('team status') || error?.includes('not allowed')) {
+                    errorTitle = 'Phantom Portal Approval Required';
+                    errorMessage = 'Your app ID (ab881c51-6335-49b9-8800-0e4ad7d21ca3) needs approval from Phantom Portal.\n\nSteps to fix:\n1. Visit https://phantom.app/developers\n2. Sign in with your Phantom wallet\n3. Find your app and submit for approval\n4. Wait 1-3 business days\n\nFor immediate development testing, use email or phone authentication instead.';
+                  } else if (error?.includes('network') || error?.includes('connection')) {
+                    errorMessage = 'Network connection issue. Please check your internet connection and try again.';
+                  }
+
+                  Alert.alert(errorTitle, errorMessage);
                 }}
               />
 

@@ -101,7 +101,7 @@ export default function App() {
       <ErrorBoundary>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <PhantomSDKProvider theme="dark">
+            <PhantomSDKProvider theme="dark" skipPortalCheck={__DEV__}>
               <AppProvider>
                 <WalletProvider>
                 <NavigationWrapper>

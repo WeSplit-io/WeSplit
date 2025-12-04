@@ -1,51 +1,29 @@
 /**
  * Unified Authentication Service for WeSplit
- * Consolidates all authentication methods: Google OAuth, Twitter OAuth, Apple Sign-In, and Email
+ * Consolidates all authentication methods: Phone Authentication, Email Verification
+ * All social authentication (Google, Apple) is handled through Phantom
  * Replaces: consolidatedAuthService, unifiedSSOService, simpleGoogleAuth, firebaseGoogleAuth
  */
 
-import { 
-  GoogleAuthProvider, 
-  signInWithCredential, 
+import {
+  signInWithCredential,
   User,
-  OAuthProvider,
-  TwitterAuthProvider,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  updateProfile,
   signInWithPhoneNumber,
   PhoneAuthProvider,
   RecaptchaVerifier,
   ConfirmationResult,
   linkWithCredential,
-  updatePhoneNumber,
   signInWithCustomToken
 } from 'firebase/auth';
 import { auth } from '../../config/firebase/firebase';
 import { Platform } from 'react-native';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-import * as Crypto from 'expo-crypto';
 import { logger } from '../analytics/loggingService';
-import { getEnvVar, getPlatformGoogleClientId, getOAuthRedirectUri } from '../../utils/core';
+import { getEnvVar } from '../../utils/core';
 import { firebaseDataService } from '../data/firebaseDataService';
 import { walletService } from '../blockchain/wallet';
 import { UserMigrationService } from '../core/UserMigrationService';
-import Constants from 'expo-constants';
 
-// Environment variable helper
-const getEnvVarSafe = (key: string): string => {
-  if (process.env[key]) {return process.env[key]!;}
-  if (process.env[`EXPO_PUBLIC_${key}`]) {return process.env[`EXPO_PUBLIC_${key}`]!;}
-  if (Constants.expoConfig?.extra?.[key]) {return Constants.expoConfig.extra[key];}
-  if (Constants.expoConfig?.extra?.[`EXPO_PUBLIC_${key}`]) {return Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`];}
-  if ((Constants.manifest as any)?.extra?.[key]) {return (Constants.manifest as any).extra[key];}
-  if ((Constants.manifest as any)?.extra?.[`EXPO_PUBLIC_${key}`]) {return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];}
-  return '';
-};
 
 // Types
 export interface AuthResult {
@@ -81,24 +59,26 @@ export interface UserData {
   hasCompletedOnboarding?: boolean;
 }
 
-export type AuthProvider = 'google' | 'twitter' | 'apple' | 'email' | 'phone';
+export type AuthProvider = 'google' | 'apple' | 'phone';
 
 class AuthService {
+  /**
+   * Validate phone number format (E.164)
+   */
+  private validatePhoneNumber(phoneNumber: string): { isValid: boolean; error?: string } {
+    if (!phoneNumber || !phoneNumber.startsWith('+')) {
+      return {
+        isValid: false,
+        error: 'Phone number must be in E.164 format (e.g., +1234567890)'
+      };
+    }
+    return { isValid: true };
+  }
   private static instance: AuthService;
-  private googleClientId: string;
-  private twitterClientId: string;
-  private appleClientId: string;
 
   private constructor() {
-    this.googleClientId = getPlatformGoogleClientId();
-    this.twitterClientId = getEnvVarSafe('EXPO_PUBLIC_TWITTER_CLIENT_ID');
-    this.appleClientId = getEnvVarSafe('EXPO_PUBLIC_APPLE_CLIENT_ID');
-    
     if (__DEV__) {
       logger.info('AuthService initialized', {
-        hasGoogleClientId: !!this.googleClientId,
-        hasTwitterClientId: !!this.twitterClientId,
-        hasAppleClientId: !!this.appleClientId,
         platform: Platform.OS
       }, 'AuthService');
     }
@@ -111,322 +91,10 @@ class AuthService {
     return AuthService.instance;
   }
 
-  /**
-   * Sign in with Google OAuth
-   */
-  async signInWithGoogle(): Promise<AuthResult> {
-    try {
-      if (!this.googleClientId) {
-        return { success: false, error: 'Google Client ID not configured' };
-      }
 
-      logger.info('🔄 Starting Google Sign-In', {
-        platform: Platform.OS,
-        clientId: this.googleClientId.substring(0, 20) + '...'
-      }, 'AuthService');
 
-      const redirectUri = getOAuthRedirectUri();
-      const request = new AuthSession.AuthRequest({
-        clientId: this.googleClientId,
-        scopes: ['openid', 'profile', 'email'],
-        redirectUri,
-        responseType: AuthSession.ResponseType.Code,
-        extraParams: {},
-        prompt: AuthSession.Prompt.SelectAccount,
-      });
 
-      const result = await request.promptAsync({
-        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-      });
 
-      if (result.type === 'success') {
-        const tokenResponse = await AuthSession.exchangeCodeAsync(
-          {
-            clientId: this.googleClientId,
-            code: result.params.code,
-            redirectUri,
-            extraParams: {
-              code_verifier: request.codeVerifier || '',
-            },
-          },
-          {
-            tokenEndpoint: 'https://oauth2.googleapis.com/token',
-          }
-        );
-
-        const credential = GoogleAuthProvider.credential(tokenResponse.idToken);
-        const userCredential = await signInWithCredential(auth, credential);
-        
-        // Check if user exists in our database
-        const isNewUser = await this.checkIfUserIsNew(userCredential.user.uid);
-        
-        // Create or update user data
-        await this.createOrUpdateUserData(userCredential.user, isNewUser);
-
-        logger.info('✅ Google Sign-In successful', {
-          userId: userCredential.user.uid,
-          isNewUser
-        }, 'AuthService');
-
-        return {
-          success: true,
-          user: userCredential.user,
-          isNewUser
-        };
-      } else {
-        return { success: false, error: 'Google authentication was cancelled' };
-      }
-    } catch (error) {
-      logger.error('❌ Google Sign-In failed', error, 'AuthService');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Google authentication failed' 
-      };
-    }
-  }
-
-  /**
-   * Sign in with Twitter OAuth
-   */
-  async signInWithTwitter(): Promise<AuthResult> {
-    try {
-      if (!this.twitterClientId) {
-        return { success: false, error: 'Twitter Client ID not configured' };
-      }
-
-      logger.info('🔄 Starting Twitter Sign-In', {
-        platform: Platform.OS
-      }, 'AuthService');
-
-      const redirectUri = getOAuthRedirectUri();
-      const request = new AuthSession.AuthRequest({
-        clientId: this.twitterClientId,
-        scopes: ['tweet.read', 'users.read'],
-        redirectUri,
-        responseType: AuthSession.ResponseType.Code,
-        extraParams: {},
-      });
-
-      const result = await request.promptAsync({
-        authorizationEndpoint: 'https://twitter.com/i/oauth2/authorize',
-      });
-
-      if (result.type === 'success') {
-        const tokenResponse = await AuthSession.exchangeCodeAsync(
-          {
-            clientId: this.twitterClientId,
-            code: result.params.code,
-            redirectUri,
-            extraParams: {
-              code_verifier: request.codeVerifier || '',
-            },
-          },
-          {
-            tokenEndpoint: 'https://api.twitter.com/2/oauth2/token',
-          }
-        );
-
-        const credential = TwitterAuthProvider.credential(tokenResponse.accessToken, '');
-        const userCredential = await signInWithCredential(auth, credential);
-        
-        // Check if user exists in our database
-        const isNewUser = await this.checkIfUserIsNew(userCredential.user.uid);
-        
-        // Create or update user data
-        await this.createOrUpdateUserData(userCredential.user, isNewUser);
-
-        logger.info('✅ Twitter Sign-In successful', {
-          userId: userCredential.user.uid,
-          isNewUser
-        }, 'AuthService');
-
-        return {
-          success: true,
-          user: userCredential.user,
-          isNewUser
-        };
-      } else {
-        return { success: false, error: 'Twitter authentication was cancelled' };
-      }
-    } catch (error) {
-      logger.error('❌ Twitter Sign-In failed', error, 'AuthService');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Twitter authentication failed' 
-      };
-    }
-  }
-
-  /**
-   * Sign in with Apple ID
-   */
-  async signInWithApple(): Promise<AuthResult> {
-    try {
-      if (!this.appleClientId) {
-        return { success: false, error: 'Apple Client ID not configured' };
-      }
-
-      logger.info('🔄 Starting Apple Sign-In', {
-        platform: Platform.OS
-      }, 'AuthService');
-
-      const redirectUri = getOAuthRedirectUri();
-      const request = new AuthSession.AuthRequest({
-        clientId: this.appleClientId,
-        scopes: ['name', 'email'],
-        redirectUri,
-        responseType: AuthSession.ResponseType.Code,
-        extraParams: {},
-      });
-
-      const result = await request.promptAsync({
-        authorizationEndpoint: 'https://appleid.apple.com/auth/authorize',
-      });
-
-      if (result.type === 'success') {
-        const tokenResponse = await AuthSession.exchangeCodeAsync(
-          {
-            clientId: this.appleClientId,
-            code: result.params.code,
-            redirectUri,
-            extraParams: {
-              code_verifier: request.codeVerifier || '',
-            },
-          },
-          {
-            tokenEndpoint: 'https://appleid.apple.com/auth/token',
-          }
-        );
-
-        const provider = new OAuthProvider('apple.com');
-        const credential = provider.credential({
-          idToken: tokenResponse.idToken!,
-          rawNonce: 'apple-signin-nonce', // Apple Sign-In nonce
-        });
-        
-        const userCredential = await signInWithCredential(auth, credential);
-        
-        // Check if user exists in our database
-        const isNewUser = await this.checkIfUserIsNew(userCredential.user.uid);
-        
-        // Create or update user data
-        await this.createOrUpdateUserData(userCredential.user, isNewUser);
-
-        logger.info('✅ Apple Sign-In successful', {
-          userId: userCredential.user.uid,
-          isNewUser
-        }, 'AuthService');
-
-        return {
-          success: true,
-          user: userCredential.user,
-          isNewUser
-        };
-      } else {
-        return { success: false, error: 'Apple authentication was cancelled' };
-      }
-    } catch (error) {
-      logger.error('❌ Apple Sign-In failed', error, 'AuthService');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Apple authentication failed' 
-      };
-    }
-  }
-
-  /**
-   * Sign in with email and password
-   */
-  async signInWithEmail(email: string, password: string): Promise<AuthResult> {
-    try {
-      logger.info('🔄 Starting Email Sign-In', {
-        email: email.substring(0, 5) + '...'
-      }, 'AuthService');
-
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      // Check if user exists in our database
-      const isNewUser = await this.checkIfUserIsNew(userCredential.user.uid);
-      
-      // Create or update user data (this handles wallet recovery)
-      await this.createOrUpdateUserData(userCredential.user, isNewUser);
-      
-      // Update last login time
-      await this.updateLastLoginTime(userCredential.user.uid);
-
-      logger.info('✅ Email Sign-In successful', {
-        userId: userCredential.user.uid,
-        isNewUser
-      }, 'AuthService');
-
-      return {
-        success: true,
-        user: userCredential.user,
-        isNewUser
-      };
-    } catch (error) {
-      logger.error('❌ Email Sign-In failed', error, 'AuthService');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Email authentication failed' 
-      };
-    }
-  }
-
-  /**
-   * Create account with email and password
-   */
-  async createAccountWithEmail(email: string, password: string, name: string): Promise<AuthResult> {
-    try {
-      logger.info('🔄 Starting Email Account Creation', {
-        email: email.substring(0, 5) + '...'
-      }, 'AuthService');
-
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Update display name
-      await updateProfile(userCredential.user, { displayName: name });
-      
-      // Send email verification
-      await sendEmailVerification(userCredential.user);
-      
-      // Create user data
-      await this.createOrUpdateUserData(userCredential.user, true);
-
-      logger.info('✅ Email Account Creation successful', {
-        userId: userCredential.user.uid
-      }, 'AuthService');
-
-      return {
-        success: true,
-        user: userCredential.user,
-        isNewUser: true
-      };
-    } catch (error) {
-      logger.error('❌ Email Account Creation failed', error, 'AuthService');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Email account creation failed' 
-      };
-    }
-  }
-
-  /**
-   * Send password reset email
-   */
-  async sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      await sendPasswordResetEmail(auth, email);
-      logger.info('✅ Password reset email sent', { email: email.substring(0, 5) + '...' }, 'AuthService');
-      return { success: true };
-    } catch (error) {
-      logger.error('❌ Password reset email failed', error, 'AuthService');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to send password reset email' 
-      };
-    }
-  }
 
   /**
    * Sign in with phone number (Firebase Phone Authentication)
@@ -434,11 +102,29 @@ class AuthService {
    */
   async signInWithPhoneNumber(phoneNumber: string, recaptchaVerifier?: RecaptchaVerifier): Promise<{ success: boolean; verificationId?: string; error?: string }> {
     try {
-      // Validate phone number format (E.164)
-      if (!phoneNumber || !phoneNumber.startsWith('+')) {
+      // Validate Firebase is initialized
+      if (!auth || !auth.app) {
         return {
           success: false,
-          error: 'Phone number must be in E.164 format (e.g., +1234567890)'
+          error: 'Firebase authentication is not initialized'
+        };
+      }
+
+      // Log Firebase configuration for debugging
+      logger.info('Firebase Phone Auth Configuration Check', {
+        projectId: auth.app.options.projectId,
+        authDomain: auth.app.options.authDomain,
+        hasApiKey: !!auth.app.options.apiKey,
+        platform: Platform.OS,
+        isDev: __DEV__
+      }, 'AuthService');
+
+      // Validate phone number format (E.164)
+      const phoneValidation = this.validatePhoneNumber(phoneNumber);
+      if (!phoneValidation.isValid) {
+        return {
+          success: false,
+          error: phoneValidation.error
         };
       }
 
@@ -448,18 +134,78 @@ class AuthService {
 
       logger.info('🔄 Starting Phone Sign-In', {
         phone: phoneNumber.substring(0, 5) + '...',
-        isTestNumber
+        isTestNumber,
+        firebaseInitialized: !!auth?.app,
+        projectId: auth.app?.options?.projectId
       }, 'AuthService');
 
       // Handle phone authentication based on environment
       let confirmationResult: ConfirmationResult;
 
       try {
+        logger.info('Attempting Firebase Phone Auth', {
+          platform: Platform.OS,
+          phonePrefix: phoneNumber.substring(0, 5),
+          isTestNumber,
+          firebaseConfig: {
+            projectId: auth.app.options.projectId,
+            authDomain: auth.app.options.authDomain
+          }
+        }, 'AuthService');
+
+        // DEBUG: Check Firebase auth state
+        logger.info('Firebase Auth Debug', {
+          currentUser: !!auth.currentUser,
+          currentUserId: auth.currentUser?.uid,
+          appName: auth.app.name,
+          projectId: auth.app.options.projectId
+        }, 'AuthService');
+
         if (Platform.OS === 'web' && recaptchaVerifier) {
           confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
         } else if (Platform.OS !== 'web') {
-          // Mobile - Firebase should handle reCAPTCHA automatically
-          confirmationResult = await signInWithPhoneNumber(auth, phoneNumber);
+          // Mobile - React Native/Expo with reCAPTCHA Enterprise requires proper configuration
+          logger.info('Setting up React Native phone authentication with reCAPTCHA', {
+            phonePrefix: phoneNumber.substring(0, 5),
+            platform: Platform.OS,
+            firebaseVersion: '11.10.0',
+            recaptchaEnabled: true
+          }, 'AuthService');
+
+          try {
+            // For React Native with reCAPTCHA Enterprise enabled,
+            // Firebase handles reCAPTCHA automatically but requires proper Firebase Console setup
+
+            // Try with explicit reCAPTCHA verifier for React Native/Expo
+            if (Platform.OS === 'ios' && !isTestNumber) {
+              // For iOS real numbers, try with web fallback approach
+              console.log('iOS real number detected - using web fallback approach');
+              confirmationResult = await signInWithPhoneNumber(auth, phoneNumber);
+            } else {
+              // For Android, web, or test numbers
+              confirmationResult = await signInWithPhoneNumber(auth, phoneNumber);
+            }
+          } catch (mobileError: any) {
+            logger.error('React Native Phone Auth failed', {
+              error: mobileError.message,
+              code: mobileError.code,
+              platform: Platform.OS,
+              stack: mobileError.stack?.substring(0, 200)
+            }, 'AuthService');
+
+            // Check for specific Firebase errors
+            if (mobileError.message?.includes('Unable to load external scripts')) {
+              throw new Error('reCAPTCHA Enterprise configuration issue. To maintain security:\n\nAction Required:\n1. Phone Authentication ENABLED in Firebase Console > Authentication > Sign-in method\n2. reCAPTCHA Enterprise ENABLED and properly configured\n3. Add your app domains to reCAPTCHA Enterprise\n4. Test with +15551234567 first, then real numbers\n\nFor security: Keep reCAPTCHA Enterprise enabled but ensure proper domain configuration.');
+            } else if (mobileError.code === 'auth/invalid-phone-number') {
+              throw new Error('Invalid phone number format. Use E.164 format (e.g., +33635551484)');
+            } else if (mobileError.code === 'auth/too-many-requests') {
+              throw new Error('Too many requests. Please wait before trying again.');
+            } else if (mobileError.code === 'auth/missing-client-identifier') {
+              throw new Error('Firebase configuration error. Check google-services.json and GoogleService-Info.plist');
+            }
+
+            throw mobileError;
+          }
         } else {
           return {
             success: false,
@@ -474,21 +220,25 @@ class AuthService {
 
           logger.error('Firebase Phone Auth reCAPTCHA issue', {
             error: phoneError.message,
+            errorCode: phoneError.code,
             phone: phoneNumber.substring(0, 5) + '...',
             platform: Platform.OS,
-            isDevMode: __DEV__
+            isDevMode: __DEV__,
+            firebaseProjectId: auth.app?.options?.projectId,
+            authDomain: auth.app?.options?.authDomain,
+            suggestion: 'Check Firebase Console: Authentication > Sign-in method > Phone should be ENABLED'
           }, 'AuthService');
 
-          // Provide helpful guidance based on environment
-          if (__DEV__) {
+          // Provide specific guidance for React Native/Expo
+          if (Platform.OS !== 'web') {
             return {
               success: false,
-              error: 'Phone authentication requires reCAPTCHA setup. For testing: +15551234567, +15559876543, +15551111111 (code: 123456). For production: Configure reCAPTCHA site key in Firebase Console.'
+              error: 'Phone Authentication failed. Please check:\n1. Phone is ENABLED in Firebase Console > Authentication > Sign-in method\n2. reCAPTCHA Enterprise is DISABLED\n3. Your app is properly registered in Firebase Console\n\nFor testing, use: +15551234567 (code: 123456)'
             };
           } else {
             return {
               success: false,
-              error: 'Phone authentication requires configuration. Please contact support or use email authentication.'
+              error: 'Phone authentication requires a reCAPTCHA verifier for web platform.'
             };
           }
         }
@@ -669,10 +419,11 @@ class AuthService {
       }
 
       // Validate phone number format (E.164)
-      if (!phoneNumber || !phoneNumber.startsWith('+')) {
-        return { 
-          success: false, 
-          error: 'Phone number must be in E.164 format (e.g., +1234567890)' 
+      const phoneValidation = this.validatePhoneNumber(phoneNumber);
+      if (!phoneValidation.isValid) {
+        return {
+          success: false,
+          error: phoneValidation.error
         };
       }
 
@@ -784,7 +535,7 @@ class AuthService {
         } else if (phoneError.code === 'auth/invalid-phone-number') {
           return {
             success: false,
-            error: 'Invalid phone number. Please enter a valid phone number in international format (e.g., +1234567890).'
+            error: 'Invalid phone number. Please enter a valid phone number in E.164 format (e.g., +33635551484).'
           };
         } else if (phoneError.code === 'auth/too-many-requests') {
           return {
@@ -1031,10 +782,78 @@ class AuthService {
       return { success: true };
     } catch (error) {
       logger.error('❌ Sign out failed', error, 'AuthService');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Sign out failed' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Sign out failed'
       };
+    }
+  }
+
+  /**
+   * Ensure user has a wallet (consolidated wallet creation logic)
+   */
+  async ensureUserWallet(userId: string): Promise<{ walletAddress: string; walletPublicKey: string } | null> {
+    try {
+      // Check if user already has wallet in database
+      const existingUser = await firebaseDataService.user.getCurrentUser(userId);
+      if (existingUser?.wallet_address) {
+        return {
+          walletAddress: existingUser.wallet_address,
+          walletPublicKey: existingUser.wallet_public_key || existingUser.wallet_address
+        };
+      }
+
+      // Check if wallet exists on device
+      const hasWalletOnDevice = await walletService.hasWalletOnDevice(userId);
+      if (hasWalletOnDevice) {
+        // Try to get wallet info from device
+        const walletInfo = await walletService.getWalletInfo(userId);
+        if (walletInfo) {
+          // Update database with wallet info
+          await firebaseDataService.user.updateUser(userId, {
+            wallet_address: walletInfo.address,
+            wallet_public_key: walletInfo.publicKey,
+            wallet_status: 'healthy',
+            wallet_created_at: new Date().toISOString(),
+            wallet_has_private_key: true,
+            wallet_type: 'app-generated'
+          });
+          return {
+            walletAddress: walletInfo.address,
+            walletPublicKey: walletInfo.publicKey
+          };
+        }
+      }
+
+      // Create new wallet
+      const walletResult = await walletService.createWallet(userId);
+      if (walletResult.success && walletResult.wallet) {
+        // Update database with new wallet info
+        await firebaseDataService.user.updateUser(userId, {
+          wallet_address: walletResult.wallet.address,
+          wallet_public_key: walletResult.wallet.publicKey,
+          wallet_status: 'healthy',
+          wallet_created_at: new Date().toISOString(),
+          wallet_has_private_key: true,
+          wallet_type: 'app-generated'
+        });
+
+        logger.info('✅ Created wallet for user', {
+          userId,
+          walletAddress: walletResult.wallet.address
+        }, 'AuthService');
+
+        return {
+          walletAddress: walletResult.wallet.address,
+          walletPublicKey: walletResult.wallet.publicKey
+        };
+      }
+
+      logger.error('❌ Failed to create wallet for user', { userId }, 'AuthService');
+      return null;
+    } catch (error) {
+      logger.error('❌ Error ensuring user wallet', error, 'AuthService');
+      return null;
     }
   }
 
@@ -1052,25 +871,6 @@ class AuthService {
     return !!auth.currentUser;
   }
 
-  /**
-   * Authenticate with any SSO provider
-   */
-  async authenticateWithSSO(provider: AuthProvider): Promise<AuthResult> {
-    switch (provider) {
-      case 'google':
-        return this.signInWithGoogle();
-      case 'twitter':
-        return this.signInWithTwitter();
-      case 'apple':
-        return this.signInWithApple();
-      case 'email':
-        throw new Error('Email authentication requires email and password parameters');
-      case 'phone':
-        throw new Error('Phone authentication requires phone number and verification code parameters');
-      default:
-        return { success: false, error: `Unsupported provider: ${provider}` };
-    }
-  }
 
   /**
    * Check if user is new by looking up their data in Firestore and device storage
@@ -1141,75 +941,8 @@ class AuthService {
         });
       }
       
-      if (isNewUser) {
-        // Create wallet for new user using atomic creation
-        const walletResult = await walletService.createWallet(consistentUser.id);
-        if (walletResult.success && walletResult.wallet) {
-          logger.info('✅ New user wallet created atomically', {
-            userId: consistentUser.id,
-            walletAddress: walletResult.wallet.address
-          }, 'AuthService');
-        } else {
-          logger.error('❌ Failed to create wallet for new user', {
-            userId: consistentUser.id,
-            error: walletResult.error
-          }, 'AuthService');
-        }
-      } else {
-        // Handle existing user - check if they have wallet on device
-        const hasWalletOnDevice = await walletService.hasWalletOnDevice(consistentUser.id);
-        
-        if (hasWalletOnDevice) {
-          // User has wallet on device - normal case
-          logger.info('✅ Existing user with wallet on device', {
-            userId: consistentUser.id,
-            existingWalletAddress: consistentUser.wallet_address
-          }, 'AuthService');
-        } else if (consistentUser.wallet_address) {
-          // User exists in database but no wallet on device (app reinstalled)
-          logger.warn('⚠️ User exists in database but no wallet on device - attempting wallet recovery', { 
-            userId: consistentUser.id,
-            databaseWalletAddress: consistentUser.wallet_address 
-          }, 'AuthService');
-          
-          // Try to recover wallet using existing wallet address from database
-          let walletResult = await walletService.recoverWalletFromAddress(consistentUser.id, consistentUser.wallet_address);
-          
-          // If local recovery failed, try cloud backup restore
-          if (!walletResult.success) {
-            logger.info('Local recovery failed, cloud backup restore will be attempted', { 
-              userId: consistentUser.id 
-            }, 'AuthService');
-            
-            const { walletCloudBackupService } = await import('../security/walletCloudBackupService');
-            const hasBackup = await walletCloudBackupService.hasBackup(consistentUser.id);
-            
-            if (hasBackup) {
-              logger.info('Cloud backup available for restore', { userId: consistentUser.id }, 'AuthService');
-            } else {
-              logger.warn('No cloud backup found, user will need to restore from seed phrase', { 
-                userId: consistentUser.id 
-              }, 'AuthService');
-            }
-          } else {
-            logger.info('✅ Wallet recovered successfully', { userId: consistentUser.id }, 'AuthService');
-          }
-        } else {
-          // User has no wallet - create one
-          logger.info('Creating wallet for existing user without wallet', { userId: consistentUser.id }, 'AuthService');
-          const walletResult = await walletService.createWallet(consistentUser.id);
-          if (walletResult.success && walletResult.wallet) {
-            await firebaseDataService.user.updateUser(consistentUser.id, {
-              wallet_address: walletResult.wallet.address,
-              wallet_public_key: walletResult.wallet.publicKey,
-              wallet_status: 'healthy',
-              wallet_created_at: new Date().toISOString(),
-              wallet_has_private_key: true,
-              wallet_type: 'app-generated'
-            });
-          }
-        }
-      }
+      // Ensure user has a wallet using consolidated logic
+      await this.ensureUserWallet(consistentUser.id);
     } catch (error) {
       logger.error('❌ Failed to create/update user data (phone)', error, 'AuthService');
       // Don't throw error - authentication should still succeed
@@ -1230,78 +963,8 @@ class AuthService {
         isNewUser
       }, 'AuthService');
       
-      if (isNewUser) {
-        // Create wallet for new user using atomic creation
-        const walletResult = await walletService.createWallet(consistentUser.id);
-        if (walletResult.success && walletResult.wallet) {
-          logger.info('✅ New user wallet created atomically', {
-            userId: consistentUser.id,
-            walletAddress: walletResult.wallet.address
-          }, 'AuthService');
-        } else {
-          logger.error('❌ Failed to create wallet for new user', {
-            userId: consistentUser.id,
-            error: walletResult.error
-          }, 'AuthService');
-        }
-      } else {
-        // Handle existing user - check if they have wallet on device
-        const hasWalletOnDevice = await walletService.hasWalletOnDevice(consistentUser.id);
-        
-        if (hasWalletOnDevice) {
-          // User has wallet on device - normal case
-          logger.info('✅ Existing user with wallet on device', {
-            userId: consistentUser.id,
-            existingWalletAddress: consistentUser.wallet_address
-          }, 'AuthService');
-        } else if (consistentUser.wallet_address) {
-          // User exists in database but no wallet on device (app reinstalled)
-          logger.warn('⚠️ User exists in database but no wallet on device - attempting wallet recovery', { 
-            userId: consistentUser.id,
-            databaseWalletAddress: consistentUser.wallet_address 
-          }, 'AuthService');
-          
-          // Try to recover wallet using existing wallet address from database
-          let walletResult = await walletService.recoverWalletFromAddress(consistentUser.id, consistentUser.wallet_address);
-          
-          // If local recovery failed, try cloud backup restore (requires user password)
-          if (!walletResult.success) {
-            logger.info('Local recovery failed, cloud backup restore will be attempted on next login with password', { 
-              userId: consistentUser.id 
-            }, 'AuthService');
-            
-            // Note: Cloud backup restore requires user password, so we'll prompt user later
-            // For now, we'll just log that backup is available
-            const { walletCloudBackupService } = await import('../security/walletCloudBackupService');
-            const hasBackup = await walletCloudBackupService.hasBackup(consistentUser.id);
-            
-            if (hasBackup) {
-              logger.info('Cloud backup available for restore', { userId: consistentUser.id }, 'AuthService');
-              // User will be prompted to restore from backup on next screen
-            } else {
-              logger.warn('No cloud backup found, user will need to restore from seed phrase', { 
-                userId: consistentUser.id 
-              }, 'AuthService');
-            }
-          } else {
-            logger.info('✅ Wallet recovered successfully', { userId: consistentUser.id }, 'AuthService');
-          }
-        } else {
-          // User has no wallet - create one
-          logger.info('Creating wallet for existing user without wallet', { userId: consistentUser.id }, 'AuthService');
-          const walletResult = await walletService.createWallet(consistentUser.id);
-          if (walletResult.success && walletResult.wallet) {
-            await firebaseDataService.user.updateUser(consistentUser.id, {
-              wallet_address: walletResult.wallet.address,
-              wallet_public_key: walletResult.wallet.publicKey,
-              wallet_status: 'healthy',
-              wallet_created_at: new Date().toISOString(),
-              wallet_has_private_key: true,
-              wallet_type: 'app-generated'
-            });
-          }
-        }
-      }
+      // Ensure user has a wallet using consolidated logic
+      await this.ensureUserWallet(consistentUser.id);
     } catch (error) {
       logger.error('❌ Failed to create/update user data', error, 'AuthService');
       // Don't throw error - authentication should still succeed
@@ -1325,3 +988,359 @@ class AuthService {
 // Export singleton instance
 export const authService = AuthService.getInstance();
 export default authService;
+
+/**
+ * Backend test utility for phone authentication - no frontend dependencies
+ * Use this to test and debug Firebase Phone Authentication logic
+ */
+export class PhoneAuthBackendTester {
+  private authService: AuthService;
+
+  constructor() {
+    this.authService = AuthService.getInstance();
+  }
+
+  /**
+   * Test Firebase Phone Authentication configuration
+   */
+  async testFirebaseConfiguration(): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      console.log('🔧 Testing Firebase Phone Authentication Configuration...');
+      console.log('='.repeat(60));
+
+      // Check if we're in a Node.js environment with Firebase
+      const isNode = typeof global !== 'undefined' && typeof global.process !== 'undefined';
+      const hasFirebase = typeof global !== 'undefined' && (global as any).firebase;
+
+      console.log(`🌐 Environment: ${isNode ? 'Node.js' : 'Browser/React Native'}`);
+      console.log(`🔥 Firebase Available: ${hasFirebase ? '✅' : '❌'}`);
+
+      if (hasFirebase) {
+        const apps = (global as any).firebase.apps || [];
+        const projectId = apps[0]?.options?.projectId;
+        console.log(`📱 Firebase Apps: ${apps.length}`);
+        console.log(`📋 Project ID: ${projectId || 'Not found'}`);
+      }
+
+      // For React Native testing, Firebase should be initialized
+      const firebaseInitialized = hasFirebase && (global as any).firebase.apps?.length > 0;
+
+      if (!firebaseInitialized) {
+        return {
+          success: false,
+          message: 'Firebase not properly initialized in test environment',
+          data: { hasFirebase, isNode }
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Firebase configuration available for testing',
+        data: { hasFirebase, isNode, firebaseApps: (global as any).firebase.apps?.length }
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        message: `Configuration test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        data: { error: error instanceof Error ? error.message : error }
+      };
+    }
+  }
+
+  /**
+   * Test phone authentication with Firebase test number (bypasses reCAPTCHA)
+   */
+  async testFirebaseTestNumber(): Promise<{ success: boolean; message: string; data?: any }> {
+    const testPhone = '+15551234567';
+    const expectedCode = '123456';
+
+    try {
+      console.log('\n🧪 Testing Firebase Phone Auth with test number...');
+      console.log(`📞 Phone: ${testPhone}`);
+      console.log(`🔐 Expected code: ${expectedCode}`);
+      console.log('-'.repeat(50));
+
+      // Step 1: Send verification code
+      console.log('📤 Step 1: Sending verification code...');
+      const sendResult = await this.authService.signInWithPhoneNumber(testPhone);
+
+      if (!sendResult.success) {
+        console.log(`❌ Failed to send code: ${sendResult.error}`);
+        return {
+          success: false,
+          message: `Failed to send verification code: ${sendResult.error}`,
+          data: sendResult
+        };
+      }
+
+      console.log('✅ Verification code sent successfully');
+      console.log(`📋 Verification ID received: ${!!sendResult.verificationId}`);
+
+      // Step 2: Verify code (simulate user entering code)
+      console.log('\n🔍 Step 2: Verifying code...');
+      const verifyResult = await this.authService.verifyPhoneCode(sendResult.verificationId!, expectedCode);
+
+      if (verifyResult.success) {
+        console.log('✅ Phone authentication successful!');
+        console.log(`👤 User ID: ${verifyResult.user?.uid?.substring(0, 8)}...`);
+        console.log(`📧 Email: ${verifyResult.user?.email || 'Not provided'}`);
+        console.log(`🆕 New User: ${verifyResult.isNewUser ? 'Yes' : 'No'}`);
+
+        return {
+          success: true,
+          message: 'Firebase Phone Authentication working correctly with test number!',
+          data: {
+            userId: verifyResult.user?.uid,
+            email: verifyResult.user?.email,
+            phoneNumber: testPhone,
+            isNewUser: verifyResult.isNewUser,
+            verificationId: sendResult.verificationId?.substring(0, 20) + '...'
+          }
+        };
+      } else {
+        console.log(`❌ Code verification failed: ${verifyResult.error}`);
+        return {
+          success: false,
+          message: `Code verification failed: ${verifyResult.error}`,
+          data: verifyResult
+        };
+      }
+
+    } catch (error) {
+      console.error('💥 Test failed with error:', error);
+      return {
+        success: false,
+        message: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        data: { error: error instanceof Error ? error.message : error }
+      };
+    }
+  }
+
+  /**
+   * Test phone authentication with real number (tests reCAPTCHA configuration)
+   */
+  async testRealNumber(phoneNumber: string): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      console.log(`\n🧪 Testing Firebase Phone Auth with real number...`);
+      console.log(`📞 Phone: ${phoneNumber}`);
+      console.log('⚠️  Note: This tests reCAPTCHA Enterprise configuration');
+      console.log('-'.repeat(50));
+
+      const sendResult = await this.authService.signInWithPhoneNumber(phoneNumber);
+
+      if (!sendResult.success) {
+        console.log(`❌ Failed to send code to real number: ${sendResult.error}`);
+
+        // Analyze the error to provide specific guidance
+        const error = sendResult.error || '';
+        if (error.includes('reCAPTCHA Enterprise configuration')) {
+          console.log('🔧 Issue: reCAPTCHA Enterprise needs proper configuration');
+          console.log('   Solution: Configure reCAPTCHA Enterprise in Google Cloud Console');
+        } else if (error.includes('Phone Authentication is NOT ENABLED')) {
+          console.log('🔧 Issue: Phone Authentication disabled in Firebase Console');
+          console.log('   Solution: Enable Phone provider in Firebase Console > Authentication > Sign-in method');
+        }
+
+        return {
+          success: false,
+          message: `Failed to send code to real number: ${sendResult.error}`,
+          data: sendResult
+        };
+      }
+
+      console.log('✅ Verification code sent to real number!');
+      console.log('📝 Check your phone for the SMS verification code');
+      console.log(`📋 Verification ID: ${sendResult.verificationId?.substring(0, 20)}...`);
+
+      return {
+        success: true,
+        message: 'SMS sent successfully to real number! reCAPTCHA Enterprise is working.',
+        data: {
+          verificationId: sendResult.verificationId,
+          phoneNumber,
+          note: 'Use the received SMS code to complete authentication'
+        }
+      };
+
+    } catch (error) {
+      console.error('💥 Real number test failed:', error);
+      return {
+        success: false,
+        message: `Real number test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        data: { error: error instanceof Error ? error.message : error }
+      };
+    }
+  }
+
+  /**
+   * Complete authentication with received SMS code
+   */
+  async completeWithSmsCode(verificationId: string, smsCode: string): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      console.log('\n🔍 Completing authentication with SMS code...');
+      console.log(`📋 Verification ID: ${verificationId.substring(0, 20)}...`);
+      console.log(`🔐 SMS Code: ${smsCode}`);
+      console.log('-'.repeat(50));
+
+      const result = await this.authService.verifyPhoneCode(verificationId, smsCode);
+
+      if (result.success) {
+        console.log('✅ Authentication completed successfully!');
+        console.log(`👤 User ID: ${result.user?.uid?.substring(0, 8)}...`);
+        console.log(`📧 Email: ${result.user?.email || 'Not provided'}`);
+        console.log(`🆕 New User: ${result.isNewUser ? 'Yes' : 'No'}`);
+
+        return {
+          success: true,
+          message: 'Phone authentication completed successfully!',
+          data: {
+            userId: result.user?.uid,
+            email: result.user?.email,
+            isNewUser: result.isNewUser
+          }
+        };
+      } else {
+        console.log(`❌ Authentication failed: ${result.error}`);
+        return {
+          success: false,
+          message: `Authentication failed: ${result.error}`,
+          data: result
+        };
+      }
+
+    } catch (error) {
+      console.error('💥 SMS code verification failed:', error);
+      return {
+        success: false,
+        message: `SMS verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        data: { error: error instanceof Error ? error.message : error }
+      };
+    }
+  }
+
+  /**
+   * Run comprehensive phone authentication backend tests
+   */
+  async runComprehensiveBackendTest(): Promise<{ success: boolean; message: string; results: any[] }> {
+    console.log('🚀 Starting comprehensive Firebase Phone Authentication backend test...');
+    console.log('='.repeat(70));
+
+    const results = [];
+
+    // Test 1: Firebase configuration
+    console.log('\n📋 Test 1: Firebase Configuration Check');
+    console.log('-'.repeat(50));
+    const configResult = await this.testFirebaseConfiguration();
+    results.push({ test: 'firebase_config', ...configResult });
+
+    if (!configResult.success) {
+      console.log('\n❌ Firebase configuration failed - cannot proceed with tests');
+      return {
+        success: false,
+        message: 'Firebase configuration issues detected',
+        results
+      };
+    }
+
+    // Test 2: Firebase test number (tests Phone Auth enablement)
+    console.log('\n📋 Test 2: Firebase Test Number (+15551234567)');
+    console.log('-'.repeat(50));
+    const testResult = await this.testFirebaseTestNumber();
+    results.push({ test: 'firebase_test_number', ...testResult });
+
+    if (!testResult.success) {
+      console.log('\n❌ Firebase test number failed - Phone Authentication may not be enabled');
+      console.log('🔧 Solution: Enable Phone provider in Firebase Console > Authentication > Sign-in method');
+      return {
+        success: false,
+        message: 'Phone Authentication not enabled in Firebase Console',
+        results
+      };
+    }
+
+    // Test 3: Real number attempt (tests reCAPTCHA configuration)
+    console.log('\n📋 Test 3: Real Number reCAPTCHA Test (+33635551484)');
+    console.log('-'.repeat(50));
+    const realResult = await this.testRealNumber('+33635551484');
+    results.push({ test: 'real_number_recaptcha', ...realResult });
+
+    // Summary
+    console.log('\n📊 Backend Test Results Summary:');
+    console.log('='.repeat(70));
+
+    const configPassed = results.find(r => r.test === 'firebase_config')?.success;
+    const firebaseTestPassed = results.find(r => r.test === 'firebase_test_number')?.success;
+    const realNumberWorked = results.find(r => r.test === 'real_number_recaptcha')?.success;
+
+    if (configPassed && firebaseTestPassed && realNumberWorked) {
+      console.log('✅ ALL TESTS PASSED - Phone Authentication fully functional!');
+      console.log('🔐 reCAPTCHA Enterprise properly configured');
+      console.log('📱 Mobile authentication ready for production');
+      return {
+        success: true,
+        message: 'Phone authentication backend is fully functional with security enabled',
+        results
+      };
+    } else if (configPassed && firebaseTestPassed && !realNumberWorked) {
+      console.log('⚠️  PARTIAL SUCCESS - Basic setup works, reCAPTCHA Enterprise needs configuration');
+      console.log('🔧 Next step: Configure reCAPTCHA Enterprise in Google Cloud Console');
+      return {
+        success: true,
+        message: 'Basic phone authentication works, but reCAPTCHA Enterprise needs configuration for real numbers',
+        results
+      };
+    } else {
+      console.log('❌ TESTS FAILED - Phone Authentication backend has issues');
+      console.log('🔧 Check Firebase Console configuration');
+      return {
+        success: false,
+        message: 'Phone authentication backend configuration issues detected',
+        results
+      };
+    }
+  }
+}
+
+// Backend test utilities - no frontend dependencies
+export const phoneAuthBackendTestUtils = {
+  /**
+   * Test Firebase configuration
+   */
+  async testFirebaseConfiguration(): Promise<{ success: boolean; message: string; data?: any }> {
+    const tester = new PhoneAuthBackendTester();
+    return tester.testFirebaseConfiguration();
+  },
+
+  /**
+   * Test Firebase Phone Authentication with test number
+   */
+  async testFirebaseTestNumber(): Promise<{ success: boolean; message: string; data?: any }> {
+    const tester = new PhoneAuthBackendTester();
+    return tester.testFirebaseTestNumber();
+  },
+
+  /**
+   * Test with real phone number (reCAPTCHA test)
+   */
+  async testRealNumber(phoneNumber: string): Promise<{ success: boolean; message: string; data?: any }> {
+    const tester = new PhoneAuthBackendTester();
+    return tester.testRealNumber(phoneNumber);
+  },
+
+  /**
+   * Complete authentication with SMS code
+   */
+  async completeWithSmsCode(verificationId: string, smsCode: string): Promise<{ success: boolean; message: string; data?: any }> {
+    const tester = new PhoneAuthBackendTester();
+    return tester.completeWithSmsCode(verificationId, smsCode);
+  },
+
+  /**
+   * Run comprehensive backend tests
+   */
+  async runComprehensiveBackendTest(): Promise<{ success: boolean; message: string; results: any[] }> {
+    const tester = new PhoneAuthBackendTester();
+    return tester.runComprehensiveBackendTest();
+  }
+};

@@ -8,7 +8,6 @@
 
 import { logger } from '../analytics/loggingService';
 import { firebaseDataService } from '../data/firebaseDataService';
-import { PHANTOM_CONFIG } from '../../config/env';
 
 export interface PhantomAuthResult {
   success: boolean;
@@ -145,12 +144,13 @@ class PhantomAuthService {
       // Check if user already exists
       let existingUser = await this.getPhantomUserByAuthId(authUserId);
 
+      // Extract user information that we'll need for both existing and new users
+      const userEmail = phantomUser.email || phantomUser.userInfo?.email;
+      const userName = phantomUser.name || phantomUser.label || phantomUser.userInfo?.name;
+      const userAvatar = phantomUser.avatar || phantomUser.icon || phantomUser.userInfo?.avatar;
+
       if (existingUser) {
         // Update existing user with latest data
-        const userEmail = phantomUser.email || phantomUser.userInfo?.email;
-        const userName = phantomUser.name || phantomUser.label || phantomUser.userInfo?.name;
-        const userAvatar = phantomUser.avatar || phantomUser.icon || phantomUser.userInfo?.avatar;
-
         // Update with real data if available
         if (userEmail && userEmail !== existingUser.email) {
           existingUser.email = userEmail;
@@ -167,25 +167,41 @@ class PhantomAuthService {
         await this.updatePhantomUser(existingUser);
         this.currentUser = existingUser;
         logger.info('Existing Phantom user updated', { userId: existingUser.id }, 'PhantomAuthService');
+
+        // For existing users, ensure Firebase Auth user exists if provider is Google
+        if (provider === 'google' && userEmail && !existingUser.firebaseUserId) {
+          await this.ensureFirebaseAuthUserForPhantom(existingUser, userEmail);
+        }
+
         return {
           success: true,
           user: existingUser,
           wallet: { address: walletAddress, publicKey: walletAddress }
         };
       } else {
-        // Extract real user information from Phantom SDK
-        // Note: Currently Phantom SDK may not provide detailed Google/Apple account info
-        // This needs to be enhanced to properly fetch user profile data
-        const userEmail = phantomUser.email || phantomUser.userInfo?.email;
-        const userName = phantomUser.name || phantomUser.label || phantomUser.userInfo?.name;
-        const userAvatar = phantomUser.avatar || phantomUser.icon || phantomUser.userInfo?.avatar;
+        // Create new Phantom user
+        // For Google auth, ensure we have a valid email (required for Firebase Auth)
+        let finalEmail: string;
+        let finalName: string;
 
-        // TODO: Implement proper OAuth flow to get real Google/Apple account data
-        // For now, use available data or create meaningful placeholder
-        const finalEmail = userEmail || `${authUserId}@${provider}.phantom.app`;
-        const finalName = userName || `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`;
+        if (provider === 'google') {
+          // For Google auth, we MUST have an email to create Firebase Auth user
+          if (!userEmail) {
+            logger.error('Google authentication requires email but none provided', { phantomUser }, 'PhantomAuthService');
+            return {
+              success: false,
+              error: 'Email is required for Google authentication'
+            };
+          }
+          finalEmail = userEmail;
+          finalName = userName || userEmail.split('@')[0]; // Use email username as fallback
+        } else {
+          // For Apple or other providers, use available data or create meaningful placeholder
+          finalEmail = userEmail || `${authUserId}@${provider}.phantom.app`;
+          finalName = userName || `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`;
+        }
 
-        // Create new user with real data
+        // Create new Phantom user
         const newUser: PhantomUser = {
           id: authUserId,
           name: finalName,
@@ -197,9 +213,39 @@ class PhantomAuthService {
           lastLoginAt: Date.now(),
         };
 
+        // For Google provider, create Firebase Auth user and Firestore user record
+        if (provider === 'google' && finalEmail) {
+          logger.info('Creating Firebase Auth user for Google Phantom auth', {
+            phantomUserId: newUser.id,
+            email: finalEmail,
+            provider
+          }, 'PhantomAuthService');
+
+          const firebaseResult = await this.createFirebaseAuthUserForPhantom(newUser, finalEmail);
+          if (!firebaseResult.success) {
+            logger.error('Failed to create Firebase Auth user for Phantom Google auth', {
+              error: firebaseResult.error,
+              phantomUserId: newUser.id,
+              email: finalEmail
+            }, 'PhantomAuthService');
+            return {
+              success: false,
+              error: firebaseResult.error || 'Failed to create Firebase user account'
+            };
+          }
+
+          // Update Phantom user with Firebase user ID
+          newUser.firebaseUserId = firebaseResult.firebaseUserId;
+          logger.info('Successfully linked Phantom user to Firebase Auth user', {
+            phantomUserId: newUser.id,
+            firebaseUserId: firebaseResult.firebaseUserId,
+            email: finalEmail
+          }, 'PhantomAuthService');
+        }
+
         await this.createPhantomUser(newUser);
         this.currentUser = newUser;
-        logger.info('New Phantom user created', { userId: newUser.id }, 'PhantomAuthService');
+        logger.info('New Phantom user created', { userId: newUser.id, hasFirebaseLink: !!newUser.firebaseUserId }, 'PhantomAuthService');
         return {
           success: true,
           user: newUser,
@@ -213,6 +259,127 @@ class PhantomAuthService {
         success: false,
         error: error instanceof Error ? error.message : 'Authentication failed'
       };
+    }
+  }
+
+  /**
+   * Create Firebase Auth user for Phantom Google authentication
+   */
+  private async createFirebaseAuthUserForPhantom(phantomUser: PhantomUser, email: string): Promise<{ success: boolean; firebaseUserId?: string; error?: string }> {
+    try {
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const firebaseConfig = await import('../../config/firebase/firebase');
+      const app = firebaseConfig.default || (firebaseConfig as any).app;
+      const functions = getFunctions(app, 'us-central1');
+
+      const getCustomToken = httpsCallable(functions, 'getCustomTokenForUser');
+      const result = await getCustomToken({ email, userId: phantomUser.id });
+
+      if (result.data && typeof result.data === 'object' && 'token' in result.data && 'userId' in result.data) {
+        const { token, userId: firebaseUserId } = result.data as { token: string; userId: string };
+
+        // Sign in with the custom token
+        const { signInWithCustomToken, auth } = await import('firebase/auth');
+        await signInWithCustomToken(auth, token);
+
+        logger.info('Successfully created and signed in Firebase Auth user for Phantom', {
+          phantomUserId: phantomUser.id,
+          firebaseUserId,
+          email: email.substring(0, 5) + '...'
+        }, 'PhantomAuthService');
+
+        // Now create the Firestore user record using AuthService logic
+        await this.createFirestoreUserRecord(firebaseUserId, phantomUser);
+
+        return { success: true, firebaseUserId };
+      } else {
+        logger.error('Invalid response from getCustomTokenForUser', { result: result.data }, 'PhantomAuthService');
+        return { success: false, error: 'Invalid response from authentication service' };
+      }
+    } catch (error) {
+      logger.error('Failed to create Firebase Auth user for Phantom', error, 'PhantomAuthService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create Firebase user account'
+      };
+    }
+  }
+
+  /**
+   * Ensure Firebase Auth user exists for existing Phantom user
+   */
+  private async ensureFirebaseAuthUserForPhantom(phantomUser: PhantomUser, email: string): Promise<void> {
+    try {
+      if (!email) {
+        logger.warn('Cannot ensure Firebase Auth user - no email provided', { phantomUserId: phantomUser.id }, 'PhantomAuthService');
+        return;
+      }
+
+      const result = await this.createFirebaseAuthUserForPhantom(phantomUser, email);
+      if (result.success && result.firebaseUserId) {
+        phantomUser.firebaseUserId = result.firebaseUserId;
+        await this.updatePhantomUser(phantomUser);
+      }
+    } catch (error) {
+      logger.error('Failed to ensure Firebase Auth user for existing Phantom user', error, 'PhantomAuthService');
+      // Don't throw - this is not critical for existing users
+    }
+  }
+
+  /**
+   * Create Firestore user record using AuthService logic
+   */
+  private async createFirestoreUserRecord(firebaseUserId: string, phantomUser: PhantomUser): Promise<void> {
+    try {
+      const { auth } = await import('firebase/auth');
+      const currentUser = auth.currentUser;
+
+      if (!currentUser || currentUser.uid !== firebaseUserId) {
+        throw new Error('Firebase Auth user not properly signed in');
+      }
+
+      // Use AuthService's createOrUpdateUserData logic
+      const { UserMigrationService } = await import('../core/UserMigrationService');
+      const { firebaseDataService } = await import('../data/firebaseDataService');
+
+      // Create the user data object
+      const userData = {
+        id: firebaseUserId,
+        name: phantomUser.name,
+        email: phantomUser.email,
+        avatar: phantomUser.avatar,
+        wallet_address: phantomUser.phantomWalletAddress,
+        wallet_public_key: phantomUser.phantomWalletAddress,
+        created_at: new Date(phantomUser.createdAt).toISOString(),
+        emailVerified: true, // Since user authenticated via Google through Phantom
+        lastLoginAt: new Date(phantomUser.lastLoginAt).toISOString(),
+        hasCompletedOnboarding: true
+      };
+
+      // Use UserMigrationService to ensure consistency
+      const consistentUser = await UserMigrationService.ensureUserConsistency(currentUser);
+
+      // Update with Phantom-specific data
+      await firebaseDataService.user.updateUser(consistentUser.id, {
+        ...userData,
+        name: phantomUser.name,
+        email: phantomUser.email,
+        avatar: phantomUser.avatar,
+        wallet_address: phantomUser.phantomWalletAddress,
+        wallet_public_key: phantomUser.phantomWalletAddress,
+        emailVerified: true,
+        hasCompletedOnboarding: true
+      });
+
+      logger.info('Created Firestore user record for Phantom auth', {
+        firebaseUserId,
+        phantomUserId: phantomUser.id,
+        email: phantomUser.email.substring(0, 5) + '...'
+      }, 'PhantomAuthService');
+
+    } catch (error) {
+      logger.error('Failed to create Firestore user record', error, 'PhantomAuthService');
+      throw error;
     }
   }
 

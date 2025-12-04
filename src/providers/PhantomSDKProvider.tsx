@@ -12,28 +12,7 @@ import {
   lightTheme,
   AddressType
 } from '@phantom/react-native-sdk';
-
-// Configuration based on Phantom Portal setup
-const PHANTOM_CONFIG = {
-  // Get from Phantom Portal after app registration and approval
-  // NOTE: If you get "check team status" error, your app needs Phantom approval
-  appId: process.env.EXPO_PUBLIC_PHANTOM_APP_ID,
-  appOrigin: process.env.EXPO_PUBLIC_PHANTOM_APP_ORIGIN,
-
-  // Supported providers for authentication
-  providers: ['google', 'apple', 'phantom', 'injected'] as const,
-
-  // Supported blockchain address types
-  addressTypes: [AddressType.solana],
-
-  // Authentication options
-  authOptions: {
-    redirectUrl: process.env.EXPO_PUBLIC_PHANTOM_REDIRECT_URI || 'wesplit://auth/phantom-callback'
-  },
-
-  // Custom URL scheme for the app
-  scheme: 'wesplit'
-};
+import { PHANTOM_CONFIG } from '../config/env';
 
 // Validate configuration and provide helpful error messages
 const validatePhantomConfiguration = () => {
@@ -47,12 +26,13 @@ const validatePhantomConfiguration = () => {
     issues.push('EXPO_PUBLIC_PHANTOM_APP_ORIGIN not set. Should be your app\'s domain.');
   }
 
-  if (!PHANTOM_CONFIG.authOptions?.redirectUrl) {
+  if (!PHANTOM_CONFIG.redirectUri) {
     issues.push('EXPO_PUBLIC_PHANTOM_REDIRECT_URI not set. Should be your app\'s deep link URL.');
   }
 
-  if (PHANTOM_CONFIG.appId && PHANTOM_CONFIG.appId.includes('test-app-id')) {
-    issues.push('Using test app ID. Replace with real Phantom Portal app ID.');
+  // Only warn about obviously test IDs
+  if (PHANTOM_CONFIG.appId && PHANTOM_CONFIG.appId === 'test-app-id') {
+    issues.push('Using placeholder test app ID. Replace with real Phantom Portal app ID.');
   }
 
   return {
@@ -92,20 +72,45 @@ export const PhantomSDKProvider: React.FC<PhantomSDKProviderProps> = ({
   theme = 'dark',
   skipPortalCheck = false
 }) => {
-  // If Phantom is not configured, render children without provider
+  // Validate configuration
   const configValidation = validatePhantomConfiguration();
-  if (!configValidation.isValid && !skipPortalCheck) {
+
+  // In development, always try to render the provider with any valid config
+  // This allows testing even with unapproved app IDs
+  const hasBasicConfig = PHANTOM_CONFIG.appId && PHANTOM_CONFIG.appOrigin && PHANTOM_CONFIG.redirectUri;
+  const shouldRenderProvider = hasBasicConfig || (__DEV__ && skipPortalCheck);
+
+  if (!shouldRenderProvider) {
     if (__DEV__) {
-      console.warn('Phantom SDK configuration issues:', configValidation.issues);
-      console.warn('For "check team status" error: Your app needs Phantom Portal approval. Visit https://phantom.app/developers');
-      console.warn('For development testing, set skipPortalCheck=true in PhantomSDKProvider');
+      console.warn('Phantom SDK missing basic configuration, not rendering provider:', {
+        hasAppId: !!PHANTOM_CONFIG.appId,
+        hasAppOrigin: !!PHANTOM_CONFIG.appOrigin,
+        hasRedirectUri: !!PHANTOM_CONFIG.redirectUri,
+        skipPortalCheck,
+        isDev: __DEV__
+      });
     }
     return <>{children}</>;
   }
 
-  // Warn about portal issues even in skip mode
-  if (!configValidation.isValid && skipPortalCheck && __DEV__) {
-    console.warn('Phantom SDK has configuration issues but skipping portal check for development:', configValidation.issues);
+  // Log configuration status
+  if (__DEV__) {
+    console.log('🚀 Rendering PhantomProvider with config:', {
+      appId: PHANTOM_CONFIG.appId,
+      appOrigin: PHANTOM_CONFIG.appOrigin,
+      redirectUri: PHANTOM_CONFIG.redirectUri,
+      hasAppId: !!PHANTOM_CONFIG.appId,
+      validationPassed: configValidation.isValid,
+      skipPortalCheck
+    });
+
+    if (!configValidation.isValid) {
+      console.warn('⚠️ Phantom configuration issues detected. If you get "check team status" or "not allowed" errors:');
+      console.warn('   1. Visit https://phantom.app/developers');
+      console.warn('   2. Find your app with ID: ab881c51-6335-49b9-8800-0e4ad7d21ca3');
+      console.warn('   3. Submit for approval and wait 1-3 business days');
+      console.warn('   4. Or use email/phone authentication for immediate development testing');
+    }
   }
 
   // Select theme based on prop
@@ -113,9 +118,31 @@ export const PhantomSDKProvider: React.FC<PhantomSDKProviderProps> = ({
                        theme === 'light' ? lightTheme :
                        wesplitTheme;
 
+  // Convert our config format to Phantom SDK format
+  const phantomSDKConfig = {
+    appId: PHANTOM_CONFIG.appId,
+    appOrigin: PHANTOM_CONFIG.appOrigin,
+    providers: ['google', 'apple', 'phantom', 'injected'] as const,
+    addressTypes: [AddressType.solana],
+    authOptions: {
+      redirectUrl: PHANTOM_CONFIG.redirectUri
+    },
+    scheme: 'wesplit'
+  };
+
+  if (__DEV__) {
+    console.log('🚀 Initializing PhantomProvider with config:', {
+      appId: phantomSDKConfig.appId,
+      appOrigin: phantomSDKConfig.appOrigin,
+      redirectUrl: phantomSDKConfig.authOptions.redirectUrl,
+      skipPortalCheck,
+      isDev: __DEV__
+    });
+  }
+
   return (
     <PhantomProvider
-      config={PHANTOM_CONFIG}
+      config={phantomSDKConfig}
       theme={selectedTheme}
       appIcon={PHANTOM_BRANDING.appIcon}
       appName={PHANTOM_BRANDING.appName}

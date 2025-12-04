@@ -320,8 +320,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [state.currentUser]);
 
-  const logoutUser = useCallback(() => {
-    dispatch({ type: 'LOGOUT_USER' });
+  const logoutUser = useCallback(async () => {
+    try {
+      // Sign out from Firebase Auth
+      const { authService } = await import('../services/auth/AuthService');
+      await authService.signOut();
+
+      // Sign out from Phantom if applicable
+      const { PhantomAuthService } = await import('../services/auth/PhantomAuthService');
+      const phantomService = PhantomAuthService.getInstance();
+      await phantomService.signOut();
+
+      // Clear app state
+      dispatch({ type: 'LOGOUT_USER' });
+
+      logger.info('User signed out from all services', null, 'AppContext');
+    } catch (error) {
+      logger.error('Error during logout', error, 'AppContext');
+      // Still clear app state even if sign out fails
+      dispatch({ type: 'LOGOUT_USER' });
+    }
   }, []);
 
   const clearError = useCallback(() => {

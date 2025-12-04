@@ -39,6 +39,7 @@ module.exports = {
       displayName: "WeSplit Beta",
       buildNumber: "19",
       deploymentTarget: "15.1",
+      googleServicesFile: "./GoogleService-Info.plist", // Uncomment when file is added
       infoPlist: {
         LSApplicationQueriesSchemes: [
           "phantom",
@@ -68,6 +69,7 @@ module.exports = {
       package: "com.wesplit.app",
       displayName: "WeSplit Beta",
       versionCode: 11219,
+      googleServicesFile: "./google-services.json", // Uncomment when file is added
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"
