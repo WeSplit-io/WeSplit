@@ -34,6 +34,7 @@ import { Container, Button, ModernLoader, PhosphorIcon, TabSecondary } from '../
 import Tabs from '../../../components/shared/Tabs';
 import CreateChoiceModal from '../../../components/shared/CreateChoiceModal';
 import SharedWalletCard from '../../../components/SharedWalletCard';
+import SharedWalletGridCard from '../../../components/SharedWalletGridCard';
 import { BillSplitSummary } from '../../../types/billSplitting';
 import { splitStorageService, Split, SplitStorageService } from '../../../services/splits';
 import { SharedWalletService, SharedWallet } from '../../../services/sharedWallet';
@@ -1253,17 +1254,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
             activeOpacity={0.8}
             disabled={activeTab === 'sharedWallets' && !__DEV__}
           >
-            <LinearGradient
-              colors={activeTab === 'sharedWallets' && !__DEV__ ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.newPoolButton}
-            >
-              <PhosphorIcon name="Plus" size={14} color={activeTab === 'sharedWallets' && !__DEV__ ? colors.white50 : colors.black} weight="bold" />
-              <Text style={[styles.newPoolButtonText, activeTab === 'sharedWallets' && !__DEV__ && styles.newPoolButtonTextDisabled]}>
-                {activeTab === 'splits' ? 'Create' : 'New Wallet'}
-              </Text>
-            </LinearGradient>
+              <PhosphorIcon name="Plus" size={16} color={activeTab === 'sharedWallets' && !__DEV__ ? colors.white : colors.white} weight="bold" />
+              
           </TouchableOpacity>
         </View>
 
@@ -1421,13 +1413,13 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
               </View>
             </View>
           ) : (
-            <View>
-              {sharedWallets.map((wallet) => (
-                <SharedWalletCard
+            <View style={styles.sharedWalletGrid}>
+              {sharedWallets.map((wallet, index) => (
+                <SharedWalletGridCard
                   key={wallet.id}
                   wallet={wallet}
-                  currentUserId={currentUser?.id?.toString()}
                   onPress={handleSharedWalletPress}
+                  colorIndex={index}
                 />
               ))}
             </View>

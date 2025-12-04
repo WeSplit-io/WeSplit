@@ -13,6 +13,9 @@ export const colors = {
     blackOverlay: 'rgba(0, 0, 0, 0.65)',
     black: '#061113',
     black80: 'rgba(6, 17, 19, 0.80)',
+    black70: 'rgba(6, 17, 19, 0.70)',
+    black20: 'rgba(6, 17, 19, 0.20)',
+    black15: 'rgba(6, 17, 19, 0.15)',
     blackWhite5: '#121D1F',
     blackGreen: '#363F2C',
 
@@ -49,8 +52,18 @@ export const colors = {
     christmasRed: '#CB343D',
     christmasYellow: '#FFFFD9',
  
-
-
-
+    // ===== SHARED WALLET CUSTOMIZATION COLORS =====
+    walletPurple: '#9B59B6',
+    walletGreen: '#2ECC71',
+    walletOrange: '#E67E22',
+    walletBlue: '#3498DB',
+    walletRed: '#E74C3C',
+    walletMagenta: '#E91E63',
+    walletPink: '#EC407A',
+    walletTeal: '#1ABC9C',
+    walletYellow: '#F1C40F',
+    walletIndigo: '#5C6BC0',
+    walletCyan: '#00BCD4',
+    walletAmber: '#FFC107',
   
 }; 

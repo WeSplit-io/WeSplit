@@ -1,0 +1,215 @@
+/**
+ * Shared Wallet Grid Card Component
+ * Displays a shared wallet in a colorful grid card format
+ * Used in the Shared Wallets tab
+ */
+
+import React, { useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { PhosphorIcon } from './shared';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
+import type { SharedWallet } from '../services/sharedWallet';
+
+// Calculate card width for 2 columns
+// Use percentage-based width to ensure 2 cards per row
+const getCardWidth = () => {
+  const { width: SCREEN_WIDTH } = Dimensions.get('window');
+  // Use 48% width per card to ensure 2 fit per row with margins
+  // This accounts for all padding and gaps automatically
+  return SCREEN_WIDTH * 0.42;
+};
+
+interface SharedWalletGridCardProps {
+  wallet: SharedWallet;
+  onPress: (wallet: SharedWallet) => void;
+  colorIndex?: number;
+}
+
+// Array of wallet colors for customization
+const WALLET_COLORS = [
+  colors.walletPurple,
+  colors.walletGreen,
+  colors.walletOrange,
+  colors.walletBlue,
+  colors.walletRed,
+  colors.walletMagenta,
+];
+
+const SharedWalletGridCard: React.FC<SharedWalletGridCardProps> = ({
+  wallet,
+  onPress,
+  colorIndex = 0,
+}) => {
+  // Calculate card width dynamically
+  const cardWidth = useMemo(() => getCardWidth(), []);
+  
+  // Determine if this is an odd-indexed card (left column) - add marginRight
+  const isLeftColumn = useMemo(() => colorIndex % 2 === 0, [colorIndex]);
+  
+  // Get wallet color - use customColor if available, otherwise cycle through default colors
+  const walletColor = useMemo(() => {
+    if (wallet.customColor) {
+      return wallet.customColor;
+    }
+    return WALLET_COLORS[colorIndex % WALLET_COLORS.length];
+  }, [wallet.customColor, colorIndex]);
+
+  // Format balance
+  const formatBalance = useCallback((amount: number) => {
+    const currency = wallet.currency || 'USDC';
+    
+    if (currency === 'USDC') {
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount) + ' USDC';
+    }
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  }, [wallet.currency]);
+
+  const formattedBalance = useMemo(() => formatBalance(wallet.totalBalance), [formatBalance, wallet.totalBalance]);
+
+  // Get wallet icon
+  const walletIcon = useMemo(() => {
+    if (wallet.customLogo && !wallet.customLogo.startsWith('http')) {
+      return wallet.customLogo as any;
+    }
+    return 'House';
+  }, [wallet.customLogo]);
+
+  const handlePress = useCallback(() => {
+    onPress(wallet);
+  }, [onPress, wallet]);
+
+  const cardStyle = useMemo(() => ({
+    ...styles.card,
+    backgroundColor: walletColor,
+    width: cardWidth,
+    marginRight: isLeftColumn ? spacing.md : 0,
+    marginBottom: spacing.md,
+  }), [walletColor, cardWidth, isLeftColumn]);
+
+  return (
+    <TouchableOpacity
+      style={cardStyle}
+      onPress={handlePress}
+      activeOpacity={0.8}
+    >
+      {/* Black20 overlay on top of the card color */}
+      <View style={styles.cardOverlay} />
+      <View style={styles.cardItem}></View>
+      
+      {/* Card content with wallet color and gradient overlay */}
+      <View style={[styles.cardContent, { backgroundColor: walletColor }]}>
+        <LinearGradient
+          colors={[
+            'rgba(255, 255, 255, 0.15)',
+            'rgba(255, 255, 255, 0.00)',
+            'rgba(255, 255, 255, 0.15)',
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.gradientOverlay}
+        >
+        {/* Icon */}
+        <View style={styles.iconContainer}>
+          <PhosphorIcon
+            name={walletIcon}
+            size={24}
+            color={colors.white}
+            weight="regular"
+          />
+        </View>
+
+        {/* Wallet Name */}
+        <Text style={styles.walletName} numberOfLines={1}>
+          {wallet.name}
+        </Text>
+
+        {/* Balance */}
+        <Text style={styles.balance} numberOfLines={1}>
+          {formattedBalance}
+        </Text>
+        </LinearGradient>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: spacing.lg,
+    minHeight: 120,
+    justifyContent: 'flex-start',
+    flexShrink: 0,
+    flexGrow: 0,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.white10,
+
+
+  },
+  cardOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.black20,
+    borderRadius: spacing.md,
+  },
+  cardItem: {
+    marginTop: spacing.sm,
+    marginHorizontal: spacing.md,
+    height: 10,
+    borderTopLeftRadius: spacing.md,
+    borderTopRightRadius: spacing.md,
+    backgroundColor: colors.black20,
+  },
+  cardContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    borderRadius: spacing.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.white10,
+
+  },
+  gradientOverlay: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    padding: spacing.md,
+  },
+  iconContainer: {
+    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.black15,
+    borderRadius: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  walletName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white,
+    marginBottom: spacing.xs,
+  },
+  balance: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+  },
+});
+
+export default React.memo(SharedWalletGridCard);
+

@@ -41,11 +41,12 @@ export const styles = StyleSheet.create({
   },
   newPoolButton: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
+    paddingVertical: spacing.md,
+    borderRadius: 100,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+    backgroundColor: colors.white5,
   },
   newPoolButtonIcon: {
     color: colors.black,
@@ -356,6 +357,15 @@ export const styles = StyleSheet.create({
     color: colors.black,
     fontSize: typography.fontSize.lg,
     fontWeight: '500',
+  },
+  // Shared Wallet Grid Layout
+  sharedWalletGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingBottom: spacing.xxxl + spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
   },
   // Shared Wallet Empty State - Clean and Minimalist
   sharedWalletEmptyState: {
