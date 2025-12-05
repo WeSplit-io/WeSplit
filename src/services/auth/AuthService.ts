@@ -1,28 +1,20 @@
 /**
  * Unified Authentication Service for WeSplit
- * Consolidates all authentication methods: Phone Authentication, Email Verification
- * All social authentication (Google, Apple) is handled through Phantom
- * Replaces: consolidatedAuthService, unifiedSSOService, simpleGoogleAuth, firebaseGoogleAuth
+ * Main orchestration service for authentication flows
+ * Delegates to specialized services for specific auth methods
  */
 
 import {
-  signInWithCredential,
   User,
   signOut as firebaseSignOut,
-  signInWithPhoneNumber,
-  PhoneAuthProvider,
-  RecaptchaVerifier,
-  ConfirmationResult,
-  linkWithCredential,
   signInWithCustomToken
 } from 'firebase/auth';
 import { auth } from '../../config/firebase/firebase';
 import { Platform } from 'react-native';
 import { logger } from '../analytics/loggingService';
-import { getEnvVar } from '../../utils/core';
 import { firebaseDataService } from '../data/firebaseDataService';
 import { walletService } from '../blockchain/wallet';
-import { UserMigrationService } from '../core/UserMigrationService';
+import { EmailAuthService } from './EmailAuthService';
 
 
 // Types
@@ -62,6 +54,8 @@ export interface UserData {
 export type AuthProvider = 'google' | 'apple' | 'phone';
 
 class AuthService {
+  private lastAuthCallTimes: Map<string, number> = new Map();
+
   /**
    * Validate phone number format (E.164)
    */
@@ -100,10 +94,70 @@ class AuthService {
    * Sign in with phone number (Firebase Phone Authentication)
    * Firebase automatically sends SMS code
    */
-  async signInWithPhoneNumber(phoneNumber: string, recaptchaVerifier?: RecaptchaVerifier): Promise<{ success: boolean; verificationId?: string; error?: string }> {
+  /**
+   * Check if email user exists
+   */
+  async checkEmailUserExists(email: string): Promise<{ success: boolean; userExists: boolean; userId?: string; error?: string }> {
+    return EmailAuthService.checkUserExists(email);
+  }
+
+  /**
+   * Send email verification code
+   */
+  async sendEmailVerificationCode(email: string): Promise<{ success: boolean; error?: string }> {
+    return EmailAuthService.sendVerificationCode(email);
+  }
+
+  /**
+   * Verify email code
+   */
+  async verifyEmailCode(email: string, code: string): Promise<AuthResult> {
+    const result = await EmailAuthService.verifyCode(email, code);
+
+    if (result.success && result.user) {
+      // Ensure wallet exists for email users too
+      await this.ensureUserWallet(result.user.id);
+      await this.updateLastLoginTime(result.user.id);
+    }
+
+    return result;
+  }
+
+  /**
+   * Start phone authentication process
+   * Checks for existing user (instant login) or sends SMS
+   */
+  async signInWithPhoneNumber(phoneNumber: string): Promise<{ success: boolean; verificationId?: string; expiresIn?: number; user?: any; isNewUser?: boolean; error?: string }> {
     try {
+      // Prevent duplicate calls for the same phone number within a short time window
+      const now = Date.now();
+      const lastCallKey = `phone_auth_${phoneNumber}`;
+      const lastCallTime = this.lastAuthCallTimes?.get(lastCallKey);
+
+      if (lastCallTime && (now - lastCallTime) < 5000) { // 5 second cooldown
+        logger.warn('Phone auth call too frequent, blocking duplicate request', {
+          phone: phoneNumber.substring(0, 5) + '...',
+          timeSinceLastCall: now - lastCallTime
+        }, 'AuthService');
+        return {
+          success: false,
+          error: 'Please wait before requesting another SMS code'
+        };
+      }
+
+      // Initialize lastAuthCallTimes if it doesn't exist
+      if (!this.lastAuthCallTimes) {
+        this.lastAuthCallTimes = new Map();
+      }
+      this.lastAuthCallTimes.set(lastCallKey, now);
+
       // Validate Firebase is initialized
       if (!auth || !auth.app) {
+        logger.error('Firebase auth not initialized', {
+          auth: !!auth,
+          authApp: !!auth?.app,
+          authAppOptions: auth?.app?.options
+        }, 'AuthService');
         return {
           success: false,
           error: 'Firebase authentication is not initialized'
@@ -128,148 +182,183 @@ class AuthService {
         };
       }
 
-      // Check if this is a Firebase test phone number (bypasses reCAPTCHA)
-      const testPhoneNumbers = ['+15551234567', '+15559876543', '+15551111111'];
-      const isTestNumber = testPhoneNumbers.includes(phoneNumber);
-
       logger.info('🔄 Starting Phone Sign-In', {
         phone: phoneNumber.substring(0, 5) + '...',
-        isTestNumber,
         firebaseInitialized: !!auth?.app,
         projectId: auth.app?.options?.projectId
       }, 'AuthService');
 
-      // Handle phone authentication based on environment
-      let confirmationResult: ConfirmationResult;
-
-      try {
-        logger.info('Attempting Firebase Phone Auth', {
-          platform: Platform.OS,
-          phonePrefix: phoneNumber.substring(0, 5),
-          isTestNumber,
-          firebaseConfig: {
-            projectId: auth.app.options.projectId,
-            authDomain: auth.app.options.authDomain
-          }
-        }, 'AuthService');
-
-        // DEBUG: Check Firebase auth state
-        logger.info('Firebase Auth Debug', {
-          currentUser: !!auth.currentUser,
-          currentUserId: auth.currentUser?.uid,
-          appName: auth.app.name,
-          projectId: auth.app.options.projectId
-        }, 'AuthService');
-
-        if (Platform.OS === 'web' && recaptchaVerifier) {
-          confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-        } else if (Platform.OS !== 'web') {
-          // Mobile - React Native/Expo with reCAPTCHA Enterprise requires proper configuration
-          logger.info('Setting up React Native phone authentication with reCAPTCHA', {
-            phonePrefix: phoneNumber.substring(0, 5),
-            platform: Platform.OS,
-            firebaseVersion: '11.10.0',
-            recaptchaEnabled: true
-          }, 'AuthService');
-
-          try {
-            // For React Native with reCAPTCHA Enterprise enabled,
-            // Firebase handles reCAPTCHA automatically but requires proper Firebase Console setup
-
-            // Try with explicit reCAPTCHA verifier for React Native/Expo
-            if (Platform.OS === 'ios' && !isTestNumber) {
-              // For iOS real numbers, try with web fallback approach
-              console.log('iOS real number detected - using web fallback approach');
-              confirmationResult = await signInWithPhoneNumber(auth, phoneNumber);
-            } else {
-              // For Android, web, or test numbers
-              confirmationResult = await signInWithPhoneNumber(auth, phoneNumber);
-            }
-          } catch (mobileError: any) {
-            logger.error('React Native Phone Auth failed', {
-              error: mobileError.message,
-              code: mobileError.code,
-              platform: Platform.OS,
-              stack: mobileError.stack?.substring(0, 200)
-            }, 'AuthService');
-
-            // Check for specific Firebase errors
-            if (mobileError.message?.includes('Unable to load external scripts')) {
-              throw new Error('reCAPTCHA Enterprise configuration issue. To maintain security:\n\nAction Required:\n1. Phone Authentication ENABLED in Firebase Console > Authentication > Sign-in method\n2. reCAPTCHA Enterprise ENABLED and properly configured\n3. Add your app domains to reCAPTCHA Enterprise\n4. Test with +15551234567 first, then real numbers\n\nFor security: Keep reCAPTCHA Enterprise enabled but ensure proper domain configuration.');
-            } else if (mobileError.code === 'auth/invalid-phone-number') {
-              throw new Error('Invalid phone number format. Use E.164 format (e.g., +33635551484)');
-            } else if (mobileError.code === 'auth/too-many-requests') {
-              throw new Error('Too many requests. Please wait before trying again.');
-            } else if (mobileError.code === 'auth/missing-client-identifier') {
-              throw new Error('Firebase configuration error. Check google-services.json and GoogleService-Info.plist');
-            }
-
-            throw mobileError;
-          }
-        } else {
-          return {
-            success: false,
-            error: 'reCAPTCHA verifier is required for web platform'
-          };
-        }
-      } catch (phoneError: any) {
-        // Handle specific Firebase Phone Auth errors
-        if (phoneError.message?.includes('Unable to load external scripts') ||
-            phoneError.message?.includes('reCAPTCHA') ||
-            phoneError.message?.includes('external scripts')) {
-
-          logger.error('Firebase Phone Auth reCAPTCHA issue', {
-            error: phoneError.message,
-            errorCode: phoneError.code,
-            phone: phoneNumber.substring(0, 5) + '...',
-            platform: Platform.OS,
-            isDevMode: __DEV__,
-            firebaseProjectId: auth.app?.options?.projectId,
-            authDomain: auth.app?.options?.authDomain,
-            suggestion: 'Check Firebase Console: Authentication > Sign-in method > Phone should be ENABLED'
-          }, 'AuthService');
-
-          // Provide specific guidance for React Native/Expo
-          if (Platform.OS !== 'web') {
-            return {
-              success: false,
-              error: 'Phone Authentication failed. Please check:\n1. Phone is ENABLED in Firebase Console > Authentication > Sign-in method\n2. reCAPTCHA Enterprise is DISABLED\n3. Your app is properly registered in Firebase Console\n\nFor testing, use: +15551234567 (code: 123456)'
-            };
-          } else {
-            return {
-              success: false,
-              error: 'Phone authentication requires a reCAPTCHA verifier for web platform.'
-            };
-          }
-        }
-
-        // Re-throw other errors
-        throw phoneError;
-      }
-
-      logger.info('✅ SMS code sent successfully', {
-        phone: phoneNumber.substring(0, 5) + '...'
+      // Check if user already exists with this phone number for instant login
+      logger.info('Checking if user exists with phone number', {
+        phonePrefix: phoneNumber.substring(0, 5)
       }, 'AuthService');
 
-      return {
-        success: true,
-        verificationId: confirmationResult.verificationId
-      };
-    } catch (error: any) {
-      logger.error('❌ Phone Sign-In failed', error, 'AuthService');
+      try {
+        // Import Firebase Functions dynamically
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const functions = getFunctions();
 
-      // Handle other Firebase Phone Auth errors
-      if (error.code === 'auth/invalid-phone-number') {
+        // Call server-side function to check if user exists
+        const checkUserExists = httpsCallable<{ phoneNumber: string }, {
+          success: boolean;
+          userExists: boolean;
+          userId?: string;
+          message?: string;
+        }>(functions, 'checkPhoneUserExists');
+
+        const checkResult = await checkUserExists({ phoneNumber });
+        const checkData = checkResult.data as {
+          success: boolean;
+          userExists: boolean;
+          userId?: string;
+          message?: string;
+        };
+
+        if (checkData.success && checkData.userExists && checkData.userId) {
+          // User exists - instant login without SMS verification
+          logger.info('User exists with phone number - instant login', {
+            userId: checkData.userId,
+            phonePrefix: phoneNumber.substring(0, 5)
+          }, 'AuthService');
+
+          // Get user custom token for instant login
+          const getUserToken = httpsCallable<{ userId: string }, {
+            success: boolean;
+            customToken: string;
+            message?: string;
+          }>(functions, 'getUserCustomToken');
+
+          const tokenResult = await getUserToken({ userId: checkData.userId });
+          const tokenData = tokenResult.data as {
+            success: boolean;
+            customToken: string;
+            message?: string;
+          };
+
+          if (!tokenData.success) {
+            throw new Error(tokenData.message || 'Failed to get user token');
+          }
+
+          // Sign in with custom token
+          const userCredential = await signInWithCustomToken(auth, tokenData.customToken);
+
+          // Get user data from Firestore
+          const { firebaseDataService } = await import('../data/firebaseDataService');
+          const existingUserData = await firebaseDataService.user.getCurrentUser(userCredential.user.uid);
+
+          if (!existingUserData) {
+            throw new Error('User data not found in database');
+            }
+
+          // Ensure wallet exists for the user
+          await this.ensureUserWallet(userCredential.user.uid);
+
+          // Update last login time
+          await this.updateLastLoginTime(userCredential.user.uid);
+
+          logger.info('✅ Phone instant login successful', {
+            userId: userCredential.user.uid,
+            phone: phoneNumber.substring(0, 5) + '...',
+            isNewUser: false
+          }, 'AuthService');
+
+            return {
+            success: true,
+            verificationId: 'instant-login', // Special marker for instant login
+            user: userCredential.user,
+            isNewUser: false
+          };
+        }
+      } catch (checkError) {
+        logger.warn('Failed to check existing user, proceeding with SMS verification', {
+          error: checkError instanceof Error ? checkError.message : String(checkError)
+        }, 'AuthService');
+        // Continue with SMS verification if instant login check fails
+      }
+
+      // User doesn't exist or check failed - proceed with SMS verification
+      logger.info('User not found or check failed - proceeding with SMS verification', {
+        phonePrefix: phoneNumber.substring(0, 5)
+      }, 'AuthService');
+
+      // Use Firebase's actual SMS sending for real SMS delivery
+      logger.info('Using server-side SMS verification with Twilio', {
+        phonePrefix: phoneNumber.substring(0, 5),
+        platform: Platform.OS
+      }, 'AuthService');
+
+      try {
+        // Use server-side SMS sending with Twilio (bypasses reCAPTCHA issues)
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const functions = getFunctions();
+
+        const startPhoneAuth = httpsCallable<{ phoneNumber: string }, {
+          success: boolean;
+          sessionId: string;
+          expiresIn: number;
+          message?: string;
+        }>(functions, 'startPhoneAuthentication');
+
+        const result = await startPhoneAuth({ phoneNumber });
+        const data = result.data as {
+          success: boolean;
+          sessionId: string;
+          expiresIn: number;
+          message?: string;
+        };
+
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to start phone authentication');
+        }
+
+        logger.info('✅ SMS verification session started with Twilio', {
+          sessionId: data.sessionId,
+          phonePrefix: phoneNumber.substring(0, 5),
+          expiresIn: data.expiresIn
+        }, 'AuthService');
+
+        return {
+          success: true,
+          verificationId: data.sessionId,
+          expiresIn: data.expiresIn
+        };
+
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorCode = error instanceof Error ? (error as any).code : 'unknown';
+
+        logger.error('❌ Server-side SMS session creation failed', {
+          message: errorMessage,
+          code: errorCode,
+          phonePrefix: phoneNumber.substring(0, 5)
+        }, 'AuthService');
+
+        return {
+          success: false,
+          error: errorMessage || 'Failed to send SMS verification code'
+        };
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorCode = error instanceof Error ? (error as any).code : 'unknown';
+
+      logger.error('❌ Phone Sign-In failed', {
+        message: errorMessage,
+        code: errorCode
+      }, 'AuthService');
+
+      // Handle specific Firebase Phone Auth errors
+      if (errorCode === 'auth/invalid-phone-number') {
         return {
           success: false,
           error: 'Invalid phone number. Please enter a valid phone number in international format (e.g., +1234567890).'
         };
-      } else if (error.code === 'auth/too-many-requests') {
+      } else if (errorCode === 'auth/too-many-requests') {
         return {
           success: false,
           error: 'Too many requests. Please wait a few minutes before trying again.'
         };
-      } else if (error.code === 'auth/missing-client-identifier') {
+      } else if (errorCode === 'auth/missing-client-identifier') {
         return {
           success: false,
           error: 'Phone authentication is not properly configured. Please contact support.'
@@ -283,140 +372,32 @@ class AuthService {
     }
   }
 
-  /**
-   * Get custom token for linking (helper method)
-   */
-  private async getCustomTokenForLinking(userId: string, email: string): Promise<string | null> {
-    try {
-      const { getFunctions, httpsCallable } = await import('firebase/functions');
-      const firebaseConfig = await import('../../config/firebase/firebase');
-      const app = firebaseConfig.default || (firebaseConfig as any).app;
-      const functions = getFunctions(app, 'us-central1');
-      
-      const getCustomToken = httpsCallable(functions, 'getCustomTokenForUser');
-      const result = await getCustomToken({ userId, email });
-      
-      if (result.data && typeof result.data === 'object' && 'token' in result.data) {
-        return (result.data as { token: string }).token;
-      }
-      
-      return null;
-    } catch (error) {
-      logger.warn('Failed to get custom token for linking', error, 'AuthService');
-      return null;
-    }
-  }
 
-  /**
-   * Ensure user is signed into Firebase Auth
-   * This is needed for linking phone numbers when user is authenticated via email/Firestore
-   */
-  private async ensureFirebaseAuthUser(userId: string, email: string): Promise<boolean> {
-    try {
-      // Check if already signed in
-      if (auth.currentUser && auth.currentUser.uid === userId) {
-        return true;
-      }
-
-      logger.info('Ensuring Firebase Auth user is signed in', { userId, email: email.substring(0, 5) + '...' }, 'AuthService');
-
-      // Try to get a custom token from backend using verifyCode function's logic
-      // The verifyCode function creates/gets Firebase Auth user and returns customToken
-      const { getFunctions, httpsCallable } = await import('firebase/functions');
-      const firebaseConfig = await import('../../config/firebase/firebase');
-      const app = firebaseConfig.default || (firebaseConfig as any).app;
-      const functions = getFunctions(app, 'us-central1');
-      
-      try {
-        // Try to call a function that gets/creates custom token
-        // First, try the getCustomTokenForUser function (if it exists)
-        try {
-          const getCustomToken = httpsCallable(functions, 'getCustomTokenForUser');
-          const result = await getCustomToken({ userId, email });
-          
-          if (result.data && typeof result.data === 'object' && 'token' in result.data) {
-            const customToken = (result.data as { token: string }).token;
-            await signInWithCustomToken(auth, customToken);
-            logger.info('✅ Signed in with custom token', { userId }, 'AuthService');
-            return true;
-          } else {
-            logger.warn('getCustomTokenForUser returned invalid response', { data: result.data }, 'AuthService');
-          }
-        } catch (funcError: any) {
-          // Log the error but don't fail - we'll show a helpful error message
-          logger.warn('Failed to get custom token from backend', { 
-            error: funcError.message,
-            code: funcError.code 
-          }, 'AuthService');
-          
-          // Alternative: Check if user exists in Firebase Auth by trying to sign in
-          // Since we don't have password, we can't use signInWithEmailAndPassword
-          // Instead, we'll need to create a backend function or use a different approach
-          
-          // For now, we'll check if there's a Firebase Auth user with this email
-          // by checking auth state or using a workaround
-          // The best solution is to ensure users are signed into Firebase Auth when they verify email
-          // But for now, we'll return false and handle it in the caller
-        }
-      } catch (error: any) {
-        logger.warn('Failed to get custom token', { error: error.message }, 'AuthService');
-      }
-
-      // If we can't get a custom token, we can't proceed with phone linking
-      // The user needs to be signed into Firebase Auth
-      return false;
-    } catch (error) {
-      logger.error('Failed to ensure Firebase Auth user', error, 'AuthService');
-      return false;
-    }
-  }
 
   /**
    * Link phone number to existing user account (for profile settings)
-   * Sends SMS code to verify phone number
+   * Uses server-side phone linking to avoid reCAPTCHA issues
    */
-  async linkPhoneNumberToUser(phoneNumber: string, recaptchaVerifier?: RecaptchaVerifier, userId?: string, email?: string): Promise<{ success: boolean; verificationId?: string; error?: string }> {
+  async linkPhoneNumberToUser(phoneNumber: string, userId?: string): Promise<{ success: boolean; verificationId?: string; error?: string }> {
     try {
-      let currentUser = auth.currentUser;
-      
-      // If Firebase Auth user is not available but we have userId, try to ensure they're signed in
-      if (!currentUser && userId && email) {
-        logger.info('Firebase Auth currentUser is null, attempting to sign in user', { userId }, 'AuthService');
-        
-        // Wait a bit for auth state to sync first
-        await new Promise(resolve => setTimeout(resolve, 200));
-        currentUser = auth.currentUser;
-        
-        // If still not available, try to ensure Firebase Auth sign-in
-        if (!currentUser) {
-          const signedIn = await this.ensureFirebaseAuthUser(userId, email);
-          if (signedIn) {
-            // Wait again for auth state to update
-            await new Promise(resolve => setTimeout(resolve, 200));
-            currentUser = auth.currentUser;
-          }
-        }
-        
-        if (!currentUser) {
-          logger.warn('Firebase Auth currentUser is still null after attempting sign-in', { userId }, 'AuthService');
-          
-          // On mobile, Firebase Phone Auth requires currentUser to be set for linking
-          // We need to inform the user they need to sign in to Firebase Auth
+      // Validate we have a user ID
+      if (!userId) {
+        logger.error('User ID is required for phone linking', null, 'AuthService');
           return {
             success: false,
-            error: 'Unable to link phone number. Please log out and log back in to refresh your authentication.'
+          error: 'User ID is required for phone linking'
           };
         }
-      }
-      
-      // On mobile, Firebase Phone Auth can work even without currentUser
-      // The phone will be linked when we verify the code
-      if (!currentUser && Platform.OS === 'web') {
-        return {
-          success: false,
-          error: 'User must be logged in to link phone number'
-        };
-      }
+
+      logger.info('🔄 Starting server-side phone linking process', {
+        userId,
+        phone: phoneNumber.substring(0, 5) + '...',
+        platform: Platform.OS
+      }, 'AuthService');
+
+      // Use server-side phone linking to avoid reCAPTCHA issues
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const functions = getFunctions();
 
       // Validate phone number format (E.164)
       const phoneValidation = this.validatePhoneNumber(phoneNumber);
@@ -427,139 +408,55 @@ class AuthService {
         };
       }
 
-      logger.info('🔄 Linking phone number to existing user', {
-        userId: currentUser?.uid || userId || 'unknown',
+      logger.info('🔄 Starting server-side phone linking process', {
+        userId,
         phone: phoneNumber.substring(0, 5) + '...',
-        hasCurrentUser: !!currentUser
+        platform: Platform.OS
       }, 'AuthService');
 
-      // IMPORTANT: For linking phone numbers, we MUST have currentUser set
-      // On mobile, signInWithPhoneNumber can work without currentUser for NEW sign-ups,
-      // but for LINKING to an existing account, currentUser must be set
-      if (!currentUser) {
-        return {
-          success: false,
-          error: 'Unable to link phone number. Please log out and log back in to refresh your authentication, then try again.'
-        };
-      }
+      // Call the server-side function to start phone linking
+      const startPhoneLinking = httpsCallable<{
+        phoneNumber: string;
+        userId: string;
+      }, {
+        success: boolean;
+        sessionId: string;
+        expiresIn: number;
+        message?: string;
+      }>(functions, 'startPhoneLinking');
 
-      // On mobile, recaptchaVerifier is not needed (automatic)
-      // On web, it's required
-      let confirmationResult: ConfirmationResult;
-      
-      try {
-        if (Platform.OS === 'web' && recaptchaVerifier) {
-          confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-        } else if (Platform.OS !== 'web') {
-          // Mobile - no recaptcha needed
-          // For linking phone numbers on mobile, we can use signInWithPhoneNumber
-          // even when a user is signed in - Firebase handles this correctly
-          // Wait a bit more to ensure auth state is fully synced
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Double-check currentUser is still set
-          const finalCurrentUser = auth.currentUser;
-          if (!finalCurrentUser) {
-            logger.warn('currentUser became null before sending SMS', { userId }, 'AuthService');
-            return {
-              success: false,
-              error: 'Authentication state lost. Please try again.'
-            };
+      const result = await startPhoneLinking({
+        phoneNumber,
+        userId
+      });
+
+      const data = result.data as {
+        success: boolean;
+        sessionId: string;
+        expiresIn: number;
+        message?: string;
+      };
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to start phone linking');
           }
           
-          logger.info('Sending SMS for phone linking', {
+      logger.info('✅ Server-side SMS code sent for phone linking', {
+        userId,
             phone: phoneNumber.substring(0, 5) + '...',
-            currentUserId: finalCurrentUser.uid,
-            email: finalCurrentUser.email
-          }, 'AuthService');
-          
-          // On mobile, signInWithPhoneNumber can be called even when user is signed in
-          // However, there's a known Firebase issue where it fails with auth/argument-error
-          // when reCAPTCHA Enterprise tries to initialize on mobile
-          // The workaround is to temporarily sign out, send SMS, then sign back in
-          const currentUserBeforeSMS = finalCurrentUser;
-          let tempSignedOut = false;
-          let customTokenForRestore: string | null = null;
-          
-          try {
-            // First, try the normal way
-            confirmationResult = await signInWithPhoneNumber(auth, phoneNumber);
-          } catch (signInError: any) {
-            // If signInWithPhoneNumber fails with argument-error, use workaround
-            if (signInError.code === 'auth/argument-error') {
-              logger.warn('signInWithPhoneNumber failed with argument-error, using workaround', {
-                error: signInError.message
-              }, 'AuthService');
-              
-              // The workaround of signing out doesn't help because the reCAPTCHA Enterprise
-              // error occurs regardless of auth state. This is a Firebase configuration issue.
-              // The best solution is to inform the user and provide instructions.
-              logger.error('Phone linking failed due to reCAPTCHA Enterprise configuration issue', {
-                error: signInError.message,
-                note: 'This requires Firebase Console configuration changes'
-              }, 'AuthService');
-              
-              // Provide a helpful error message
-              throw new Error(
-                'Phone authentication is currently unavailable due to a configuration issue. ' +
-                'Please contact support or try again later. ' +
-                'Alternatively, you can disable reCAPTCHA Enterprise in Firebase Console ' +
-                'under Authentication > Settings > Phone authentication.'
-              );
-            } else {
-              throw signInError;
-            }
-          }
-        } else {
-          return {
-            success: false,
-            error: 'reCAPTCHA verifier is required for web platform'
-          };
-        }
-      } catch (phoneError: any) {
-        logger.error('Failed to send SMS for phone linking', {
-          error: phoneError.message,
-          code: phoneError.code,
-          phone: phoneNumber.substring(0, 5) + '...'
-        }, 'AuthService');
-        
-        // Provide more specific error messages
-        if (phoneError.code === 'auth/argument-error') {
-          // This error typically occurs when reCAPTCHA Enterprise is enabled
-          // but not properly configured for mobile React Native/Expo apps
-          // The solution is to disable reCAPTCHA Enterprise in Firebase Console
-          return {
-            success: false,
-            error: 'Phone authentication is currently unavailable due to a Firebase configuration issue with reCAPTCHA Enterprise. Please disable reCAPTCHA Enterprise in Firebase Console under Authentication > Settings > Phone authentication, or contact support.'
-          };
-        } else if (phoneError.code === 'auth/invalid-phone-number') {
-          return {
-            success: false,
-            error: 'Invalid phone number. Please enter a valid phone number in E.164 format (e.g., +33635551484).'
-          };
-        } else if (phoneError.code === 'auth/too-many-requests') {
-          return {
-            success: false,
-            error: 'Too many requests. Please wait a few minutes before trying again.'
-          };
-        }
-        
-        return {
-          success: false,
-          error: phoneError.message || 'Failed to send verification code. Please try again.'
-        };
-      }
-
-      logger.info('✅ SMS code sent for phone linking', {
-        phone: phoneNumber.substring(0, 5) + '...'
+        sessionId: data.sessionId,
+        expiresIn: data.expiresIn
       }, 'AuthService');
 
       return {
         success: true,
-        verificationId: confirmationResult.verificationId
+        verificationId: data.sessionId // Use session ID as verification ID
       };
     } catch (error) {
-      logger.error('❌ Phone linking failed', error, 'AuthService');
+      logger.error('❌ Phone linking failed', {
+        message: error instanceof Error ? error.message : String(error),
+        code: error instanceof Error ? (error as any).code : 'unknown'
+      }, 'AuthService');
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to send verification code' 
@@ -599,52 +496,75 @@ class AuthService {
         }
       }
 
-      logger.info('🔄 Verifying phone code for linking', {
-        userId: currentUser.uid,
-        phone: phoneNumber.substring(0, 5) + '...'
-      }, 'AuthService');
-
-      // Create credential from verification ID and code
-      const credential = PhoneAuthProvider.credential(verificationId, code);
-      
-      // Link phone credential to current user
-      await linkWithCredential(currentUser, credential);
-
-      const finalUserId = currentUser?.uid || userId;
-      
-      if (!finalUserId) {
+      if (!currentUser) {
         return {
           success: false,
-          error: 'Unable to determine user ID for phone linking'
+          error: 'User authentication lost during verification'
         };
       }
 
-      logger.info('✅ Phone number linked successfully', {
-        userId: finalUserId,
+      logger.info('🔄 Verifying phone code for linking (server-side)', {
+        sessionId: verificationId.substring(0, 10) + '...',
+        phone: phoneNumber.substring(0, 5) + '...',
+        userId: userId
+      }, 'AuthService');
+
+      // Use server-side verification for phone linking
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const functions = getFunctions();
+      
+      // Call the server-side function to verify phone code and link to user
+      const verifyPhoneForLinking = httpsCallable<{
+        userId: string;
+        phoneNumber: string;
+        sessionId: string;
+        code: string;
+      }, {
+        success: boolean;
+        message?: string;
+      }>(functions, 'verifyPhoneForLinking');
+
+      const result = await verifyPhoneForLinking({
+        userId: userId!,
+        phoneNumber,
+        sessionId: verificationId,
+        code
+      });
+
+      const data = result.data as {
+        success: boolean;
+        message?: string;
+      };
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to verify phone code for linking');
+      }
+
+      logger.info('✅ Phone number linked successfully (server-side)', {
+        userId: userId,
         phone: phoneNumber.substring(0, 5) + '...'
       }, 'AuthService');
 
-      // Update user profile in Firestore
-      const { firebaseDataService } = await import('../data/firebaseDataService');
-      await firebaseDataService.user.updateUser(finalUserId, {
-        phone: phoneNumber,
-        phoneVerified: true,
-        primary_phone: phoneNumber
-      });
+      // Note: Server-side function already updated the user data in Firestore
 
       return {
         success: true
       };
-    } catch (error: any) {
-      logger.error('❌ Phone code verification/linking failed', error, 'AuthService');
+    } catch (error: unknown) {
+      const errorCode = error instanceof Error ? (error as any).code : 'unknown';
+
+      logger.error('❌ Phone code verification/linking failed', {
+        message: error instanceof Error ? error.message : String(error),
+        code: errorCode
+      }, 'AuthService');
       
       // Handle specific Firebase errors
-      if (error.code === 'auth/credential-already-in-use') {
+      if (errorCode === 'auth/credential-already-in-use') {
         return {
           success: false,
           error: 'This phone number is already linked to another account'
         };
-      } else if (error.code === 'auth/invalid-verification-code') {
+      } else if (errorCode === 'auth/invalid-verification-code') {
         return {
           success: false,
           error: 'Invalid verification code. Please try again.'
@@ -663,111 +583,210 @@ class AuthService {
    */
   async verifyPhoneCode(verificationId: string, code: string): Promise<AuthResult> {
     try {
-      logger.info('🔄 Verifying phone code', {
-        verificationId: verificationId.substring(0, 10) + '...'
+      // Prevent duplicate verification attempts for the same session
+      const now = Date.now();
+      const lastCallKey = `phone_verify_${verificationId}`;
+      const lastCallTime = this.lastAuthCallTimes?.get(lastCallKey);
+
+      if (lastCallTime && (now - lastCallTime) < 3000) { // 3 second cooldown
+        logger.warn('Phone verification call too frequent, blocking duplicate request', {
+          verificationId,
+          timeSinceLastCall: now - lastCallTime
+        }, 'AuthService');
+        return {
+          success: false,
+          error: 'Verification already in progress'
+        };
+      }
+
+      // Initialize lastAuthCallTimes if it doesn't exist
+      if (!this.lastAuthCallTimes) {
+        this.lastAuthCallTimes = new Map();
+      }
+      this.lastAuthCallTimes.set(lastCallKey, now);
+
+      logger.info('🔄 Verifying phone code (server-side)', {
+        sessionId: verificationId.substring(0, 10) + '...',
+        codeLength: code.length
       }, 'AuthService');
 
-      // Create credential from verification ID and code
-      const credential = PhoneAuthProvider.credential(verificationId, code);
-      
-      // CRITICAL: Before signing in, check if phone number exists in Firestore
-      // This ensures we link to existing email accounts properly
-      const { firebaseDataService } = await import('../data/firebaseDataService');
-      let existingUserByPhone: any = null;
-      
-      try {
-        // Get phone number from the verification ID (we need to extract it)
-        // Since we don't have the phone number yet, we'll check after sign-in
-        // But we can check if the credential will create a new user or use existing
-      } catch (checkError) {
-        logger.warn('Could not check for existing phone before sign-in', checkError, 'AuthService');
-      }
-      
-      // Sign in with credential
-      // If phone is already linked to a Firebase Auth user, this will sign into that user
-      // If not, it creates a new Firebase Auth user
-      const userCredential = await signInWithCredential(auth, credential);
-      
-      // Get phone number from user
-      const phoneNumber = userCredential.user.phoneNumber;
-      
-      if (!phoneNumber) {
-        throw new Error('Phone number not found in user credential');
+      // Use server-side verification to bypass reCAPTCHA issues
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const functions = getFunctions();
+
+      // Call the server-side function to verify phone code
+      const verifyPhoneCodeFunction = httpsCallable<{
+        sessionId: string;
+        code: string;
+      }, {
+        success: boolean;
+        customToken: string;
+        userId: string;
+        isNewUser: boolean;
+        phoneNumber: string;
+        message?: string;
+      }>(functions, 'verifyPhoneCode');
+
+      const result = await verifyPhoneCodeFunction({ sessionId: verificationId, code });
+
+      const data = result.data as {
+        success: boolean;
+        customToken: string;
+        userId: string;
+        isNewUser: boolean;
+        phoneNumber: string;
+        message?: string;
+      };
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to verify phone code');
       }
 
-      // CRITICAL: Check if this phone number is linked to an existing email account in Firestore
-      // This handles the case where user added phone to their email account
+      // Sign in with the custom token returned from the server
+      const userCredential = await signInWithCustomToken(auth, data.customToken);
+
+      // The server-side function already handled user creation and phone verification
+      // For phone auth, the Firebase Function should have created the Firestore document
+      // We just need to ensure wallet setup and update login time
+      const phoneNumber = data.phoneNumber;
+      const isNewUser = data.isNewUser;
+
+      logger.info('Phone verification result', {
+        userId: userCredential.user.uid,
+        isNewUser,
+        phoneNumber: phoneNumber.substring(0, 5) + '...'
+      }, 'AuthService');
+
+      // Get user data from Firestore - Firebase Function should have created it
+      let existingUserData;
       try {
-        existingUserByPhone = await firebaseDataService.user.getUserByPhone(phoneNumber);
-        
-        if (existingUserByPhone) {
-          logger.info('📱 Found existing user by phone number', {
-            phone: phoneNumber.substring(0, 5) + '...',
-            existingUserId: existingUserByPhone.id,
-            firebaseUid: userCredential.user.uid,
-            hasEmail: !!existingUserByPhone.email
-          }, 'AuthService');
-          
-          // If the Firebase Auth UID doesn't match the Firestore user ID, we need to link them
-          if (existingUserByPhone.id !== userCredential.user.uid) {
-            logger.warn('⚠️ Phone number linked to different Firebase Auth user', {
-              firestoreUserId: existingUserByPhone.id,
-              firebaseAuthUid: userCredential.user.uid,
-              email: existingUserByPhone.email?.substring(0, 5) + '...'
-            }, 'AuthService');
-            
-            // The phone is linked to a different Firebase Auth user (the one with email)
-            // We need to sign out and sign in with the correct user
-            // However, since we just signed in, we should update Firestore to use the new UID
-            // OR link the phone credential to the existing Firebase Auth user
-            
-            // For now, update Firestore user to use the new Firebase Auth UID
-            // This ensures consistency
-            await firebaseDataService.user.updateUser(existingUserByPhone.id, {
-              firebase_uid: userCredential.user.uid
-            });
-            
-            // Also update the user document ID reference if needed
-            // But we should keep the original user data
-            logger.info('✅ Updated Firestore user to match Firebase Auth UID', {
-              userId: existingUserByPhone.id,
-              firebaseUid: userCredential.user.uid
+        existingUserData = await firebaseDataService.user.getCurrentUser(userCredential.user.uid);
+        logger.info('User data found in Firestore after phone verification', {
+          userId: userCredential.user.uid,
+          hasName: !!existingUserData?.name,
+          hasWallet: !!existingUserData?.wallet_address
+        }, 'AuthService');
+      } catch (firestoreError) {
+        logger.warn('User data not immediately found in Firestore after phone verification', {
+          userId: userCredential.user.uid,
+          isNewUser,
+          error: firestoreError instanceof Error ? firestoreError.message : String(firestoreError)
+        }, 'AuthService');
+
+        // If Firebase Function reported this as a new user but document doesn't exist yet,
+        // wait a bit and try again (could be eventual consistency)
+        if (isNewUser) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+          try {
+            existingUserData = await firebaseDataService.user.getCurrentUser(userCredential.user.uid);
+            logger.info('User data found after retry', { userId: userCredential.user.uid }, 'AuthService');
+          } catch (retryError) {
+            logger.error('User data still not found after retry', {
+              userId: userCredential.user.uid,
+              error: retryError instanceof Error ? retryError.message : String(retryError)
             }, 'AuthService');
           }
         }
-      } catch (phoneCheckError) {
-        logger.warn('Could not check for existing phone in Firestore', phoneCheckError, 'AuthService');
-        // Continue with normal flow
       }
 
-      // Check if user exists in our database
-      const isNewUser = await this.checkIfUserIsNew(userCredential.user.uid);
-      
-      // Create or update user data (this handles wallet recovery and phone linking)
-      // UserMigrationService.ensureUserConsistencyWithPhone will find existing user by phone
-      // and preserve email if phone is linked to an email account
-      await this.createOrUpdateUserDataWithPhone(userCredential.user, phoneNumber, isNewUser);
-      
+      // Only create Firestore document as fallback if Firebase Function failed to create it
+      // This should be rare since the Firebase Function handles document creation
+      if (!existingUserData) {
+        logger.warn('Firebase Function did not create Firestore document, creating as fallback', {
+          userId: userCredential.user.uid,
+          isNewUser,
+          phoneNumber: phoneNumber.substring(0, 5) + '...'
+        }, 'AuthService');
+
+        try {
+          const phoneNumber = userCredential.user.phoneNumber || '';
+
+          // Create minimal user document - Firebase Function should have created the full one
+          await firebaseDataService.user.createUser({
+            name: userCredential.user.displayName || '',
+            email: userCredential.user.email || '',
+            phone: phoneNumber,
+            phoneVerified: true,
+            primary_phone: phoneNumber,
+            wallet_address: '',
+            wallet_public_key: '',
+            avatar: userCredential.user.photoURL || '',
+            email_verified: !!userCredential.user.email,
+            hasCompletedOnboarding: false,
+            points: 0,
+            total_points_earned: 0
+          });
+
+          logger.info('✅ Firestore document created as fallback for phone user', {
+            userId: userCredential.user.uid
+          }, 'AuthService');
+
+        } catch (createError) {
+          // Check if document was created by another process (race condition)
+          if (createError instanceof Error && createError.message.includes('already exists')) {
+            logger.info('Document was created by another process (race condition resolved)', {
+              userId: userCredential.user.uid
+            }, 'AuthService');
+          } else {
+            logger.error('❌ Failed to create Firestore document for phone user', {
+              userId: userCredential.user.uid,
+              error: createError instanceof Error ? createError.message : String(createError)
+            }, 'AuthService');
+            throw createError; // Fail the authentication if we can't create the user
+          }
+        }
+      } else {
+        logger.info('Phone user document exists in Firestore', {
+          userId: userCredential.user.uid,
+          hasWallet: !!existingUserData.wallet_address,
+          isNewUser
+        }, 'AuthService');
+      }
+
+      // Ensure wallet exists for the user
+      await this.ensureUserWallet(userCredential.user.uid);
+
       // Update last login time
       await this.updateLastLoginTime(userCredential.user.uid);
 
-      logger.info('✅ Phone Sign-In successful', {
+      logger.info('✅ Server-side Phone Sign-In successful', {
         userId: userCredential.user.uid,
         phone: phoneNumber.substring(0, 5) + '...',
-        isNewUser,
-        hadExistingAccount: !!existingUserByPhone
+        isNewUser: isNewUser,
+        firebaseFunctionUserId: data.userId
       }, 'AuthService');
 
       return {
         success: true,
         user: userCredential.user,
-        isNewUser
+        isNewUser: isNewUser
       };
-    } catch (error) {
-      logger.error('❌ Phone code verification failed', error, 'AuthService');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Phone code verification failed' 
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorCode = error instanceof Error ? (error as any).code : 'unknown';
+
+      logger.error('❌ Phone code verification failed', {
+        message: errorMessage,
+        code: errorCode
+      }, 'AuthService');
+
+      // Handle specific Firebase errors
+      if (errorCode === 'auth/invalid-verification-code') {
+        return {
+          success: false,
+          error: 'Invalid verification code. Please try again.'
+        };
+      } else if (errorCode === 'auth/code-expired') {
+        return {
+          success: false,
+          error: 'Verification code has expired. Please request a new code.'
+        };
+      }
+
+      return {
+        success: false,
+        error: errorMessage || 'Failed to verify phone code'
       };
     }
   }
@@ -781,7 +800,10 @@ class AuthService {
       logger.info('✅ User signed out successfully', {}, 'AuthService');
       return { success: true };
     } catch (error) {
-      logger.error('❌ Sign out failed', error, 'AuthService');
+      logger.error('❌ Sign out failed', {
+        message: error instanceof Error ? error.message : String(error),
+        code: error instanceof Error ? (error as any).code : 'unknown'
+      }, 'AuthService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Sign out failed'
@@ -792,18 +814,49 @@ class AuthService {
   /**
    * Ensure user has a wallet (consolidated wallet creation logic)
    */
-  async ensureUserWallet(userId: string): Promise<{ walletAddress: string; walletPublicKey: string } | null> {
+  async ensureUserWallet(userId: string): Promise<{ walletAddress: string; walletPublicKey: string; needsRecovery?: boolean } | null> {
     try {
       // Check if user already has wallet in database
       const existingUser = await firebaseDataService.user.getCurrentUser(userId);
       if (existingUser?.wallet_address) {
+        // Check if wallet exists on device
+        const hasWalletOnDevice = await walletService.hasWalletOnDevice(userId);
+
+        if (hasWalletOnDevice) {
+          // Try to get wallet info from device
+          const walletInfo = await walletService.getWalletInfo(userId);
+          if (walletInfo) {
+            // Ensure database is up to date
+            await firebaseDataService.user.updateUser(userId, {
+              wallet_address: walletInfo.address,
+              wallet_public_key: walletInfo.publicKey,
+              wallet_status: 'healthy',
+              wallet_has_private_key: true
+            });
+            return {
+              walletAddress: walletInfo.address,
+              walletPublicKey: walletInfo.publicKey
+            };
+          }
+        }
+
+        // Wallet exists in database but not on device - recovery needed
+        logger.warn('Wallet exists in database but not on device - recovery situation', {
+          userId,
+          expectedAddress: existingUser.wallet_address,
+          hasWalletOnDevice
+        }, 'AuthService');
+
+        // Return database wallet info but mark as needing recovery
+        // The UI should detect this and prompt user to restore wallet
         return {
           walletAddress: existingUser.wallet_address,
-          walletPublicKey: existingUser.wallet_public_key || existingUser.wallet_address
+          walletPublicKey: existingUser.wallet_public_key || existingUser.wallet_address,
+          needsRecovery: true
         };
       }
 
-      // Check if wallet exists on device
+      // Check if wallet exists on device but not in database
       const hasWalletOnDevice = await walletService.hasWalletOnDevice(userId);
       if (hasWalletOnDevice) {
         // Try to get wallet info from device
@@ -852,7 +905,10 @@ class AuthService {
       logger.error('❌ Failed to create wallet for user', { userId }, 'AuthService');
       return null;
     } catch (error) {
-      logger.error('❌ Error ensuring user wallet', error, 'AuthService');
+      logger.error('❌ Error ensuring user wallet', {
+        message: error instanceof Error ? error.message : String(error),
+        code: error instanceof Error ? (error as any).code : 'unknown'
+      }, 'AuthService');
       return null;
     }
   }
@@ -872,104 +928,8 @@ class AuthService {
   }
 
 
-  /**
-   * Check if user is new by looking up their data in Firestore and device storage
-   */
-  private async checkIfUserIsNew(userId: string): Promise<boolean> {
-    try {
-      // Check if user exists in Firebase database
-      const existingUser = await firebaseDataService.user.getCurrentUser(userId);
-      
-      // Check if wallet exists on device (in secure storage)
-      const hasWalletOnDevice = await walletService.hasWalletOnDevice(userId);
-      
-      // User is new if they don't exist in database AND don't have wallet on device
-      const isNewUser = !existingUser && !hasWalletOnDevice;
-      
-      logger.info('User existence check', {
-        userId,
-        existsInDatabase: !!existingUser,
-        hasWalletOnDevice,
-        isNewUser
-      }, 'AuthService');
-      
-      return isNewUser;
-    } catch (error) {
-      logger.error('❌ Failed to check if user is new', error, 'AuthService');
-      return true; // Default to new user if check fails
-    }
-  }
 
-  /**
-   * Create or update user data in Firestore using phone-based identification
-   */
-  private async createOrUpdateUserDataWithPhone(user: User, phoneNumber: string, isNewUser: boolean): Promise<void> {
-    try {
-      // Use UserMigrationService to ensure consistent user identification
-      // First try to find by phone, then by email if phone not found
-      const consistentUser = await UserMigrationService.ensureUserConsistencyWithPhone(user, phoneNumber);
-      
-      logger.info('✅ User consistency ensured (phone)', {
-        userId: consistentUser.id,
-        phone: phoneNumber.substring(0, 5) + '...',
-        email: consistentUser.email?.substring(0, 5) + '...' || 'none',
-        isNewUser
-      }, 'AuthService');
-      
-      // CRITICAL: If user has email, save it to SecureStore for future logins
-      // This ensures users can log in with either email or phone after linking
-      if (consistentUser.email) {
-        try {
-          const { EmailPersistenceService } = await import('../core/emailPersistenceService');
-          await EmailPersistenceService.saveEmail(consistentUser.email);
-          logger.info('✅ Email saved to SecureStore after phone login', {
-            email: consistentUser.email.substring(0, 5) + '...',
-            userId: consistentUser.id
-          }, 'AuthService');
-        } catch (emailSaveError) {
-          logger.warn('Failed to save email after phone login (non-critical)', emailSaveError, 'AuthService');
-          // Non-critical, continue
-        }
-      }
-      
-      // Update user with phone number if not already set
-      if (!consistentUser.phone || consistentUser.phone !== phoneNumber) {
-        await firebaseDataService.user.updateUser(consistentUser.id, {
-          phone: phoneNumber,
-          phoneVerified: true,
-          primary_phone: phoneNumber
-        });
-      }
-      
-      // Ensure user has a wallet using consolidated logic
-      await this.ensureUserWallet(consistentUser.id);
-    } catch (error) {
-      logger.error('❌ Failed to create/update user data (phone)', error, 'AuthService');
-      // Don't throw error - authentication should still succeed
-    }
-  }
 
-  /**
-   * Create or update user data in Firestore using email-based identification
-   */
-  private async createOrUpdateUserData(user: User, isNewUser: boolean): Promise<void> {
-    try {
-      // Use UserMigrationService to ensure consistent user identification
-      const consistentUser = await UserMigrationService.ensureUserConsistency(user);
-      
-      logger.info('✅ User consistency ensured', {
-        userId: consistentUser.id,
-        email: consistentUser.email.substring(0, 5) + '...',
-        isNewUser
-      }, 'AuthService');
-      
-      // Ensure user has a wallet using consolidated logic
-      await this.ensureUserWallet(consistentUser.id);
-    } catch (error) {
-      logger.error('❌ Failed to create/update user data', error, 'AuthService');
-      // Don't throw error - authentication should still succeed
-    }
-  }
 
   /**
    * Update last login time
@@ -979,7 +939,10 @@ class AuthService {
       // Note: lastLoginAt is not part of the User type, so we skip this update
       logger.info('✅ Last login time update skipped (not in User type)', { userId }, 'AuthService');
     } catch (error) {
-      logger.error('❌ Failed to update last login time', error, 'AuthService');
+      logger.error('❌ Failed to update last login time', {
+        message: error instanceof Error ? error.message : String(error),
+        code: error instanceof Error ? (error as any).code : 'unknown'
+      }, 'AuthService');
       // Don't throw error - this is not critical
     }
   }

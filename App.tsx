@@ -29,6 +29,7 @@ import CryptoTransferScreen from './src/screens/Deposit/CryptoTransferScreen';
 import MoonPayWebViewScreen from './src/screens/Deposit/MoonPayWebViewScreen';
 import AccountSettingsScreen from './src/screens/Settings/AccountSettings/AccountSettingsScreen';
 import PremiumScreen from './src/screens/Settings/Premium/PremiumScreen';
+import { SeedPhraseRecoveryScreen } from './src/screens/SeedPhraseRecovery';
 import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
 import LanguageScreen from './src/screens/Settings/Language/LanguageScreen';
 import RewardsScreen from './src/screens/Rewards/RewardsScreen';
@@ -167,6 +168,7 @@ export default function App() {
                     <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
                     <Stack.Screen name="AssetSelection" component={AssetSelectionScreen} />
                     <Stack.Screen name="Premium" component={PremiumScreen} />
+                    <Stack.Screen name="SeedPhraseRecovery" component={SeedPhraseRecoveryScreen} />
                     <Stack.Screen name="Notifications" component={NotificationsScreen} />
                     <Stack.Screen name="Language" component={LanguageScreen} />
                     <Stack.Screen name="UserProfile" component={UserProfileScreen} />

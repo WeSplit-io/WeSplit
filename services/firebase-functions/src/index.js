@@ -52,8 +52,14 @@ exports.verifyCode = emailFunctions.verifyCode;
 // Import and export phone functions
 const phoneFunctions = require('./phoneFunctions');
 exports.getCustomTokenForUser = phoneFunctions.getCustomTokenForUser;
-exports.sendPhoneVerificationCode = phoneFunctions.sendPhoneVerificationCode;
+exports.checkPhoneUserExists = phoneFunctions.checkPhoneUserExists;
+exports.getUserCustomToken = phoneFunctions.getUserCustomToken;
+exports.checkEmailUserExists = emailFunctions.checkEmailUserExists;
+exports.startPhoneAuthentication = phoneFunctions.startPhoneAuthentication;
+exports.verifyPhoneCode = phoneFunctions.verifyPhoneCode;
+exports.startPhoneLinking = phoneFunctions.startPhoneLinking;
 exports.verifyPhoneForLinking = phoneFunctions.verifyPhoneForLinking;
+exports.sendPhoneVerificationCode = phoneFunctions.sendPhoneVerificationCode;
 
 // Import and export MoonPay functions
 const moonpayFunctions = require('./moonpay.js');

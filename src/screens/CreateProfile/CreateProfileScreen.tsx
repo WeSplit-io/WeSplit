@@ -333,33 +333,65 @@ const CreateProfileScreen: React.FC = () => {
     try {
       setIsLoading(true);
 
+      // Get authentication method and required fields
+      const params = route?.params as any;
+      const phoneNumber = params?.phoneNumber;
+      const isPhoneAuth = !!phoneNumber && !params?.email;
+
       // Get email from route/params, authenticated user, or stored email
-      // IMPORTANT: Don't use fallback 'user@example.com' - if no email, we should handle it properly
       let email = (route?.params as any)?.email || state.currentUser?.email;
       
       // If still no email, try loading from SecureStore
       if (!email) {
         try {
-          const { EmailPersistenceService } = await import('../../services/core/emailPersistenceService');
-          email = await EmailPersistenceService.loadEmail();
+          const { AuthPersistenceService } = await import('../../../services/core/authPersistenceService');
+          email = await AuthPersistenceService.loadEmail();
         } catch (error) {
           logger.warn('Failed to load email from SecureStore', error, 'CreateProfileScreen');
         }
       }
       
-      // If still no email, this is an error condition - user should have an email
-      if (!email) {
-        logger.error('No email available for profile creation', null, 'CreateProfileScreen');
+      // For phone authentication, email is optional
+      // For email authentication, email is required
+      if (!isPhoneAuth && !email) {
+        logger.error('No email available for email-based profile creation', null, 'CreateProfileScreen');
         Alert.alert('Error', 'Email address is required. Please log in again.');
         return;
       }
 
+      logger.info('Creating profile', {
+        isPhoneAuth,
+        hasEmail: !!email,
+        phoneNumber: phoneNumber?.substring(0, 5) + '...',
+        email: email?.substring(0, 5) + '...'
+      }, 'CreateProfileScreen');
+
       // Check if user already exists and has a username
+      // Use different logic for email vs phone authentication
+      let existingUser = null;
+
       try {
-        const existingUser = await firebaseDataService.user.getUserByEmail(email);
+        if (isPhoneAuth) {
+          // For phone authentication, check by current user ID or phone number
+          if (state.currentUser?.id) {
+            existingUser = await firebaseDataService.user.getCurrentUser(state.currentUser.id);
+          } else if (phoneNumber) {
+            // Fallback: try to find by phone number
+            const usersByPhone = await firebaseDataService.user.getUsersByPhone(phoneNumber);
+            if (usersByPhone && usersByPhone.length > 0) {
+              existingUser = usersByPhone[0];
+            }
+          }
+        } else {
+          // For email authentication, check by email
+          existingUser = await firebaseDataService.user.getUserByEmail(email);
+        }
         
         if (existingUser && existingUser.name && existingUser.name.trim() !== '') {
-          logger.info('User already has username, skipping profile creation', { name: existingUser.name }, 'CreateProfileScreen');
+          logger.info('User already has username, skipping profile creation', {
+            name: existingUser.name,
+            authMethod: isPhoneAuth ? 'phone' : 'email'
+          }, 'CreateProfileScreen');
           
           // User already has a username, authenticate them directly
           const user = {
@@ -368,7 +400,8 @@ const CreateProfileScreen: React.FC = () => {
             // Then override with critical fields
             id: existingUser.id.toString(),
             name: existingUser.name,
-            email: existingUser.email,
+            email: existingUser.email || '',
+            phone: existingUser.phone || phoneNumber || '',
             avatar: existingUser.avatar || DEFAULT_AVATAR_URL,
             walletAddress: existingUser.wallet_address,
             wallet_address: existingUser.wallet_address,
@@ -384,7 +417,7 @@ const CreateProfileScreen: React.FC = () => {
             active_wallet_background: existingUser.active_wallet_background || undefined,
           };
 
-          authenticateUser(user, 'email');
+          authenticateUser(user, isPhoneAuth ? 'phone' : 'email');
           
           try {
             (navigation as any).replace('Dashboard');
@@ -400,15 +433,69 @@ const CreateProfileScreen: React.FC = () => {
 
         // Create or update user using unified service
       try {
-        logger.info('Creating/updating user with firebase service', { email, name: pseudo }, 'CreateProfileScreen');
+        logger.info('Creating/updating user with firebase service', {
+          isPhoneAuth,
+          email: email?.substring(0, 5) + '...',
+          phone: phoneNumber?.substring(0, 5) + '...',
+          name: pseudo
+        }, 'CreateProfileScreen');
         
-        // First check if user exists
-        const existingUser = await firebaseDataService.user.getUserByEmail(email);
+        // Handle user creation differently for email vs phone auth
         let user;
+        let existingUser;
+
+        if (isPhoneAuth) {
+          // For phone authentication, check by current user ID
+          if (state.currentUser?.id) {
+            existingUser = await firebaseDataService.user.getCurrentUser(state.currentUser.id);
+          }
         
         if (existingUser) {
           // User exists, update their profile data
-          logger.info('User exists, updating profile data', { userId: existingUser.id, name: pseudo }, 'CreateProfileScreen');
+            logger.info('Phone user exists, updating profile data', { userId: existingUser.id, name: pseudo }, 'CreateProfileScreen');
+            user = await firebaseDataService.user.updateUser(existingUser.id, {
+              name: pseudo,
+              avatar: avatar || existingUser.avatar,
+              phone: phoneNumber,
+              hasCompletedOnboarding: true
+            });
+          } else {
+            // Create new phone user
+            logger.info('Creating new phone user', { phone: phoneNumber?.substring(0, 5) + '...', name: pseudo }, 'CreateProfileScreen');
+            const newUserId = state.currentUser?.id || 'unknown';
+
+            // Create user document with phone as primary identifier
+            await firebaseDataService.user.createUserDocument({
+              uid: newUserId,
+              email: email || '',
+              phoneNumber: phoneNumber || '',
+              displayName: pseudo,
+              photoURL: avatar || DEFAULT_AVATAR_URL
+            } as any, null);
+
+            user = {
+              id: newUserId,
+              name: pseudo,
+              email: email || '',
+              phone: phoneNumber || '',
+              avatar: avatar || DEFAULT_AVATAR_URL,
+              wallet_address: '',
+              wallet_public_key: '',
+              created_at: new Date().toISOString(),
+              hasCompletedOnboarding: true,
+              badges: [],
+              profile_borders: [],
+              wallet_backgrounds: []
+            };
+          }
+        } else {
+          // For email authentication, use existing logic
+          // First check if user exists
+          existingUser = await firebaseDataService.user.getUserByEmail(email);
+
+          if (existingUser) {
+            // User exists, update their profile data
+            logger.info('Email user exists, updating profile data', { userId: existingUser.id, name: pseudo }, 'CreateProfileScreen');
           user = await firebaseDataService.user.updateUser(existingUser.id, {
             name: pseudo,
             avatar: avatar || existingUser.avatar,
@@ -483,7 +570,8 @@ const CreateProfileScreen: React.FC = () => {
           // Then override with critical fields
           id: user.id.toString(),
           name: user.name,
-          email: user.email,
+          email: user.email || '',
+          phone: user.phone || phoneNumber || '',
           avatar: finalAvatarUrl || DEFAULT_AVATAR_URL,
           walletAddress: user.wallet_address,
           wallet_address: user.wallet_address,
@@ -507,7 +595,7 @@ const CreateProfileScreen: React.FC = () => {
           hasCompletedOnboarding: appUser.hasCompletedOnboarding 
         }, 'CreateProfileScreen');
 
-        authenticateUser(appUser, 'email');
+        authenticateUser(appUser, isPhoneAuth ? 'phone' : 'email');
         
         // Sync onboarding and profile image quests after user is authenticated
         try {
@@ -579,6 +667,7 @@ const CreateProfileScreen: React.FC = () => {
         } catch (e) {
           console.error('Navigation error:', e);
           Alert.alert('Navigation Error', 'Navigation error: ' + (e as any).message);
+        }
         }
       } catch (createError) {
         console.error('Error creating user:', createError);

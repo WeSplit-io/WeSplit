@@ -79,7 +79,7 @@ interface AppContextType {
   dispatch: React.Dispatch<AppAction>;
   
   // User operations
-  authenticateUser: (user: User, method: 'wallet' | 'email' | 'guest' | 'social') => void;
+  authenticateUser: (user: User, method: 'wallet' | 'email' | 'phone' | 'guest' | 'social') => void;
   updateUser: (updates: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
   logoutUser: () => void;
@@ -245,7 +245,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [state.currentUser, state.notifications, removeNotification]);
 
   // User operations
-  const authenticateUser = useCallback(async (user: User, method: 'wallet' | 'email' | 'guest' | 'social') => {
+  const authenticateUser = useCallback(async (user: User, method: 'wallet' | 'email' | 'phone' | 'guest' | 'social') => {
     try {
       dispatch({
         type: 'AUTHENTICATE_USER',

@@ -36,6 +36,7 @@ export interface WalletCreationResult {
   mnemonic?: string;
   error?: string;
   requiresUserAction?: boolean;
+  needsRecovery?: boolean;
   requiresSeedPhraseRestore?: boolean;
 }
 
@@ -215,18 +216,48 @@ class SimplifiedWalletService {
             logger.error('Comprehensive recovery failed', comprehensiveError, 'SimplifiedWalletService');
           }
           
-          if (recoveryResult.requiresUserAction) {
-            // Database wallet cannot be recovered, user needs to take action
-            logger.error('Database wallet recovery requires user action', { 
+          if (recoveryResult?.requiresUserAction) {
+            // Check if we have a database wallet address even if recovery failed
+            const { firebaseDataService } = await import('../../data/firebaseDataService');
+            const userData = await firebaseDataService.user.getCurrentUser(userId);
+
+            if (userData?.wallet_address) {
+              // We have a database wallet but can't recover the keys
+              // Return a "recovery needed" wallet that shows the address but can't perform transactions
+              logger.warn('Database wallet exists but recovery failed - returning recovery-needed wallet', {
+                userId,
+                walletAddress: userData.wallet_address,
+                errorMessage: recoveryResult?.errorMessage || 'Recovery failed'
+              }, 'SimplifiedWalletService');
+
+              const recoveryNeededResult: WalletCreationResult = {
+                success: true,
+                wallet: {
+                  address: userData.wallet_address,
+                  publicKey: userData.wallet_public_key || userData.wallet_address,
+                  secretKey: null, // No secret key available
+                  isConnected: false, // Cannot perform transactions without keys
+                  walletName: 'Wallet Needs Recovery',
+                  walletType: 'recovery-needed'
+                },
+                needsRecovery: true
+              };
+
+              this.walletRecoveryCache.set(userId, recoveryNeededResult);
+              return recoveryNeededResult;
+            }
+
+            // No database wallet, return error
+            logger.error('Database wallet recovery requires user action and no database wallet found', {
               userId,
-              errorMessage: recoveryResult.errorMessage
+              errorMessage: recoveryResult?.errorMessage || 'Recovery failed'
             }, 'SimplifiedWalletService');
-            
+
             const errorResult: WalletCreationResult = {
               success: false,
-              error: recoveryResult.errorMessage || 'Database wallet cannot be recovered. Please restore from seed phrase.'
+              error: recoveryResult?.errorMessage || 'Wallet cannot be recovered. Please restore from seed phrase.'
             };
-            
+
             this.walletRecoveryCache.set(userId, errorResult);
             return errorResult;
           }
@@ -895,6 +926,135 @@ class SimplifiedWalletService {
       }
     } catch (error) {
       logger.error('Error restoring wallet from seed phrase', error, 'SimplifiedWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Clear user wallet data to allow creating a new wallet
+   */
+  public async clearUserWalletData(userId: string): Promise<void> {
+    try {
+      logger.info('Clearing user wallet data', { userId }, 'SimplifiedWalletService');
+
+      // Clear from SecureStore
+      const { SecureStore } = await import('expo-secure-store');
+      const keysToDelete = [
+        `wallet_private_key_${userId}`,
+        `wallet_mnemonic_${userId}`,
+        `wallet_mnemonic`, // Legacy key
+        `wallet_private_key` // Legacy key
+      ];
+
+      for (const key of keysToDelete) {
+        try {
+          await SecureStore.deleteItemAsync(key);
+        } catch (error) {
+          // Ignore errors for keys that don't exist
+        }
+      }
+
+      // Clear from AsyncStorage
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      const asyncKeysToDelete = [
+        `storedWallets_${userId}`,
+        'storedWallets' // Legacy key
+      ];
+
+      for (const key of asyncKeysToDelete) {
+        try {
+          await AsyncStorage.removeItem(key);
+        } catch (error) {
+          // Ignore errors for keys that don't exist
+        }
+      }
+
+      // Clear cache
+      this.walletRecoveryCache.delete(userId);
+      this.balanceCache.delete(userId);
+
+      // Update database to clear wallet information (but keep the user record)
+      const { firebaseDataService } = await import('../../data/firebaseDataService');
+      await firebaseDataService.user.updateUser(userId, {
+        wallet_address: '',
+        wallet_public_key: '',
+        wallet_status: 'none',
+        wallet_created_at: null,
+        wallet_has_private_key: false,
+        wallet_has_seed_phrase: false,
+        wallet_type: ''
+      });
+
+      logger.info('User wallet data cleared successfully', { userId }, 'SimplifiedWalletService');
+    } catch (error) {
+      logger.error('Failed to clear user wallet data', error, 'SimplifiedWalletService');
+      throw error;
+    }
+  }
+
+
+  /**
+   * Restore wallet from private key
+   */
+  async restoreWalletFromPrivateKey(userId: string, privateKey: string, expectedAddress?: string): Promise<WalletCreationResult> {
+    try {
+      logger.info('Restoring wallet from private key', { userId, expectedAddress }, 'SimplifiedWalletService');
+
+      // Derive wallet from private key
+      const { deriveWalletFromPrivateKey } = await import('./derive');
+      const derivedWallet = await deriveWalletFromPrivateKey(privateKey);
+
+      if (!derivedWallet) {
+        return {
+          success: false,
+          error: 'Failed to derive wallet from private key'
+        };
+      }
+
+      // Check if address matches expected (if provided)
+      if (expectedAddress && derivedWallet.address.toLowerCase() !== expectedAddress.toLowerCase()) {
+        return {
+          success: false,
+          error: `Private key generates address ${derivedWallet.address}, but expected ${expectedAddress}`
+        };
+      }
+
+      // Store the wallet (convert hex secret key to base64 as expected by storeWallet)
+      const stored = await walletRecoveryService.storeWallet(userId, {
+        address: derivedWallet.address,
+        publicKey: derivedWallet.publicKey,
+        privateKey: Buffer.from(derivedWallet.secretKey, 'hex').toString('base64')
+      }, undefined); // No email for private key restoration
+
+      if (!stored) {
+        return {
+          success: false,
+          error: 'Failed to store restored wallet'
+        };
+      }
+
+      logger.info('Wallet restored successfully from private key', {
+        userId,
+        address: derivedWallet.address.substring(0, 10) + '...'
+      }, 'SimplifiedWalletService');
+
+      return {
+        success: true,
+        wallet: {
+          address: derivedWallet.address,
+          publicKey: derivedWallet.publicKey,
+          secretKey: derivedWallet.secretKey,
+          isConnected: true,
+          walletName: 'Restored Wallet',
+          walletType: 'restored-private-key'
+        }
+      };
+
+    } catch (error) {
+      logger.error('Failed to restore wallet from private key', error, 'SimplifiedWalletService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'

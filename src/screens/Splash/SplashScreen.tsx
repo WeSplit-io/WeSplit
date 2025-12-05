@@ -7,7 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { auth, firestoreService, db } from '../../config/firebase/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { logger } from '../../services/analytics/loggingService';
-import { EmailPersistenceService } from '../../services/core/emailPersistenceService';
+import { AuthPersistenceService } from '../../services/core/authPersistenceService';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -274,7 +274,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           logger.info('User not authenticated, checking for stored email', null, 'SplashScreen');
           
           try {
-            const storedEmail = await EmailPersistenceService.loadEmail();
+            const storedEmail = await AuthPersistenceService.loadEmail();
             if (storedEmail) {
               logger.info('Found stored email, checking verification status', { email: storedEmail }, 'SplashScreen');
               

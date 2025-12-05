@@ -106,6 +106,14 @@ export class BalanceUtils {
       const { PublicKey } = await memoryManager.loadModule('solana-web3');
       const { getAssociatedTokenAddress, getAccount } = await memoryManager.loadModule('solana-spl-token');
 
+      // Debug logging
+      logger.debug('BalanceUtils.getUsdcBalance called', {
+        publicKey: typeof publicKey === 'string' ? publicKey.substring(0, 10) + '...' : typeof publicKey,
+        usdcMint: typeof usdcMint === 'string' ? usdcMint.substring(0, 10) + '...' : typeof usdcMint,
+        publicKeyType: typeof publicKey,
+        usdcMintType: typeof usdcMint
+      }, 'BalanceUtils');
+
       // Ensure parameters are PublicKey instances
       if (!publicKey) {
         throw new Error('publicKey parameter is required');
@@ -114,10 +122,27 @@ export class BalanceUtils {
         throw new Error('usdcMint parameter is required');
       }
 
-      const pubKey = publicKey instanceof PublicKey ? publicKey : new PublicKey(publicKey);
-      const mintKey = usdcMint instanceof PublicKey ? usdcMint : new PublicKey(usdcMint);
+      let pubKey: PublicKey;
+      let mintKey: PublicKey;
+
+      try {
+        pubKey = publicKey instanceof PublicKey ? publicKey : new PublicKey(publicKey);
+      } catch (keyError) {
+        throw new Error(`Invalid publicKey parameter: ${publicKey} (${typeof publicKey}). Error: ${keyError instanceof Error ? keyError.message : String(keyError)}`);
+      }
+
+      try {
+        mintKey = usdcMint instanceof PublicKey ? usdcMint : new PublicKey(usdcMint);
+      } catch (mintError) {
+        throw new Error(`Invalid usdcMint parameter: ${usdcMint} (${typeof usdcMint}). Error: ${mintError instanceof Error ? mintError.message : String(mintError)}`);
+      }
       
-      const usdcTokenAccount = await getAssociatedTokenAddress(mintKey, pubKey);
+      let usdcTokenAccount: any;
+      try {
+        usdcTokenAccount = await getAssociatedTokenAddress(mintKey, pubKey);
+      } catch (tokenAccountError) {
+        throw new Error(`Failed to get associated token address: ${tokenAccountError instanceof Error ? tokenAccountError.message : String(tokenAccountError)}`);
+      }
       
       logger.debug('BalanceUtils: USDC token account derivation', {
         publicKey: pubKey.toBase58(),
@@ -126,7 +151,19 @@ export class BalanceUtils {
       }, 'BalanceUtils');
       
       const connection = await transactionUtils.getConnection();
-      const accountInfo = await getAccount(connection, usdcTokenAccount);
+      let accountInfo: any;
+      try {
+        accountInfo = await getAccount(connection, usdcTokenAccount);
+      } catch (accountError) {
+        // If account doesn't exist, that's OK - it just means balance is 0
+        if (accountError instanceof Error && accountError.message.includes('Account does not exist')) {
+          return {
+            balance: 0,
+            accountExists: false
+          };
+        }
+        throw new Error(`Failed to get account info: ${accountError instanceof Error ? accountError.message : String(accountError)}`);
+      }
       
       logger.debug('BalanceUtils: USDC balance retrieved successfully', {
         publicKey: pubKey.toBase58(),

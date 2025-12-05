@@ -58,6 +58,9 @@ const sendVerificationEmailFunction = httpsCallable(functionsRegion, 'sendVerifi
 const verifyCodeFunction = httpsCallable(functionsRegion, 'verifyCode', {
   timeout: 60000 // 60 seconds timeout
 });
+const checkEmailUserExistsFunction = httpsCallable(functionsRegion, 'checkEmailUserExists', {
+  timeout: 30000 // 30 seconds timeout
+});
 
 export interface FirebaseAuthResponse {
   success: boolean;
@@ -231,6 +234,49 @@ export async function verifyCode(email: string, code: string): Promise<FirebaseV
       throw new Error(error.message);
     } else {
       throw new Error('Failed to verify code. Please try again.');
+    }
+  }
+}
+
+/**
+ * Check if email user exists
+ */
+export async function checkEmailUserExists(email: string): Promise<{ success: boolean; userExists: boolean; userId?: string; message?: string }> {
+  if (__DEV__) { logger.info('checkEmailUserExists called (Firebase Functions)', null, 'firebaseFunctionsService'); }
+  if (__DEV__) { logger.debug('Email', { email }, 'firebaseFunctionsService'); }
+
+  try {
+    // Call Firebase Function to check if email user exists
+    const result = await checkEmailUserExistsFunction({
+      email: email.trim()
+    });
+
+    const response = result.data as { success: boolean; userExists: boolean; userId?: string; message?: string };
+
+    if (__DEV__) { logger.debug('Firebase Functions checkEmailUserExists response', { response }, 'firebaseFunctionsService'); }
+
+    if (response.success) {
+      if (__DEV__) { logger.info('Email user existence check completed', null, 'firebaseFunctionsService'); }
+      return response;
+    } else {
+      throw new Error(response.message || 'Failed to check user existence');
+    }
+
+  } catch (error: unknown) {
+    if (__DEV__) { console.error('❌ Error checking email user existence via Firebase Functions:', error); }
+
+    // Handle Firebase Functions specific errors
+    const errorCode = (error as any)?.code;
+    const errorMessage = (error as any)?.message || '';
+
+    if (errorCode === 'functions/invalid-argument') {
+      throw new Error('Invalid email format. Please enter a valid email address.');
+    } else if (errorCode === 'functions/internal') {
+      throw new Error(errorMessage || 'Failed to check user existence. Please try again.');
+    } else if (errorMessage) {
+      throw new Error(errorMessage);
+    } else {
+      throw new Error('Failed to check user existence. Please try again.');
     }
   }
 }

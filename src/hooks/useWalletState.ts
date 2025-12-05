@@ -14,15 +14,18 @@ export interface WalletState {
   address: string | null;
   publicKey: string | null;
   isConnected: boolean;
-  
+
   // Balance info
   balance: UserWalletBalance | null;
   totalUSD: number;
-  
+
   // Loading states
   isLoading: boolean;
   isInitialized: boolean;
-  
+
+  // Recovery state
+  needsRecovery?: boolean;
+
   // Error state
   error: string | null;
 }
@@ -52,11 +55,34 @@ export const useWalletState = (userId?: string) => {
       logger.info('Ensuring wallet for user', { userId }, 'useWalletState');
       
       const walletResult = await walletService.ensureUserWallet(userId);
-      
+
       if (walletResult.success && walletResult.wallet) {
-        // Get balance
+        // Check if wallet needs recovery
+        if (walletResult.needsRecovery || walletResult.wallet.walletType === 'recovery-needed') {
+          logger.warn('Wallet needs recovery', {
+            userId,
+            address: walletResult.wallet.address,
+            walletType: walletResult.wallet.walletType
+          }, 'useWalletState');
+
+          setState(prev => ({
+            ...prev,
+            address: walletResult.wallet!.address,
+            publicKey: walletResult.wallet!.publicKey,
+            isConnected: false, // Cannot perform transactions without keys
+            balance: null,
+            totalUSD: 0,
+            isInitialized: true,
+            needsRecovery: true,
+            error: 'Wallet needs recovery. Please restore from seed phrase.'
+          }));
+
+          return true;
+        }
+
+        // Get balance for functional wallet
         const balance = await walletService.getUserWalletBalance(userId);
-        
+
         setState(prev => ({
           ...prev,
           address: walletResult.wallet!.address,
@@ -67,13 +93,13 @@ export const useWalletState = (userId?: string) => {
           isInitialized: true,
           error: null
         }));
-        
-        logger.info('Wallet ensured successfully', { 
-          userId, 
+
+        logger.info('Wallet ensured successfully', {
+          userId,
           address: walletResult.wallet.address,
           totalUSD: balance?.totalUSD || 0
         }, 'useWalletState');
-        
+
         return true;
       } else {
         setState(prev => ({

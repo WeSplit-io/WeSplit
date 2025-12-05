@@ -124,6 +124,9 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
+// PRODUCTION: Use live Firebase Auth (no emulator for production readiness)
+// Emulator was used for development testing, now using production Firebase
+
 // Initialize Firebase Authentication with persistence
 export const auth = initializeFirebaseAuth(app);
 

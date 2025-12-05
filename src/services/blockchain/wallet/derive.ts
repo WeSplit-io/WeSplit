@@ -12,6 +12,41 @@ import { logger } from '../../analytics/loggingService';
 // Standard Solana derivation path
 export const SOLANA_DERIVATION_PATH = "m/44'/501'/0'/0'";
 
+// Base58 alphabet used by Solana
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+/**
+ * Decode a base58 string to Uint8Array
+ */
+function base58ToUint8Array(base58: string): Uint8Array {
+  const alphabet = BASE58_ALPHABET;
+  const base = BigInt(58);
+
+  let result = BigInt(0);
+  for (let i = 0; i < base58.length; i++) {
+    const char = base58[i];
+    const charIndex = alphabet.indexOf(char);
+    if (charIndex === -1) {
+      throw new Error(`Invalid base58 character: ${char}`);
+    }
+    result = result * base + BigInt(charIndex);
+  }
+
+  // Convert to Uint8Array
+  const bytes: number[] = [];
+  while (result > 0) {
+    bytes.unshift(Number(result % BigInt(256)));
+    result = result / BigInt(256);
+  }
+
+  // Pad with leading zeros if necessary (for Solana keys, should be 64 bytes)
+  while (bytes.length < 64) {
+    bytes.unshift(0);
+  }
+
+  return new Uint8Array(bytes);
+}
+
 export interface WalletDerivationResult {
   keypair: Keypair;
   mnemonic: string;
@@ -25,6 +60,13 @@ export interface MnemonicValidationResult {
   isValid: boolean;
   wordCount: number;
   checksum: string;
+}
+
+export interface PrivateKeyDerivationResult {
+  keypair: Keypair;
+  address: string;
+  publicKey: string;
+  secretKey: string;
 }
 
 /**
@@ -269,6 +311,74 @@ export function validateWalletChecksum(publicKey: string, expectedChecksum: stri
   } catch (error) {
     logger.error('Failed to validate wallet checksum', error, 'WalletDerive');
     return false;
+  }
+}
+
+/**
+ * Derive wallet from private key (hex or base58 format)
+ */
+export async function deriveWalletFromPrivateKey(privateKey: string): Promise<PrivateKeyDerivationResult | null> {
+  try {
+    logger.info('Deriving wallet from private key', {
+      keyLength: privateKey.length,
+      isHex: /^[0-9a-fA-F]{64}$/.test(privateKey.trim()),
+      isBase58: /^[1-9A-HJ-NP-Za-km-z]{88}$/.test(privateKey.trim())
+    }, 'deriveWalletFromPrivateKey');
+
+    const trimmedKey = privateKey.trim();
+    let secretKey: Uint8Array;
+
+    try {
+      // Handle hex format (64 characters - 32 bytes * 2 hex chars per byte)
+      if (/^[0-9a-fA-F]{64}$/.test(trimmedKey)) {
+        secretKey = new Uint8Array(trimmedKey.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
+      }
+      // Handle base58 format (88 characters - standard Solana private key format)
+      else if (/^[1-9A-HJ-NP-Za-km-z]{88}$/.test(trimmedKey)) {
+        secretKey = base58ToUint8Array(trimmedKey);
+        // Solana private keys are 64 bytes, ensure we have the right length
+        if (secretKey.length !== 64) {
+          logger.error('Invalid base58 private key length', {
+            expected: 64,
+            actual: secretKey.length
+          }, 'deriveWalletFromPrivateKey');
+          return null;
+        }
+      } else {
+        logger.error('Invalid private key format', {
+          length: trimmedKey.length,
+          format: 'hex (64 chars) or base58 (88 chars) expected',
+          provided: trimmedKey.substring(0, 10) + '...'
+        }, 'deriveWalletFromPrivateKey');
+        return null;
+      }
+    } catch (decodeError) {
+      logger.error('Failed to decode private key', decodeError, 'deriveWalletFromPrivateKey');
+      return null;
+    }
+
+    // Create keypair from secret key
+    const keypair = Keypair.fromSecretKey(secretKey);
+    const address = keypair.publicKey.toBase58();
+    const publicKey = keypair.publicKey.toBase58();
+    const secretKeyHex = Buffer.from(keypair.secretKey).toString('hex');
+
+    logger.info('Successfully derived wallet from private key', {
+      address: address.substring(0, 10) + '...',
+      publicKeyLength: publicKey.length,
+      secretKeyLength: secretKeyHex.length
+    }, 'deriveWalletFromPrivateKey');
+
+    return {
+      keypair,
+      address,
+      publicKey,
+      secretKey: secretKeyHex
+    };
+
+  } catch (error) {
+    logger.error('Failed to derive wallet from private key', error, 'deriveWalletFromPrivateKey');
+    return null;
   }
 }
 

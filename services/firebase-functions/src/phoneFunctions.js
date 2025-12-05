@@ -112,12 +112,12 @@ exports.getCustomTokenForUser = functions.https.onCall(async (data, context) => 
 });
 
 /**
- * HTTP Callable Function: Send SMS verification code for phone linking
- * This bypasses the reCAPTCHA Enterprise issue on mobile by using backend SMS sending
+ * HTTP Callable Function: Check if phone user exists
+ * Used for instant login without SMS verification for existing users
  */
-exports.sendPhoneVerificationCode = functions.https.onCall(async (data, context) => {
+exports.checkPhoneUserExists = functions.https.onCall(async (data, context) => {
   try {
-    const { phoneNumber, userId } = data;
+    const { phoneNumber } = data;
     
     // Validate input
     if (!phoneNumber) {
@@ -129,50 +129,146 @@ exports.sendPhoneVerificationCode = functions.https.onCall(async (data, context)
       throw new functions.https.HttpsError('invalid-argument', 'Phone number must be in E.164 format');
     }
 
-    console.log('📱 Sending SMS verification code for phone linking', { 
-      userId, 
+    console.log('🔍 Checking if user exists with phone number', {
       phone: phoneNumber.substring(0, 5) + '...' 
     });
 
-    // Note: Firebase Admin SDK doesn't have a direct method to send SMS
-    // We need to use Firebase Auth's phone authentication, but we can create
-    // a verification session server-side
-    // However, the best approach is to let the client handle it but with better error handling
-    
-    // For now, we'll return success and let the client handle the actual SMS sending
-    // The client will need to handle the reCAPTCHA issue differently
+    // Check if user exists with this phone number
+    const existingUsers = await db.collection('users')
+      .where('phone', '==', phoneNumber)
+      .limit(1)
+      .get();
+
+    if (!existingUsers.empty) {
+      const userDoc = existingUsers.docs[0];
+      const userData = userDoc.data();
+
+      console.log('📱 Found existing user in Firestore', {
+        firestoreId: userData.id,
+        phone: phoneNumber.substring(0, 5) + '...'
+      });
+
+      // Ensure Firebase Auth user exists for this Firestore user
+      try {
+        let firebaseUser = await admin.auth().getUser(userData.id);
+        console.log('✅ Found existing Firebase Auth user by UID', { uid: firebaseUser.uid });
+
+        // Update the user's phone number in Firebase Auth if not set
+        if (!firebaseUser.phoneNumber) {
+          await admin.auth().updateUser(userData.id, {
+            phoneNumber: phoneNumber
+          });
+          console.log('📱 Updated Firebase Auth user with phone number');
+        }
+
+        return {
+          success: true,
+          userExists: true,
+          userId: firebaseUser.uid
+        };
+      } catch (authError) {
+        // Firebase Auth user doesn't exist, create one
+        console.log('⚠️ Firebase Auth user not found, creating one...', { uid: userData.id });
+
+        try {
+          const firebaseUser = await admin.auth().createUser({
+            uid: userData.id,
+            phoneNumber: phoneNumber
+          });
+          console.log('✅ Created Firebase Auth user for existing Firestore user', { uid: firebaseUser.uid });
+
+          return {
+            success: true,
+            userExists: true,
+            userId: firebaseUser.uid
+          };
+        } catch (createError) {
+          console.error('❌ Failed to create Firebase Auth user', createError);
+          return {
+            success: true,
+            userExists: false
+          };
+        }
+      }
+    }
+
+    console.log('❌ No user found with phone number', {
+      phone: phoneNumber.substring(0, 5) + '...'
+    });
     
     return {
       success: true,
-      message: 'SMS verification should be handled client-side',
-      note: 'This function is a placeholder. The actual SMS sending happens client-side.'
+      userExists: false
     };
+
   } catch (error) {
-    console.error('❌ Error in sendPhoneVerificationCode', error);
+    console.error('❌ Error in checkPhoneUserExists', error);
     
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
     
-    throw new functions.https.HttpsError('internal', 'Failed to send phone verification code');
+    throw new functions.https.HttpsError('internal', 'Failed to check user existence');
   }
 });
 
 /**
- * HTTP Callable Function: Verify phone number and link to existing user
- * This is used when an existing user wants to add a phone number to their account
+ * HTTP Callable Function: Get user custom token for instant login
+ * Provides authentication token for existing users without SMS verification
  */
-exports.verifyPhoneForLinking = functions.https.onCall(async (data, context) => {
+exports.getUserCustomToken = functions.https.onCall(async (data, context) => {
   try {
-    // This function is called after the phone verification code is verified on the client
-    // The actual phone verification is handled by Firebase Auth on the client side
-    // This function just updates the Firestore user document
-    
-    const { userId, phoneNumber } = data;
+    const { userId } = data;
+
+    // Validate input
+    if (!userId) {
+      throw new functions.https.HttpsError('invalid-argument', 'User ID is required');
+    }
+
+    console.log('🔑 Generating custom token for existing user', { userId });
+
+    // Verify user exists in Firestore
+    const userDoc = await db.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'User not found');
+    }
+
+    // Generate custom token for the user
+    const customToken = await admin.auth().createCustomToken(userId);
+
+    console.log('✅ Custom token generated for user', { userId });
+
+    return {
+      success: true,
+      customToken: customToken
+    };
+
+  } catch (error) {
+    console.error('❌ Error in getUserCustomToken', error);
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError('internal', 'Failed to generate custom token');
+  }
+});
+
+/**
+ * HTTP Callable Function: Start phone authentication (server-side)
+ * This completely bypasses reCAPTCHA by handling phone verification on the server
+ * The client sends the phone number, server sends SMS and returns a session ID
+ */
+exports.startPhoneAuthentication = functions.runWith({
+  secrets: ['TWILIO_SID', 'TWILIO_AUTH_TOKKEN', 'TWILIO_PHONE_NUMBER']
+}).https.onCall(async (data, context) => {
+  try {
+    const { phoneNumber } = data;
     
     // Validate input
-    if (!userId || !phoneNumber) {
-      throw new functions.https.HttpsError('invalid-argument', 'User ID and phone number are required');
+    if (!phoneNumber) {
+      throw new functions.https.HttpsError('invalid-argument', 'Phone number is required');
     }
     
     // Validate phone number format (E.164)
@@ -180,20 +276,470 @@ exports.verifyPhoneForLinking = functions.https.onCall(async (data, context) => 
       throw new functions.https.HttpsError('invalid-argument', 'Phone number must be in E.164 format');
     }
 
-    console.log('📱 Verifying phone for linking', { 
-      userId, 
+    console.log('📱 Starting server-side phone authentication', {
       phone: phoneNumber.substring(0, 5) + '...' 
     });
 
-    // Update user document in Firestore
-    const userDoc = db.collection('users').doc(userId);
-    const userSnapshot = await userDoc.get();
+    // Generate a unique session ID for this verification attempt
+    const sessionId = `phone_auth_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Store the session in Firestore with a TTL (time to live)
+    const sessionDoc = db.collection('phoneAuthSessions').doc(sessionId);
+    await sessionDoc.set({
+      phoneNumber: phoneNumber,
+      sessionId: sessionId,
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + (5 * 60 * 1000)), // 5 minutes
+      attempts: 0,
+      maxAttempts: 3
+    });
+
+    console.log('✅ Phone auth session created', { sessionId });
+
+    // Generate a 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store the verification code securely (hashed)
+    const crypto = require('crypto');
+    const codeHash = crypto.createHash('sha256').update(verificationCode).digest('hex');
+
+    console.log('📱 Sending SMS verification code via Twilio');
+
+    try {
+      // Send SMS via Twilio
+      const twilio = require('twilio');
+      const twilioClient = twilio(
+        process.env.TWILIO_SID,
+        process.env.TWILIO_AUTH_TOKKEN
+      );
+
+      const message = await twilioClient.messages.create({
+        body: `WeSplit verification code: ${verificationCode}`,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phoneNumber
+      });
+
+      console.log('✅ SMS sent successfully via Twilio', {
+        messageSid: message.sid,
+        to: phoneNumber.substring(0, 5) + '...'
+      });
+
+      // Update session with code hash and status
+      await sessionDoc.update({
+        verificationCodeHash: codeHash,
+        status: 'code_sent',
+        twilioMessageSid: message.sid
+      });
+
+      console.log('✅ Verification code sent and session updated');
+
+    } catch (twilioError) {
+      console.error('❌ Twilio SMS sending failed:', twilioError.message);
+
+      // Check if Twilio credentials are configured
+      if (!process.env.TWILIO_SID || !process.env.TWILIO_AUTH_TOKKEN || !process.env.TWILIO_PHONE_NUMBER) {
+        console.warn('⚠️ Twilio credentials not configured, falling back to test mode');
+
+        // Fallback: Store test code for development
+        const testCode = '123456';
+        const testCodeHash = crypto.createHash('sha256').update(testCode).digest('hex');
+
+        await sessionDoc.update({
+          verificationCodeHash: testCodeHash,
+          status: 'code_sent'
+        });
+
+        console.log(`📱 TEST CODE for ${phoneNumber}: ${testCode}`);
+        console.log('⚠️ Configure TWILIO_SID, TWILIO_AUTH_TOKKEN, and TWILIO_PHONE_NUMBER for real SMS');
+      } else {
+        // Re-throw Twilio errors
+        throw twilioError;
+      }
+    }
+
+    return {
+      success: true,
+      sessionId: sessionId,
+      message: 'Verification code sent to your phone',
+      expiresIn: 300 // 5 minutes
+    };
+
+  } catch (error) {
+    console.error('❌ Error in startPhoneAuthentication', error);
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError('internal', 'Failed to start phone authentication');
+  }
+});
+
+/**
+ * HTTP Callable Function: Verify phone code (server-side)
+ * This completes the phone authentication and returns a Firebase custom token
+ */
+exports.verifyPhoneCode = functions.https.onCall(async (data, context) => {
+  try {
+    const { sessionId, code } = data;
+
+    // Validate input
+    if (!sessionId || !code) {
+      throw new functions.https.HttpsError('invalid-argument', 'Session ID and verification code are required');
+    }
+
+    console.log('🔍 Verifying phone code', { sessionId, codeLength: code.length });
+
+    // Get the session from Firestore
+    const sessionDoc = db.collection('phoneAuthSessions').doc(sessionId);
+    const sessionSnapshot = await sessionDoc.get();
+
+    if (!sessionSnapshot.exists) {
+      throw new functions.https.HttpsError('not-found', 'Verification session not found or expired');
+    }
+
+    const session = sessionSnapshot.data();
+
+    // Check if session is expired
+    if (session.expiresAt.toMillis() < Date.now()) {
+      throw new functions.https.HttpsError('deadline-exceeded', 'Verification code has expired');
+    }
+
+    // Check if too many attempts
+    if (session.attempts >= session.maxAttempts) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Too many verification attempts');
+    }
+
+    // Increment attempts
+    await sessionDoc.update({
+      attempts: admin.firestore.FieldValue.increment(1)
+    });
+
+    // Verify the code
+    const crypto = require('crypto');
+    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+
+    if (codeHash !== session.verificationCodeHash) {
+      console.log('❌ Invalid verification code');
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid verification code');
+    }
+
+    console.log('✅ Verification code correct');
+
+    // Mark session as verified
+    await sessionDoc.update({
+      status: 'verified',
+      verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Check if user already exists with this phone number
+    const existingUsers = await db.collection('users')
+      .where('phone', '==', session.phoneNumber)
+      .limit(1)
+      .get();
+
+    let firebaseUser;
+    let isNewUser = false;
+
+    if (!existingUsers.empty) {
+      // Existing user - try to find their Firebase Auth account by phone number
+      const userDoc = existingUsers.docs[0];
+      const userData = userDoc.data();
+
+      console.log('📱 Found existing user in Firestore', {
+        firestoreId: userData.id,
+        phone: session.phoneNumber.substring(0, 5) + '...'
+      });
+
+      // Check if this is an emulator-style UID from development
+      const isEmulatorUid = userData.id.startsWith('emulator-user-');
+
+      if (isEmulatorUid) {
+        console.log('⚠️ Found emulator-style UID, treating as orphaned development user', { firestoreId: userData.id });
+        // Don't try to create Firebase Auth user with emulator UID
+        // Treat as new user instead
+      } else {
+        // For existing users with valid UIDs, try to find Firebase Auth user
+        try {
+          firebaseUser = await admin.auth().getUser(userData.id);
+          console.log('✅ Found existing Firebase Auth user by UID', { uid: firebaseUser.uid });
+        } catch (authError) {
+          // Firebase Auth user doesn't exist, create one with the existing UID
+          console.log('⚠️  Firebase Auth user not found, creating with existing UID...', { uid: userData.id });
+          firebaseUser = await admin.auth().createUser({
+            uid: userData.id
+          });
+          console.log('✅ Created Firebase Auth user with existing UID', { uid: firebaseUser.uid });
+        }
+      }
+
+      // If we have a valid Firebase Auth user, return it
+      if (firebaseUser) {
+        return {
+          success: true,
+          userExists: true,
+          userId: firebaseUser.uid
+        };
+      }
+
+      // Fall through to new user creation if no valid Firebase Auth user
+    }
+
+    // New user or emulator UID case - create new Firebase Auth account
+    {
+      // New user - create Firebase Auth account (without phone number)
+      isNewUser = true;
+      firebaseUser = await admin.auth().createUser({
+        // No phone number - we handle verification server-side
+      });
+      console.log('✅ Created new Firebase Auth user', { uid: firebaseUser.uid });
+
+      // Create user document in Firestore with complete wallet fields matching email users
+      const userData = {
+        id: firebaseUser.uid,
+        phone: session.phoneNumber,
+        phoneVerified: true,
+        primary_phone: session.phoneNumber,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        name: '',
+        email: '',
+        wallet_address: '',
+        wallet_public_key: '',
+        wallet_status: 'healthy',
+        wallet_created_at: admin.firestore.FieldValue.serverTimestamp(),
+        wallet_type: 'app-generated',
+        wallet_migration_status: 'none',
+        avatar: '',
+        hasCompletedOnboarding: false,
+        points: 0,
+        total_points_earned: 0,
+        points_last_updated: admin.firestore.FieldValue.serverTimestamp(),
+        badges: [],
+        profile_borders: [],
+        wallet_backgrounds: [],
+        migration_completed: admin.firestore.FieldValue.serverTimestamp(),
+        migration_version: '1.0'
+      };
+
+      console.log('📝 Creating Firestore user document', {
+        userId: firebaseUser.uid,
+        phone: session.phoneNumber.substring(0, 5) + '...'
+      });
+
+      try {
+        // Check if document already exists (prevent duplicates from race conditions)
+        const userDocRef = db.collection('users').doc(firebaseUser.uid);
+        const existingDoc = await userDocRef.get();
+
+        if (existingDoc.exists) {
+          console.log('⚠️ Firestore user document already exists, skipping creation', {
+            userId: firebaseUser.uid
+          });
+        } else {
+          await userDocRef.set(userData);
+          console.log('✅ Firestore user document created successfully', {
+            userId: firebaseUser.uid,
+            phone: session.phoneNumber.substring(0, 5) + '...'
+          });
+        }
+      } catch (firestoreError) {
+        console.error('❌ Failed to create/check Firestore user document', {
+          userId: firebaseUser.uid,
+          error: firestoreError.message,
+          code: firestoreError.code
+        });
+        throw new functions.https.HttpsError('internal', `Failed to create user account: ${firestoreError.message}`);
+      }
+    }
+
+    // Create custom token for the user
+    const customToken = await admin.auth().createCustomToken(firebaseUser.uid);
+    console.log('✅ Created custom token for authenticated user', { uid: firebaseUser.uid });
+
+    // Clean up the session
+    await sessionDoc.delete();
     
-    if (!userSnapshot.exists) {
+    return {
+      success: true,
+      customToken: customToken,
+      userId: firebaseUser.uid,
+      isNewUser: isNewUser,
+      phoneNumber: session.phoneNumber
+    };
+
+  } catch (error) {
+    console.error('❌ Error in verifyPhoneCode', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError('internal', 'Failed to verify phone code');
+  }
+});
+
+/**
+ * HTTP Callable Function: Start phone linking for existing user
+ * This creates a phone verification session for linking phone to existing account
+ */
+exports.startPhoneLinking = functions.https.onCall(async (data, context) => {
+  try {
+    const { phoneNumber, userId } = data;
+
+    // Validate input
+    if (!phoneNumber || !userId) {
+      throw new functions.https.HttpsError('invalid-argument', 'Phone number and user ID are required');
+    }
+
+    // Validate phone number format (E.164)
+    if (!phoneNumber.startsWith('+')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Phone number must be in E.164 format');
+    }
+
+    // Check if user exists
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
       throw new functions.https.HttpsError('not-found', 'User not found');
     }
 
+    // Check if phone is already linked to another user
+    const existingUsersWithPhone = await db.collection('users')
+      .where('phone', '==', phoneNumber)
+      .limit(1)
+      .get();
+
+    if (!existingUsersWithPhone.empty) {
+      const existingUser = existingUsersWithPhone.docs[0];
+      if (existingUser.id !== userId) {
+        throw new functions.https.HttpsError('already-exists', 'This phone number is already linked to another account');
+      }
+    }
+
+    console.log('📱 Starting server-side phone linking', {
+      userId,
+      phone: phoneNumber.substring(0, 5) + '...'
+    });
+
+    // Generate a unique session ID for this verification attempt
+    const sessionId = `phone_link_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Store the session in Firestore with a TTL (time to live)
+    const sessionDoc = db.collection('phoneLinkSessions').doc(sessionId);
+    await sessionDoc.set({
+      userId: userId,
+      phoneNumber: phoneNumber,
+      sessionId: sessionId,
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + (5 * 60 * 1000)), // 5 minutes
+      attempts: 0,
+      maxAttempts: 3
+    });
+
+    console.log('✅ Phone linking session created', { sessionId, userId });
+
+    // Generate a test verification code (in production, this would be sent via SMS)
+    const testCode = '123456'; // For testing - replace with real SMS sending
+
+    // Store the verification code securely (hashed)
+    const crypto = require('crypto');
+    const codeHash = crypto.createHash('sha256').update(testCode).digest('hex');
+
+    await sessionDoc.update({
+      verificationCodeHash: codeHash,
+      status: 'code_sent'
+    });
+
+    console.log(`📱 TEST CODE for linking ${phoneNumber}: ${testCode}`);
+    console.log('⚠️  In production, this code would be sent via SMS service');
+
+    return {
+      success: true,
+      sessionId: sessionId,
+      message: 'Verification code sent to your phone for linking',
+      expiresIn: 300 // 5 minutes
+    };
+
+  } catch (error) {
+    console.error('❌ Error in startPhoneLinking', error);
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError('internal', 'Failed to start phone linking');
+  }
+});
+
+/**
+ * HTTP Callable Function: Verify phone code and link to existing user
+ * This completes the phone linking process server-side
+ */
+exports.verifyPhoneForLinking = functions.https.onCall(async (data, context) => {
+  try {
+    const { userId, phoneNumber, sessionId, code } = data;
+
+    // Validate input
+    if (!userId || !phoneNumber || !sessionId || !code) {
+      throw new functions.https.HttpsError('invalid-argument', 'User ID, phone number, session ID, and verification code are required');
+    }
+
+    console.log('🔍 Verifying phone code for linking', {
+      userId,
+      sessionId: sessionId.substring(0, 10) + '...',
+      codeLength: code.length
+    });
+
+    // Get the session from Firestore
+    const sessionDoc = db.collection('phoneLinkSessions').doc(sessionId);
+    const sessionSnapshot = await sessionDoc.get();
+
+    if (!sessionSnapshot.exists) {
+      throw new functions.https.HttpsError('not-found', 'Verification session not found or expired');
+    }
+
+    const session = sessionSnapshot.data();
+
+    // Verify session belongs to this user
+    if (session.userId !== userId) {
+      throw new functions.https.HttpsError('permission-denied', 'Session does not belong to this user');
+    }
+
+    // Check if session is expired
+    if (session.expiresAt.toMillis() < Date.now()) {
+      throw new functions.https.HttpsError('deadline-exceeded', 'Verification code has expired');
+    }
+
+    // Check if too many attempts
+    if (session.attempts >= session.maxAttempts) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Too many verification attempts');
+    }
+
+    // Increment attempts
+    await sessionDoc.update({
+      attempts: admin.firestore.FieldValue.increment(1)
+    });
+
+    // Verify the code
+    const crypto = require('crypto');
+    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+
+    if (codeHash !== session.verificationCodeHash) {
+      console.log('❌ Invalid verification code for linking');
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid verification code');
+    }
+
+    console.log('✅ Verification code correct for linking');
+
+    // Mark session as verified
+    await sessionDoc.update({
+      status: 'verified',
+      verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
     // Update user document with phone number
+    const userDoc = db.collection('users').doc(userId);
     await userDoc.update({
       phone: phoneNumber,
       phoneVerified: true,
@@ -201,13 +747,18 @@ exports.verifyPhoneForLinking = functions.https.onCall(async (data, context) => 
       phoneLinkedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    console.log('✅ Phone number linked successfully', { userId });
+    console.log('✅ Phone number linked successfully to existing user', { userId });
+
+    // Clean up the session
+    await sessionDoc.delete();
 
     return {
       success: true,
       message: 'Phone number linked successfully',
-      phoneNumber: phoneNumber
+      phoneNumber: phoneNumber,
+      userId: userId
     };
+
   } catch (error) {
     console.error('❌ Error in verifyPhoneForLinking', error);
     

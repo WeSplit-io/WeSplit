@@ -44,6 +44,15 @@
       "npm --prefix \"$RESOURCE_DIR\" run build"
     ],
     "runtime": "nodejs20"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    }
   }
 }
  

@@ -37,9 +37,11 @@ class LiveBalanceService {
    * Subscribe to balance updates for a specific address
    */
   subscribe(address: string, callback: BalanceUpdateCallback): string {
-    const subscriptionId = `balance_${address}_${Date.now()}`;
-    
-    logger.info('Subscribing to balance updates', { address, subscriptionId }, 'LiveBalanceService');
+    logger.info('Subscribing to balance updates', {
+      address: typeof address === 'string' ? address.substring(0, 10) + '...' : typeof address,
+      addressType: typeof address,
+      subscriptionId: `balance_${address}_${Date.now()}`
+    }, 'LiveBalanceService');
     
     const subscription: BalanceSubscription = {
       id: subscriptionId,

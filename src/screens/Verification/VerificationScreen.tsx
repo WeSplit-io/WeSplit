@@ -11,16 +11,21 @@ import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import { authService } from '../../services/auth/AuthService';
 import { auth } from '../../config/firebase/firebase';
-import { EmailPersistenceService } from '../../services/core/emailPersistenceService';
+import { AuthPersistenceService } from '../../services/core/authPersistenceService';
 
-const CODE_LENGTH = 4; // 4-digit code
+// Dynamic code length based on verification type
+const getCodeLength = (phoneNumber?: string) => phoneNumber ? 6 : 4; // 6 digits for phone, 4 for email
 const RESEND_SECONDS = 30;
 
 const VerificationScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
   const { authenticateUser, state } = useApp();
-  const [code, setCode] = useState(Array(CODE_LENGTH).fill(''));
+
+  // Get code length based on verification type
+  const codeLength = getCodeLength(route.params?.phoneNumber);
+
+  const [code, setCode] = useState(Array(codeLength).fill(''));
   const [error, setError] = useState('');
   const [timer, setTimer] = useState(RESEND_SECONDS);
   const [resending, setResending] = useState(false);
@@ -35,17 +40,36 @@ const VerificationScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, [timer]);
 
+  // Reset code array when verification type changes
+  useEffect(() => {
+    const newCodeLength = getCodeLength(route.params?.phoneNumber);
+    if (__DEV__) {
+      console.log('VerificationScreen: Code length calculation', {
+        phoneNumber: route.params?.phoneNumber,
+        email: route.params?.email,
+        calculatedLength: newCodeLength,
+        currentLength: code.length
+      });
+    }
+    if (newCodeLength !== code.length) {
+      setCode(Array(newCodeLength).fill(''));
+      setError(''); // Clear any existing errors
+      // Reset input refs
+      inputRefs.current = [];
+    }
+  }, [route.params?.phoneNumber]); // Re-run when phoneNumber param changes
+
   const handleChange = (val: string, idx: number) => {
-    if (val.length === CODE_LENGTH && /^\d{4}$/.test(val)) {
+    if (val.length === codeLength && new RegExp(`^\\d{${codeLength}}$`).test(val)) {
       setCode(val.split(''));
-      inputRefs.current[CODE_LENGTH - 1]?.focus();
+      inputRefs.current[codeLength - 1]?.focus();
       return;
     }
     if (/^\d?$/.test(val)) {
       const newCode = [...code];
       newCode[idx] = val;
       setCode(newCode);
-      if (val && idx < CODE_LENGTH - 1) {
+      if (val && idx < codeLength - 1) {
         inputRefs.current[idx + 1]?.focus();
       }
     }
@@ -58,8 +82,8 @@ const VerificationScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (code.join('').length !== CODE_LENGTH) {
-      setError('Please enter the 4-digit code');
+    if (code.join('').length !== codeLength) {
+      setError(`Please enter the ${codeLength}-digit code`);
       return;
     }
 
@@ -126,7 +150,7 @@ const VerificationScreen: React.FC = () => {
                 // This ensures the user can still log in with email after linking phone
                 if (transformedUser.email) {
                   try {
-                    await EmailPersistenceService.saveEmail(transformedUser.email);
+                    await AuthPersistenceService.saveEmail(transformedUser.email);
                     if (__DEV__) { logger.info('Email preserved in SecureStore after phone linking', { email: transformedUser.email }, 'VerificationScreen'); }
                   } catch (emailSaveError) {
                     logger.warn('Failed to preserve email after phone linking (non-critical)', emailSaveError, 'VerificationScreen');
@@ -161,7 +185,7 @@ const VerificationScreen: React.FC = () => {
             // This ensures email persistence is maintained
             if (state.currentUser?.email) {
               try {
-                await EmailPersistenceService.saveEmail(state.currentUser.email);
+                await AuthPersistenceService.saveEmail(state.currentUser.email);
                 if (__DEV__) { logger.info('Email preserved in SecureStore after phone linking (fallback)', { email: state.currentUser.email }, 'VerificationScreen'); }
               } catch (emailSaveError) {
                 logger.warn('Failed to preserve email after phone linking (fallback, non-critical)', emailSaveError, 'VerificationScreen');
@@ -185,8 +209,65 @@ const VerificationScreen: React.FC = () => {
 
           // Code verified successfully and user is now authenticated
           if (__DEV__) { logger.info('Phone authentication successful', { user: authResponse.user.uid }, 'VerificationScreen'); }
-          
-          // Get user data from Firestore
+
+          // Create user object from Firebase Auth data - AuthService handles Firestore
+          const transformedUser = {
+            id: authResponse.user.uid, // Use actual Firebase Auth UID
+            name: authResponse.user.displayName || '',
+            email: authResponse.user.email || '',
+            phone: phoneNumber,
+            wallet_address: '',
+            wallet_public_key: '',
+            created_at: authResponse.user.metadata.creationTime || new Date().toISOString(),
+            avatar: authResponse.user.photoURL || '',
+            emailVerified: false,
+            lastLoginAt: new Date().toISOString(),
+            hasCompletedOnboarding: false,
+            badges: [],
+            active_badge: undefined,
+            profile_borders: [],
+            active_profile_border: undefined,
+            wallet_backgrounds: [],
+            active_wallet_background: undefined,
+          };
+
+          // Save email if available
+          if (transformedUser.email) {
+            try {
+              await AuthPersistenceService.saveEmail(transformedUser.email);
+            } catch (error) {
+              logger.warn('Failed to save email after phone auth', error, 'VerificationScreen');
+            }
+          }
+
+          // Update app context
+          authenticateUser(transformedUser, 'phone');
+
+          // Ensure wallet exists
+          try {
+            const { authService } = await import('../../services/auth/AuthService');
+            await authService.ensureUserWallet(transformedUser.id);
+          } catch (error) {
+            logger.warn('Failed to ensure wallet for phone user', error, 'VerificationScreen');
+          }
+
+          // Check if profile needed
+          const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+
+          if (needsProfile) {
+            (navigation as any).reset({
+              index: 0,
+              routes: [{ name: 'CreateProfile', params: {
+                email: transformedUser.email,
+                phoneNumber: transformedUser.phone
+              } }],
+            });
+          } else {
+            (navigation as any).reset({
+              index: 0,
+              routes: [{ name: 'Dashboard' }],
+            });
+          }
           try {
             const { firestoreService } = await import('../../config/firebase/firebase');
             const existingUserData = await firestoreService.getUserDocument(authResponse.user.uid);
@@ -218,39 +299,201 @@ const VerificationScreen: React.FC = () => {
               // This ensures users can log in with either email or phone after phone signup
               if (transformedUser.email) {
                 try {
-                  await EmailPersistenceService.saveEmail(transformedUser.email);
+                  await AuthPersistenceService.saveEmail(transformedUser.email);
                   if (__DEV__) { logger.info('Email saved to SecureStore after phone signup', { email: transformedUser.email }, 'VerificationScreen'); }
                 } catch (emailSaveError) {
                   logger.warn('Failed to save email after phone signup (non-critical)', emailSaveError, 'VerificationScreen');
                   // Non-critical, continue with authentication
                 }
               }
+
+              if (__DEV__) {
+                logger.debug('Raw Phone API Response', { authResponse }, 'VerificationScreen');
+                logger.debug('Transformed Phone User', { transformedUser }, 'VerificationScreen');
+              }
               
               // Update the global app context with the authenticated user
               authenticateUser(transformedUser, 'phone');
-              
-              // Check if user needs to create a profile
+              if (__DEV__) { logger.info('User authenticated in app context', null, 'VerificationScreen'); }
+
+              // Ensure wallet exists for the user (consistent with email authentication)
+              try {
+                const { authService } = await import('../../services/auth/AuthService');
+                await authService.ensureUserWallet(transformedUser.id);
+                logger.info('Wallet ensured for phone user', { userId: transformedUser.id }, 'VerificationScreen');
+              } catch (walletError) {
+                logger.warn('Failed to ensure wallet for phone user (non-critical)', walletError, 'VerificationScreen');
+                // Non-critical, continue with authentication
+              }
+
+              // Check if user needs to create a profile (same logic for both email and phone)
               const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-              
+
               if (needsProfile) {
-                logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'VerificationScreen');
+                logger.info('User needs to create profile (no name), navigating to CreateProfile', {
+                  method: route.params?.phoneNumber ? 'phone' : 'email',
+                  phoneNumber: transformedUser.phone,
+                  email: transformedUser.email
+                }, 'VerificationScreen');
                 (navigation as any).reset({
                   index: 0,
-                  routes: [{ name: 'CreateProfile', params: { email: transformedUser.email, phoneNumber: transformedUser.phone } }],
+                  routes: [{ name: 'CreateProfile', params: {
+                    email: transformedUser.email,
+                    phoneNumber: transformedUser.phone
+                  } }],
                 });
               } else {
-                logger.info('User already has name, navigating to Dashboard', { name: transformedUser.name }, 'VerificationScreen');
+                logger.info('User already has name, navigating to Dashboard', {
+                  name: transformedUser.name,
+                  method: route.params?.phoneNumber ? 'phone' : 'email'
+                }, 'VerificationScreen');
                 (navigation as any).reset({
                   index: 0,
                   routes: [{ name: 'Dashboard' }],
                 });
               }
             } else {
-              throw new Error('User data not found');
+              // CRITICAL: User data not found in Firestore - this should not happen for phone auth
+              // But let's handle it gracefully like email verification does
+              logger.error('User data not found in Firestore for phone auth', {
+                userId: authResponse.user.uid,
+                phoneNumber: phoneNumber.substring(0, 5) + '...'
+              }, 'VerificationScreen');
+
+              // Create a basic user object from Firebase Auth user data
+              // This ensures the user can still proceed even if Firestore data is missing
+              const transformedUser = {
+                id: authResponse.user.uid,
+                name: authResponse.user.displayName || '',
+                email: authResponse.user.email || '',
+                phone: phoneNumber,
+                wallet_address: '',
+                wallet_public_key: '',
+                created_at: new Date().toISOString(),
+                avatar: authResponse.user.photoURL || '',
+                emailVerified: false,
+                lastLoginAt: new Date().toISOString(),
+                hasCompletedOnboarding: false,
+                // Ensure asset fields are included with proper defaults
+                badges: [],
+                active_badge: undefined,
+                profile_borders: [],
+                active_profile_border: undefined,
+                wallet_backgrounds: [],
+                active_wallet_background: undefined,
+              };
+
+              logger.info('Created fallback user object for phone auth', { transformedUser }, 'VerificationScreen');
+
+              // Update the global app context with the authenticated user
+              authenticateUser(transformedUser, 'phone');
+              if (__DEV__) { logger.info('User authenticated in app context', null, 'VerificationScreen'); }
+
+              // Ensure wallet exists for the user (consistent with email authentication)
+              try {
+                const { authService } = await import('../../services/auth/AuthService');
+                await authService.ensureUserWallet(transformedUser.id);
+                logger.info('Wallet ensured for phone user (fallback)', { userId: transformedUser.id }, 'VerificationScreen');
+              } catch (walletError) {
+                logger.warn('Failed to ensure wallet for phone user (fallback, non-critical)', walletError, 'VerificationScreen');
+                // Non-critical, continue with authentication
+              }
+
+              // Check if user needs to create a profile (same logic as email)
+              const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+
+              if (needsProfile) {
+                logger.info('Phone user needs to create profile (no name, fallback case), navigating to CreateProfile', { phoneNumber: transformedUser.phone }, 'VerificationScreen');
+                (navigation as any).reset({
+                  index: 0,
+                  routes: [{ name: 'CreateProfile', params: {
+                    phoneNumber: transformedUser.phone,
+                    email: transformedUser.email
+                  } }],
+                });
+              } else {
+                logger.info('Phone user already has name (fallback case), navigating to Dashboard', { name: transformedUser.name, phoneNumber: transformedUser.phone }, 'VerificationScreen');
+                (navigation as any).reset({
+                  index: 0,
+                  routes: [{ name: 'Dashboard' }],
+                });
+              }
+              return;
             }
           } catch (firestoreError) {
-            logger.error('Failed to get user data from Firestore', firestoreError, 'VerificationScreen');
-            throw new Error('Failed to load user data');
+            logger.error('Failed to get user data from Firestore for phone auth', firestoreError, 'VerificationScreen');
+
+            // CRITICAL FIX: Even if Firestore fails, create a basic user object
+            // This ensures phone authentication can still succeed even with Firestore issues
+            const transformedUser = {
+              id: authResponse.user.uid,
+              name: authResponse.user.displayName || '',
+              email: authResponse.user.email || '',
+              phone: phoneNumber,
+              wallet_address: '',
+              wallet_public_key: '',
+              created_at: new Date().toISOString(),
+              avatar: authResponse.user.photoURL || '',
+              emailVerified: false,
+              lastLoginAt: new Date().toISOString(),
+              hasCompletedOnboarding: false,
+              // Ensure asset fields are included with proper defaults
+              badges: [],
+              active_badge: undefined,
+              profile_borders: [],
+              active_profile_border: undefined,
+              wallet_backgrounds: [],
+              active_wallet_background: undefined,
+            };
+
+            logger.info('Created fallback user object after Firestore error', { transformedUser }, 'VerificationScreen');
+
+            // CRITICAL: If user has email, save it to SecureStore for future logins
+            // This ensures users can log in with either email or phone after phone signup
+            if (transformedUser.email) {
+              try {
+                await AuthPersistenceService.saveEmail(transformedUser.email);
+                if (__DEV__) { logger.info('Email saved to SecureStore after phone signup (fallback)', { email: transformedUser.email }, 'VerificationScreen'); }
+              } catch (emailSaveError) {
+                logger.warn('Failed to save email after phone signup (fallback, non-critical)', emailSaveError, 'VerificationScreen');
+                // Non-critical, continue with authentication
+              }
+            }
+
+            // Update the global app context with the fallback user
+            authenticateUser(transformedUser, 'phone');
+            if (__DEV__) { logger.info('User authenticated in app context with fallback data', null, 'VerificationScreen'); }
+
+            // Ensure wallet exists for the user (consistent with email authentication, even for fallback)
+            try {
+              const { authService } = await import('../../services/auth/AuthService');
+              await authService.ensureUserWallet(transformedUser.id);
+              logger.info('Wallet ensured for phone user (Firestore error fallback)', { userId: transformedUser.id }, 'VerificationScreen');
+            } catch (walletError) {
+              logger.warn('Failed to ensure wallet for phone user (Firestore error fallback, non-critical)', walletError, 'VerificationScreen');
+              // Non-critical, continue with authentication
+            }
+
+            // Check if user needs to create a profile (same logic as email, even for fallback)
+            const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+
+            if (needsProfile) {
+              logger.info('Phone user needs to create profile (no name, Firestore error fallback), navigating to CreateProfile', { phoneNumber: transformedUser.phone }, 'VerificationScreen');
+              (navigation as any).reset({
+                index: 0,
+                routes: [{ name: 'CreateProfile', params: {
+                  phoneNumber: transformedUser.phone,
+                  email: transformedUser.email
+                } }],
+              });
+            } else {
+              logger.info('Phone user already has name (Firestore error fallback), navigating to Dashboard', { name: transformedUser.name, phoneNumber: transformedUser.phone }, 'VerificationScreen');
+              (navigation as any).reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            }
+            return;
           }
         }
       } 
@@ -258,7 +501,7 @@ const VerificationScreen: React.FC = () => {
       else if (email) {
         if (__DEV__) { logger.info('Verifying email code', { codeString, email }, 'VerificationScreen'); }
       
-      const authResponse = await verifyCode(email, codeString);
+      const authResponse = await authService.verifyEmailCode(email, codeString);
 
       if (!authResponse.success || !authResponse.user) {
         throw new Error(authResponse.error || 'Authentication failed');
@@ -330,7 +573,7 @@ const VerificationScreen: React.FC = () => {
       
       // Save email to persistence for future logins
       try {
-        await EmailPersistenceService.saveEmail(transformedUser.email);
+        await AuthPersistenceService.saveEmail(transformedUser.email);
         if (__DEV__) { logger.info('Email saved to persistence after successful verification', { email: transformedUser.email }, 'VerificationScreen'); }
       } catch (emailSaveError) {
         logger.warn('Failed to save email to persistence (non-critical)', emailSaveError, 'VerificationScreen');
@@ -340,7 +583,17 @@ const VerificationScreen: React.FC = () => {
       // Update the global app context with the authenticated user
       authenticateUser(transformedUser, 'email');
       if (__DEV__) { logger.info('User authenticated in app context', null, 'VerificationScreen'); }
-      
+
+      // Ensure wallet exists for the user (consistent with phone authentication)
+      try {
+        const { authService } = await import('../../services/auth/AuthService');
+        await authService.ensureUserWallet(transformedUser.id);
+        logger.info('Wallet ensured for email user', { userId: transformedUser.id }, 'VerificationScreen');
+      } catch (walletError) {
+        logger.warn('Failed to ensure wallet for email user (non-critical)', walletError, 'VerificationScreen');
+        // Non-critical, continue with authentication
+      }
+
       // Check if user needs to create a profile (has no name/pseudo)
       const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
       
@@ -459,10 +712,10 @@ const VerificationScreen: React.FC = () => {
           {route.params?.phoneNumber ? 'Check your Phone' : 'Check your Email'}
         </Text>
         <Text style={styles.subtitle}>
-          We sent a code to{' '}
+          We sent a {codeLength}-digit code to{' '}
           <Text style={styles.emailHighlight}>
             {route.params?.phoneNumber 
-              ? route.params.phoneNumber.substring(0, 5) + '...' 
+              ? route.params.phoneNumber.substring(0, 5) + '***' + route.params.phoneNumber.slice(-2)
               : route.params?.email || 'yourname@gmail.com'}
           </Text>
         </Text>
@@ -470,20 +723,24 @@ const VerificationScreen: React.FC = () => {
         <View style={styles.codeRow}>
           {code.map((digit, idx) => (
             <TextInput
-              key={idx}
+              key={`input-${idx}`}
               ref={(ref) => {
+                if (inputRefs.current) {
                 inputRefs.current[idx] = ref;
+                }
               }}
               style={styles.codeInput}
               value={digit}
               onChangeText={val => handleChange(val, idx)}
               keyboardType="number-pad"
-              maxLength={CODE_LENGTH}
+              maxLength={1} // Each input accepts only 1 digit
               onKeyPress={e => handleKeyPress(e, idx)}
               textContentType="oneTimeCode"
               returnKeyType="done"
               autoComplete="one-time-code"
               enablesReturnKeyAutomatically={true}
+              placeholder="0"
+              placeholderTextColor={colors.white30}
             />
           ))}
         </View>

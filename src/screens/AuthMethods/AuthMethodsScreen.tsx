@@ -14,15 +14,15 @@ import { styles } from './styles';
 import { Container, Header, Button, Input, LoadingScreen, Tabs } from '../../components/shared';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
-import { EmailPersistenceService } from '../../services/core/emailPersistenceService';
+import { AuthPersistenceService } from '../../services/core/authPersistenceService';
 import { isPhantomSocialLoginEnabled, isPhantomEnabled } from '../../config/features';
-import { sendVerificationCode } from '../../services/data/firebaseFunctionsService';
 import { PhantomAuthButton } from '../../components/auth/PhantomAuthButton';
 import { authService } from '../../services/auth/AuthService';
 
 type RootStackParamList = {
   Dashboard: undefined;
   Verification: { email?: string; phoneNumber?: string; verificationId?: string };
+  CreateProfile: { email?: string; phoneNumber?: string };
   AuthMethods: undefined;
 };
 
@@ -59,22 +59,29 @@ const AuthMethodsScreen: React.FC = () => {
     return cleaned;
   };
 
-  // Load persisted email on component mount
+  // Load persisted email and phone on component mount
   useEffect(() => {
-    const loadPersistedEmail = async () => {
+    const loadPersistedData = async () => {
       try {
-        const persistedEmail = await EmailPersistenceService.loadEmail();
+        // Load persisted email
+        const persistedEmail = await AuthPersistenceService.loadEmail();
         if (persistedEmail) {
           setEmail(persistedEmail);
         }
+
+        // Load persisted phone number
+        const persistedPhone = await AuthPersistenceService.loadPhone();
+        if (persistedPhone) {
+          setPhoneNumber(persistedPhone);
+        }
       } catch (error) {
-        logger.error('Failed to load persisted email', { error }, 'AuthMethodsScreen');
+        logger.error('Failed to load persisted auth data', { error }, 'AuthMethodsScreen');
       } finally {
         setIsInitializing(false);
       }
     };
 
-    loadPersistedEmail();
+    loadPersistedData();
   }, []);
 
   // Helper function to process phantom authentication success
@@ -126,7 +133,9 @@ const AuthMethodsScreen: React.FC = () => {
           return;
         }
       } catch (error) {
-        logger.warn('Failed to get Firebase user for Google Phantom auth, falling back to phantom user', error, 'AuthMethodsScreen');
+        logger.warn('Failed to get Firebase user for Google Phantom auth, falling back to phantom user', {
+          error: error instanceof Error ? error.message : String(error)
+        }, 'AuthMethodsScreen');
       }
     }
 
@@ -174,10 +183,100 @@ const AuthMethodsScreen: React.FC = () => {
       logger.info('Starting email authentication', { email: email.trim() }, 'AuthMethodsScreen');
 
       // Save email for persistence
-      await EmailPersistenceService.saveEmail(email.trim());
+      await AuthPersistenceService.saveEmail(email.trim());
 
-      // Send verification code
-      const result = await sendVerificationCode(email.trim());
+      // Check if user already exists for instant login
+      const userExistsResult = await authService.checkEmailUserExists(email.trim());
+      if (!userExistsResult.success) {
+        logger.warn('Failed to check if email user exists, proceeding with verification code', {
+          error: userExistsResult.error
+        }, 'AuthMethodsScreen');
+      }
+
+      // If user exists, perform instant login (similar to phone flow)
+      if (userExistsResult.success && userExistsResult.userExists && userExistsResult.userId) {
+        logger.info('Email user exists - performing instant login', {
+          userId: userExistsResult.userId,
+          email: email.trim()
+        }, 'AuthMethodsScreen');
+
+        // Get user data from Firestore to create proper user object
+        try {
+          const { firebaseDataService } = await import('../../services/data/firebaseDataService');
+          const existingUserData = await firebaseDataService.user.getCurrentUser(userExistsResult.userId);
+
+          if (existingUserData) {
+            // Create properly formatted user object (consistent with phone flow)
+            const authenticatedUser = {
+              id: userExistsResult.userId,
+              name: existingUserData.name || '',
+              email: existingUserData.email || email.trim(),
+              phone: existingUserData.phone || '',
+              wallet_address: existingUserData.wallet_address || '',
+              wallet_public_key: existingUserData.wallet_public_key || '',
+              created_at: existingUserData.created_at || new Date().toISOString(),
+              avatar: existingUserData.avatar || '',
+              emailVerified: existingUserData.email_verified || true, // Existing users are verified
+              lastLoginAt: new Date().toISOString(), // Use current time for login
+              hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false,
+            };
+
+            // Update authentication context BEFORE navigating
+            authenticateUser(authenticatedUser, 'email');
+
+            logger.info('Authentication context updated for email instant login', {
+              userId: userExistsResult.userId
+            }, 'AuthMethodsScreen');
+
+            // Check if user needs to create a profile (same logic as phone)
+            const needsProfile = !authenticatedUser.name || authenticatedUser.name.trim() === '';
+
+            if (needsProfile) {
+              logger.info('Email user needs to create profile (no name), navigating to CreateProfile', {
+                userId: userExistsResult.userId,
+                email: email.trim()
+              }, 'AuthMethodsScreen');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'CreateProfile', params: {
+                  email: email.trim(),
+                  phoneNumber: authenticatedUser.phone
+                } }],
+              });
+            } else {
+              logger.info('Email user already has name, navigating to Dashboard', {
+                userId: userExistsResult.userId,
+                name: authenticatedUser.name,
+                email: email.trim()
+              }, 'AuthMethodsScreen');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            }
+            return;
+          } else {
+            logger.error('User data not found in Firestore for email instant login', {
+              userId: userExistsResult.userId
+            }, 'AuthMethodsScreen');
+            // Fall through to verification code flow
+          }
+        } catch (firestoreError) {
+          logger.error('Failed to fetch user data for email instant login', {
+            error: firestoreError instanceof Error ? firestoreError.message : String(firestoreError),
+            userId: userExistsResult.userId
+          }, 'AuthMethodsScreen');
+          // Fall through to verification code flow
+        }
+      }
+
+      // New user or failed instant login - send verification code
+      logger.info('New email user or instant login failed - sending verification code', {
+        email: email.trim(),
+        userExists: userExistsResult.userExists
+      }, 'AuthMethodsScreen');
+
+      const result = await authService.sendEmailVerificationCode(email.trim());
       if (!result.success) {
         Alert.alert('Error', result.error || 'Failed to send verification code');
         return;
@@ -210,14 +309,100 @@ const AuthMethodsScreen: React.FC = () => {
     try {
       logger.info('Starting phone authentication', { phoneNumber: formattedPhone.substring(0, 5) + '...' }, 'AuthMethodsScreen');
 
-      // Send SMS verification code
+      // Save phone number for persistence
+      await AuthPersistenceService.savePhone(formattedPhone);
+
+      // Start phone authentication (may result in instant login or SMS verification)
       const result = await authService.signInWithPhoneNumber(formattedPhone);
       if (!result.success) {
-        Alert.alert('Error', result.error || 'Failed to send SMS code');
+        Alert.alert('Error', result.error || 'Failed to authenticate with phone number');
         return;
       }
 
-      // Navigate to verification screen
+      // Check if user was instantly logged in (existing user)
+      if (result.user && !result.isNewUser) {
+        logger.info('Phone instant login successful - user already exists', {
+          userId: result.user.uid,
+          phoneNumber: formattedPhone.substring(0, 5) + '...'
+        }, 'AuthMethodsScreen');
+
+        // Get user data from Firestore to create proper user object
+        try {
+          const { firebaseDataService } = await import('../../services/data/firebaseDataService');
+          const existingUserData = await firebaseDataService.user.getCurrentUser(result.user.uid);
+
+          if (existingUserData) {
+            // Create properly formatted user object (consistent with email flow)
+            const authenticatedUser = {
+              id: result.user.uid,
+              name: existingUserData.name || '',
+              email: existingUserData.email || '',
+              phone: existingUserData.phone || formattedPhone,
+              wallet_address: existingUserData.wallet_address || '',
+              wallet_public_key: existingUserData.wallet_public_key || '',
+              created_at: existingUserData.created_at || new Date().toISOString(),
+              avatar: existingUserData.avatar || '',
+              emailVerified: existingUserData.email_verified || false,
+              lastLoginAt: new Date().toISOString(), // Use current time for login
+              hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false,
+            };
+
+            // Update authentication context BEFORE navigating
+            authenticateUser(authenticatedUser, 'phone');
+
+            logger.info('Authentication context updated for phone instant login', {
+              userId: result.user.uid
+            }, 'AuthMethodsScreen');
+
+            // Check if user needs to create a profile (same logic as email)
+            const needsProfile = !authenticatedUser.name || authenticatedUser.name.trim() === '';
+
+            if (needsProfile) {
+              logger.info('Phone user needs to create profile (no name), navigating to CreateProfile', {
+                userId: result.user.uid,
+                phoneNumber: formattedPhone.substring(0, 5) + '...'
+              }, 'AuthMethodsScreen');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'CreateProfile', params: {
+                  phoneNumber: formattedPhone,
+                  email: authenticatedUser.email
+                } }],
+              });
+            } else {
+              logger.info('Phone user already has name, navigating to Dashboard', {
+                userId: result.user.uid,
+                name: authenticatedUser.name,
+                phoneNumber: formattedPhone.substring(0, 5) + '...'
+              }, 'AuthMethodsScreen');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            }
+            return;
+          } else {
+            logger.error('User data not found in Firestore for instant login', {
+              userId: result.user.uid
+            }, 'AuthMethodsScreen');
+            Alert.alert('Error', 'User data not found. Please try again.');
+            return;
+          }
+        } catch (firestoreError) {
+          logger.error('Failed to fetch user data for instant login', {
+            error: firestoreError instanceof Error ? firestoreError.message : String(firestoreError)
+          }, 'AuthMethodsScreen');
+          Alert.alert('Error', 'Failed to load user data. Please try again.');
+          return;
+        }
+      }
+
+      // New user - navigate to verification screen for SMS code
+      logger.info('New phone user - navigating to SMS verification', {
+        phoneNumber: formattedPhone.substring(0, 5) + '...',
+        verificationId: result.verificationId
+      }, 'AuthMethodsScreen');
+
       navigation.navigate('Verification', {
         phoneNumber: formattedPhone,
         verificationId: result.verificationId
@@ -364,7 +549,7 @@ const AuthMethodsScreen: React.FC = () => {
               onChangeText={(text) => {
                 setEmail(text);
                 // Save email to persistence
-                EmailPersistenceService.saveEmail(text).catch((error) => {
+                AuthPersistenceService.saveEmail(text).catch((error) => {
                   logger.error('Failed to save email', { error }, 'AuthMethodsScreen');
                 });
               }}

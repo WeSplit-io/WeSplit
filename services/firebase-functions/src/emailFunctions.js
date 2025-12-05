@@ -69,6 +69,75 @@ function generateEmailTemplate(code) {
 }
 
 /**
+ * HTTP Callable Function: Check if email user exists
+ * Checks if a user with the given email address already exists in the system
+ */
+exports.checkEmailUserExists = functions.https.onCall(async (data, context) => {
+  try {
+    const { email } = data;
+
+    // Sanitize email by trimming whitespace and newlines
+    const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+
+    console.log('🧹 Email sanitization in checkEmailUserExists:', { original: email, sanitized: sanitizedEmail });
+
+    // Validate input
+    if (!sanitizedEmail) {
+      throw new functions.https.HttpsError('invalid-argument', 'Email is required');
+    }
+
+    if (!sanitizedEmail.includes('@')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
+    }
+
+    console.log('🔍 Checking if user exists with email', {
+      email: sanitizedEmail.substring(0, 3) + '...' + sanitizedEmail.substring(sanitizedEmail.indexOf('@'))
+    });
+
+    // Check if user exists with this email
+    const existingUsers = await db.collection('users')
+      .where('email', '==', sanitizedEmail)
+      .limit(1)
+      .get();
+
+    if (!existingUsers.empty) {
+      const userDoc = existingUsers.docs[0];
+      const userData = userDoc.data();
+
+      console.log('📧 Found existing user in Firestore', {
+        firestoreId: userData.id,
+        email: sanitizedEmail.substring(0, 3) + '...' + sanitizedEmail.substring(sanitizedEmail.indexOf('@'))
+      });
+
+      return {
+        success: true,
+        userExists: true,
+        userId: userData.id,
+        message: 'User exists'
+      };
+    } else {
+      console.log('📧 No existing user found for email', {
+        email: sanitizedEmail.substring(0, 3) + '...' + sanitizedEmail.substring(sanitizedEmail.indexOf('@'))
+      });
+
+      return {
+        success: true,
+        userExists: false,
+        message: 'User does not exist'
+      };
+    }
+  } catch (error) {
+    console.error('❌ Error in checkEmailUserExists', error);
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError('internal', 'Failed to check user existence');
+  }
+});
+
+/**
  * HTTP Callable Function: Send verification code via email
  * Secrets are explicitly bound using runWith to ensure EMAIL_USER and EMAIL_PASSWORD are available
  */
@@ -336,8 +405,9 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
         lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
         lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
         hasCompletedOnboarding: false,
-        // Wallet management tracking
-        wallet_status: 'no_wallet',
+        // Wallet management tracking (consistent with phone users)
+        wallet_status: 'healthy',
+        wallet_created_at: admin.firestore.FieldValue.serverTimestamp(),
         wallet_type: 'app-generated',
         wallet_migration_status: 'none',
         // Migration tracking

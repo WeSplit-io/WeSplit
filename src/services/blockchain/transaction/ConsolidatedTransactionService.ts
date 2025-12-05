@@ -523,8 +523,18 @@ class ConsolidatedTransactionService {
    */
   async getUsdcBalance(walletAddress: string): Promise<UsdcBalanceResult> {
     try {
+      logger.debug('ConsolidatedTransactionService.getUsdcBalance called', {
+        walletAddress: walletAddress ? walletAddress.substring(0, 10) + '...' : 'undefined',
+        walletAddressType: typeof walletAddress
+      }, 'ConsolidatedTransactionService');
+
       const { BalanceUtils } = await import('../../shared/balanceUtils');
       const usdcMintAddress = USDC_CONFIG.mintAddress;
+
+      logger.debug('Calling BalanceUtils.getUsdcBalance', {
+        walletAddress: walletAddress ? walletAddress.substring(0, 10) + '...' : 'undefined',
+        usdcMintAddress: usdcMintAddress ? usdcMintAddress.substring(0, 10) + '...' : 'undefined'
+      }, 'ConsolidatedTransactionService');
 
       const result = await BalanceUtils.getUsdcBalance(walletAddress, usdcMintAddress);
       return {
@@ -534,7 +544,7 @@ class ConsolidatedTransactionService {
       };
     } catch (error) {
       logger.error('Failed to get USDC balance', {
-        walletAddress,
+        walletAddress: walletAddress ? walletAddress.substring(0, 10) + '...' : 'undefined',
         error,
         errorMessage: error instanceof Error ? error.message : String(error),
         errorStack: error instanceof Error ? error.stack : undefined

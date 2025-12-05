@@ -38,7 +38,11 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
   const { currentUser } = state;
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
-  
+
+  // Determine auth method
+  const authMethod = state.authMethod || 'email';
+  const isPhoneAuth = authMethod === 'phone';
+
   // Form states
   const [pseudo, setPseudo] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
@@ -116,16 +120,18 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
   // Track changes
   useEffect(() => {
     const originalPseudo = currentUser?.name || '';
+    const originalEmail = currentUser?.email || '';
     const originalAvatar = currentUser?.avatar || null;
     const originalShowBadges = currentUser?.show_badges_on_profile !== false;
-    
-    const hasModifications = 
-      pseudo !== originalPseudo || 
+
+    const hasModifications =
+      pseudo !== originalPseudo ||
+      email !== originalEmail ||
       avatar !== originalAvatar ||
       showBadgesOnProfile !== originalShowBadges;
-    
+
     setHasChanges(hasModifications);
-  }, [pseudo, avatar, showBadgesOnProfile, currentUser]);
+  }, [pseudo, email, avatar, showBadgesOnProfile, currentUser]);
 
   const handlePickImage = () => {
     const options = avatar 
@@ -287,12 +293,25 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
       }
       
       // Update user profile
-      await updateUser({ 
-        ...currentUser, 
+      await updateUser({
+        ...currentUser,
         name: pseudo.trim(),
+        email: email.trim(),
         avatar: finalAvatarUrl,
         show_badges_on_profile: showBadgesOnProfile
       });
+
+      // If email was added/changed, save it to EmailPersistenceService for future logins
+      if (email.trim() && email.trim() !== currentUser?.email) {
+        try {
+          const { AuthPersistenceService } = await import('../../../services/core/authPersistenceService');
+          await AuthPersistenceService.saveEmail(email.trim());
+          logger.info('Email saved to persistence after profile update', { email: email.trim() }, 'AccountSettingsScreen');
+        } catch (emailSaveError) {
+          logger.warn('Failed to save email to persistence after profile update (non-critical)', emailSaveError, 'AccountSettingsScreen');
+          // Non-critical, continue with profile update
+        }
+      }
       
       // Sync profile image quest completion if avatar was added
       if (finalAvatarUrl && finalAvatarUrl !== currentUser.avatar) {
@@ -582,7 +601,10 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Enter your email"
-                editable={false}
+                editable={true}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
               />
 
               {/* Phone Number Field - Temporarily hidden */}

@@ -96,7 +96,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               // Import required services
               const { authService } = await import('../../../services/auth');
               const { walletService } = await import('../../../services/blockchain/wallet');
-              const { EmailPersistenceService } = await import('../../../services/core/emailPersistenceService');
+              const { AuthPersistenceService } = await import('../../../services/core/authPersistenceService');
               const { clearAesKeyCache } = await import('../../../services/security/secureVault');
 
               // Step 1: Sign out from Firebase Auth
@@ -145,13 +145,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 // Continue with logout even if wallet context clearing fails
               }
 
-              // Step 5: Clear stored email
+              // Step 5: Clear stored email and phone
               try {
-                await EmailPersistenceService.clearEmail();
-                if (__DEV__) { logger.info('Stored email cleared', null, 'ProfileScreen'); }
-              } catch (emailError) {
-                console.warn('⚠️ Failed to clear stored email:', emailError);
-                // Continue with logout even if email clearing fails
+                await AuthPersistenceService.clearEmail();
+                await AuthPersistenceService.clearPhone();
+                if (__DEV__) { logger.info('Stored email and phone cleared', null, 'ProfileScreen'); }
+              } catch (authDataError) {
+                console.warn('⚠️ Failed to clear stored auth data:', authDataError);
+                // Continue with logout even if auth data clearing fails
               }
 
               // Step 6: Clear app context state (this also clears listeners and cache)

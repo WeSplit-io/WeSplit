@@ -145,6 +145,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     isConnected: walletConnected,
     isLoading: walletLoading,
     error: walletError,
+    needsRecovery,
     refreshWallet
   } = useWalletState(currentUser?.id);
 
@@ -448,6 +449,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     currentUser: any;
     setShowQRCodeScreen: (show: boolean) => void;
     textColor: string;
+    needsRecovery?: boolean;
   }> = ({
     isBalanceHidden,
     setIsBalanceHidden,
@@ -457,7 +459,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     walletAddress,
     currentUser,
     setShowQRCodeScreen,
-    textColor
+    textColor,
+    needsRecovery = false
   }) => (
       <>
         <View style={styles.balanceHeader}>
@@ -489,7 +492,16 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
         <View style={styles.balanceContainer}>
           <View style={{ flex: 1, alignItems: 'flex-start' }}>
-            {walletLoading || liveBalanceLoading ? (
+            {needsRecovery ? (
+              <View style={{ alignItems: 'flex-start' }}>
+                <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start', color: '#FFA500', fontSize: 16 }]}>
+                  Recovery Needed
+                </Text>
+                <Text style={{ color: textColor, fontSize: 12, opacity: 0.8, marginTop: 2 }}>
+                  Balance unavailable
+                </Text>
+              </View>
+            ) : walletLoading || liveBalanceLoading ? (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={textColor} style={{ marginRight: 8 }} />
               </View>
@@ -1421,6 +1433,104 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           </>
         )}
 
+        {/* Wallet Recovery Notice */}
+        {needsRecovery && (
+          <View style={{
+            backgroundColor: '#FFF3CD',
+            borderColor: '#FFECB5',
+            borderWidth: 1,
+            borderRadius: 12,
+            padding: 16,
+            marginHorizontal: 20,
+            marginBottom: 20
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ marginRight: 12 }}>
+                <Text style={{ fontSize: 24 }}>🔑</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#856404',
+                  marginBottom: 4
+                }}>
+                  Wallet Recovery Needed
+                </Text>
+                <Text style={{
+                  fontSize: 14,
+                  color: '#856404',
+                  lineHeight: 20
+                }}>
+                  Your wallet address is available but the keys need to be restored. You can recover using your seed phrase or create a new wallet.
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#856404',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  alignItems: 'center'
+                }}
+                onPress={() => {
+                  navigation.navigate('SeedPhraseRecovery', {
+                    expectedAddress: walletAddress,
+                    userId: currentUser?.id
+                  });
+                }}
+              >
+                <Text style={{ color: 'white', fontWeight: '600' }}>
+                  Recover with Seed Phrase
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#dc3545',
+                  borderRadius: 8,
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  alignItems: 'center'
+                }}
+                onPress={async () => {
+                  Alert.alert(
+                    'Create New Wallet',
+                    'This will create a new wallet and replace the current one. Make sure you have backed up any important information. Continue?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Create New',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            // Clear existing wallet data and create new wallet
+                            const { walletService } = await import('../../services/blockchain/wallet');
+                            // Force creation of new wallet by clearing cache and storage
+                            await walletService.clearUserWalletData(currentUser?.id || '');
+                            // Refresh wallet state
+                            refreshWallet();
+                            Alert.alert('Success', 'New wallet created successfully!');
+                          } catch (error) {
+                            Alert.alert('Error', 'Failed to create new wallet. Please try again.');
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }}
+              >
+                <Text style={{ color: 'white', fontWeight: '600' }}>
+                  Create New Wallet
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Balance Card */}
         {(() => {
           // Handle SVG backgrounds with special styling
@@ -1471,6 +1581,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                   currentUser={currentUser}
                   setShowQRCodeScreen={setShowQRCodeScreen}
                   textColor={textColor}
+                  needsRecovery={needsRecovery}
                 />
               </View>
             );
@@ -1507,6 +1618,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                   currentUser={currentUser}
                   setShowQRCodeScreen={setShowQRCodeScreen}
                   textColor={textColor}
+                  needsRecovery={needsRecovery}
                 />
               </ImageBackground>
             );
