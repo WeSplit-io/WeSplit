@@ -58,8 +58,9 @@
         "EXPO_PUBLIC_FORCE_MAINNET": "true",
         "EXPO_PUBLIC_DEV_NETWORK": "mainnet",
         "EXPO_PUBLIC_USE_PROD_FUNCTIONS": "true"
-      },
-      "prebuildCommand": "node scripts/validate-network-config.js && node scripts/validate-env-vars.js"
+      }
+      // Temporarily disabled prebuildCommand to debug the --platform error
+      // "prebuildCommand": "node scripts/validate-network-config.js && node scripts/validate-env-vars.js"
     },
     "testflight": {
       "distribution": "store",

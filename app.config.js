@@ -54,9 +54,9 @@ module.exports = {
         NSPhotoLibraryUsageDescription: "This app accesses the photo library to let you select profile pictures.",
         ITSAppUsesNonExemptEncryption: false
       },
-      entitlements: {
-        'com.apple.developer.devicecheck': true
-      },
+      // entitlements: {
+      //   'com.apple.developer.devicecheck': true  // Removed - causing provisioning profile issues
+      // },
       // Associated domains for iOS Universal Links
       // This allows https://wesplit.io links to open directly in the app
       associatedDomains: [
