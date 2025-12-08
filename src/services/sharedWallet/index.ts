@@ -18,7 +18,7 @@
  */
 
 import { logger } from '../core';
-import type {
+import {
   SharedWallet,
   CreateSharedWalletParams,
   SharedWalletResult,
@@ -30,6 +30,8 @@ import type {
   InviteToSharedWalletResult,
   UpdateSharedWalletSettingsParams,
   UpdateSharedWalletSettingsResult,
+  GetSharedWalletTransactionsResult,
+  SHARED_WALLET_CONSTANTS, // Import it as a value, not a type
 } from './types';
 
 // Lazy load modules to prevent circular dependencies
@@ -37,14 +39,14 @@ let modulesLoaded = false;
 
 async function loadModules() {
   if (modulesLoaded) return;
-  
+
   // Dynamic imports to prevent circular dependencies
   await Promise.all([
     import('./SharedWalletCreation'),
-    import('./SharedWalletFunding'),
-    import('./SharedWalletWithdrawal'),
+    // NOTE: SharedWalletFunding and SharedWalletWithdrawal are not used
+    // Transaction logic is handled by ConsolidatedTransactionService instead
   ]);
-  
+
   modulesLoaded = true;
 }
 
@@ -161,7 +163,7 @@ export class SharedWalletService {
       const recentWalletsQuery = query(
         collection(db, 'sharedWallets'),
         orderBy('createdAt', 'desc'),
-        limit(100) // Limit to 100 most recent wallets for performance
+        limit(SHARED_WALLET_CONSTANTS.RECENT_WALLETS_LIMIT) // Limit for performance
       );
       
       const recentWalletsSnapshot = await getDocs(recentWalletsQuery);
@@ -252,50 +254,48 @@ export class SharedWalletService {
 
   /**
    * Fund a shared wallet
-   * 
+   * NOTE: This method is deprecated. Use CentralizedTransactionHandler instead.
+   * Transaction logic is handled by ConsolidatedTransactionService for consistency.
+   *
+   * @deprecated Use CentralizedTransactionHandler with 'shared_wallet_funding' context
    * @param params - Funding parameters
    * @returns Result with transaction signature or error
    */
   static async fundSharedWallet(
     params: FundSharedWalletParams
   ): Promise<FundSharedWalletResult> {
-    try {
-      await loadModules();
-      const { SharedWalletFunding } = await import('./SharedWalletFunding');
-      
-      return await SharedWalletFunding.fundSharedWallet(params);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      logger.error('SharedWalletService: Error funding shared wallet', { error: errorMessage }, 'SharedWalletService');
-      return {
-        success: false,
-        error: errorMessage,
-      };
-    }
+    logger.warn('SharedWalletService.fundSharedWallet is deprecated', {
+      sharedWalletId: params.sharedWalletId,
+      userId: params.userId
+    }, 'SharedWalletService');
+
+    return {
+      success: false,
+      error: 'This method is deprecated. Use CentralizedTransactionHandler instead.',
+    };
   }
 
   /**
    * Withdraw from a shared wallet
-   * 
+   * NOTE: This method is deprecated. Use CentralizedTransactionHandler instead.
+   * Transaction logic is handled by ConsolidatedTransactionService for consistency.
+   *
+   * @deprecated Use CentralizedTransactionHandler with 'shared_wallet_withdrawal' context
    * @param params - Withdrawal parameters
    * @returns Result with transaction signature or error
    */
   static async withdrawFromSharedWallet(
     params: WithdrawFromSharedWalletParams
   ): Promise<WithdrawFromSharedWalletResult> {
-    try {
-      await loadModules();
-      const { SharedWalletWithdrawal } = await import('./SharedWalletWithdrawal');
-      
-      return await SharedWalletWithdrawal.withdrawFromSharedWallet(params);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      logger.error('SharedWalletService: Error withdrawing from shared wallet', { error: errorMessage }, 'SharedWalletService');
-      return {
-        success: false,
-        error: errorMessage,
-      };
-    }
+    logger.warn('SharedWalletService.withdrawFromSharedWallet is deprecated', {
+      sharedWalletId: params.sharedWalletId,
+      userId: params.userId
+    }, 'SharedWalletService');
+
+    return {
+      success: false,
+      error: 'This method is deprecated. Use CentralizedTransactionHandler instead.',
+    };
   }
 
   /**
@@ -438,9 +438,87 @@ export class SharedWalletService {
   }
 
   /**
+   * Accept shared wallet invitation
+   * Changes member status from 'invited' to 'active'
+   *
+   * @param sharedWalletId - The shared wallet ID
+   * @param userId - The user accepting the invitation
+   * @returns Success or error
+   */
+  static async acceptSharedWalletInvitation(
+    sharedWalletId: string,
+    userId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { getSharedWalletDocById } = await import('./utils');
+      const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+      const { db } = await import('../../config/firebase/firebase');
+
+      // Get shared wallet
+      const result = await getSharedWalletDocById(sharedWalletId);
+      if (!result) {
+        return {
+          success: false,
+          error: 'Shared wallet not found',
+        };
+      }
+
+      const { wallet, walletDocId } = result;
+
+      // Find the invited member
+      const memberIndex = wallet.members.findIndex((m) => m.userId === userId);
+      if (memberIndex === -1) {
+        return {
+          success: false,
+          error: 'You are not a member of this shared wallet',
+        };
+      }
+
+      const member = wallet.members[memberIndex];
+      if (member.status !== 'invited') {
+        return {
+          success: false,
+          error: 'No pending invitation found',
+        };
+      }
+
+      // Update member status to active
+      const updatedMembers = [...wallet.members];
+      updatedMembers[memberIndex] = {
+        ...member,
+        status: 'active' as const,
+      };
+
+      await updateDoc(doc(db, 'sharedWallets', walletDocId), {
+        members: updatedMembers,
+        updatedAt: serverTimestamp(),
+      });
+
+      logger.info('Shared wallet invitation accepted', {
+        sharedWalletId,
+        userId,
+      }, 'SharedWalletService');
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      logger.error('Failed to accept shared wallet invitation', {
+        sharedWalletId,
+        userId,
+        error: errorMessage
+      }, 'SharedWalletService');
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
    * Invite users to a shared wallet
    * Adds new members to the shared wallet
-   * 
+   *
    * @param params - Invitation parameters
    * @returns Result with invitation count or error
    */
@@ -583,6 +661,31 @@ export class SharedWalletService {
         updatedAt: serverTimestamp(),
       });
 
+      // Grant private key access to new members
+      if (newMembers.length > 0) {
+        const { SplitWalletSecurity } = await import('../split/SplitWalletSecurity');
+        const grantAccessResult = await SplitWalletSecurity.addParticipantsToSplitWalletPrivateKey(
+          params.sharedWalletId,
+          newMembers.map(m => ({ userId: m.userId, name: m.name }))
+        );
+
+        if (!grantAccessResult.success) {
+          logger.error('Failed to grant private key access to new members', {
+            sharedWalletId: params.sharedWalletId,
+            newMembersCount: newMembers.length,
+            error: grantAccessResult.error
+          }, 'SharedWalletService');
+
+          // This is a critical error - new members won't be able to withdraw
+          // Consider rolling back the member additions here
+        } else {
+          logger.info('Private key access granted to new shared wallet members', {
+            sharedWalletId: params.sharedWalletId,
+            newMembersCount: newMembers.length
+          }, 'SharedWalletService');
+        }
+      }
+
       logger.info('Users invited to shared wallet', {
         sharedWalletId: params.sharedWalletId,
         inviterId: params.inviterId,
@@ -613,7 +716,7 @@ export class SharedWalletService {
 
   /**
    * Get transaction history for a shared wallet
-   * 
+   *
    * @param sharedWalletId - The shared wallet ID
    * @param limit - Maximum number of transactions to return (default: 50)
    * @returns Array of transactions or error
@@ -621,26 +724,26 @@ export class SharedWalletService {
   static async getSharedWalletTransactions(
     sharedWalletId: string,
     limit: number = 50
-  ): Promise<{ success: boolean; transactions?: any[]; error?: string }> {
+  ): Promise<GetSharedWalletTransactionsResult> {
     try {
       await loadModules();
-      
+
       const { db } = await import('../../config/firebase/firebase');
       const { collection, query, where, orderBy, limit: limitQuery, getDocs } = await import('firebase/firestore');
-      
+
       const q = query(
         collection(db, 'sharedWalletTransactions'),
         where('sharedWalletId', '==', sharedWalletId),
         orderBy('createdAt', 'desc'),
         limitQuery(limit)
       );
-      
+
       const querySnapshot = await getDocs(q);
       const transactions = querySnapshot.docs.map(doc => ({
         ...doc.data(),
         firebaseDocId: doc.id,
       }));
-      
+
       return {
         success: true,
         transactions,
@@ -648,6 +751,50 @@ export class SharedWalletService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       logger.error('SharedWalletService: Error getting shared wallet transactions', { error: errorMessage }, 'SharedWalletService');
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Get on-chain balance for a shared wallet
+   *
+   * @param sharedWalletId - The shared wallet ID
+   * @returns On-chain balance result
+   */
+  static async getSharedWalletOnChainBalance(
+    sharedWalletId: string
+  ): Promise<{ success: boolean; balance?: number; error?: string; accountExists?: boolean }> {
+    try {
+      await loadModules();
+
+      // First get the wallet to find the wallet address
+      const walletResult = await this.getSharedWallet(sharedWalletId);
+      if (!walletResult.success || !walletResult.wallet) {
+        return {
+          success: false,
+          error: 'Shared wallet not found'
+        };
+      }
+
+      const wallet = walletResult.wallet;
+
+      // Get on-chain balance
+      const { BalanceUtils } = await import('../shared/balanceUtils');
+      const { USDC_CONFIG } = await import('../shared/walletConstants');
+
+      const balanceResult = await BalanceUtils.getUsdcBalance(wallet.walletAddress, USDC_CONFIG.mintAddress);
+
+      return {
+        success: true,
+        balance: balanceResult.balance,
+        accountExists: balanceResult.accountExists
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      logger.error('SharedWalletService: Error getting on-chain balance', { error: errorMessage, sharedWalletId }, 'SharedWalletService');
       return {
         success: false,
         error: errorMessage,
@@ -691,7 +838,7 @@ export class SharedWalletService {
       }
 
       // Build update object - only include fields that are provided
-      const updates: any = {
+      const updates: Partial<Pick<SharedWallet, 'customColor' | 'customLogo' | 'name' | 'settings' | 'updatedAt'>> = {
         updatedAt: serverTimestamp(),
       };
 

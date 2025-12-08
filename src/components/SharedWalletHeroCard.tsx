@@ -43,8 +43,17 @@ const SharedWalletHeroCard: React.FC<SharedWalletHeroCardProps> = ({
 
   const middleLayerColor = colors.black70;
   const formattedBalance = useMemo(
-    () => formatBalance(wallet.totalBalance, (wallet.currency ?? 'USDC') as string),
-    [wallet.totalBalance, wallet.currency]
+    () => {
+      const balance = formatBalance(wallet.totalBalance, (wallet.currency ?? 'USDC') as string);
+      console.log('SharedWalletHeroCard: formatting balance', {
+        walletId: wallet.id,
+        totalBalance: wallet.totalBalance,
+        currency: wallet.currency,
+        formattedBalance: balance
+      });
+      return balance;
+    },
+    [wallet.totalBalance, wallet.currency, wallet.id]
   );
   return (
     <View style={[styles.container, { backgroundColor: walletColor }, style]}>

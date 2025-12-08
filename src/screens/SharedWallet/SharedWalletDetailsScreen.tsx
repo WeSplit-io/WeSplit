@@ -13,10 +13,10 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { 
-  Container, 
-  Header, 
-  ModernLoader, 
+import {
+  Container,
+  Header,
+  ModernLoader,
   ErrorScreen,
   PhosphorIcon,
   TabSecondary,
@@ -35,6 +35,8 @@ import SharedWalletHeroCard from '../../components/SharedWalletHeroCard';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import CentralizedTransactionModal, { type TransactionModalConfig } from '../../components/shared/CentralizedTransactionModal';
+import { db } from '../../config/firebase/firebase';
+import { doc, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
 
 const SharedWalletDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -42,7 +44,8 @@ const SharedWalletDetailsScreen: React.FC = () => {
   const { state } = useApp();
   const { currentUser } = state;
 
-  const { walletId, wallet: routeWallet } = (route.params as any) || {};
+  const { walletId, sharedWalletId, wallet: routeWallet } = (route.params as any) || {};
+  const effectiveWalletId = walletId || sharedWalletId;
   
   const [wallet, setWallet] = useState<SharedWallet | null>(routeWallet || null);
   const [isLoadingWallet, setIsLoadingWallet] = useState(!routeWallet);
@@ -50,6 +53,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [transactionModalConfig, setTransactionModalConfig] = useState<TransactionModalConfig | null>(null);
   const [userWalletAddress, setUserWalletAddress] = useState<string | null>(null);
+  const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'transactions' | 'members'>('transactions');
@@ -67,14 +71,199 @@ const SharedWalletDetailsScreen: React.FC = () => {
 
     setIsLoadingTransactions(true);
     try {
-      // TODO: Replace with real transactions fetch when backend is ready
-      setTransactions([]);
+      const { SharedWalletService } = await import('../../services/sharedWallet');
+      const result = await SharedWalletService.getSharedWalletTransactions(wallet.id, 50);
+
+      if (result.success && result.transactions) {
+        // Transform transactions to match the UnifiedTransaction interface
+        const unifiedTransactions = result.transactions.map((tx: any) => ({
+          id: tx.id,
+          firebaseDocId: tx.firebaseDocId,
+          type: tx.type as 'funding' | 'withdrawal' | 'transfer' | 'fee' | 'send' | 'receive' | 'deposit' | 'payment' | 'refund',
+          amount: tx.amount,
+          currency: tx.currency || 'USDC',
+          userName: tx.userName,
+          memo: tx.memo,
+          status: tx.status as 'confirmed' | 'pending' | 'failed' | 'completed',
+          createdAt: tx.createdAt,
+          transactionSignature: tx.transactionSignature,
+          sharedWalletId: tx.sharedWalletId,
+          // Additional fields for shared wallet context
+          userId: tx.userId,
+          // For withdrawal transactions, mark as external if destination is different from wallet
+          isExternalWallet: tx.type === 'withdrawal' && tx.destination ? true : false,
+        }));
+
+        setTransactions(unifiedTransactions);
+      } else {
+        setTransactions([]);
+      }
     } catch (error) {
       logger.error('Error loading transactions', { error: String(error) }, 'SharedWalletDetailsScreen');
+      setTransactions([]);
     } finally {
       setIsLoadingTransactions(false);
     }
   }, [wallet?.id]);
+
+  // Set up real-time listener for wallet updates
+  useEffect(() => {
+    if (!wallet?.firebaseDocId) return;
+
+    logger.info('Setting up real-time listener for shared wallet', {
+      walletId: wallet.id,
+      firebaseDocId: wallet.firebaseDocId
+    }, 'SharedWalletDetailsScreen');
+
+    const walletRef = doc(db, 'sharedWallets', wallet.firebaseDocId);
+    const unsubscribe = onSnapshot(walletRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const updatedWallet = {
+          ...docSnapshot.data(),
+          firebaseDocId: docSnapshot.id,
+        } as SharedWallet;
+
+        logger.info('Real-time wallet update received', {
+          walletId: wallet.id,
+          oldBalance: wallet.totalBalance,
+          newBalance: updatedWallet.totalBalance,
+          balanceDifference: updatedWallet.totalBalance - wallet.totalBalance,
+          memberCount: updatedWallet.members?.length,
+          updatedAt: updatedWallet.updatedAt
+        }, 'SharedWalletDetailsScreen');
+
+        setWallet(updatedWallet);
+      }
+    }, (error) => {
+      logger.error('Real-time listener error for shared wallet', {
+        walletId: wallet.id,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SharedWalletDetailsScreen');
+    });
+
+    return () => {
+      logger.info('Cleaning up real-time listener for shared wallet', {
+        walletId: wallet.id
+      }, 'SharedWalletDetailsScreen');
+      unsubscribe();
+    };
+  }, [wallet?.firebaseDocId, wallet?.id]);
+
+  // Set up real-time listener for transactions
+  useEffect(() => {
+    if (!wallet?.id) return;
+
+    logger.info('Setting up real-time listener for shared wallet transactions', {
+      walletId: wallet.id
+    }, 'SharedWalletDetailsScreen');
+
+    const transactionsRef = collection(db, 'sharedWalletTransactions');
+    const q = query(
+      transactionsRef,
+      where('sharedWalletId', '==', wallet.id),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const updatedTransactions = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: data.id,
+          firebaseDocId: doc.id,
+          type: data.type as 'funding' | 'withdrawal' | 'transfer' | 'fee' | 'send' | 'receive' | 'deposit' | 'payment' | 'refund',
+          amount: data.amount,
+          currency: data.currency || 'USDC',
+          userName: data.userName,
+          memo: data.memo,
+          status: data.status as 'confirmed' | 'pending' | 'failed' | 'completed',
+          createdAt: data.createdAt,
+          transactionSignature: data.transactionSignature,
+          sharedWalletId: data.sharedWalletId,
+          userId: data.userId,
+          isExternalWallet: data.type === 'withdrawal' && data.destination ? true : false,
+        } as UnifiedTransaction;
+      });
+
+      logger.debug('Real-time transactions update received', {
+        walletId: wallet.id,
+        transactionCount: updatedTransactions.length
+      }, 'SharedWalletDetailsScreen');
+
+      setTransactions(updatedTransactions);
+    }, (error) => {
+      logger.error('Real-time listener error for shared wallet transactions', {
+        walletId: wallet.id,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SharedWalletDetailsScreen');
+    });
+
+    return () => {
+      logger.info('Cleaning up real-time listener for shared wallet transactions', {
+        walletId: wallet.id
+      }, 'SharedWalletDetailsScreen');
+      unsubscribe();
+    };
+  }, [wallet?.id]);
+
+  // Load wallet data with on-chain balance verification
+  const loadWalletData = useCallback(async (walletId: string) => {
+    try {
+      const { SharedWalletService } = await import('../../services/sharedWallet');
+      const result = await SharedWalletService.getSharedWallet(walletId);
+
+      if (result.success && result.wallet) {
+        let updatedWallet = result.wallet;
+
+        // Fetch on-chain balance for verification
+        try {
+          const onChainResult = await SharedWalletService.getSharedWalletOnChainBalance(walletId);
+
+          if (onChainResult.success) {
+            logger.info('On-chain balance check for shared wallet', {
+              walletId,
+              databaseBalance: updatedWallet.totalBalance,
+              onChainBalance: onChainResult.balance,
+              accountExists: onChainResult.accountExists,
+              difference: updatedWallet.totalBalance - (onChainResult.balance || 0)
+            }, 'SharedWalletDetailsScreen');
+
+            // If there's a significant difference, log it for monitoring
+            const difference = Math.abs(updatedWallet.totalBalance - (onChainResult.balance || 0));
+            if (difference > 0.01) { // More than 1 cent difference
+              logger.warn('Balance discrepancy detected', {
+                walletId,
+                databaseBalance: updatedWallet.totalBalance,
+                onChainBalance: onChainResult.balance,
+                difference
+              }, 'SharedWalletDetailsScreen');
+            }
+          } else {
+            logger.error('Failed to fetch on-chain balance', {
+              walletId,
+              error: onChainResult.error
+            }, 'SharedWalletDetailsScreen');
+          }
+        } catch (balanceError) {
+          logger.error('Failed to fetch on-chain balance', {
+            walletId,
+            error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+          }, 'SharedWalletDetailsScreen');
+        }
+
+        setWallet(updatedWallet);
+        return updatedWallet;
+      } else {
+        logger.error('Failed to load wallet data', { walletId, error: result.error }, 'SharedWalletDetailsScreen');
+        return null;
+      }
+    } catch (error) {
+      logger.error('Error loading wallet data', {
+        walletId,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SharedWalletDetailsScreen');
+      return null;
+    }
+  }, []);
 
   // Load wallet data
   useEffect(() => {
@@ -86,7 +275,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
         return;
       }
 
-      if (!walletId) {
+      if (!effectiveWalletId) {
         logger.error('No walletId provided', null, 'SharedWalletDetailsScreen');
         Alert.alert('Error', 'No wallet specified');
         handleBack();
@@ -94,12 +283,23 @@ const SharedWalletDetailsScreen: React.FC = () => {
       }
 
       try {
-        logger.info('Loading shared wallet', walletId ? { walletId } : {}, 'SharedWalletDetailsScreen');
-        const result = await SharedWalletService.getSharedWallet(walletId);
+        logger.info('Loading shared wallet', effectiveWalletId ? { walletId: effectiveWalletId } : {}, 'SharedWalletDetailsScreen');
+        const result = await SharedWalletService.getSharedWallet(effectiveWalletId);
 
         if (result.success && result.wallet) {
           setWallet(result.wallet);
           loadTransactions();
+
+          // Get user's wallet address for withdrawal transactions
+          if (currentUser?.id) {
+            try {
+              const { ConsolidatedTransactionService } = await import('../../services/blockchain/transaction');
+              const userWalletAddress = await ConsolidatedTransactionService.getInstance().getUserWalletAddress(currentUser.id);
+              setUserWalletAddress(userWalletAddress || '');
+            } catch (error) {
+              logger.warn('Failed to get user wallet address', { error }, 'SharedWalletDetailsScreen');
+            }
+          }
         } else {
           Alert.alert('Error', result.error || 'Failed to load shared wallet');
           handleBack();
@@ -114,7 +314,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
     };
 
     loadWallet();
-  }, [walletId, routeWallet]);
+  }, [effectiveWalletId, routeWallet, currentUser?.id]);
 
   // Loading states
   if (isLoadingWallet) {
@@ -199,36 +399,49 @@ const SharedWalletDetailsScreen: React.FC = () => {
               const modalConfig: TransactionModalConfig = {
                 title: 'Withdraw from Shared Wallet',
                 subtitle: 'Transfer funds from the shared wallet to your personal wallet',
-                transactionType: 'shared_wallet_withdrawal',
-                recipientInfo: {
-                  name: 'Your Personal Wallet',
-                  address: userWalletAddress || 'Your Wallet',
-                  type: 'personal'
-                },
+                showAmountInput: true,
+                showMemoInput: true,
+                showQuickAmounts: false,
                 allowExternalDestinations: false,
                 allowFriendDestinations: false,
                 context: 'shared_wallet_withdrawal',
-                prefilledAmount: wallet.totalBalance || 0,
+                prefilledAmount: (() => {
+                  const currentUserMember = wallet.members?.find(m => m.userId === currentUser?.id);
+                  if (currentUserMember) {
+                    const availableBalance = (currentUserMember.totalContributed || 0) - (currentUserMember.totalWithdrawn || 0);
+                    return Math.max(0, availableBalance);
+                  }
+                  return 0;
+                })(),
                 customRecipientInfo: {
                   name: 'Your Personal Wallet',
                   address: userWalletAddress || 'Your Wallet',
                   type: 'personal'
                 },
-                onSuccess: (result) => {
+                onSuccess: async (result) => {
                   logger.info('Shared wallet withdrawal successful', { result });
-                  setTransactionModalConfig(null);
-                  // Refresh wallet data
-                  loadTransactions();
-                  // Reload wallet data by triggering a re-render
-                  setWallet(prev => prev ? {...prev} : prev);
+                  setIsProcessingTransaction(true);
+                  try {
+                    // Reload wallet data from database with on-chain verification
+                    await loadWalletData(wallet.id);
+                    // Refresh transactions
+                    await loadTransactions();
+                  } catch (error) {
+                    logger.error('Error refreshing wallet data after withdrawal', { error }, 'SharedWalletDetailsScreen');
+                  } finally {
+                    setIsProcessingTransaction(false);
+                    setTransactionModalConfig(null);
+                  }
                 },
                 onError: (error) => {
                   logger.error('Shared wallet withdrawal failed', { error });
                   Alert.alert('Withdrawal Failed', error);
                   setTransactionModalConfig(null);
+                  setIsProcessingTransaction(false);
                 },
                 onClose: () => {
                   setTransactionModalConfig(null);
+                  setIsProcessingTransaction(false);
                 }
               };
 
@@ -248,12 +461,9 @@ const SharedWalletDetailsScreen: React.FC = () => {
               const modalConfig: TransactionModalConfig = {
                 title: 'Top Up Shared Wallet',
                 subtitle: 'Add funds to the shared wallet from your personal wallet',
-                transactionType: 'shared_wallet_funding',
-                recipientInfo: {
-                  name: wallet.name || 'Shared Wallet',
-                  address: wallet.id,
-                  type: 'shared_wallet'
-                },
+                showAmountInput: true,
+                showMemoInput: true,
+                showQuickAmounts: true,
                 allowExternalDestinations: false,
                 allowFriendDestinations: false,
                 context: 'shared_wallet_funding',
@@ -262,21 +472,48 @@ const SharedWalletDetailsScreen: React.FC = () => {
                   address: wallet.id,
                   type: 'shared_wallet'
                 },
-                onSuccess: (result) => {
-                  logger.info('Shared wallet funding successful', { result });
-                  setTransactionModalConfig(null);
-                  // Refresh wallet data
-                  loadTransactions();
-                  // Reload wallet data by triggering a re-render
-                  setWallet(prev => prev ? {...prev} : prev);
+                onSuccess: async (result) => {
+                  logger.info('Shared wallet funding successful - starting UI refresh', {
+                    result,
+                    walletId: wallet.id,
+                    currentBalance: wallet.totalBalance
+                  }, 'SharedWalletDetailsScreen');
+
+                  setIsProcessingTransaction(true);
+                  try {
+                    // Reload wallet data from database with on-chain verification
+                    const updatedWallet = await loadWalletData(wallet.id);
+                    logger.info('Wallet data reloaded after funding', {
+                      walletId: wallet.id,
+                      oldBalance: wallet.totalBalance,
+                      newBalance: updatedWallet?.totalBalance
+                    }, 'SharedWalletDetailsScreen');
+
+                    // Refresh transactions
+                    await loadTransactions();
+                    logger.info('Transactions refreshed after funding', {
+                      walletId: wallet.id
+                    }, 'SharedWalletDetailsScreen');
+                  } catch (error) {
+                    logger.error('Error refreshing wallet data after funding', {
+                      error: error instanceof Error ? error.message : String(error),
+                      walletId: wallet.id
+                    }, 'SharedWalletDetailsScreen');
+                  } finally {
+                    setIsProcessingTransaction(false);
+                    setTransactionModalConfig(null);
+                    logger.info('Funding UI refresh completed', { walletId: wallet.id }, 'SharedWalletDetailsScreen');
+                  }
                 },
                 onError: (error) => {
                   logger.error('Shared wallet funding failed', { error });
                   Alert.alert('Top Up Failed', error);
                   setTransactionModalConfig(null);
+                  setIsProcessingTransaction(false);
                 },
                 onClose: () => {
                   setTransactionModalConfig(null);
+                  setIsProcessingTransaction(false);
                 }
               };
 
@@ -367,10 +604,24 @@ const SharedWalletDetailsScreen: React.FC = () => {
             <MembersList
               members={wallet.members}
               currentUserId={currentUser?.id?.toString()}
+              walletId={wallet.id}
+              onMemberUpdate={() => {
+                // Reload wallet data when member status changes
+                loadWalletData(wallet.id);
+              }}
             />
                     </View>
         )}
       </ScrollView>
+
+      {/* Transaction Processing Loading Overlay */}
+      {isProcessingTransaction && (
+        <View style={styles.processingOverlay}>
+          <View style={styles.processingContainer}>
+            <ModernLoader size="large" text="Processing transaction..." />
+          </View>
+        </View>
+      )}
 
       {/* Centralized Transaction Modal */}
       {transactionModalConfig && (
@@ -378,6 +629,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
           visible={!!transactionModalConfig}
           config={transactionModalConfig}
           sharedWalletId={wallet.id}
+          currentUser={currentUser}
         />
       )}
     </Container>
@@ -521,6 +773,24 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  processingOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  processingContainer: {
+    backgroundColor: colors.white5,
+    borderRadius: spacing.lg,
+    padding: spacing.xl,
+    minWidth: 200,
     alignItems: 'center',
   },
 });

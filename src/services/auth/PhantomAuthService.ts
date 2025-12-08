@@ -8,6 +8,7 @@
 
 import { logger } from '../analytics/loggingService';
 import { firebaseDataService } from '../data/firebaseDataService';
+// import { PhantomConnectService } from './PhantomConnectService'; // PhantomConnectService does not exist yet
 
 export interface PhantomAuthResult {
   success: boolean;
@@ -49,20 +50,26 @@ class PhantomAuthService {
    * Initialize Phantom Auth for the app
    */
   public async initialize(): Promise<void> {
-    const phantomConnect = PhantomConnectService.getInstance();
+    // Block in production
+    if (!__DEV__) {
+      logger.info('Phantom Auth disabled in production', null, 'PhantomAuthService');
+      return;
+    }
+
+    // const phantomConnect = PhantomConnectService.getInstance();
 
     // Configure for app authentication (not just splits)
-    phantomConnect.configure({
-      enableSocialLogin: true,
-      enableEmbeddedWallets: true,
-      spendingLimits: {
-        maxAmount: 1000, // Higher limits for app-wide auth
-        maxDaily: 5000,
-        allowedTokens: ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v']
-      }
-    });
+    // phantomConnect.configure({
+    //   enableSocialLogin: true,
+    //   enableEmbeddedWallets: true,
+    //   spendingLimits: {
+    //     maxAmount: 1000, // Higher limits for app-wide auth
+    //     maxDaily: 5000,
+    //     allowedTokens: ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v']
+    //   }
+    // });
 
-    logger.info('Phantom Auth Service initialized', null, 'PhantomAuthService');
+    logger.info('Phantom Auth Service initialized (mock)', null, 'PhantomAuthService');
 
     // Try to restore existing session
     await this.restoreSession();
@@ -79,6 +86,14 @@ class PhantomAuthService {
     phantomUser: any,
     provider: 'google' | 'apple'
   ): Promise<PhantomAuthResult> {
+    // Block in production
+    if (!__DEV__) {
+      return {
+        success: false,
+        error: 'Phantom authentication is currently disabled'
+      };
+    }
+
     try {
       logger.info('Processing authenticated Phantom user', {
         userKeys: phantomUser ? Object.keys(phantomUser) : 'undefined',
@@ -394,12 +409,15 @@ class PhantomAuthService {
       const stateData = JSON.parse(atob(state));
       const { provider } = stateData;
 
-      const phantomConnect = PhantomConnectService.getInstance();
-      const connectResult = await phantomConnect.connect({
-        authCode,
-        preferredMethod: 'social',
-        socialProvider: provider
-      });
+      // const phantomConnect = PhantomConnectService.getInstance();
+      // const connectResult = await phantomConnect.connect({
+      //   authCode,
+      //   preferredMethod: 'social',
+      //   socialProvider: provider
+      // });
+
+      // Mock result for now since PhantomConnectService is missing
+      const connectResult: any = { success: false, error: 'Phantom Connect Service not available' };
 
       if (!connectResult.success) {
         return {
@@ -710,7 +728,7 @@ class PhantomAuthService {
    */
   public async signOut(): Promise<void> {
     try {
-      const phantomConnect = PhantomConnectService.getInstance();
+      // const phantomConnect = PhantomConnectService.getInstance();
       // Note: Phantom Connect doesn't have explicit sign out
       // We'll clear local session
       this.currentUser = null;

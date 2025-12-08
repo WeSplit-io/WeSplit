@@ -4,30 +4,43 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Avatar } from '../shared';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { Avatar, Button } from '../shared';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-
-interface Member {
-  userId: string;
-  name: string;
-  walletAddress: string;
-  role: 'creator' | 'admin' | 'member';
-  totalContributed: number;
-  totalWithdrawn: number;
-}
+import { SharedWalletService, SharedWalletMember } from '../../services/sharedWallet';
+import { logger } from '../../services/analytics/loggingService';
 
 interface MembersListProps {
-  members?: Member[];
+  members?: SharedWalletMember[];
   currentUserId?: string;
+  walletId?: string;
+  onMemberUpdate?: () => void;
 }
 
 const MembersList: React.FC<MembersListProps> = ({
   members = [],
   currentUserId,
+  walletId,
+  onMemberUpdate,
 }) => {
+  const handleAcceptInvitation = async (member: SharedWalletMember) => {
+    if (!walletId) return;
+
+    try {
+      const result = await SharedWalletService.acceptSharedWalletInvitation(walletId, member.userId);
+      if (result.success) {
+        Alert.alert('Success', 'You have joined the shared wallet!');
+        onMemberUpdate?.();
+      } else {
+        Alert.alert('Error', result.error || 'Failed to join shared wallet');
+      }
+    } catch (error) {
+      logger.error('Failed to accept invitation', { walletId, userId: member.userId, error });
+      Alert.alert('Error', 'Failed to join shared wallet');
+    }
+  };
   const formatWalletAddress = (address?: string) => {
     if (!address) return 'No wallet address';
     if (address.length <= 10) return address;
@@ -45,11 +58,25 @@ const MembersList: React.FC<MembersListProps> = ({
     }
   };
 
+  const getStatusInfo = (status?: SharedWalletMember['status']) => {
+    switch (status) {
+      case 'invited':
+        return { label: 'Invited', color: colors.warning };
+      case 'left':
+        return { label: 'Left', color: colors.error };
+      case 'active':
+      default:
+        return { label: 'Active', color: colors.success };
+    }
+  };
+
   return (
     <View style={styles.listContainer}>
       {members.map((member) => {
         const roleLabel = getRoleLabel(member.role);
+        const statusInfo = getStatusInfo(member.status);
         const isCurrentUser = currentUserId && member.userId === currentUserId;
+        const canAcceptInvitation = isCurrentUser && member.status === 'invited';
 
         return (
           <View key={member.userId} style={styles.memberCard}>
@@ -64,11 +91,24 @@ const MembersList: React.FC<MembersListProps> = ({
               <Text style={styles.memberWalletAddress}>
                 {formatWalletAddress(member.walletAddress)}
               </Text>
+              <View style={styles.statusContainer}>
+                <View style={[styles.statusBadge, { backgroundColor: statusInfo.color }]}>
+                  <Text style={styles.statusText}>{statusInfo.label}</Text>
+                </View>
+                <Text style={styles.memberRole}>
+                  {roleLabel}
+                  {isCurrentUser ? ' (You)' : ''}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.memberRole}>
-              {roleLabel}
-              {isCurrentUser ? ' (You)' : ''}
-            </Text>
+            {canAcceptInvitation && (
+              <Button
+                title="Join"
+                onPress={() => handleAcceptInvitation(member)}
+                size="small"
+                style={styles.joinButton}
+              />
+            )}
           </View>
         );
       })}
@@ -116,6 +156,24 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.white70,
     fontWeight: typography.fontWeight.regular,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: spacing.sm,
+  },
+  statusText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white,
+  },
+  joinButton: {
+    minWidth: 60,
   },
 });
 

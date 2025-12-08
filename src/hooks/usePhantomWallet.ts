@@ -50,6 +50,23 @@ export interface UsePhantomWalletReturn {
 }
 
 export const usePhantomWallet = (): UsePhantomWalletReturn => {
+  // Block in production
+  if (!__DEV__) {
+    return {
+      isConnected: false,
+      isConnecting: false,
+      user: null,
+      walletAddress: null,
+      connectWallet: async () => {},
+      disconnectWallet: async () => {},
+      createSplitWallet: async () => ({ success: false, error: 'Phantom integration disabled' }),
+      signTransaction: async () => ({ success: false, error: 'Phantom integration disabled' }),
+      signMessage: async () => ({ success: false, error: 'Phantom integration disabled' }),
+      switchNetwork: async () => {},
+      getBalance: async () => 0,
+    };
+  }
+
   const { isConnected, user, connect, disconnect } = usePhantom();
   const { solana } = useSolana();
 

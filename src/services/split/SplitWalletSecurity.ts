@@ -851,6 +851,83 @@ export class SplitWalletSecurity {
   }
 
   /**
+   * Add participants to an existing split wallet private key
+   * SECURITY: For Degen Split, all participants need access to the private key
+   */
+  static async addParticipantsToSplitWalletPrivateKey(
+    splitWalletId: string,
+    newParticipants: { userId: string; name: string }[]
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (!newParticipants || newParticipants.length === 0) {
+        return {
+          success: false,
+          error: 'No new participants provided'
+        };
+      }
+
+      const { db } = await import('../../config/firebase/firebase');
+      const { doc, getDoc, updateDoc } = await import('firebase/firestore');
+
+      const privateKeyDocRef = doc(db, 'splitWalletPrivateKeys', splitWalletId);
+      const privateKeyDoc = await getDoc(privateKeyDocRef);
+
+      if (!privateKeyDoc.exists()) {
+        return {
+          success: false,
+          error: 'Split wallet private key document not found'
+        };
+      }
+
+      const data = privateKeyDoc.data() as SharedPrivateKeyDocument;
+      const existingParticipants = data.participants || [];
+
+      // Check for duplicates and filter out existing participants
+      const uniqueNewParticipants = newParticipants.filter(newParticipant =>
+        !existingParticipants.some(existing =>
+          existing.userId === newParticipant.userId
+        )
+      );
+
+      if (uniqueNewParticipants.length === 0) {
+        logger.info('All new participants are already in the private key access list', {
+          splitWalletId,
+          requestedCount: newParticipants.length
+        }, 'SplitWalletSecurity');
+        return { success: true };
+      }
+
+      // Add new participants to the list
+      const updatedParticipants = [...existingParticipants, ...uniqueNewParticipants];
+
+      await updateDoc(privateKeyDocRef, {
+        participants: updatedParticipants,
+        updatedAt: new Date().toISOString()
+      });
+
+      logger.info('Participants added to split wallet private key access', {
+        splitWalletId,
+        addedCount: uniqueNewParticipants.length,
+        totalParticipants: updatedParticipants.length
+      }, 'SplitWalletSecurity');
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to add participants to split wallet private key', {
+        splitWalletId,
+        newParticipantsCount: newParticipants.length,
+        error: errorMessage
+      }, 'SplitWalletSecurity');
+
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
    * Store split wallet private key for all participants (Degen Split)
    * SECURITY: For Degen Split, all participants need access to the private key
    */

@@ -331,6 +331,9 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
       return;
     }
 
+    // Prevent reloading if already loading
+    if (isLoadingSharedWallets) return;
+
     setIsLoadingSharedWallets(true);
     try {
       const result = await SharedWalletService.getUserSharedWallets(currentUser.id.toString());
@@ -356,7 +359,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     } finally {
       setIsLoadingSharedWallets(false);
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isLoadingSharedWallets]);
 
   // Handle route params to set active tab (e.g., when navigating from SharedWalletName or SharedWalletDetails)
   // Only apply if user hasn't manually changed the tab and route params have changed

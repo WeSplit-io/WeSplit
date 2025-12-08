@@ -47,6 +47,138 @@ export interface SharedWalletMember {
 }
 
 /**
+ * Error handling utilities for shared wallet services
+ */
+export class SharedWalletError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public context?: Record<string, any>
+  ) {
+    super(message);
+    this.name = 'SharedWalletError';
+  }
+}
+
+export const SHARED_WALLET_ERROR_CODES = {
+  // Validation errors
+  INVALID_PARAMS: 'INVALID_PARAMS',
+  NAME_TOO_LONG: 'NAME_TOO_LONG',
+  NAME_REQUIRED: 'NAME_REQUIRED',
+  CREATOR_REQUIRED: 'CREATOR_REQUIRED',
+  MEMBERS_REQUIRED: 'MEMBERS_REQUIRED',
+  INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+  NOT_A_MEMBER: 'NOT_A_MEMBER',
+  NOT_ACTIVE_MEMBER: 'NOT_ACTIVE_MEMBER',
+
+  // Transaction errors
+  TRANSACTION_FAILED: 'TRANSACTION_FAILED',
+  VERIFICATION_FAILED: 'VERIFICATION_FAILED',
+  BLOCKCHAIN_ERROR: 'BLOCKCHAIN_ERROR',
+
+  // Access errors
+  PRIVATE_KEY_ACCESS_DENIED: 'PRIVATE_KEY_ACCESS_DENIED',
+  WALLET_NOT_FOUND: 'WALLET_NOT_FOUND',
+
+  // Permission errors
+  INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
+
+  // System errors
+  FIRESTORE_ERROR: 'FIRESTORE_ERROR',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+} as const;
+
+/**
+ * Utility functions for consistent error handling
+ */
+export const SharedWalletErrors = {
+  /**
+   * Create a standardized error result
+   */
+  createError: (
+    code: keyof typeof SHARED_WALLET_ERROR_CODES,
+    message: string,
+    context?: Record<string, any>
+  ): ErrorResult => ({
+    success: false,
+    error: message,
+    code: SHARED_WALLET_ERROR_CODES[code],
+    context,
+  }),
+
+  /**
+   * Create a standardized success result
+   */
+  createSuccess: <T>(data: T): SuccessResult<T> => ({
+    success: true,
+    data,
+  }),
+
+};
+
+/**
+ * Standard error response interface
+ */
+export interface ErrorResult {
+  success: false;
+  error: string;
+  code?: string;
+  context?: Record<string, any>;
+}
+
+/**
+ * Success response interface
+ */
+export interface SuccessResult<T = any> {
+  success: true;
+  data: T;
+}
+
+/**
+ * Standard result type that can be either success or error
+ */
+export type ServiceResult<T = any> = SuccessResult<T> | ErrorResult;
+
+/**
+ * Shared wallet constants and limits
+ */
+export const SHARED_WALLET_CONSTANTS = {
+  // Name limits
+  MAX_WALLET_NAME_LENGTH: 100,
+  MIN_WALLET_NAME_LENGTH: 1,
+
+  // Balance and transaction limits
+  MAX_TRANSACTION_HISTORY_LIMIT: 100,
+  RECENT_WALLETS_LIMIT: 100,
+  USDC_DECIMALS: 6,
+
+  // Default values
+  DEFAULT_CURRENCY: 'USDC' as const,
+  DEFAULT_ALLOW_MEMBER_INVITES: true,
+  DEFAULT_REQUIRE_APPROVAL_FOR_WITHDRAWALS: false,
+
+  // Status values
+  MEMBER_STATUS_ACTIVE: 'active' as const,
+  MEMBER_STATUS_INVITED: 'invited' as const,
+  MEMBER_STATUS_LEFT: 'left' as const,
+
+  // Role values
+  ROLE_CREATOR: 'creator' as const,
+  ROLE_ADMIN: 'admin' as const,
+  ROLE_MEMBER: 'member' as const,
+
+  // Transaction types
+  TRANSACTION_TYPE_FUNDING: 'funding' as const,
+  TRANSACTION_TYPE_WITHDRAWAL: 'withdrawal' as const,
+
+  // Status values
+  WALLET_STATUS_ACTIVE: 'active' as const,
+  WALLET_STATUS_PAUSED: 'paused' as const,
+  WALLET_STATUS_ARCHIVED: 'archived' as const,
+} as const;
+
+/**
  * Shared wallet settings
  */
 export interface SharedWalletSettings {
@@ -194,5 +326,14 @@ export interface SharedWalletTransaction {
   source?: SharedWalletFundingSource;
   destination?: string;
   firebaseDocId?: string;
+}
+
+/**
+ * Result type for getSharedWalletTransactions
+ */
+export interface GetSharedWalletTransactionsResult {
+  success: boolean;
+  transactions?: SharedWalletTransaction[];
+  error?: string;
 }
 

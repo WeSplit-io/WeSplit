@@ -137,6 +137,11 @@ export const PhantomAuthButton: React.FC<PhantomAuthButtonProps> = ({
     }
   }, [isConnected, user]);
 
+  // Block in production
+  if (!__DEV__) {
+    return null;
+  }
+
   return (
     <View style={[fullWidth ? styles.fullWidthContainer : styles.container, style]}>
       <Button

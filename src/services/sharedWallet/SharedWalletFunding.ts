@@ -13,6 +13,7 @@ import type {
   FundSharedWalletParams,
   FundSharedWalletResult,
   SharedWalletTransaction,
+  SHARED_WALLET_CONSTANTS,
 } from './types';
 import { db } from '../../config/firebase/firebase';
 import { collection, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -145,7 +146,7 @@ export class SharedWalletFunding {
       }
 
       // Calculate amount (USDC has 6 decimals)
-      const transferAmount = Math.floor(params.amount * Math.pow(10, 6));
+      const transferAmount = Math.floor(params.amount * Math.pow(10, SHARED_WALLET_CONSTANTS.USDC_DECIMALS));
 
       // Add transfer instruction
       transaction.add(
@@ -215,7 +216,7 @@ export class SharedWalletFunding {
         userId: params.userId,
         userName: wallet.members.find((m) => m.userId === params.userId)?.name || 'Unknown',
         amount: params.amount,
-        currency: wallet.currency || 'USDC',
+        currency: wallet.currency || SHARED_WALLET_CONSTANTS.DEFAULT_CURRENCY,
         transactionSignature: signature,
         status: 'confirmed',
         memo: params.memo,

@@ -16,6 +16,7 @@ import type {
   CreateSharedWalletParams,
   SharedWalletResult,
   SharedWalletMember,
+  SHARED_WALLET_CONSTANTS,
 } from './types';
 
 export class SharedWalletCreation {
@@ -37,8 +38,11 @@ export class SharedWalletCreation {
       return { valid: false, error: 'Wallet name is required' };
     }
 
-    if (params.name.length > 100) {
-      return { valid: false, error: 'Wallet name must be 100 characters or less' };
+    if (params.name.length > SHARED_WALLET_CONSTANTS.MAX_WALLET_NAME_LENGTH) {
+      return {
+        valid: false,
+        error: `Wallet name must be ${SHARED_WALLET_CONSTANTS.MAX_WALLET_NAME_LENGTH} characters or less`
+      };
     }
 
     if (!params.creatorId || typeof params.creatorId !== 'string') {
@@ -169,7 +173,7 @@ export class SharedWalletCreation {
         walletAddress: wallet.address,
         publicKey: wallet.publicKey,
         totalBalance: 0, // Start with zero balance
-        currency: params.currency || 'USDC',
+        currency: params.currency || SHARED_WALLET_CONSTANTS.DEFAULT_CURRENCY,
         status: 'active',
         members,
         createdAt: new Date().toISOString(),

@@ -69,6 +69,11 @@ const SharedWalletNameScreen: React.FC = () => {
   );
 
   const handleNext = useCallback(async () => {
+    if (!__DEV__) {
+      Alert.alert('Coming Soon', 'Shared Wallet creation is currently disabled in this version.');
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }

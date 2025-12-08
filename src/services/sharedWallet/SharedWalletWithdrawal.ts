@@ -13,6 +13,7 @@ import type {
   WithdrawFromSharedWalletParams,
   WithdrawFromSharedWalletResult,
   SharedWalletTransaction,
+  SHARED_WALLET_CONSTANTS,
 } from './types';
 import { db } from '../../config/firebase/firebase';
 import { collection, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -90,7 +91,7 @@ export class SharedWalletWithdrawal {
       if (params.amount > userAvailableBalance) {
         return {
           success: false,
-          error: `Insufficient balance. You can withdraw up to ${userAvailableBalance} ${wallet.currency || 'USDC'}`,
+          error: `Insufficient balance. You can withdraw up to ${userAvailableBalance} ${wallet.currency || SHARED_WALLET_CONSTANTS.DEFAULT_CURRENCY}`,
         };
       }
 
@@ -190,7 +191,7 @@ export class SharedWalletWithdrawal {
       }
 
       // Calculate amount (USDC has 6 decimals)
-      const transferAmount = Math.floor(params.amount * Math.pow(10, 6));
+      const transferAmount = Math.floor(params.amount * Math.pow(10, SHARED_WALLET_CONSTANTS.USDC_DECIMALS));
 
       // Add transfer instruction
       transaction.add(
@@ -261,7 +262,7 @@ export class SharedWalletWithdrawal {
         userId: params.userId,
         userName: userMember.name || 'Unknown',
         amount: params.amount,
-        currency: wallet.currency || 'USDC',
+        currency: wallet.currency || SHARED_WALLET_CONSTANTS.DEFAULT_CURRENCY,
         transactionSignature: signature,
         status: 'confirmed',
         memo: params.memo,
@@ -276,7 +277,7 @@ export class SharedWalletWithdrawal {
         success: true,
         transactionSignature: signature,
         newBalance,
-        message: `Successfully withdrew ${params.amount} ${wallet.currency || 'USDC'} to ${params.destination === 'linked-card' ? 'your linked card' : 'your personal wallet'}`,
+        message: `Successfully withdrew ${params.amount} ${wallet.currency || SHARED_WALLET_CONSTANTS.DEFAULT_CURRENCY} to ${params.destination === 'linked-card' ? 'your linked card' : 'your personal wallet'}`,
       };
 
     } catch (error) {

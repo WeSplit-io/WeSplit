@@ -91,14 +91,75 @@ export class CentralizedTransactionHandler {
         }
 
         case 'shared_wallet_funding': {
-          const feeCalculation = FeeService.calculateCompanyFee(amount, 'send');
+          const feeCalculation = FeeService.calculateCompanyFee(amount, 'deposit');
           requiredBalance = feeCalculation.totalAmount;
           break;
         }
 
         case 'shared_wallet_withdrawal': {
-          const feeCalculation = FeeService.calculateCompanyFee(amount, 'withdraw');
-          requiredBalance = feeCalculation.totalAmount;
+          // For shared wallet withdrawal, we need to validate against the shared wallet balance
+          // and the user's available balance within that wallet, not their personal wallet
+          const sharedWalletId = (params as any).sharedWalletId;
+          if (!sharedWalletId) {
+            return {
+              canExecute: false,
+              error: 'Shared wallet ID is required for withdrawal validation'
+            };
+          }
+
+          try {
+            // Get shared wallet data to check user's available balance
+            const { SharedWalletService } = await import('../sharedWallet');
+            const walletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
+
+            if (!walletResult.success || !walletResult.wallet) {
+              return {
+                canExecute: false,
+                error: 'Shared wallet not found'
+              };
+            }
+
+            const wallet = walletResult.wallet;
+            const userMember = wallet.members?.find((m) => m.userId === userId);
+
+            if (!userMember) {
+              return {
+                canExecute: false,
+                error: 'User is not a member of this shared wallet'
+              };
+            }
+
+            // Calculate user's available balance in shared wallet
+            const userContributed = userMember.totalContributed || 0;
+            const userWithdrawn = userMember.totalWithdrawn || 0;
+            const userAvailableBalance = userContributed - userWithdrawn;
+
+            // Check if user has enough available balance
+            if (amount > userAvailableBalance) {
+              return {
+                canExecute: false,
+                error: `Insufficient balance in shared wallet. You can withdraw up to ${userAvailableBalance.toFixed(6)} ${wallet.currency || 'USDC'}`
+              };
+            }
+
+            // Check if shared wallet has enough total balance
+            if (amount > wallet.totalBalance) {
+              return {
+                canExecute: false,
+                error: 'Insufficient balance in shared wallet'
+              };
+            }
+
+            // For withdrawal, we need the user's personal wallet to have enough for fees
+            // But the main amount comes from the shared wallet
+            const feeCalculation = FeeService.calculateCompanyFee(amount, 'withdraw');
+            requiredBalance = feeCalculation.fee; // Only fees come from personal wallet
+          } catch (error) {
+            return {
+              canExecute: false,
+              error: 'Failed to validate shared wallet withdrawal'
+            };
+          }
           break;
         }
 

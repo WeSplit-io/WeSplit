@@ -1060,7 +1060,7 @@ class ExternalTransferService {
       // Enhanced verification using shared utility
       // CRITICAL: Don't return success until transaction is actually confirmed
       // Best practice: Use shared verification utility for consistent behavior
-      const verificationResult = await verifyTransactionOnBlockchain(await transactionUtils.getConnection(), signature);
+      const verificationResult = await verifyTransactionOnBlockchain(signature);
       if (!verificationResult.success) {
         const errorMessage = verificationResult.error || '';
         const isTimeout = 

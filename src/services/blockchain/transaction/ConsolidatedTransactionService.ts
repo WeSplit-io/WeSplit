@@ -911,18 +911,243 @@ class ConsolidatedTransactionService {
   private async handleSharedWalletFunding(params: any): Promise<CentralizedTransactionResult> {
     const { userId, amount, sharedWalletId, memo } = params;
 
-    // Use internal transfer service for shared wallet funding
-    const result = await this.sendUSDCTransaction({
-      to: sharedWalletId, // Send to shared wallet
+    try {
+      // Validate parameters
+      if (!sharedWalletId || !userId || !amount || amount <= 0) {
+        return {
+          success: false,
+          error: 'Invalid funding parameters'
+        };
+      }
+
+      // Get shared wallet
+      const { SharedWalletService } = await import('../../sharedWallet');
+      const walletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
+      if (!walletResult.success || !walletResult.wallet) {
+        return {
+          success: false,
+          error: 'Shared wallet not found'
+        };
+      }
+
+      const wallet = walletResult.wallet;
+
+      // Verify user is an active member
+      const userMember = wallet.members?.find((m) => m.userId === userId);
+      if (!userMember || userMember.status !== 'active') {
+        return {
+          success: false,
+          error: 'You must be an active member to fund this wallet'
+        };
+      }
+
+      // Execute blockchain transaction using external transfer service (same as withdrawals)
+      logger.info('Shared wallet funding transaction', {
+        sharedWalletId,
+        walletAddress: wallet.walletAddress,
+        amount,
+        userId
+      }, 'ConsolidatedTransactionService');
+
+      const { externalTransferService } = await import('./sendExternal');
+      const result = await externalTransferService.instance.sendExternalTransfer({
+        to: wallet.walletAddress, // Send to shared wallet address
       amount: amount,
       currency: 'USDC',
-      userId: userId,
       memo: memo || `Shared wallet funding`,
+        userId: userId,
       priority: 'medium',
-      transactionType: 'send'
-    });
+        transactionType: 'deposit' // Use deposit type for funding (no fees)
+      });
 
-    if (result.success) {
+      logger.info('External transfer result', {
+        success: result.success,
+        hasSignature: !!result.signature,
+        signature: result.signature,
+        error: result.error
+      }, 'ConsolidatedTransactionService');
+
+      if (!result.success) {
+        // If we have a signature, the transaction might have succeeded despite verification failure
+        // Let's verify the transaction on-chain before giving up
+        if (result.signature) {
+          logger.warn('External transfer returned failure but has signature - verifying on-chain', {
+            signature: result.signature,
+            sharedWalletId,
+            amount,
+            originalError: result.error
+          }, 'ConsolidatedTransactionService');
+
+          try {
+            // First, check the recipient balance to see if funds actually arrived
+            const recipientBalanceBefore = await this.getUsdcBalance(wallet.walletAddress);
+            logger.info('Checking recipient balance before on-chain verification', {
+              sharedWalletId,
+              walletAddress: wallet.walletAddress,
+              currentBalance: recipientBalanceBefore.balance,
+              expectedIncrease: amount
+            }, 'ConsolidatedTransactionService');
+
+            const { verifyTransactionOnBlockchain } = await import('../utils/transactionUtils');
+            const verificationResult = await verifyTransactionOnBlockchain(result.signature);
+
+            if (verificationResult.success) {
+              logger.info('Transaction verified as successful on-chain despite initial failure', {
+                signature: result.signature,
+                sharedWalletId,
+                amount
+              }, 'ConsolidatedTransactionService');
+
+              // Transaction actually succeeded - proceed with balance update
+            } else {
+              logger.error('Transaction verification failed on-chain', {
+                signature: result.signature,
+                verificationError: verificationResult.error,
+                sharedWalletId,
+                amount
+              }, 'ConsolidatedTransactionService');
+
+              return {
+                success: false,
+                error: `Transaction verification failed: ${verificationResult.error}`
+              };
+            }
+          } catch (verificationError) {
+            logger.error('Failed to verify transaction on-chain', {
+              signature: result.signature,
+              error: verificationError instanceof Error ? verificationError.message : String(verificationError),
+              sharedWalletId,
+              amount
+            }, 'ConsolidatedTransactionService');
+
+            // If we can't verify but have a signature, give user benefit of doubt but warn
+            // This prevents users from losing funds due to verification timeouts
+            logger.warn('Proceeding with balance update despite verification failure - user may have lost funds', {
+              signature: result.signature,
+              sharedWalletId,
+              amount,
+              originalError: result.error
+            }, 'ConsolidatedTransactionService');
+
+            // For shared wallet funding, if we have a signature but verification failed,
+            // we'll proceed with the balance update but log extensively for monitoring
+          }
+        } else {
+          // No signature means transaction definitely failed
+          return {
+            success: false,
+            error: result.error || 'Shared wallet funding failed'
+          };
+        }
+      }
+
+      if (!result.signature) {
+        return {
+          success: false,
+          error: 'Transaction completed but no signature returned'
+        };
+      }
+
+      // Update shared wallet balance and member contribution using Firestore transaction for atomicity
+      const { db } = await import('../../../config/firebase/firebase');
+      const { doc, runTransaction, addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+
+      // Get wallet document ID (assuming it's stored in the wallet object)
+      const walletDocId = (wallet as any).firebaseDocId;
+      if (!walletDocId) {
+        logger.error('Wallet document ID not found', { sharedWalletId }, 'ConsolidatedTransactionService');
+        return {
+          success: false,
+          error: 'Failed to update wallet data'
+        };
+      }
+
+      // Use Firestore transaction to ensure atomic balance updates
+      const walletRef = doc(db, 'sharedWallets', walletDocId);
+      let newBalance: number;
+
+      try {
+        await runTransaction(db, async (transaction) => {
+          const walletDoc = await transaction.get(walletRef);
+
+          if (!walletDoc.exists()) {
+            throw new Error('Shared wallet document not found');
+          }
+
+          const currentWallet = walletDoc.data();
+          const currentBalance = currentWallet.totalBalance || 0;
+          newBalance = currentBalance + amount;
+
+          // Update member contribution
+          const currentMembers = currentWallet.members || [];
+          const updatedMembers = currentMembers.map((m: any) => {
+            if (m.userId === userId) {
+              return {
+                ...m,
+                totalContributed: (m.totalContributed || 0) + amount,
+              };
+            }
+            return m;
+          });
+
+          transaction.update(walletRef, {
+            totalBalance: newBalance,
+            members: updatedMembers,
+            updatedAt: serverTimestamp(),
+          });
+        });
+      } catch (transactionError) {
+        logger.error('Failed to update shared wallet balance atomically', {
+          sharedWalletId,
+          userId,
+          amount,
+          error: transactionError instanceof Error ? transactionError.message : String(transactionError)
+        }, 'ConsolidatedTransactionService');
+
+        return {
+          success: false,
+          error: 'Failed to update wallet balance'
+        };
+      }
+
+      // Update member contribution
+      const updatedMembers = wallet.members.map((m) => {
+        if (m.userId === userId) {
+          return {
+            ...m,
+            totalContributed: (m.totalContributed || 0) + amount,
+          };
+        }
+        return m;
+      });
+
+      // Update wallet document
+      await updateDoc(doc(db, 'sharedWallets', walletDocId), {
+        totalBalance: newBalance,
+        members: updatedMembers,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Record transaction
+      const { generateUniqueId } = await import('../../sharedWallet/utils');
+      const transactionData = {
+        id: generateUniqueId('tx'),
+        sharedWalletId: sharedWalletId,
+        type: 'funding',
+        userId: userId,
+        userName: wallet.members.find((m) => m.userId === userId)?.name || 'Unknown',
+        amount: amount,
+        currency: wallet.currency || 'USDC',
+        transactionSignature: result.signature,
+        status: 'confirmed',
+        memo: memo,
+        createdAt: new Date().toISOString(),
+        confirmedAt: new Date().toISOString(),
+        source: 'in-app-wallet',
+      };
+
+      await addDoc(collection(db, 'sharedWalletTransactions'), transactionData);
+
         return {
           success: true,
           transactionSignature: result.signature,
@@ -930,10 +1155,11 @@ class ConsolidatedTransactionService {
           txId: result.txId,
           message: `Successfully funded shared wallet with ${amount.toFixed(6)} USDC`
         };
-    } else {
+    } catch (error) {
+      logger.error('Shared wallet funding failed', error, 'ConsolidatedTransactionService');
       return {
         success: false,
-        error: result.error || 'Shared wallet funding failed'
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
@@ -944,33 +1170,239 @@ class ConsolidatedTransactionService {
   private async handleSharedWalletWithdrawal(params: any): Promise<CentralizedTransactionResult> {
     const { userId, amount, sharedWalletId, destinationAddress, memo } = params;
 
-    // Use external transfer service for shared wallet withdrawals
-    const { externalTransferService } = await import('./sendExternal');
-    const result = await externalTransferService.instance.sendExternalTransfer({
-      to: destinationAddress,
-      amount: amount,
-      currency: 'USDC',
-      userId: userId,
-      memo: memo || `Shared wallet withdrawal`,
-      priority: 'medium',
-      transactionType: 'withdraw'
-    });
+    try {
+      // Validate parameters
+      if (!sharedWalletId || !userId || !amount || amount <= 0) {
+        return {
+          success: false,
+          error: 'Invalid withdrawal parameters'
+        };
+      }
 
-    if (result.success) {
+      // Get shared wallet
+      const { SharedWalletService } = await import('../../sharedWallet');
+      const walletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
+      if (!walletResult.success || !walletResult.wallet) {
+        return {
+          success: false,
+          error: 'Shared wallet not found'
+        };
+      }
+
+      const wallet = walletResult.wallet;
+
+      // Verify user is an active member
+      const userMember = wallet.members?.find((m) => m.userId === userId);
+      if (!userMember || userMember.status !== 'active') {
+        return {
+          success: false,
+          error: 'You must be an active member to withdraw from this wallet'
+        };
+      }
+
+      // Check user's available balance
+      const userContributed = userMember.totalContributed || 0;
+      const userWithdrawn = userMember.totalWithdrawn || 0;
+      const userAvailableBalance = userContributed - userWithdrawn;
+
+      if (amount > userAvailableBalance) {
+        return {
+          success: false,
+          error: `Insufficient balance. You can withdraw up to ${userAvailableBalance} ${wallet.currency || 'USDC'}`
+        };
+      }
+
+      // Check shared wallet has enough balance
+      if (amount > wallet.totalBalance) {
+        return {
+          success: false,
+          error: 'Insufficient balance in shared wallet'
+        };
+      }
+
+      // Get shared wallet private key
+      const privateKeyResult = await SharedWalletService.getSharedWalletPrivateKey(sharedWalletId, userId);
+      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        return {
+          success: false,
+          error: privateKeyResult.error || 'Failed to access shared wallet private key'
+        };
+      }
+
+      // Execute blockchain transaction using the shared wallet's private key
+      // We need to create a custom transaction since the shared wallet is the sender
+      const { createSolanaConnection } = await import('../connection/connectionFactory');
+      const connectionInstance = await createSolanaConnection();
+
+      const { PublicKey, Keypair, Transaction } = await import('@solana/web3.js');
+      const { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction, getAccount } = await import('../secureTokenUtils');
+      const { USDC_CONFIG } = await import('../../shared/walletConstants');
+
+      const fromPublicKey = new PublicKey(wallet.walletAddress);
+      const toPublicKey = new PublicKey(destinationAddress);
+      const mintPublicKey = new PublicKey(USDC_CONFIG.mintAddress);
+
+      const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromPublicKey);
+      const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
+
+      // Create transaction
+      const transaction = new Transaction();
+
+      // Check if destination token account exists
+      try {
+        await getAccount(connectionInstance, toTokenAccount);
+      } catch {
+        // Create associated token account if it doesn't exist
+        const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
+        const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+        const companyPublicKey = new PublicKey(companyWalletAddress);
+
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            companyPublicKey,
+            toTokenAccount,
+            toPublicKey,
+            mintPublicKey
+          )
+        );
+      }
+
+      // Calculate amount (USDC has 6 decimals)
+      const transferAmount = Math.floor(amount * Math.pow(10, 6));
+
+      // Add transfer instruction
+      transaction.add(
+        createTransferInstruction(
+          fromTokenAccount,
+          toTokenAccount,
+          fromPublicKey,
+          transferAmount
+        )
+      );
+
+      // Sign and send transaction
+      const fromKeypair = Keypair.fromSecretKey(
+        Uint8Array.from(JSON.parse(privateKeyResult.privateKey))
+      );
+
+      transaction.feePayer = fromPublicKey;
+      const latestBlockhash = await connectionInstance.getLatestBlockhash();
+      transaction.recentBlockhash = latestBlockhash.blockhash;
+
+      // Sign transaction
+      transaction.sign(fromKeypair);
+
+      // Send transaction
+      const signature = await connectionInstance.sendRawTransaction(
+        transaction.serialize(),
+        { skipPreflight: false }
+      );
+
+      // Wait for confirmation
+      await connectionInstance.confirmTransaction(signature, 'confirmed');
+
+      // Update shared wallet balance and member withdrawal amount using Firestore transaction for atomicity
+      const { db } = await import('../../../config/firebase/firebase');
+      const { doc, runTransaction, addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+
+      // Get wallet document ID
+      const walletDocId = (wallet as any).firebaseDocId;
+      if (!walletDocId) {
+        logger.error('Wallet document ID not found', { sharedWalletId }, 'ConsolidatedTransactionService');
+        return {
+          success: false,
+          error: 'Failed to update wallet data'
+        };
+      }
+
+      // Use Firestore transaction to ensure atomic balance updates
+      const walletRef = doc(db, 'sharedWallets', walletDocId);
+      let newBalance: number;
+
+      try {
+        await runTransaction(db, async (transaction) => {
+          const walletDoc = await transaction.get(walletRef);
+
+          if (!walletDoc.exists()) {
+            throw new Error('Shared wallet document not found');
+          }
+
+          const currentWallet = walletDoc.data();
+          const currentBalance = currentWallet.totalBalance || 0;
+          newBalance = currentBalance - amount;
+
+          // Check if wallet has sufficient balance
+          if (newBalance < 0) {
+            throw new Error('Insufficient balance in shared wallet');
+          }
+
+          // Update member withdrawal amount
+          const currentMembers = currentWallet.members || [];
+          const updatedMembers = currentMembers.map((m: any) => {
+            if (m.userId === userId) {
+              return {
+                ...m,
+                totalWithdrawn: (m.totalWithdrawn || 0) + amount,
+              };
+            }
+            return m;
+          });
+
+          transaction.update(walletRef, {
+            totalBalance: newBalance,
+            members: updatedMembers,
+            updatedAt: serverTimestamp(),
+          });
+        });
+      } catch (transactionError) {
+        logger.error('Failed to update shared wallet balance atomically', {
+          sharedWalletId,
+          userId,
+          amount,
+          error: transactionError instanceof Error ? transactionError.message : String(transactionError)
+        }, 'ConsolidatedTransactionService');
+
+        return {
+          success: false,
+          error: transactionError instanceof Error ? transactionError.message : 'Failed to update wallet balance'
+        };
+      }
+
+      // Record transaction
+      const { generateUniqueId } = await import('../../sharedWallet/utils');
+      const transactionData = {
+        id: generateUniqueId('tx'),
+        sharedWalletId: sharedWalletId,
+        type: 'withdrawal',
+        userId: userId,
+        userName: userMember.name || 'Unknown',
+        amount: amount,
+        currency: wallet.currency || 'USDC',
+        transactionSignature: signature,
+        status: 'confirmed',
+        memo: memo,
+        createdAt: new Date().toISOString(),
+        confirmedAt: new Date().toISOString(),
+        destination: destinationAddress,
+      };
+
+      await addDoc(collection(db, 'sharedWalletTransactions'), transactionData);
+
         return {
           success: true,
-          transactionSignature: result.signature || '',
-          transactionId: result.txId || '',
-          txId: result.txId || '',
-          fee: result.companyFee || 0,
-          netAmount: result.netAmount || amount,
-          blockchainFee: result.blockchainFee || 0,
+        transactionSignature: signature,
+        transactionId: signature,
+        txId: signature,
+        fee: 0, // Company covers fees for withdrawals
+        netAmount: amount,
+        blockchainFee: 0,
           message: `Successfully withdrew ${amount.toFixed(6)} USDC from shared wallet`
         };
-    } else {
+    } catch (error) {
+      logger.error('Shared wallet withdrawal failed', error, 'ConsolidatedTransactionService');
       return {
         success: false,
-        error: result.error || 'Shared wallet withdrawal failed'
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }

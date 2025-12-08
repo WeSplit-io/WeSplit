@@ -50,6 +50,7 @@ interface CentralizedTransactionModalProps {
   splitId?: string;
   billId?: string;
   sharedWalletId?: string;
+  currentUser?: any;
   isSettlement?: boolean;
   requestId?: string;
 }
@@ -65,6 +66,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   splitId,
   billId,
   sharedWalletId,
+  currentUser: propCurrentUser,
   isSettlement,
   requestId,
   ...props
@@ -80,14 +82,13 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   // ✅ CRITICAL: Prevent multiple transaction executions (debouncing)
   const isExecutingRef = useRef(false);
 
-  // Context hooks - we'll need to import these
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  // Use currentUser directly from props instead of local state
+  const currentUser = propCurrentUser;
   const [appWalletBalance, setAppWalletBalance] = useState<number | null>(null);
   const [liveBalance, setLiveBalance] = useState<any>(null);
 
   // For now, we'll use placeholder values - in real implementation, these would come from context
   useEffect(() => {
-    // TODO: Get current user from context
     // TODO: Get wallet balance from context
     // TODO: Subscribe to live balance
   }, []);
