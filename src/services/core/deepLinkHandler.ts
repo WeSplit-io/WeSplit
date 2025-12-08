@@ -14,7 +14,7 @@ import { NavigationContainerRef, ParamListBase } from '@react-navigation/native'
 import { logger } from '../analytics/loggingService';
 import { User } from '../../types';
 import { pendingInvitationService, PendingInvitation } from './pendingInvitationService';
-import { firebaseDataService } from './index';
+import { firebaseDataService } from '../data/firebaseDataService';
 
 // Universal link domains that we recognize
 const UNIVERSAL_LINK_DOMAINS = ['wesplit.io', 'www.wesplit.io'];
