@@ -879,6 +879,9 @@ export class SharedWalletService {
   }
 }
 
+// Export constants for convenience
+export { SHARED_WALLET_CONSTANTS } from './types';
+
 // Export types for convenience
 export type {
   SharedWallet,
