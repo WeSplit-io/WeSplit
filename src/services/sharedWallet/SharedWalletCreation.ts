@@ -16,8 +16,8 @@ import type {
   CreateSharedWalletParams,
   SharedWalletResult,
   SharedWalletMember,
-  SHARED_WALLET_CONSTANTS,
 } from './types';
+import { SHARED_WALLET_CONSTANTS } from './index';
 
 export class SharedWalletCreation {
   /**

@@ -13,8 +13,8 @@ import type {
   FundSharedWalletParams,
   FundSharedWalletResult,
   SharedWalletTransaction,
-  SHARED_WALLET_CONSTANTS,
 } from './types';
+import { SHARED_WALLET_CONSTANTS } from './index';
 import { db } from '../../config/firebase/firebase';
 import { collection, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
