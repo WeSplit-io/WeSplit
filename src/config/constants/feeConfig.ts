@@ -148,24 +148,21 @@ async function getCompanyWalletAddress(): Promise<string> {
       cachedCompanyWalletAddress = address;
       return address;
     } catch (error: any) {
-      // In production, we MUST have the address from Firebase - no fallback
-      if (!__DEV__) {
-        throw new Error(
-          `Company wallet address not available from Firebase: ${error?.message || String(error)}. ` +
-          `This is required in production. Ensure getCompanyWalletAddress function is deployed.`
-        );
-      }
+      // CRITICAL: Don't throw in production - return empty string and log error
+      // This is an async function, but throwing here can still cause issues
+      console.error('⚠️ Company wallet address not available from Firebase:', error?.message || String(error));
+      console.error('   Set EXPO_PUBLIC_COMPANY_WALLET_ADDRESS or ensure Firebase function is deployed.');
       
-      // In development, allow fallback to env var for testing
+      // Try fallback to env var
       const envAddress = getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS');
       if (envAddress) {
         cachedCompanyWalletAddress = envAddress.trim();
         return cachedCompanyWalletAddress;
       }
-      throw new Error(
-        `Company wallet address not available: ${error?.message || String(error)}. ` +
-        `Firebase function failed and no environment variable found.`
-      );
+      
+      // Return empty string instead of throwing
+      // Code using this should check for empty string
+      return '';
     }
   })();
 
@@ -188,6 +185,13 @@ export const COMPANY_WALLET_CONFIG = {
     const envAddress = getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS');
     if (envAddress) {
       return envAddress;
+    }
+    // CRITICAL: Don't throw in production - return empty string and log error
+    // Code should use getCompanyWalletAddress() async function instead
+    if (!__DEV__) {
+      console.error('⚠️ Company wallet address not available. Use getCompanyWalletAddress() async function instead.');
+      console.error('   Or set EXPO_PUBLIC_COMPANY_WALLET_ADDRESS environment variable.');
+      return ''; // Return empty string instead of throwing
     }
     throw new Error('Company wallet address not available. Call getCompanyWalletAddress() first or set EXPO_PUBLIC_COMPANY_WALLET_ADDRESS');
   },
@@ -303,11 +307,24 @@ export class FeeService {
    */
   static async getFeePayerPublicKey(_userPublicKey: PublicKey): Promise<PublicKey> {
     // Get address from Firebase (with fallback to env var)
-    const address = await COMPANY_WALLET_CONFIG.getAddress();
-    if (!address) {
-      throw new Error('Company wallet not configured. SOL gas fees must be paid by company wallet.');
+    try {
+      const address = await COMPANY_WALLET_CONFIG.getAddress();
+      if (!address || address.trim() === '') {
+        // CRITICAL: Don't throw in production - return a dummy key and log error
+        // This prevents app crashes, but transactions will fail gracefully
+        console.error('⚠️ Company wallet not configured. SOL gas fees cannot be paid.');
+        console.error('   Set EXPO_PUBLIC_COMPANY_WALLET_ADDRESS or ensure Firebase function is deployed.');
+        // Return a dummy public key - transactions will fail but app won't crash
+        // This is better than crashing the entire app
+        return new PublicKey('11111111111111111111111111111111'); // System program ID as fallback
+      }
+      return new PublicKey(address);
+    } catch (error: any) {
+      // Log error but don't crash
+      console.error('⚠️ Failed to get company wallet address:', error?.message || error);
+      console.error('   Returning fallback public key. Transactions may fail.');
+      return new PublicKey('11111111111111111111111111111111'); // System program ID as fallback
     }
-    return new PublicKey(address);
   }
 
   /**

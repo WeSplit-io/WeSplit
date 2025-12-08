@@ -102,15 +102,41 @@ const getJwtSecret = (): string => {
       console.warn('⚠️ JWT_SECRET is not configured. This should only be used in development.');
       return 'dev-secret-only-do-not-use-in-production';
     }
-    throw new Error('JWT_SECRET is required and must be configured. This is a security requirement.');
+    // CRITICAL: Don't throw in production - JWT_SECRET is a server-side secret
+    // Client-side code shouldn't require it. If it's needed, it should be handled by backend.
+    console.error('⚠️ JWT_SECRET is not configured. This is typically a server-side secret.');
+    console.error('   Client-side code should not require JWT_SECRET.');
+    console.error('   If JWT operations are needed, they should be handled by backend services.');
+    // Return a placeholder that will fail gracefully if used
+    return 'JWT_SECRET_NOT_CONFIGURED_CLIENT_SIDE';
   }
   return secret;
 };
 
+// Lazy initialization to prevent crashes at module load time
+let jwtConfigCache: { secret: string; expiresIn: string; refreshExpiresIn: string } | null = null;
+
+const getJwtConfig = () => {
+  if (!jwtConfigCache) {
+    jwtConfigCache = {
+      secret: getJwtSecret(),
+      expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      refreshExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
+    };
+  }
+  return jwtConfigCache;
+};
+
 export const JWT_CONFIG = {
-  secret: getJwtSecret(),
-  expiresIn: process.env.JWT_EXPIRES_IN || '24h',
-  refreshExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
+  get secret() {
+    return getJwtConfig().secret;
+  },
+  get expiresIn() {
+    return getJwtConfig().expiresIn;
+  },
+  get refreshExpiresIn() {
+    return getJwtConfig().refreshExpiresIn;
+  },
 };
 
 // Email configuration

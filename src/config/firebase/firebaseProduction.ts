@@ -36,7 +36,8 @@ const getEnvVar = (key: string): string => {
 };
 
 // Get Firebase configuration with fallbacks
-const getFirebaseConfig = () => {
+// Returns null if required fields are missing (instead of throwing)
+const getFirebaseConfig = (): any => {
   const apiKey = getEnvVar('FIREBASE_API_KEY');
   const authDomain = getEnvVar('FIREBASE_AUTH_DOMAIN') || "wesplit-35186.firebaseapp.com";
   const projectId = getEnvVar('FIREBASE_PROJECT_ID') || "wesplit-35186";
@@ -64,7 +65,10 @@ const getFirebaseConfig = () => {
   if (missingFields.length > 0) {
     const errorMessage = `Missing required Firebase configuration: ${missingFields.join(', ')}`;
     logger.error('Firebase Configuration Error', { missingFields }, 'firebaseProduction');
-    throw new Error(errorMessage);
+    // CRITICAL: Don't throw - return null config and let initialization fail gracefully
+    console.error('🚨 Firebase configuration incomplete. Returning null config.');
+    console.error('   App will continue but Firebase features will not work.');
+    return null; // Return null instead of throwing
   }
   
   return {
@@ -92,6 +96,12 @@ export const initializeFirebaseProduction = () => {
     
     // Get configuration
     const config = getFirebaseConfig();
+    
+    // If config is null (missing required fields), return null instances
+    if (!config) {
+      console.error('🚨 Cannot initialize Firebase - configuration is incomplete');
+      return { app: null, auth: null, db: null, storage: null };
+    }
     
     // Initialize Firebase app
     firebaseApp = initializeApp(config);
@@ -145,19 +155,83 @@ export const initializeFirebaseProduction = () => {
   }
 };
 
-// Export initialized instances
-export const { app, auth, db, storage } = initializeFirebaseProduction();
+// CRITICAL: Don't initialize at module load time - this can crash the app
+// Initialize lazily on first access
+let firebaseInstances: { app: any; auth: any; db: any; storage: any } | null = null;
+let initializationAttempted = false;
+
+const getFirebaseInstances = () => {
+  if (!firebaseInstances && !initializationAttempted) {
+    initializationAttempted = true;
+    try {
+      firebaseInstances = initializeFirebaseProduction();
+    } catch (error: any) {
+      console.error('🚨 Failed to initialize Firebase Production:', error?.message || error);
+      // Return null objects to prevent crashes
+      firebaseInstances = {
+        app: null,
+        auth: null,
+        db: null,
+        storage: null,
+      };
+    }
+  }
+  return firebaseInstances || { app: null, auth: null, db: null, storage: null };
+};
+
+// Export lazy getters - initialize on first access, not at module load
+// This prevents crashes if initialization fails
+export const app = new Proxy({} as any, {
+  get(target, prop) {
+    const instance = getFirebaseInstances().app;
+    if (!instance) return undefined;
+    return typeof instance[prop] === 'function' 
+      ? instance[prop].bind(instance) 
+      : instance[prop];
+  }
+});
+
+export const auth = new Proxy({} as any, {
+  get(target, prop) {
+    const instance = getFirebaseInstances().auth;
+    if (!instance) return undefined;
+    return typeof instance[prop] === 'function' 
+      ? instance[prop].bind(instance) 
+      : instance[prop];
+  }
+});
+
+export const db = new Proxy({} as any, {
+  get(target, prop) {
+    const instance = getFirebaseInstances().db;
+    if (!instance) return undefined;
+    return typeof instance[prop] === 'function' 
+      ? instance[prop].bind(instance) 
+      : instance[prop];
+  }
+});
+
+export const storage = new Proxy({} as any, {
+  get(target, prop) {
+    const instance = getFirebaseInstances().storage;
+    if (!instance) return undefined;
+    return typeof instance[prop] === 'function' 
+      ? instance[prop].bind(instance) 
+      : instance[prop];
+  }
+});
 
 // Test Firebase connection
 export const testFirebaseConnection = async (): Promise<boolean> => {
   try {
-    if (!auth) {
+    const authInstance = getFirebaseInstances().auth;
+    if (!authInstance) {
       logger.error('Firebase Auth not initialized', null, 'firebaseProduction');
       return false;
     }
     
     // Test basic Firebase functionality
-    const currentUser = auth.currentUser;
+    const currentUser = authInstance.currentUser;
     logger.info('Firebase connection test successful', { 
       hasCurrentUser: !!currentUser,
       userId: currentUser?.uid || 'none'

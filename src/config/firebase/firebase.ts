@@ -38,6 +38,14 @@ import { logger } from '../../services/analytics/loggingService';
 
 // Get environment variables from Expo Constants with enhanced production support
 const getEnvVar = (key: string): string => {
+  // Helper to convert FIREBASE_API_KEY -> apiKey, FIREBASE_AUTH_DOMAIN -> authDomain, etc.
+  const toCamelCase = (str: string): string => {
+    return str
+      .replace(/^FIREBASE_/, '')
+      .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+      .replace(/^[A-Z]/, (letter) => letter.toLowerCase());
+  };
+  
   // Try to get from process.env first (for development)
   if (process.env[key]) {
     return process.env[key]!.trim();
@@ -68,9 +76,23 @@ const getEnvVar = (key: string): string => {
     return String((Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`]).trim();
   }
   
-  // Additional fallback: try to get from firebase config object
-  if (Constants.expoConfig?.extra?.firebase?.[key.toLowerCase().replace('FIREBASE_', '')]) {
-    return String(Constants.expoConfig.extra.firebase[key.toLowerCase().replace('FIREBASE_', '')]).trim();
+  // CRITICAL: Try to get from firebase config object (from app.config.js)
+  // This is the primary source in production builds
+  const firebaseKey = toCamelCase(key);
+  if (Constants.expoConfig?.extra?.firebase?.[firebaseKey]) {
+    const value = Constants.expoConfig.extra.firebase[firebaseKey];
+    if (value && typeof value === 'string' && value.trim() !== '') {
+      return String(value).trim();
+    }
+  }
+  
+  // Also try legacy format (lowercase with underscores)
+  const legacyKey = key.toLowerCase().replace('firebase_', '');
+  if (Constants.expoConfig?.extra?.firebase?.[legacyKey]) {
+    const value = Constants.expoConfig.extra.firebase[legacyKey];
+    if (value && typeof value === 'string' && value.trim() !== '') {
+      return String(value).trim();
+    }
   }
   
   // Production fallback: try to get from app.config.js or app.json
@@ -85,59 +107,188 @@ const getEnvVar = (key: string): string => {
   return '';
 };
 
+// Helper to check if a value is a template string that wasn't substituted
+const isTemplateString = (value: any): boolean => {
+  return typeof value === 'string' && value.startsWith('${') && value.endsWith('}');
+};
+
 // Get Firebase configuration values
-const apiKey = getEnvVar('FIREBASE_API_KEY');
-const authDomain = getEnvVar('FIREBASE_AUTH_DOMAIN') || "wesplit-35186.firebaseapp.com";
-const projectId = getEnvVar('FIREBASE_PROJECT_ID') || "wesplit-35186";
-const storageBucket = getEnvVar('FIREBASE_STORAGE_BUCKET') || "wesplit-35186.appspot.com";
-const messagingSenderId = getEnvVar('FIREBASE_MESSAGING_SENDER_ID');
-const appId = getEnvVar('FIREBASE_APP_ID');
+let apiKey = getEnvVar('FIREBASE_API_KEY');
+let authDomain = getEnvVar('FIREBASE_AUTH_DOMAIN') || "wesplit-35186.firebaseapp.com";
+let projectId = getEnvVar('FIREBASE_PROJECT_ID') || "wesplit-35186";
+let storageBucket = getEnvVar('FIREBASE_STORAGE_BUCKET') || "wesplit-35186.appspot.com";
+let messagingSenderId = getEnvVar('FIREBASE_MESSAGING_SENDER_ID');
+let appId = getEnvVar('FIREBASE_APP_ID');
 
-// Configuration validation only
+// Check for template strings (values that weren't substituted during build)
+if (isTemplateString(apiKey)) {
+  console.warn('⚠️  apiKey appears to be a template string, was not substituted during build');
+  apiKey = '';
+}
+if (isTemplateString(messagingSenderId)) {
+  console.warn('⚠️  messagingSenderId appears to be a template string, was not substituted during build');
+  messagingSenderId = '';
+}
+if (isTemplateString(appId)) {
+  console.warn('⚠️  appId appears to be a template string, was not substituted during build');
+  appId = '';
+}
 
-// Validate required environment variables
+// Debug: Log what we found (only in development)
+if (__DEV__) {
+  console.log('Firebase Config Check:', {
+    apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING',
+    authDomain,
+    projectId,
+    storageBucket,
+    messagingSenderId: messagingSenderId ? `${messagingSenderId.substring(0, 10)}...` : 'MISSING',
+    appId: appId ? `${appId.substring(0, 10)}...` : 'MISSING',
+    hasFirebaseConfig: !!Constants.expoConfig?.extra?.firebase,
+    firebaseConfigKeys: Constants.expoConfig?.extra?.firebase ? Object.keys(Constants.expoConfig.extra.firebase) : []
+  });
+}
+
+// Configuration validation with better error messages
+const missingFields: string[] = [];
+
 if (!apiKey) {
-  console.error('EXPO_PUBLIC_FIREBASE_API_KEY is missing. Please check your .env file and app.json configuration.');
-  throw new Error('EXPO_PUBLIC_FIREBASE_API_KEY is required. Please add it to your .env file or app.json extra section.');
+  missingFields.push('EXPO_PUBLIC_FIREBASE_API_KEY');
+  console.error('❌ EXPO_PUBLIC_FIREBASE_API_KEY is missing.');
+  console.error('   Check: Constants.expoConfig?.extra?.firebase?.apiKey');
+  console.error('   Available firebase keys:', Constants.expoConfig?.extra?.firebase ? Object.keys(Constants.expoConfig.extra.firebase) : 'none');
 }
 
 if (!messagingSenderId) {
-  console.error('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID is missing. Please check your .env file and app.json configuration.');
-  throw new Error('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID is required. Please add it to your .env file or app.json extra section.');
+  missingFields.push('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID');
+  console.error('❌ EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID is missing.');
 }
 
 if (!appId) {
-  console.error('EXPO_PUBLIC_FIREBASE_APP_ID is missing. Please check your .env file and app.json configuration.');
-  throw new Error('EXPO_PUBLIC_FIREBASE_APP_ID is required. Please add it to your .env file or app.json extra section.');
+  missingFields.push('EXPO_PUBLIC_FIREBASE_APP_ID');
+  console.error('❌ EXPO_PUBLIC_FIREBASE_APP_ID is missing.');
+}
+
+if (missingFields.length > 0) {
+  const errorMessage = `Firebase configuration is incomplete. Missing: ${missingFields.join(', ')}.\n\n` +
+    `In production, these must be set as EAS secrets:\n` +
+    missingFields.map(field => `  eas secret:create --scope project --name ${field} --value "your-value"`).join('\n') +
+    `\n\nOr ensure they are in your app.config.js extra.firebase object.`;
+  
+  console.error('🚨 FIREBASE CONFIGURATION ERROR:', errorMessage);
+  
+  // CRITICAL: Never throw in production - this crashes the app before React renders
+  // Log the error and let initialization fail gracefully
+  console.error('⚠️  Firebase will not be initialized. App will continue but Firebase features will not work.');
+  console.error('   Please fix Firebase configuration and rebuild the app.');
 }
 
 // Firebase configuration
-const firebaseConfig = {
+// CRITICAL: Validate config before creating it - Firebase throws if values are invalid
+const canInitializeFirebase = apiKey && apiKey.trim() !== '' && 
+                               messagingSenderId && messagingSenderId.trim() !== '' && 
+                               appId && appId.trim() !== '';
+
+const firebaseConfig = canInitializeFirebase ? {
   apiKey,
   authDomain,
   projectId,
   storageBucket,
   messagingSenderId,
   appId
-};
+} : null;
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase with error handling
+let firebaseApp: any;
+let authInstance: any;
+let firebaseDb: any;
+let firebaseStorage: any;
 
-// PRODUCTION: Use live Firebase Auth (no emulator for production readiness)
-// Emulator was used for development testing, now using production Firebase
+// CRITICAL: Check config before trying to initialize
+// This prevents Firebase from throwing with invalid config
+if (!canInitializeFirebase || !firebaseConfig) {
+  // Set all to null - app will continue without Firebase
+  firebaseApp = null;
+  authInstance = null;
+  firebaseDb = null;
+  firebaseStorage = null;
+  
+  // Log error but don't throw - this is at module load time
+  console.error('🚨 FIREBASE CONFIGURATION INCOMPLETE - App will continue but Firebase features will not work');
+  console.error('   Missing required fields. Please check your Firebase configuration.');
+  console.error('   Required: EXPO_PUBLIC_FIREBASE_API_KEY, EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID, EXPO_PUBLIC_FIREBASE_APP_ID');
+} else {
+  // Only try to initialize if we have valid config
+  try {
+    // Initialize Firebase
+    firebaseApp = initializeApp(firebaseConfig);
+    
+    // PRODUCTION: Use live Firebase Auth (no emulator for production readiness)
+    // Emulator was used for development testing, now using production Firebase
+    
+    // Initialize Firebase Authentication with persistence
+    authInstance = initializeFirebaseAuth(firebaseApp);
+    
+    // Initialize Cloud Firestore and get a reference to the service
+    firebaseDb = getFirestore(firebaseApp);
+    
+    // Initialize Firebase Storage and get a reference to the service
+    firebaseStorage = getStorage(firebaseApp);
+    
+    if (__DEV__) {
+      logger.info('Firebase initialized successfully', { projectId }, 'firebase');
+    }
+  } catch (error: any) {
+    // CRITICAL: Never throw in production - this crashes the app before React renders
+    // All errors are caught here and handled gracefully
+    
+    const errorMessage = `Failed to initialize Firebase: ${error?.message || 'Unknown error'}`;
+    
+    // Set to null if not already set
+    firebaseApp = null;
+    authInstance = null;
+    firebaseDb = null;
+    firebaseStorage = null;
+    
+    console.error('🚨 FIREBASE INITIALIZATION ERROR:', errorMessage);
+    console.error('Firebase config:', {
+      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING',
+      authDomain,
+      projectId,
+      storageBucket,
+      messagingSenderId: messagingSenderId ? `${messagingSenderId.substring(0, 10)}...` : 'MISSING',
+      appId: appId ? `${appId.substring(0, 10)}...` : 'MISSING'
+    });
+    
+    // CRITICAL: Never throw - this crashes the app before React renders
+    // Instead, log the error and create safe fallback objects
+    // The app can still render, and Firebase-dependent features will gracefully fail
+    console.error('🚨 FIREBASE INITIALIZATION FAILED - App will continue but Firebase features will not work');
+    console.error('   This is a critical error. Please check your Firebase configuration.');
+    console.error('   Error:', errorMessage);
+    
+    // Log to error tracking if available
+    try {
+      logger.error('Firebase initialization failed - app will continue without Firebase', {
+        error: errorMessage,
+        config: {
+          hasApiKey: !!apiKey,
+          hasMessagingSenderId: !!messagingSenderId,
+          hasAppId: !!appId,
+          projectId,
+          authDomain
+        }
+      }, 'firebase');
+    } catch (logError) {
+      // Ignore logging errors
+    }
+  }
+}
 
-// Initialize Firebase Authentication with persistence
-export const auth = initializeFirebaseAuth(app);
-
-// Initialize Cloud Firestore and get a reference to the service
-export const db = getFirestore(app);
-
-// Connect to Firestore emulator in development mode
-
-
-// Initialize Firebase Storage and get a reference to the service
-export const storage = getStorage(app);
+// Export Firebase services (using const exports for compatibility)
+export const app = firebaseApp;
+export const auth = authInstance;
+export const db = firebaseDb;
+export const storage = firebaseStorage;
 
 // Firebase Authentication functions for email-only flow
 export const firebaseAuth = {
@@ -177,11 +328,18 @@ export const firebaseAuth = {
 
   // Check if the current URL is a sign-in link
   isSignInLink(url: string): boolean {
+    if (!checkFirebaseInitialized()) {
+      return false;
+    }
     return isSignInWithEmailLink(auth, url);
   },
 
   // Sign in with email link
   async signInWithEmailLink(email: string, url: string) {
+    if (!checkFirebaseInitialized()) {
+      throw new Error('Firebase is not initialized. Cannot sign in.');
+    }
+    
     try {
       const result = await signInWithEmailLink(auth, email, url);
       return result.user;
@@ -193,6 +351,9 @@ export const firebaseAuth = {
 
   // Create user with email and temporary password (for verification flow)
   async createUserWithEmail(email: string, temporaryPassword: string) {
+    if (!checkFirebaseInitialized()) {
+      throw new Error('Firebase is not initialized. Cannot create user.');
+    }
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, temporaryPassword);
       return userCredential.user;
@@ -204,6 +365,9 @@ export const firebaseAuth = {
 
   // Sign in with email and password
   async signInWithEmail(email: string, password: string) {
+    if (!checkFirebaseInitialized()) {
+      throw new Error('Firebase is not initialized. Cannot sign in.');
+    }
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       return userCredential.user;
@@ -225,6 +389,9 @@ export const firebaseAuth = {
 
   // Send password reset email
   async sendPasswordResetEmail(email: string) {
+    if (!checkFirebaseInitialized()) {
+      throw new Error('Firebase is not initialized. Cannot send password reset email.');
+    }
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
@@ -235,6 +402,10 @@ export const firebaseAuth = {
 
   // Sign out
   async signOut() {
+    if (!checkFirebaseInitialized()) {
+      // Don't throw on signOut - just return silently if Firebase isn't initialized
+      return;
+    }
     try {
       await signOut(auth);
     } catch (error) {
@@ -251,6 +422,9 @@ export const firebaseAuth = {
   // Social Authentication Methods
   // Google Sign In
   async signInWithGoogle(idToken: string) {
+    if (!checkFirebaseInitialized()) {
+      throw new Error('Firebase is not initialized. Cannot sign in with Google.');
+    }
     try {
       const credential = GoogleAuthProvider.credential(idToken);
       const result = await signInWithCredential(auth, credential);
@@ -263,6 +437,9 @@ export const firebaseAuth = {
 
   // Apple Sign In
   async signInWithApple(idToken: string, nonce: string) {
+    if (!checkFirebaseInitialized()) {
+      throw new Error('Firebase is not initialized. Cannot sign in with Apple.');
+    }
     try {
       const provider = new OAuthProvider('apple.com');
       const credential = provider.credential({
@@ -279,6 +456,9 @@ export const firebaseAuth = {
 
   // Twitter Sign In
   async signInWithTwitter(accessToken: string, secret: string) {
+    if (!checkFirebaseInitialized()) {
+      throw new Error('Firebase is not initialized. Cannot sign in with Twitter.');
+    }
     try {
       const credential = TwitterAuthProvider.credential(accessToken, secret);
       const result = await signInWithCredential(auth, credential);
@@ -291,6 +471,10 @@ export const firebaseAuth = {
 
   // Listen to auth state changes
   onAuthStateChanged(callback: (user: FirebaseUser | null) => void) {
+    if (!checkFirebaseInitialized()) {
+      // Return a no-op unsubscribe function if Firebase isn't initialized
+      return () => {};
+    }
     return onAuthStateChanged(auth, callback);
   },
 

@@ -434,6 +434,23 @@ export function clearConfigCache(): void {
   logger.info('Configuration cache cleared', null, 'unified');
 }
 
-// Convenience exports
-export const config = getConfig();
+// Convenience exports - lazy initialization to prevent crashes
+// Don't call getConfig() at module load time
+let configCache: UnifiedConfig | null = null;
+
+const getCachedConfig = (): UnifiedConfig => {
+  if (!configCache) {
+    configCache = getConfig();
+  }
+  return configCache;
+};
+
+// Export as getter to prevent module load time execution
+export const config = new Proxy({} as UnifiedConfig, {
+  get(target, prop) {
+    const instance = getCachedConfig();
+    return instance[prop as keyof UnifiedConfig];
+  }
+});
+
 export default config;

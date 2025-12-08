@@ -1,0 +1,47 @@
+[dotenv@17.2.3] injecting env (93) from .env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+[1m
+============================================================[0m
+[1m🚀 Production Build Validation[0m
+[1m============================================================
+[0m
+[1m
+🔍 Validating Firebase Configuration...[0m
+[32m✅ EXPO_PUBLIC_FIREBASE_API_KEY is set[0m
+[32m✅ EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID is set[0m
+[32m✅ EXPO_PUBLIC_FIREBASE_APP_ID is set[0m
+[32m✅ EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN is set[0m
+[32m✅ EXPO_PUBLIC_FIREBASE_PROJECT_ID is set[0m
+[32m✅ EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET is set[0m
+[32m✅ EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID is set[0m
+[32m✅ app.config.js contains firebase configuration[0m
+[1m
+🔍 Validating Network Configuration...[0m
+[33m⚠️  Network is not set to mainnet, but build scripts will set it automatically[0m
+[36mℹ️  Build scripts will set EXPO_PUBLIC_NETWORK=mainnet during build[0m
+[32m✅ At least one RPC API key is configured[0m
+[1m
+🔍 Validating Build Configuration...[0m
+[32m✅ app.config.js exists[0m
+[32m✅ App name is configured[0m
+[32m✅ App slug is configured[0m
+[32m✅ App version is configured[0m
+[31m❌ iOS bundle identifier may be missing[0m
+[31m❌ Android package may be missing[0m
+[1m
+🔍 Validating Environment Setup...[0m
+[36mℹ️  NODE_ENV: production[0m
+[36mℹ️  APP_ENV: not set[0m
+[36mℹ️  EAS_BUILD_PROFILE: not set[0m
+[32m✅ .env file exists[0m
+[1m
+============================================================[0m
+[1m📊 Validation Summary[0m
+[1m============================================================[0m
+[31m
+❌ Some validations failed. Please fix the issues above before building.[0m
+[33m
+Common fixes:[0m
+[0m  • Set missing environment variables in .env file[0m
+[0m  • Or set them as EAS secrets: eas secret:create --scope project --name KEY --value "value"[0m
+[0m  • Ensure app.config.js has all required fields
+[0m
