@@ -44,6 +44,7 @@
     "test:transactions:emulator": "USE_EMULATOR=true node scripts/test-transaction-duplicates.js",
     "test:frontend": "node scripts/test-frontend-deduplication.js",
     "test:spend:emulator": "USE_EMULATOR=true node scripts/test-spend-transactions.js",
+    "test:build": "bash scripts/test-local-build.sh",
     "security:audit": "npm audit --audit-level high",
     "security:audit:fix": "npm audit fix",
     "security:check": "npm audit --audit-level moderate && echo '✅ No critical security issues found'",
