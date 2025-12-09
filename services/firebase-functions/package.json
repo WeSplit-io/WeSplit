@@ -37,7 +37,9 @@
     "twilio": "^4.19.0"
   },
   "devDependencies": {
-    "@types/nodemailer": "^6.4.14"
+    "@solana/spl-token": "^0.4.14",
+    "@types/nodemailer": "^6.4.14",
+    "firebase": "^12.6.0"
   },
   "private": true
 }

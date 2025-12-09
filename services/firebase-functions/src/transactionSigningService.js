@@ -590,7 +590,7 @@ class TransactionSigningService {
       if (!transaction.message.recentBlockhash) {
         throw new Error('Transaction missing blockhash');
       }
-
+      
       // 3. Validate user signature is present (if multiple signers required)
       if (numRequiredSignatures > 1) {
         const userSig = transaction.signatures[1];
@@ -601,8 +601,8 @@ class TransactionSigningService {
       }
 
       // 4. Sign with company keypair
-      transaction.sign([this.companyKeypair]);
-
+        transaction.sign([this.companyKeypair]);
+        
       // 5. Return serialized transaction
       return transaction.serialize();
 
@@ -819,6 +819,16 @@ class TransactionSigningService {
         // Best Practice: Retry RPC calls with exponential backoff
         // CRITICAL: Skip preflight on both networks to avoid blockhash expiration issues
         // Preflight adds 200-500ms delay and can fail even with valid blockhashes
+        // Log RPC endpoint and network before submission
+        console.log('Submitting transaction to RPC', {
+          rpcUrl: this.rpcUrl ? this.rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***') : 'unknown',
+          isMainnet,
+          network: isMainnet ? 'mainnet' : 'devnet',
+          transactionSize: transactionBuffer.length,
+          feePayer: transaction.message.staticAccountKeys[0]?.toBase58() || 'unknown',
+          note: 'About to call sendTransaction - signature will be returned if RPC accepts it'
+        });
+        
         signature = await retryRpcOperation(
           () => this.connection.sendTransaction(transaction, {
             skipPreflight: true, // Skip preflight on both mainnet and devnet to save time
@@ -832,6 +842,15 @@ class TransactionSigningService {
           }
         );
         submitTimer.end();
+        
+        // Log that signature was returned
+        console.log('✅ RPC returned signature (transaction accepted by RPC)', {
+          signature: signature?.substring(0, 16) + '...',
+          signatureLength: signature?.length,
+          isMainnet,
+          network: isMainnet ? 'mainnet' : 'devnet',
+          note: 'Signature returned means RPC accepted transaction. Now verifying it exists on blockchain...'
+        });
       } catch (sendError) {
         submitTimer.end();
         performanceMonitor.recordError('submitTransaction', sendError);
@@ -1054,43 +1073,23 @@ class TransactionSigningService {
           const verificationTime = Date.now() - verificationStartTime;
           verifyTimer.end();
           
-          // On devnet, be more lenient - transaction might still be processing
-          // On mainnet, if we can't find it after retries, it's likely rejected
-          if (!isMainnet) {
-            console.warn('Transaction not found on devnet after retries (may still be processing)', {
-              signature,
-              verificationTimeMs: verificationTime,
-              note: 'Devnet RPC can be slow. Transaction may still be processing. Returning signature for client-side verification.'
-            });
-            
-            // On devnet, return signature anyway - client can verify asynchronously
-            // This prevents false negatives from slow RPC indexing
-            return {
-              signature,
-              confirmation: null,
-              note: 'Transaction submitted. Verification timeout on devnet - client will verify asynchronously.'
-            };
-          }
-          
-          // On mainnet, RPC indexing can be very slow (5-15 seconds during high traffic)
-          // Instead of throwing an error, return the signature and let client verify asynchronously
-          // This prevents false negatives from slow RPC indexing
-          // The transaction was successfully submitted (we have a signature), so it's likely processing
-          console.warn('⚠️ Transaction not found on mainnet after verification attempts (RPC indexing may be slow)', {
+          // CRITICAL: Don't return signature if transaction not found
+          // If sendTransaction returned a signature but we can't find it, the transaction likely failed
+          // This prevents false positives where we return success but transaction doesn't exist
+          console.error('❌ Transaction not found on blockchain after verification attempts', {
             signature,
             verificationTimeMs: verificationTime,
             maxAttempts: maxVerificationAttempts,
-            note: 'Transaction was submitted successfully (signature returned). RPC indexing may be slow. Returning signature for client-side verification.'
+            isMainnet,
+            note: 'Transaction was submitted (signature returned) but not found on blockchain. This likely indicates the transaction was rejected or failed.'
           });
           
-          // Return signature anyway - client can verify asynchronously
-          // This prevents false negatives from slow RPC indexing on mainnet
-          // If transaction was actually rejected, client will see it when they verify
-          return {
-            signature,
-            confirmation: null,
-            note: `Transaction submitted. Verification timeout on mainnet after ${verificationTime}ms - RPC indexing may be slow. Client will verify asynchronously. Please check transaction on Solana Explorer: https://solscan.io/tx/${signature}`
-          };
+          // Throw error instead of returning signature
+          // This ensures we don't show success for transactions that don't exist
+          throw handleError(
+            new Error(`Transaction not found on blockchain after ${verificationTime}ms and ${maxVerificationAttempts} attempts. Transaction may have been rejected. Signature: ${signature}`),
+            { signature, operation: 'verifyTransaction', verificationTimeMs: verificationTime }
+          );
         }
       } catch (verifyError) {
         verifyTimer.end();
@@ -1110,22 +1109,22 @@ class TransactionSigningService {
           // If we get here, all retries failed
           const verificationTime = Date.now() - verificationStartTime;
           
-          // On devnet, be more lenient - RPC can be slow or rate-limited
-          if (!isMainnet) {
-            console.warn('Transaction verification failed on devnet (may be RPC issue)', {
-              signature,
-              verificationTimeMs: verificationTime,
-              error: verifyError.message,
-              note: 'Devnet RPC can be slow. Returning signature for client-side verification.'
-            });
-            
-            // On devnet, return signature anyway - client can verify asynchronously
-            return {
-              signature,
-              confirmation: null,
-              note: 'Transaction submitted. Verification failed on devnet - client will verify asynchronously.'
-            };
-          }
+          // CRITICAL: Don't return signature if verification fails
+          // Even on devnet, if we can't verify the transaction exists, it likely failed
+          console.error('❌ Transaction verification failed after all retries', {
+            signature,
+            verificationTimeMs: verificationTime,
+            error: verifyError.message,
+            isMainnet,
+            note: 'Transaction verification failed. Transaction may have been rejected or RPC is unavailable.'
+          });
+          
+          // Throw error instead of returning signature
+          // This ensures we don't show success for transactions that can't be verified
+          throw handleError(
+            new Error(`Transaction verification failed: ${verifyError.message}. Signature: ${signature}`),
+            { signature, operation: 'verifyTransaction', verificationTimeMs: verificationTime, originalError: verifyError }
+          );
           
           // On mainnet, be stricter
           console.error('Transaction verification failed after all retries', {

@@ -678,26 +678,112 @@ export class TransactionProcessor {
           }, 'TransactionProcessor');
         }
       } else {
-        // On devnet, use faster confirmation
-      try {
-        const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature);
-        if (!confirmed) {
-          logger.warn('Transaction confirmation timed out, but transaction was sent', { 
-            signature,
-            note: 'Transaction may still be processing on the blockchain'
-          }, 'TransactionProcessor');
-        }
-      } catch (sendError) {
-        logger.error('Transaction confirmation failed', {
-          error: sendError instanceof Error ? sendError.message : String(sendError),
-          transactionType,
-          priority
+        // On devnet, verify transaction exists before showing success
+        // Do 4 attempts over 3-4 seconds - if transaction not found, fail (don't assume indexing delay)
+        logger.info('Devnet transaction submitted, verifying on blockchain', {
+          signature,
+          note: 'Verifying transaction exists before showing success (4 attempts, ~3-4 seconds)'
         }, 'TransactionProcessor');
-        // Don't throw - transaction was already submitted
-      }
+        
+        try {
+          const connection = await this.getConnection();
+          let verified = false;
+          let transactionFound = false;
+          
+          // Verification: 4 attempts with 800ms delay each (max 3-4 seconds total)
+          // This ensures transaction actually exists before showing success
+          for (let attempt = 0; attempt < 4; attempt++) {
+            if (attempt > 0) {
+              await new Promise(resolve => setTimeout(resolve, 800)); // Wait 800ms between attempts
+            }
+            
+            try {
+              const status = await Promise.race([
+                connection.getSignatureStatus(signature, {
+                  searchTransactionHistory: true
+                }),
+                new Promise<null>((_, reject) => 
+                  setTimeout(() => reject(new Error('Verification timeout')), 2500)
+                )
+              ]) as any;
+              
+              if (status && status.value) {
+                transactionFound = true;
+                
+                if (status.value.err) {
+                  // Transaction failed on blockchain - fail immediately
+                  logger.error('Transaction failed on blockchain', {
+                    signature,
+                    error: status.value.err,
+                    attempt: attempt + 1,
+                    note: 'Transaction was submitted but failed during execution'
+                  }, 'TransactionProcessor');
+                  throw new Error(`Transaction failed on blockchain: ${JSON.stringify(status.value.err)}`);
+                }
+                
+                // Transaction found and no error - verified!
+                verified = true;
+                logger.info('Transaction verified on blockchain', {
+                  signature,
+                  confirmationStatus: status.value.confirmationStatus,
+                  attempt: attempt + 1,
+                  slot: status.value.slot
+                }, 'TransactionProcessor');
+                break;
+              }
+            } catch (statusError) {
+              // If it's a transaction failure error, re-throw it
+              if (statusError instanceof Error && statusError.message.includes('failed on blockchain')) {
+                throw statusError;
+              }
+              // If timeout, continue to next attempt
+              if (statusError instanceof Error && statusError.message.includes('timeout')) {
+                logger.debug('Verification attempt timed out, retrying', {
+                  signature,
+                  attempt: attempt + 1
+                }, 'TransactionProcessor');
+                continue;
+              }
+              // Other errors - log and continue
+              logger.debug('Verification attempt failed, retrying', {
+                signature,
+                attempt: attempt + 1,
+                error: statusError instanceof Error ? statusError.message : String(statusError)
+              }, 'TransactionProcessor');
+            }
+          }
+          
+          if (!transactionFound) {
+            // Transaction not found after 4 attempts - fail the transaction
+            // Don't assume indexing delay - if transaction doesn't exist, it likely failed
+            logger.error('Transaction not found on blockchain after verification attempts', {
+              signature,
+              attempts: 4,
+              note: 'Transaction was submitted but not found on blockchain. This likely indicates the transaction failed.'
+            }, 'TransactionProcessor');
+            throw new Error('Transaction not found on blockchain after verification. Transaction may have failed.');
+          }
+          
+          if (!verified) {
+            // This shouldn't happen (transactionFound but not verified), but handle it
+            logger.warn('Transaction found but verification incomplete', {
+              signature,
+              note: 'Transaction exists but verification status unclear'
+            }, 'TransactionProcessor');
+            throw new Error('Transaction verification incomplete');
+          }
+        } catch (verifyError) {
+          // If verification fails, throw the error (don't show success)
+          logger.error('Transaction verification failed', {
+            signature,
+            error: verifyError instanceof Error ? verifyError.message : String(verifyError),
+            note: 'Transaction verification failed. Not showing success state.'
+          }, 'TransactionProcessor');
+          throw verifyError;
+        }
       }
 
-      // Return success - transaction was submitted and verified (or assumed successful on timeout)
+      // Return success - transaction was submitted and verified (or assumed successful)
       return {
         signature,
         txId: signature,
@@ -715,6 +801,59 @@ export class TransactionProcessor {
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
+  }
+
+  /**
+   * Verify transaction in background (non-blocking)
+   * Used for devnet transactions that may have indexing delays
+   */
+  private async verifyTransactionInBackground(
+    signature: string,
+    connection: Connection
+  ): Promise<void> {
+    // Background verification: check a few times over 10 seconds
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between attempts
+      
+      try {
+        const status = await connection.getSignatureStatus(signature, {
+          searchTransactionHistory: true
+        });
+        
+        if (status.value) {
+          if (status.value.err) {
+            logger.error('Background verification: Transaction failed on blockchain', {
+              signature,
+              error: status.value.err,
+              attempt: attempt + 1,
+              note: 'Transaction was submitted but failed during execution'
+            }, 'TransactionProcessor');
+            // Don't throw - just log, transaction already returned success
+            return;
+          }
+          
+          // Transaction found and no error
+          logger.info('Background verification: Transaction confirmed on blockchain', {
+            signature,
+            confirmationStatus: status.value.confirmationStatus,
+            attempt: attempt + 1
+          }, 'TransactionProcessor');
+          return;
+        }
+      } catch (error) {
+        logger.debug('Background verification attempt failed', {
+          signature,
+          attempt: attempt + 1,
+          error: error instanceof Error ? error.message : String(error)
+        }, 'TransactionProcessor');
+      }
+    }
+    
+    logger.warn('Background verification: Transaction not found after all attempts', {
+      signature,
+      attempts: 5,
+      note: 'Transaction may have failed or there is a significant RPC indexing delay'
+    }, 'TransactionProcessor');
   }
 
   /**

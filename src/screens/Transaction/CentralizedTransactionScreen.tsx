@@ -613,7 +613,7 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
   const sendComponentRecipientInfo: RecipientInfo | null = useMemo(() => {
     if (!finalRecipientInfo) return null;
 
-    // Determine recipient display name - never show "N/A"
+  // Determine recipient display name - never show "N/A"
     let recipientName = '';
     
     // For merchant, split, or shared types, use the name directly
@@ -701,8 +701,8 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
         {context === 'spend_split_payment' && isProcessing && (
           <View style={paymentScreenStyles.processingContainer}>
             <ModernLoader size="small" text="Processing payment to merchant..." />
-          </View>
-        )}
+            </View>
+          )}
 
         {/* Validation Error */}
         {validationError && (
@@ -745,8 +745,8 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
               <Text style={paymentScreenStyles.feeLabel}>Total paid</Text>
               <Text style={paymentScreenStyles.feeTotal}>{formatAmountWithComma(totalPaid)} USDC</Text>
             </View>
-          </View>
-        )}
+            </View>
+          )}
       </ScrollView>
     </Container>
   );

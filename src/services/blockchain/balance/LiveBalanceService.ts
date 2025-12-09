@@ -35,14 +35,21 @@ class LiveBalanceService {
 
   /**
    * Subscribe to balance updates for a specific address
+   * Optimized: Groups multiple callbacks for the same address to reduce RPC calls
    */
   subscribe(address: string, callback: BalanceUpdateCallback): string {
     const subscriptionId = `balance_${address}_${Date.now()}`;
     
+    // Check if we already have subscriptions for this address
+    const existingSubscriptions = Array.from(this.subscriptions.values())
+      .filter(sub => sub.address === address && sub.isActive);
+    
     logger.info('Subscribing to balance updates', {
       address: typeof address === 'string' ? address.substring(0, 10) + '...' : typeof address,
       addressType: typeof address,
-      subscriptionId
+      subscriptionId,
+      existingSubscriptionsForAddress: existingSubscriptions.length,
+      note: existingSubscriptions.length > 0 ? 'Address already has active subscriptions - will share balance updates' : 'New subscription for this address'
     }, 'LiveBalanceService');
     
     const subscription: BalanceSubscription = {
@@ -54,13 +61,22 @@ class LiveBalanceService {
     
     this.subscriptions.set(subscriptionId, subscription);
     
-    // Start polling if this is the first subscription
+    // Start polling if this is the first subscription overall
     if (this.subscriptions.size === 1) {
       this.startPolling();
     }
     
-    // Get initial balance
-    this.updateBalanceForSubscription(subscription);
+    // Only get initial balance if this is the first subscription for this address
+    // Other subscriptions will get updates from polling
+    if (existingSubscriptions.length === 0) {
+      this.updateBalanceForSubscription(subscription);
+    } else {
+      // Share the last known balance immediately if available
+      const lastBalance = existingSubscriptions[0]?.lastBalance;
+      if (lastBalance) {
+        callback(lastBalance);
+      }
+    }
     
     return subscriptionId;
   }
@@ -129,6 +145,7 @@ class LiveBalanceService {
   
   /**
    * Poll all subscribed addresses for balance updates
+   * Optimized: Groups subscriptions by address to avoid duplicate RPC calls
    */
   private async pollBalances(): Promise<void> {
     const now = Date.now();
@@ -146,75 +163,115 @@ class LiveBalanceService {
       return;
     }
     
+    // Group subscriptions by address to avoid duplicate RPC calls
+    const addressGroups = new Map<string, BalanceSubscription[]>();
+    for (const subscription of activeSubscriptions) {
+      if (!addressGroups.has(subscription.address)) {
+        addressGroups.set(subscription.address, []);
+      }
+      addressGroups.get(subscription.address)!.push(subscription);
+    }
+    
     logger.debug('Polling balances for subscriptions', { 
-      count: activeSubscriptions.length 
+      totalSubscriptions: activeSubscriptions.length,
+      uniqueAddresses: addressGroups.size,
+      note: 'Grouped by address to reduce RPC calls'
     }, 'LiveBalanceService');
     
-    // Process subscriptions in batches to avoid overwhelming the RPC
+    // Process unique addresses in batches
+    const uniqueAddresses = Array.from(addressGroups.keys());
     const batchSize = 5;
-    for (let i = 0; i < activeSubscriptions.length; i += batchSize) {
-      const batch = activeSubscriptions.slice(i, i + batchSize);
+    for (let i = 0; i < uniqueAddresses.length; i += batchSize) {
+      const addressBatch = uniqueAddresses.slice(i, i + batchSize);
       
       await Promise.allSettled(
-        batch.map(subscription => this.updateBalanceForSubscription(subscription))
+        addressBatch.map(address => {
+          const subscriptionsForAddress = addressGroups.get(address)!;
+          // Update first subscription (will share result with others)
+          return this.updateBalanceForAddress(address, subscriptionsForAddress);
+        })
       );
       
       // Small delay between batches to be respectful to RPC
-      if (i + batchSize < activeSubscriptions.length) {
+      if (i + batchSize < uniqueAddresses.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
   }
   
   /**
-   * Update balance for a specific subscription
+   * Update balance for an address and notify all subscriptions for that address
+   * This reduces RPC calls by fetching balance once per address
    */
-  private async updateBalanceForSubscription(subscription: BalanceSubscription): Promise<void> {
+  private async updateBalanceForAddress(
+    address: string,
+    subscriptions: BalanceSubscription[]
+  ): Promise<void> {
+    if (subscriptions.length === 0) {
+      return;
+    }
+    
     try {
-      const balanceResult = await consolidatedTransactionService.getUsdcBalance(subscription.address);
+      const balanceResult = await consolidatedTransactionService.getUsdcBalance(address);
       
       if (!balanceResult.success) {
-        logger.warn('Failed to get balance for subscription', {
-          subscriptionId: subscription.id,
-          address: subscription.address,
+        logger.warn('Failed to get balance for address', {
+          address,
+          subscriptionCount: subscriptions.length,
           error: balanceResult.error
         }, 'LiveBalanceService');
         return;
       }
       
       const currentBalance: BalanceUpdate = {
-        address: subscription.address,
+        address,
         solBalance: 0, // TODO: Add SOL balance fetching
         usdcBalance: balanceResult.balance,
         timestamp: Date.now()
       };
       
-      // Check if balance has changed significantly
-      const hasChanged = !subscription.lastBalance || 
-        Math.abs(currentBalance.usdcBalance - subscription.lastBalance.usdcBalance) > this.BALANCE_TOLERANCE ||
-        Math.abs(currentBalance.solBalance - subscription.lastBalance.solBalance) > this.BALANCE_TOLERANCE;
-      
-      if (hasChanged) {
-        logger.info('Balance update detected', {
-          subscriptionId: subscription.id,
-          address: subscription.address,
-          previousUsdcBalance: subscription.lastBalance?.usdcBalance || 0,
-          currentUsdcBalance: currentBalance.usdcBalance,
-          previousSolBalance: subscription.lastBalance?.solBalance || 0,
-          currentSolBalance: currentBalance.solBalance
-        }, 'LiveBalanceService');
+      // Update all subscriptions for this address
+      for (const subscription of subscriptions) {
+        // Check if balance has changed significantly for this subscription
+        const hasChanged = !subscription.lastBalance || 
+          Math.abs(currentBalance.usdcBalance - subscription.lastBalance.usdcBalance) > this.BALANCE_TOLERANCE ||
+          Math.abs(currentBalance.solBalance - subscription.lastBalance.solBalance) > this.BALANCE_TOLERANCE;
         
-        subscription.lastBalance = currentBalance;
-        subscription.callback(currentBalance);
+        if (hasChanged) {
+          subscription.lastBalance = currentBalance;
+          subscription.callback(currentBalance);
+        }
+      }
+      
+      // Log only once per address update
+      if (subscriptions.some(sub => !sub.lastBalance || 
+        Math.abs(currentBalance.usdcBalance - (sub.lastBalance?.usdcBalance || 0)) > this.BALANCE_TOLERANCE)) {
+        logger.info('Balance update detected for address', {
+          address,
+          subscriptionCount: subscriptions.length,
+          currentUsdcBalance: currentBalance.usdcBalance,
+          previousUsdcBalance: subscriptions[0]?.lastBalance?.usdcBalance || 0
+        }, 'LiveBalanceService');
       }
       
     } catch (error) {
-      logger.error('Error updating balance for subscription', {
-        subscriptionId: subscription.id,
-        address: subscription.address,
+      logger.error('Error updating balance for address', {
+        address,
+        subscriptionCount: subscriptions.length,
         error: error instanceof Error ? error.message : String(error)
       }, 'LiveBalanceService');
     }
+  }
+  
+  /**
+   * Update balance for a specific subscription (legacy method, kept for forceUpdate)
+   * For polling, use updateBalanceForAddress instead
+   */
+  private async updateBalanceForSubscription(subscription: BalanceSubscription): Promise<void> {
+    // Use the optimized address-based update
+    const subscriptionsForAddress = Array.from(this.subscriptions.values())
+      .filter(sub => sub.address === subscription.address && sub.isActive);
+    await this.updateBalanceForAddress(subscription.address, subscriptionsForAddress);
   }
   
   /**
@@ -233,6 +290,7 @@ class LiveBalanceService {
   
   /**
    * Force update for a specific address
+   * Optimized: Updates all subscriptions for the address with a single RPC call
    */
   async forceUpdate(address: string): Promise<void> {
     const subscriptions = Array.from(this.subscriptions.values())
@@ -243,11 +301,13 @@ class LiveBalanceService {
       return;
     }
     
-    logger.info('Forcing balance update for address', { address }, 'LiveBalanceService');
+    logger.info('Forcing balance update for address', { 
+      address,
+      subscriptionCount: subscriptions.length 
+    }, 'LiveBalanceService');
     
-    await Promise.allSettled(
-      subscriptions.map(subscription => this.updateBalanceForSubscription(subscription))
-    );
+    // Use optimized address-based update (single RPC call for all subscriptions)
+    await this.updateBalanceForAddress(address, subscriptions);
   }
   
   /**

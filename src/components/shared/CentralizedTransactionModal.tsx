@@ -568,8 +568,8 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
         {config.context === 'spend_split_payment' && isProcessing && (
           <View style={styles.processingContainer}>
             <ModernLoader size="small" text="Processing payment to merchant..." />
-          </View>
-        )}
+            </View>
+          )}
 
         {/* SendComponent - Main UI */}
         {sendComponentRecipientInfo && config.showAmountInput && (
@@ -612,8 +612,8 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
               <Text style={styles.feeLabel}>Total paid</Text>
               <Text style={styles.feeTotal}>{formatAmountWithComma(totalPaid)} USDC</Text>
             </View>
-          </View>
-        )}
+            </View>
+          )}
       </ScrollView>
     </Modal>
   );

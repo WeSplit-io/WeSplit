@@ -907,36 +907,28 @@ class InternalTransferService {
 
       logger.info('Transaction sent successfully', { signature }, 'InternalTransferService');
 
-      // Confirm transaction with optimized timeout handling
-      const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature);
-      
-      if (!confirmed) {
-        logger.warn('Transaction confirmation timed out, but transaction was sent', { 
+      // Confirm transaction in background (non-blocking) for faster UI response
+      // Start confirmation check but don't wait for it - return immediately
+      transactionUtils.confirmTransactionWithTimeout(signature, 15000).then((confirmed) => {
+        if (confirmed) {
+          logger.info('Transaction confirmed successfully (background)', { signature }, 'InternalTransferService');
+        } else {
+          logger.warn('Transaction confirmation timed out (background), but transaction was sent', { 
           signature,
           note: 'Transaction may still be processing on the blockchain'
         }, 'InternalTransferService');
-        
-        // Try to check transaction status one more time after a short delay
-        try {
-          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-          const status = await this.getTransactionStatus(signature);
-          
-          if (status.status === 'confirmed' || status.status === 'finalized') {
-            logger.info('Transaction confirmed on retry check', { signature, status }, 'InternalTransferService');
-          } else {
-            logger.warn('Transaction still not confirmed on retry', { signature, status }, 'InternalTransferService');
-          }
-        } catch (error) {
-          logger.warn('Failed to check transaction status on retry', { signature, error }, 'InternalTransferService');
         }
-        
-        // Don't fail the transaction - it might still succeed
-      } else {
-        logger.info('Transaction confirmed successfully', { signature }, 'InternalTransferService');
-      }
+      }).catch((confirmError) => {
+        // Log but don't block - transaction was already submitted
+        logger.warn('Background transaction confirmation failed', {
+          signature,
+          error: confirmError instanceof Error ? confirmError.message : String(confirmError),
+          note: 'Transaction was submitted successfully. Confirmation check failed in background.'
+        }, 'InternalTransferService');
+      });
 
-      // Notifications are now handled by the shared notificationUtils in saveTransactionToFirestore
-
+      // Return immediately - transaction was submitted successfully
+      // Confirmation happens in background (non-blocking)
       return {
         success: true,
         signature,

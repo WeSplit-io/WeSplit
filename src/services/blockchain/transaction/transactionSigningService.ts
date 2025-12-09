@@ -1033,24 +1033,24 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
         }
       } else {
         // Not an emulator connection issue, or emulator wasn't being used
-        logger.error('❌ Firebase Function processUsdcTransfer FAILED', {
-          error: firebaseError,
-          errorMessage,
-          errorName: firebaseError?.name || 'Unknown',
-          errorCode,
-          isTimeout,
+      logger.error('❌ Firebase Function processUsdcTransfer FAILED', {
+        error: firebaseError,
+        errorMessage,
+        errorName: firebaseError?.name || 'Unknown',
+        errorCode,
+        isTimeout,
           isInternalError,
           isConnectionError,
           wasUsingEmulator,
-          errorDetails: firebaseError?.details || {},
-          errorStack: firebaseError?.stack ? firebaseError.stack.substring(0, 500) : 'No stack trace',
-          isFirebaseError: firebaseError?.code !== undefined,
-          base64Length: base64Transaction.length,
-          base64Preview: base64Transaction.substring(0, 50) + '...',
-          functionType: typeof processUsdcTransferFunction,
-          note: isTimeout ? 'This may be a timeout - transaction might have succeeded on backend. Check Firebase logs.' : 'Standard error'
-        }, 'TransactionSigningService');
-        
+        errorDetails: firebaseError?.details || {},
+        errorStack: firebaseError?.stack ? firebaseError.stack.substring(0, 500) : 'No stack trace',
+        isFirebaseError: firebaseError?.code !== undefined,
+        base64Length: base64Transaction.length,
+        base64Preview: base64Transaction.substring(0, 50) + '...',
+        functionType: typeof processUsdcTransferFunction,
+        note: isTimeout ? 'This may be a timeout - transaction might have succeeded on backend. Check Firebase logs.' : 'Standard error'
+      }, 'TransactionSigningService');
+      
         // Re-throw the error
         throw firebaseError;
       }
@@ -1058,35 +1058,35 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
       // If we successfully fell back to production, result is set and we continue normally
       // Otherwise, handle timeout and other errors
       if (!result) {
-        // For timeout errors, provide more helpful error message
-        // CRITICAL: Don't suggest retrying immediately - transaction may have succeeded
-        // User should check transaction history first to avoid duplicate submissions
-        if (isTimeout) {
-          // ✅ CRITICAL: Use same production detection logic as timeout configuration
-          const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
-          const appEnv = getEnvVar('APP_ENV');
-          const isProduction = buildProfile === 'production' || 
-                              appEnv === 'production' ||
-                              process.env.NODE_ENV === 'production' ||
-                              !__DEV__;
-          
-          const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
-          const forceMainnet = getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
-          
-          // ✅ CRITICAL: Production builds ALWAYS use mainnet (obligatory)
-          const isMainnet = isProduction 
-            ? true  // Production always mainnet
-            : (networkEnv.toLowerCase() === 'mainnet' || forceMainnet);
-          
-          if (isMainnet) {
-            throw new Error(`Transaction processing timed out on mainnet. The transaction may have succeeded on the blockchain. Please check your transaction history before trying again. If the transaction didn't go through, wait a few moments and try again. (Error: ${errorCode})`);
-          } else {
-            throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again. (Error: ${errorCode})`);
-          }
-        }
+      // For timeout errors, provide more helpful error message
+      // CRITICAL: Don't suggest retrying immediately - transaction may have succeeded
+      // User should check transaction history first to avoid duplicate submissions
+      if (isTimeout) {
+        // ✅ CRITICAL: Use same production detection logic as timeout configuration
+        const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
+        const appEnv = getEnvVar('APP_ENV');
+        const isProduction = buildProfile === 'production' || 
+                            appEnv === 'production' ||
+                            process.env.NODE_ENV === 'production' ||
+                            !__DEV__;
         
+        const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
+        const forceMainnet = getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
+        
+        // ✅ CRITICAL: Production builds ALWAYS use mainnet (obligatory)
+        const isMainnet = isProduction 
+          ? true  // Production always mainnet
+          : (networkEnv.toLowerCase() === 'mainnet' || forceMainnet);
+        
+        if (isMainnet) {
+          throw new Error(`Transaction processing timed out on mainnet. The transaction may have succeeded on the blockchain. Please check your transaction history before trying again. If the transaction didn't go through, wait a few moments and try again. (Error: ${errorCode})`);
+        } else {
+          throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again. (Error: ${errorCode})`);
+        }
+      }
+      
         // Re-throw with more context for other errors (only if result is not set)
-        throw new Error(`Firebase Function error (${errorCode}): ${errorMessage}`);
+      throw new Error(`Firebase Function error (${errorCode}): ${errorMessage}`);
       }
     }
     
