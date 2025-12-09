@@ -822,6 +822,14 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
   signature: string;
   confirmation: any;
 }> {
+  // Detect production using same logic as network config
+  const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
+  const appEnv = getEnvVar('APP_ENV');
+  const isProduction = buildProfile === 'production' || 
+                      appEnv === 'production' ||
+                      process.env.NODE_ENV === 'production' ||
+                      !__DEV__;
+  
   try {
     logger.info('Processing USDC transfer', {
       transactionSize: serializedTransaction.length
