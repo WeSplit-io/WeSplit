@@ -162,17 +162,26 @@ async function checkTransactionHash(transactionBuffer, db) {
       note: 'Proceeding to prevent blocking all transactions. Hash will be recorded after processing.'
     });
     // Don't throw - proceed with transaction, hash will be recorded later
-    hashDoc = { exists: false }; // Treat as not found, proceed
+    // Create a mock document that matches Firestore document structure
+    hashDoc = { 
+      exists: () => false,
+      data: () => null
+    }; // Treat as not found, proceed
   }
   
-  if (hashDoc.exists) {
-    const hashData = hashDoc.data();
-    const signedAt = hashData?.signedAt?.toDate();
-    const now = new Date();
-    
-    // If signed within last 5 minutes, reject (prevent replay attacks)
-    if (signedAt && (now.getTime() - signedAt.getTime()) < 5 * 60 * 1000) {
-      throw new functions.https.HttpsError('already-exists', 'This transaction has already been signed recently. Please create a new transaction.');
+  // ✅ FIX: Check exists() method if available, otherwise check exists property
+  const hashExists = hashDoc.exists ? (typeof hashDoc.exists === 'function' ? hashDoc.exists() : hashDoc.exists) : false;
+  
+  if (hashExists) {
+    const hashData = hashDoc.data ? hashDoc.data() : null;
+    if (hashData) {
+      const signedAt = hashData?.signedAt?.toDate ? hashData.signedAt.toDate() : null;
+      const now = new Date();
+      
+      // If signed within last 5 minutes, reject (prevent replay attacks)
+      if (signedAt && (now.getTime() - signedAt.getTime()) < 5 * 60 * 1000) {
+        throw new functions.https.HttpsError('already-exists', 'This transaction has already been signed recently. Please create a new transaction.');
+      }
     }
   }
   
@@ -563,6 +572,39 @@ exports.processUsdcTransfer = functions.runWith({
       checksTimeMs: checksTime,
       processTimeMs: processTime,
       totalTimeMs: totalTime
+    });
+
+    // ✅ CRITICAL: Record transaction hash AFTER successful processing
+    // This prevents duplicate transactions even if the initial check timed out
+    // Run in background to not delay response
+    setImmediate(async () => {
+      try {
+        const crypto = require('crypto');
+        const transactionHash = crypto.createHash('sha256').update(transactionBuffer).digest('hex');
+        const hashKey = `transaction_hash_${transactionHash}`;
+        const hashRef = db.collection('transactionHashes').doc(hashKey);
+        
+        // Record hash with short timeout (non-blocking)
+        await Promise.race([
+          hashRef.set({
+            transactionHash,
+            signedAt: admin.firestore.FieldValue.serverTimestamp(),
+            signature: result.signature
+          }, { merge: false }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Post-processing hash set timeout')), 2000)
+          )
+        ]);
+        console.log('✅ Transaction hash recorded after successful processing', {
+          hash: transactionHash.substring(0, 16) + '...',
+          signature: result.signature
+        });
+      } catch (postProcessError) {
+        // Non-critical - hash recording failed but transaction succeeded
+        console.warn('⚠️ Failed to record transaction hash after processing (non-critical)', {
+          error: postProcessError.message
+        });
+      }
     });
 
     return {

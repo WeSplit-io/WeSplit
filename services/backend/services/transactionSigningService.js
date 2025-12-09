@@ -317,9 +317,29 @@ class TransactionSigningService {
       }
 
       // Check if fee payer is set to company wallet
-      const feePayer = transaction.message.staticAccountKeys[transaction.message.header.numRequiredSignatures - 1];
+      // CRITICAL: In Solana, the fee payer is ALWAYS at index 0 in staticAccountKeys
+      // The fee payer is the first account in the transaction
+      const feePayer = transaction.message.staticAccountKeys[0];
+      if (!feePayer) {
+        throw new Error('Invalid transaction: missing fee payer');
+      }
+      
       if (feePayer.toBase58() !== this.companyKeypair.publicKey.toBase58()) {
-        throw new Error('Transaction fee payer is not company wallet');
+        const companyWalletAddress = this.companyKeypair.publicKey.toBase58();
+        const staticAccountKeys = transaction.message.staticAccountKeys.map(key => key.toBase58());
+        logger.error('Transaction fee payer is not company wallet', {
+          expected: companyWalletAddress,
+          got: feePayer.toBase58(),
+          staticAccountKeys,
+          numRequiredSignatures: transaction.message.header.numRequiredSignatures,
+          note: 'Fee payer must be at index 0 and must be the company wallet'
+        }, 'TransactionSigningService');
+        throw new Error(
+          `Transaction fee payer is not company wallet. ` +
+          `Expected: ${companyWalletAddress}, ` +
+          `Got: ${feePayer.toBase58()}. ` +
+          `Fee payer must be at index 0 in staticAccountKeys.`
+        );
       }
 
       // Check if transaction has required signatures
