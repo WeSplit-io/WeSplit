@@ -803,6 +803,76 @@ export class SharedWalletService {
   }
 
   /**
+   * Update member permissions
+   * 
+   * @param sharedWalletId - The shared wallet ID
+   * @param memberId - The member ID to update
+   * @param updaterId - The user ID updating the permissions
+   * @param permissions - The permissions to update
+   * @returns Success or error
+   */
+  static async updateMemberPermissions(
+    sharedWalletId: string,
+    memberId: string,
+    updaterId: string,
+    permissions: Partial<import('./types').SharedWalletMemberPermissions>
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      await loadModules();
+      
+      const { MemberRightsService } = await import('./MemberRightsService');
+      return await MemberRightsService.updateMemberPermissions(
+        sharedWalletId,
+        memberId,
+        updaterId,
+        permissions
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      logger.error('SharedWalletService: Error updating member permissions', { error: errorMessage }, 'SharedWalletService');
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Update member role
+   * 
+   * @param sharedWalletId - The shared wallet ID
+   * @param memberId - The member ID to update
+   * @param updaterId - The user ID updating the role
+   * @param newRole - The new role ('admin' | 'member')
+   * @returns Success or error
+   */
+  static async updateMemberRole(
+    sharedWalletId: string,
+    memberId: string,
+    updaterId: string,
+    newRole: 'admin' | 'member'
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      await loadModules();
+      
+      const { MemberRightsService } = await import('./MemberRightsService');
+      return await MemberRightsService.updateMemberRole(
+        sharedWalletId,
+        memberId,
+        updaterId,
+        newRole
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      logger.error('SharedWalletService: Error updating member role', { error: errorMessage }, 'SharedWalletService');
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
    * Update shared wallet settings (customization, etc.)
    * 
    * @param params - Update parameters

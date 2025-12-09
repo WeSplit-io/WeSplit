@@ -77,6 +77,7 @@ import SharedWalletNameScreen from './src/screens/SharedWallet/SharedWalletNameS
 import SharedWalletMembersScreen from './src/screens/SharedWallet/SharedWalletMembersScreen';
 import SharedWalletDetailsScreen from './src/screens/SharedWallet/SharedWalletDetailsScreen';
 import SharedWalletSettingsScreen from './src/screens/SharedWallet/SharedWalletSettingsScreen';
+import MemberRightsScreen from './src/screens/SharedWallet/MemberRightsScreen';
 // import AuthDebugScreen from './src/screens/Debug/AuthDebugScreen';
 
 // Development-only test screen
@@ -236,6 +237,7 @@ export default function App() {
                     />
                     <Stack.Screen name="SharedWalletDetails" component={SharedWalletDetailsScreen} />
                     <Stack.Screen name="SharedWalletSettings" component={SharedWalletSettingsScreen} />
+                    <Stack.Screen name="MemberRights" component={MemberRightsScreen} />
                     {/* <Stack.Screen name="AuthDebug" component={AuthDebugScreen} /> */}
                     {__DEV__ && WalletPersistenceTestScreen && (
                       <Stack.Screen name="WalletPersistenceTest" component={WalletPersistenceTestScreen} />

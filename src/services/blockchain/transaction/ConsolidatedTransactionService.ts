@@ -941,6 +941,15 @@ class ConsolidatedTransactionService {
         };
       }
 
+      // Check member permissions
+      const { MemberRightsService } = await import('../../sharedWallet/MemberRightsService');
+      if (!MemberRightsService.canPerformAction(userMember, wallet, 'fund')) {
+        return {
+          success: false,
+          error: 'You do not have permission to add funds to this wallet'
+        };
+      }
+
       // Execute blockchain transaction using external transfer service (same as withdrawals)
       logger.info('Shared wallet funding transaction', {
         sharedWalletId,
@@ -1148,12 +1157,27 @@ class ConsolidatedTransactionService {
 
       await addDoc(collection(db, 'sharedWalletTransactions'), transactionData);
 
+      // Check if goal was reached
+      const { GoalService } = await import('../../sharedWallet/GoalService');
+      const goalCheck = await GoalService.checkAndMarkGoalReached(sharedWalletId, newBalance);
+      
+      if (goalCheck.goalReached && goalCheck.shouldNotify) {
+        // TODO: Send notification to all members
+        logger.info('Goal reached for shared wallet', {
+          sharedWalletId,
+          goalAmount: wallet.settings?.goalAmount,
+          currentBalance: newBalance,
+        }, 'ConsolidatedTransactionService');
+      }
+
         return {
           success: true,
           transactionSignature: result.signature,
           transactionId: result.txId,
           txId: result.txId,
-          message: `Successfully funded shared wallet with ${amount.toFixed(6)} USDC`
+          message: goalCheck.goalReached 
+            ? `🎉 Goal reached! Successfully funded shared wallet with ${amount.toFixed(6)} USDC`
+            : `Successfully funded shared wallet with ${amount.toFixed(6)} USDC`
         };
     } catch (error) {
       logger.error('Shared wallet funding failed', error, 'ConsolidatedTransactionService');
@@ -1197,6 +1221,26 @@ class ConsolidatedTransactionService {
         return {
           success: false,
           error: 'You must be an active member to withdraw from this wallet'
+        };
+      }
+
+      // Check member permissions
+      const { MemberRightsService } = await import('../../sharedWallet/MemberRightsService');
+      const canWithdrawCheck = MemberRightsService.canWithdrawAmount(userMember, wallet, amount);
+      if (!canWithdrawCheck.allowed) {
+        return {
+          success: false,
+          error: canWithdrawCheck.reason || 'You do not have permission to withdraw funds'
+        };
+      }
+
+      // Check if approval is required
+      if (wallet.settings?.requireApprovalForWithdrawals && wallet.creatorId !== userId) {
+        // TODO: Implement approval workflow
+        // For now, return error
+        return {
+          success: false,
+          error: 'Withdrawal requires creator approval. This feature is coming soon.'
         };
       }
 

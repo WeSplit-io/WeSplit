@@ -580,7 +580,10 @@ const SharedWalletDetailsScreen: React.FC = () => {
                 <TouchableOpacity
                   style={styles.manageRightsButton}
                   onPress={() => {
-                    Alert.alert('Coming Soon', 'Member rights management will be available soon.');
+                    (navigation as any).navigate('MemberRights', {
+                      walletId: wallet.id,
+                      wallet: wallet,
+                    });
                   }}
                   activeOpacity={0.8}
                 >

@@ -1,6 +1,8 @@
 /**
  * Shared Wallet Members Screen
- * Second step in shared wallet creation - direct contact selection
+ * Handles both:
+ * 1. Adding members during wallet creation (walletName provided)
+ * 2. Adding members to existing wallet (walletId provided)
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -26,7 +28,11 @@ const SharedWalletMembersScreen: React.FC = () => {
   const { currentUser } = state;
   const { appWalletAddress, ensureAppWallet } = useWallet();
 
-  const { walletName } = route.params || {};
+  const { walletName, walletId } = route.params || {};
+
+  // Determine if we're creating a new wallet or adding to existing
+  const isCreatingNewWallet = !!walletName && !walletId;
+  const isAddingToExisting = !!walletId;
 
   // Use app wallet address or fall back to currentUser's wallet_address
   const walletAddress = appWalletAddress || currentUser?.wallet_address || '';
@@ -34,6 +40,8 @@ const SharedWalletMembersScreen: React.FC = () => {
   const [selectedMembers, setSelectedMembers] = useState<UserContact[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<TextInput>(null);
+  const [existingMemberIds, setExistingMemberIds] = useState<Set<string>>(new Set());
+  const [loadingWallet, setLoadingWallet] = useState(false);
 
   // Ensure app wallet is initialized
   useEffect(() => {
@@ -41,6 +49,46 @@ const SharedWalletMembersScreen: React.FC = () => {
       ensureAppWallet(currentUser.id.toString());
     }
   }, [currentUser?.id, appWalletAddress, ensureAppWallet]);
+
+  // Load existing wallet members if adding to existing wallet
+  useEffect(() => {
+    const loadExistingWallet = async () => {
+      if (!isAddingToExisting || !walletId || !currentUser?.id) {
+        return;
+      }
+
+      setLoadingWallet(true);
+      try {
+        const result = await SharedWalletService.getSharedWallet(walletId);
+        if (result.success && result.wallet) {
+          // Extract existing member IDs to filter them out
+          const memberIds = new Set(
+            result.wallet.members.map(m => m.userId)
+          );
+          setExistingMemberIds(memberIds);
+          logger.info('Loaded existing wallet members', {
+            walletId,
+            existingMembersCount: memberIds.size
+          }, 'SharedWalletMembersScreen');
+        } else {
+          logger.error('Failed to load existing wallet', {
+            walletId,
+            error: result.error
+          }, 'SharedWalletMembersScreen');
+          Alert.alert('Error', result.error || 'Failed to load wallet');
+          navigation.goBack();
+        }
+      } catch (error) {
+        logger.error('Error loading existing wallet', error as LogData, 'SharedWalletMembersScreen');
+        Alert.alert('Error', 'Failed to load wallet information');
+        navigation.goBack();
+      } finally {
+        setLoadingWallet(false);
+      }
+    };
+
+    loadExistingWallet();
+  }, [isAddingToExisting, walletId, currentUser?.id, navigation]);
 
   const [visible, setVisible] = useState(true);
 
@@ -50,8 +98,14 @@ const SharedWalletMembersScreen: React.FC = () => {
   }, [navigation]);
 
   const handleContactSelect = useCallback((contact: UserContact) => {
-    // Don't allow selecting the creator
+    // Don't allow selecting the creator/current user
     if (contact.id === currentUser?.id?.toString()) {
+      return;
+    }
+
+    // Don't allow selecting existing members when adding to existing wallet
+    if (isAddingToExisting && existingMemberIds.has(contact.id.toString())) {
+      Alert.alert('Already a Member', 'This contact is already a member of this shared wallet.');
       return;
     }
 
@@ -65,23 +119,71 @@ const SharedWalletMembersScreen: React.FC = () => {
         return [...prev, contact];
       }
     });
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isAddingToExisting, existingMemberIds]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleNext = useCallback(async () => {
-    if (!currentUser || !walletAddress || isSubmitting) {
+    // Validation checks
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'You must be logged in to perform this action');
       return;
+    }
+
+    if (isSubmitting || loadingWallet) {
+      return;
+    }
+
+    if (selectedMembers.length === 0) {
+      Alert.alert('No Members Selected', 'Please select at least one member to add.');
+      return;
+    }
+
+    // Additional validation for wallet creation
+    if (isCreatingNewWallet) {
+      if (!walletName || walletName.trim().length === 0) {
+        Alert.alert('Error', 'Wallet name is required');
+        return;
+      }
+
+      if (!walletAddress) {
+        Alert.alert('Error', 'Wallet address is required. Please ensure your wallet is connected.');
+        return;
+      }
+    }
+
+    // Additional validation for adding to existing wallet
+    if (isAddingToExisting) {
+      if (!walletId) {
+        Alert.alert('Error', 'Wallet ID is missing');
+        return;
+      }
     }
 
     setIsSubmitting(true);
 
     try {
+      if (isCreatingNewWallet) {
+        // Create new wallet flow
       logger.info('Proceeding to wallet creation', {
         name: walletName,
         selectedMembersCount: selectedMembers.length,
         totalMembers: selectedMembers.length + 1
       }, 'SharedWalletMembersScreen');
+
+        // Validate that all selected members have wallet addresses
+        const membersWithoutWallets = selectedMembers.filter(m => !m.wallet_address || m.wallet_address.trim().length === 0);
+        if (membersWithoutWallets.length > 0) {
+          Alert.alert(
+            'Warning',
+            `Some selected members don't have wallet addresses. They will be added but won't be able to receive funds until they set up their wallet.`,
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => setIsSubmitting(false) },
+              { text: 'Continue', onPress: () => {} }
+            ]
+          );
+          // Continue with creation - wallet addresses can be added later
+        }
 
       // Build initialMembers array - service will ensure creator is included
       const initialMembers = [
@@ -113,21 +215,98 @@ const SharedWalletMembersScreen: React.FC = () => {
       });
 
       if (result.success && result.wallet) {
+          logger.info('Shared wallet created successfully', {
+            walletId: result.wallet.id,
+            membersCount: result.wallet.members.length
+          }, 'SharedWalletMembersScreen');
+
         navigation.replace('SharedWalletDetails', {
           walletId: result.wallet.id,
           wallet: result.wallet,
           newlyCreated: true,
         });
       } else {
+          logger.error('Failed to create shared wallet', {
+            error: result.error,
+            walletName
+          }, 'SharedWalletMembersScreen');
         Alert.alert('Error', result.error || 'Failed to create shared wallet');
+        }
+      } else if (isAddingToExisting && walletId) {
+        // Add members to existing wallet flow
+        logger.info('Adding members to existing wallet', {
+          walletId,
+          selectedMembersCount: selectedMembers.length
+        }, 'SharedWalletMembersScreen');
+
+        // Filter out any members that might already be in the wallet (double-check)
+        const validInviteeIds = selectedMembers
+          .filter(m => !existingMemberIds.has(m.id.toString()))
+          .map(m => m.id.toString());
+
+        if (validInviteeIds.length === 0) {
+          Alert.alert('Error', 'All selected members are already part of this wallet.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const result = await SharedWalletService.inviteToSharedWallet({
+          sharedWalletId: walletId,
+          inviterId: currentUser.id.toString(),
+          inviteeIds: validInviteeIds,
+        });
+
+        if (result.success) {
+          logger.info('Members invited successfully', {
+            walletId,
+            invitedCount: result.invitedCount
+          }, 'SharedWalletMembersScreen');
+
+          Alert.alert(
+            'Success',
+            result.message || `Successfully invited ${result.invitedCount || validInviteeIds.length} member(s)`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  navigation.goBack();
+                }
+              }
+            ]
+          );
+        } else {
+          logger.error('Failed to invite members', {
+            walletId,
+            error: result.error,
+            inviteeCount: validInviteeIds.length
+          }, 'SharedWalletMembersScreen');
+          Alert.alert('Error', result.error || 'Failed to invite members');
+        }
       }
     } catch (error) {
-      logger.error('Error creating shared wallet', error as LogData, 'SharedWalletMembersScreen');
-      Alert.alert('Error', 'An unexpected error occurred');
+      logger.error('Error in shared wallet operation', {
+        error: error instanceof Error ? error.message : String(error),
+        isCreatingNewWallet,
+        isAddingToExisting,
+        walletId
+      } as LogData, 'SharedWalletMembersScreen');
+      Alert.alert('Error', error instanceof Error ? error.message : 'An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
     }
-  }, [currentUser, walletAddress, walletName, selectedMembers, navigation, isSubmitting]);
+  }, [
+    currentUser,
+    walletAddress,
+    walletName,
+    walletId,
+    selectedMembers,
+    navigation,
+    isSubmitting,
+    isCreatingNewWallet,
+    isAddingToExisting,
+    loadingWallet,
+    existingMemberIds
+  ]);
 
   return (
     <Modal
@@ -136,14 +315,18 @@ const SharedWalletMembersScreen: React.FC = () => {
       showHandle
       closeOnBackdrop
       style={styles.modalContent}
-      maxHeight={800}
-      enableSwipe
+      maxHeight={700}
+      enableSwipe={false}
     >
       <SafeAreaView edges={['bottom']} style={styles.sheet}>
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Add Members</Text>
+        {/* Fixed Header */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.title}>
+            {isCreatingNewWallet ? 'Add Members' : 'Invite Members'}
+          </Text>
         </View>
 
+        {/* Fixed Search Input */}
         <Input
           placeholder="Search"
           leftIcon="MagnifyingGlass"
@@ -153,6 +336,13 @@ const SharedWalletMembersScreen: React.FC = () => {
           inputRef={searchInputRef}
         />
 
+        {/* Scrollable Contacts List - Takes remaining space */}
+        {loadingWallet ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading wallet...</Text>
+          </View>
+        ) : (
+          <View style={styles.contactsContainer}>
         <ContactsList
           onContactSelect={handleContactSelect}
           showAddButton={false}
@@ -164,16 +354,21 @@ const SharedWalletMembersScreen: React.FC = () => {
           onSearchQueryChange={setSearchQuery}
           placeholder="Search contacts"
         />
+          </View>
+        )}
 
+        {/* Fixed Button at Bottom */}
+        <View style={styles.buttonContainer}>
         <Button
-          title="Continue"
+            title={isCreatingNewWallet ? 'Continue' : 'Invite Members'}
           onPress={handleNext}
           variant="primary"
           size="large"
           fullWidth
-          disabled={selectedMembers.length === 0 || isSubmitting}
+            disabled={selectedMembers.length === 0 || isSubmitting || loadingWallet}
           loading={isSubmitting}
         />
+        </View>
       </SafeAreaView>
     </Modal>
   );
@@ -182,15 +377,18 @@ const SharedWalletMembersScreen: React.FC = () => {
 const styles = StyleSheet.create({
   modalContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    paddingBottom: 0,
   },
   sheet: {
-    flex: 1,
+    height: 700,
+    maxHeight: 700,
+    flexDirection: 'column',
   },
-  headerCenter: {
-    flex: 1,
+  headerContainer: {
     alignItems: 'center',
-    marginBottom: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    flexShrink: 0,
   },
   title: {
     fontSize: typography.fontSize.lg,
@@ -198,7 +396,29 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   searchContainer: {
-    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    flexShrink: 0,
+  },
+  contactsContainer: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  buttonContainer: {
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+    flexShrink: 0,
+    borderTopWidth: 1,
+    borderTopColor: colors.white10,
+    backgroundColor: colors.blackWhite5,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
   },
   membersMeta: {
     marginTop: spacing.sm,

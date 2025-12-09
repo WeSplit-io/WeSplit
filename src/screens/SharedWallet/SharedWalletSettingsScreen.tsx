@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Alert,
   Image,
+  Switch,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
@@ -400,6 +401,11 @@ const SharedWalletSettingsScreen: React.FC = () => {
               <View style={styles.goalTextBlock}>
                 <Text style={styles.cardLabel}>Goal amount</Text>
                 <Text style={styles.goalValue}>{formatBalance(goalAmount, wallet.currency)}</Text>
+                {wallet.settings?.goalReachedAt && (
+                  <Text style={styles.goalReachedText}>
+                    🎉 Goal reached on {new Date(wallet.settings.goalReachedAt).toLocaleDateString()}
+                  </Text>
+                )}
               </View>
               <TouchableOpacity style={styles.walletActionButton} onPress={handleSetGoal}>
                 <PhosphorIcon name="PencilSimple" size={16} color={colors.white} weight="regular" />
@@ -408,6 +414,123 @@ const SharedWalletSettingsScreen: React.FC = () => {
             </View>
           )}
         </View>
+
+        {isCreator && (
+          <View style={styles.sectionGroup}>
+            <Text style={styles.sectionHeading}>Wallet Settings</Text>
+            <View style={styles.walletCard}>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>Allow member invites</Text>
+                  <Text style={styles.settingDescription}>
+                    Members can invite other users to join
+                  </Text>
+                </View>
+                <Switch
+                  value={wallet.settings?.allowMemberInvites ?? true}
+                  onValueChange={async (value) => {
+                    if (!currentUser?.id) return;
+                    const result = await SharedWalletService.updateSharedWalletSettings({
+                      sharedWalletId: wallet.id,
+                      userId: currentUser.id.toString(),
+                      settings: {
+                        ...wallet.settings,
+                        allowMemberInvites: value,
+                      },
+                    });
+                    if (result.success) {
+                      const reloadResult = await SharedWalletService.getSharedWallet(wallet.id);
+                      if (reloadResult.success && reloadResult.wallet) {
+                        setWallet(reloadResult.wallet);
+                      }
+                    }
+                  }}
+                  trackColor={{ false: colors.white10, true: colors.green }}
+                  thumbColor={colors.white}
+                />
+              </View>
+            </View>
+
+            <View style={styles.walletCard}>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>Require approval for withdrawals</Text>
+                  <Text style={styles.settingDescription}>
+                    Creator must approve all withdrawal requests
+                  </Text>
+                </View>
+                <Switch
+                  value={wallet.settings?.requireApprovalForWithdrawals ?? false}
+                  onValueChange={async (value) => {
+                    if (!currentUser?.id) return;
+                    const result = await SharedWalletService.updateSharedWalletSettings({
+                      sharedWalletId: wallet.id,
+                      userId: currentUser.id.toString(),
+                      settings: {
+                        ...wallet.settings,
+                        requireApprovalForWithdrawals: value,
+                      },
+                    });
+                    if (result.success) {
+                      const reloadResult = await SharedWalletService.getSharedWallet(wallet.id);
+                      if (reloadResult.success && reloadResult.wallet) {
+                        setWallet(reloadResult.wallet);
+                      }
+                    }
+                  }}
+                  trackColor={{ false: colors.white10, true: colors.green }}
+                  thumbColor={colors.white}
+                />
+              </View>
+            </View>
+
+            <View style={styles.walletCard}>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>Enable custom permissions</Text>
+                  <Text style={styles.settingDescription}>
+                    Allow custom permissions per member
+                  </Text>
+                </View>
+                <Switch
+                  value={wallet.settings?.enableCustomPermissions ?? false}
+                  onValueChange={async (value) => {
+                    if (!currentUser?.id) return;
+                    const result = await SharedWalletService.updateSharedWalletSettings({
+                      sharedWalletId: wallet.id,
+                      userId: currentUser.id.toString(),
+                      settings: {
+                        ...wallet.settings,
+                        enableCustomPermissions: value,
+                      },
+                    });
+                    if (result.success) {
+                      const reloadResult = await SharedWalletService.getSharedWallet(wallet.id);
+                      if (reloadResult.success && reloadResult.wallet) {
+                        setWallet(reloadResult.wallet);
+                      }
+                    }
+                  }}
+                  trackColor={{ false: colors.white10, true: colors.green }}
+                  thumbColor={colors.white}
+                />
+              </View>
+            </View>
+
+            {wallet.settings?.maxMembers && (
+              <View style={styles.walletCard}>
+                <View style={styles.settingRow}>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingLabel}>Max members</Text>
+                    <Text style={styles.settingDescription}>
+                      Maximum number of members: {wallet.settings.maxMembers}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         {isCreator && (
           <View style={styles.sectionGroup}>
@@ -938,6 +1061,32 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  settingLabel: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white,
+    marginBottom: spacing.xs / 2,
+  },
+  settingDescription: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+  },
+  goalReachedText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.green,
+    marginTop: spacing.xs,
+    fontWeight: typography.fontWeight.medium,
   },
 });
 

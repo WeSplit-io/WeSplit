@@ -769,11 +769,15 @@ class BadgeService {
         };
       }
 
-      // Case-sensitive exact match (more secure than case-insensitive)
+      // Case-insensitive match for better user experience
+      // Convert to uppercase for comparison (all redeem codes are stored in uppercase)
+      const normalizedCode = trimmedCode.toUpperCase();
+      
       // Find badge by redeem code (supports both event and community badges)
       // Also supports backward compatibility with old codes
       let badgeInfo = Object.values(BADGE_DEFINITIONS).find(
-        badge => badge.redeemCode === trimmedCode && 
+        badge => badge.redeemCode && 
+                 badge.redeemCode.toUpperCase() === normalizedCode && 
                  (badge.isEventBadge || badge.category === 'event' || badge.category === 'community')
       );
 
@@ -786,7 +790,7 @@ class BadgeService {
           'DIGGERS': 'community_diggers'
         };
         
-        const badgeId = oldCodeMappings[trimmedCode];
+        const badgeId = oldCodeMappings[normalizedCode];
         if (badgeId) {
           badgeInfo = BADGE_DEFINITIONS[badgeId];
         }
@@ -820,7 +824,7 @@ class BadgeService {
         points: badgeInfo.points || 0,
         title: badgeInfo.title,
         description: badgeInfo.description,
-        redeemCode: trimmedCode
+        redeemCode: normalizedCode
       });
 
       // Award points if badge has points

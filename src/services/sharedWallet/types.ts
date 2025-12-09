@@ -31,6 +31,20 @@ export interface SharedWallet {
 }
 
 /**
+ * Member permissions for shared wallet operations
+ */
+export interface SharedWalletMemberPermissions {
+  canInviteMembers: boolean; // Can invite new members
+  canWithdraw: boolean; // Can withdraw funds
+  canManageSettings: boolean; // Can modify wallet settings
+  canRemoveMembers: boolean; // Can remove other members
+  canViewTransactions: boolean; // Can view transaction history
+  canFund: boolean; // Can add funds to wallet
+  withdrawalLimit?: number; // Maximum withdrawal amount per transaction (optional)
+  dailyWithdrawalLimit?: number; // Maximum withdrawal amount per day (optional)
+}
+
+/**
  * Member of a shared wallet
  * Tracks individual contributions and access
  */
@@ -44,6 +58,7 @@ export interface SharedWalletMember {
   joinedAt: string;
   status: 'active' | 'invited' | 'left';
   linkedCards?: string[]; // IDs of linked cards this member can use
+  permissions?: SharedWalletMemberPermissions; // Custom permissions (overrides role defaults)
 }
 
 /**
@@ -189,6 +204,10 @@ export interface SharedWalletSettings {
   autoTopUpThreshold?: number; // Balance threshold for auto top-up
   autoTopUpAmount?: number; // Amount to top up when threshold is reached
   goalAmount?: number; // Target amount for shared wallet goal
+  goalReachedAt?: string; // Timestamp when goal was reached
+  goalNotificationSent?: boolean; // Whether goal reached notification was sent
+  defaultMemberPermissions?: Partial<SharedWalletMemberPermissions>; // Default permissions for new members
+  enableCustomPermissions?: boolean; // Whether to allow custom permissions per member
 }
 
 /**
