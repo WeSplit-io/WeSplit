@@ -204,10 +204,23 @@ export class SharedWalletWithdrawal {
       );
 
       // Sign and send transaction
-      const { Keypair } = await import('@solana/web3.js');
-      const fromKeypair = Keypair.fromSecretKey(
-        Uint8Array.from(JSON.parse(privateKeyResult.privateKey))
-      );
+      // Use KeypairUtils to handle both base64 and JSON array formats
+      const { KeypairUtils } = await import('../shared/keypairUtils');
+      const keypairResult = KeypairUtils.createKeypairFromSecretKey(privateKeyResult.privateKey);
+      
+      if (!keypairResult.success || !keypairResult.keypair) {
+        logger.error('Failed to create keypair from private key', {
+          error: keypairResult.error,
+          sharedWalletId: params.sharedWalletId,
+          userId: params.userId
+        }, 'SharedWalletWithdrawal');
+        return {
+          success: false,
+          error: keypairResult.error || 'Failed to create keypair from private key'
+        };
+      }
+      
+      const fromKeypair = keypairResult.keypair;
 
       transaction.feePayer = fromPublicKey;
       const latestBlockhash = await connectionInstance.getLatestBlockhash();

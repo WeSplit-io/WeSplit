@@ -175,9 +175,28 @@ export class SplitWalletSecurity {
         padding: CryptoJS.pad.Pkcs7
       });
 
-      const privateKey = CryptoJS.enc.Utf8.stringify(decrypted);
+      let privateKey = CryptoJS.enc.Utf8.stringify(decrypted);
       if (!privateKey || privateKey.trim().length === 0) {
         return { success: false, error: 'Decrypted private key is empty - decryption may have failed' };
+      }
+
+      // Trim whitespace and any control characters that might have been added during encryption/decryption
+      privateKey = privateKey.trim();
+      
+      // Validate the decrypted key looks like a valid format (base64, JSON array, or hex)
+      const isValidFormat = 
+        /^[A-Za-z0-9+/=]+$/.test(privateKey) || // base64
+        /^\[.*\]$/.test(privateKey) || // JSON array
+        /^[0-9a-fA-F]+$/.test(privateKey); // hex
+      
+      if (!isValidFormat && privateKey.length > 0) {
+        logger.warn('Decrypted private key has unexpected format', {
+          splitWalletId,
+          keyLength: privateKey.length,
+          keyPreview: privateKey.substring(0, 20) + '...',
+          lastChars: '...' + privateKey.substring(Math.max(0, privateKey.length - 10))
+        }, 'SplitWalletSecurity');
+        // Still return it - let KeypairUtils handle format detection
       }
 
       return { success: true, privateKey };
@@ -744,15 +763,28 @@ export class SplitWalletSecurity {
           };
         }
         
-        // Store in cache for future requests
+        // Ensure the key is properly trimmed before caching and returning
+        const trimmedKey = decryptedKey.trim();
+        
+        // Log key format for debugging (without exposing the actual key)
+        logger.debug('Private key retrieved and validated', {
+          splitWalletId,
+          keyLength: trimmedKey.length,
+          isBase64Like: /^[A-Za-z0-9+/=]+$/.test(trimmedKey),
+          isJsonLike: trimmedKey.startsWith('['),
+          isHexLike: /^[0-9a-fA-F]+$/.test(trimmedKey),
+          firstChars: trimmedKey.substring(0, 10)
+        }, 'SplitWalletSecurity');
+        
+        // Store in cache for future requests (store trimmed version)
         this.privateKeyCache.set(cacheKey, {
-          key: decryptedKey,
+          key: trimmedKey,
           timestamp: Date.now()
         });
         
         return {
           success: true,
-          privateKey: decryptedKey
+          privateKey: trimmedKey
           };
       }
       

@@ -41,6 +41,7 @@ export interface WalletInfo {
   icon?: PhosphorIconName;
   iconColor?: string;
   imageUrl?: string; // Direct image URL for logos/external images
+  address?: string; // Wallet on-chain address for display
 }
 
 interface SendComponentProps {
@@ -168,7 +169,9 @@ const SendComponent: React.FC<SendComponentProps> = ({
         {/* Send to Section */}
         <View style={styles.sendToSection}>
         <View style={styles.sendToHeader}>
-          <Text style={styles.sendToLabel}>Send to</Text>
+          <Text style={styles.sendToLabel}>
+            {recipient.name === 'Your Personal Wallet' ? 'Withdraw to' : 'Send to'}
+          </Text>
           {showRecipientChange && onRecipientChange && (
             <TouchableOpacity
               style={styles.changeButton}

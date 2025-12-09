@@ -127,6 +127,47 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   }, [visible, config.context, amount, isProcessing]);
 
   // Determine effective balance
+  // For withdrawals, we need the shared wallet balance, not the user's wallet balance
+  const [sharedWalletBalance, setSharedWalletBalance] = useState<number | null>(null);
+  
+  useEffect(() => {
+    // Reset balance and address when modal closes or context changes
+    if (!visible || config.context !== 'shared_wallet_withdrawal') {
+      setSharedWalletBalance(null);
+      setSharedWalletAddress(null);
+      return;
+    }
+
+    if (config.context === 'shared_wallet_withdrawal' && sharedWalletId) {
+      const loadSharedWalletData = async () => {
+        try {
+          const { SharedWalletService } = await import('../../services/sharedWallet');
+          const result = await SharedWalletService.getSharedWallet(sharedWalletId);
+          if (result.success && result.wallet) {
+            const balance = result.wallet.totalBalance || 0;
+            const address = result.wallet.walletAddress || null; // Get on-chain address, not ID
+            setSharedWalletBalance(balance);
+            setSharedWalletAddress(address);
+            logger.info('Shared wallet data loaded for withdrawal', {
+              sharedWalletId,
+              balance,
+              walletAddress: address
+            }, 'CentralizedTransactionModal');
+          } else {
+            logger.error('Failed to get shared wallet', { sharedWalletId }, 'CentralizedTransactionModal');
+            setSharedWalletBalance(0);
+            setSharedWalletAddress(null);
+          }
+        } catch (error) {
+          logger.error('Failed to load shared wallet data', { error, sharedWalletId }, 'CentralizedTransactionModal');
+          setSharedWalletBalance(0);
+          setSharedWalletAddress(null);
+        }
+      };
+      loadSharedWalletData();
+    }
+  }, [visible, config.context, sharedWalletId]);
+
   const effectiveBalance = liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined
     ? liveBalance.usdcBalance
     : appWalletBalance;
@@ -497,19 +538,40 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     };
   }, [displayRecipientInfo, contact]);
 
+  // Store shared wallet address for display
+  const [sharedWalletAddress, setSharedWalletAddress] = useState<string | null>(null);
+
   // Map wallet info to SendComponent format
+  // For withdrawals, show shared wallet info; for other transactions, show user's wallet
   const walletInfo: WalletInfo = useMemo(() => {
+    // For withdrawals, ALWAYS show the shared wallet as the source (sender)
+    // This is the wallet we're withdrawing FROM
+    if (config.context === 'shared_wallet_withdrawal' && sharedWalletId) {
+      // Use shared wallet balance if loaded, otherwise show 0 (will update when loaded)
+      const balance = sharedWalletBalance !== null ? sharedWalletBalance : 0;
+      return {
+        name: 'Shared Wallet',
+        balance: balance,
+        balanceFormatted: formatAmountWithComma(balance),
+        icon: 'Wallet' as const,
+        iconColor: colors.blue,
+        imageUrl: undefined,
+        address: sharedWalletAddress || undefined, // Show on-chain address, not wallet ID
+      };
+    }
+    
+    // Default: show user's personal wallet (for funding, sends, etc.)
     return {
       name: 'WeSplit Wallet',
       balance: effectiveBalance !== null && effectiveBalance !== undefined ? effectiveBalance : 0,
       balanceFormatted: effectiveBalance !== null && effectiveBalance !== undefined 
         ? formatAmountWithComma(effectiveBalance) 
         : '0,00',
-      icon: 'Wallet',
+      icon: 'Wallet' as const,
       iconColor: colors.green,
       imageUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-new.png?alt=media&token=f42ea1b1-5f23-419e-a499-931862819cbf',
     };
-  }, [effectiveBalance]);
+  }, [effectiveBalance, config.context, sharedWalletId, sharedWalletBalance, sharedWalletAddress]);
 
   // Handle amount change from SendComponent
   const handleAmountChange = useCallback((newAmount: string) => {

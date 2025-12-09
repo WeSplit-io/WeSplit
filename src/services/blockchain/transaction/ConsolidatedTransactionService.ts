@@ -738,7 +738,7 @@ class ConsolidatedTransactionService {
           fee: feeCalculation.fee,
           netAmount: feeCalculation.recipientAmount,
           blockchainFee: result.companyFee || 0,
-          message: `Successfully contributed ${amount.toFixed(6)} USDC to fair split`
+          message: `Successfully sent ${amount.toFixed(6)} USDC`
         };
       } else {
         return {
@@ -997,8 +997,11 @@ class ConsolidatedTransactionService {
               expectedIncrease: amount
             }, 'ConsolidatedTransactionService');
 
-            const { verifyTransactionOnBlockchain } = await import('../utils/transactionUtils');
-            const verificationResult = await verifyTransactionOnBlockchain(result.signature);
+            const { verifyTransactionOnBlockchain } = await import('../../shared/transactionUtils');
+            const verificationResult = await verifyTransactionOnBlockchain(result.signature, {
+              maxAttempts: 10,
+              baseDelayMs: 2000
+            });
 
             if (verificationResult.success) {
               logger.info('Transaction verified as successful on-chain despite initial failure', {
@@ -1061,19 +1064,27 @@ class ConsolidatedTransactionService {
       const { db } = await import('../../../config/firebase/firebase');
       const { doc, runTransaction, addDoc, collection, serverTimestamp } = await import('firebase/firestore');
 
-      // Get wallet document ID (assuming it's stored in the wallet object)
-      const walletDocId = (wallet as any).firebaseDocId;
+      // Get wallet document ID - fetch it if not already in wallet object
+      let walletDocId = wallet.firebaseDocId;
       if (!walletDocId) {
-        logger.error('Wallet document ID not found', { sharedWalletId }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: 'Failed to update wallet data'
-        };
+        // Fetch wallet document to get the Firebase document ID
+        const { getSharedWalletDocById } = await import('../../sharedWallet/utils');
+        const walletDocResult = await getSharedWalletDocById(sharedWalletId);
+        if (!walletDocResult) {
+          logger.error('Wallet document ID not found', { sharedWalletId }, 'ConsolidatedTransactionService');
+          return {
+            success: false,
+            error: 'Failed to find wallet document'
+          };
+        }
+        walletDocId = walletDocResult.walletDocId;
       }
 
       // Use Firestore transaction to ensure atomic balance updates
       const walletRef = doc(db, 'sharedWallets', walletDocId);
-      let newBalance: number;
+      // Calculate expected new balance (will be recalculated in transaction with actual current balance)
+      const expectedNewBalance = (wallet.totalBalance || 0) + amount;
+      let newBalance: number = expectedNewBalance;
 
       try {
         await runTransaction(db, async (transaction) => {
@@ -1115,27 +1126,12 @@ class ConsolidatedTransactionService {
 
         return {
           success: false,
-          error: 'Failed to update wallet balance'
+          error: transactionError instanceof Error ? transactionError.message : 'Failed to update wallet balance'
         };
       }
 
-      // Update member contribution
-      const updatedMembers = wallet.members.map((m) => {
-        if (m.userId === userId) {
-          return {
-            ...m,
-            totalContributed: (m.totalContributed || 0) + amount,
-          };
-        }
-        return m;
-      });
-
-      // Update wallet document
-      await updateDoc(doc(db, 'sharedWallets', walletDocId), {
-        totalBalance: newBalance,
-        members: updatedMembers,
-        updatedAt: serverTimestamp(),
-      });
+      // Wallet balance and member contribution already updated in the transaction above
+      // No need for duplicate updateDoc call
 
       // Record transaction
       const { generateUniqueId } = await import('../../sharedWallet/utils');
@@ -1203,6 +1199,22 @@ class ConsolidatedTransactionService {
         };
       }
 
+      // Get destination address if not provided (should be user's personal wallet)
+      let finalDestinationAddress = destinationAddress;
+      if (!finalDestinationAddress) {
+        finalDestinationAddress = await this.getUserWalletAddress(userId);
+        if (!finalDestinationAddress) {
+          return {
+            success: false,
+            error: 'User wallet address not found. Please ensure your wallet is initialized.'
+          };
+        }
+        logger.info('Retrieved user wallet address for withdrawal', {
+          userId,
+          address: finalDestinationAddress
+        }, 'ConsolidatedTransactionService');
+      }
+
       // Get shared wallet
       const { SharedWalletService } = await import('../../sharedWallet');
       const walletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
@@ -1264,26 +1276,75 @@ class ConsolidatedTransactionService {
         };
       }
 
+      // CRITICAL: Verify user has access to the private key BEFORE attempting withdrawal
+      // This ensures the user is in the participants list for the encrypted private key document
+      // The getSharedWalletPrivateKey call below will also verify this, but we want to fail fast
+      // with a clear error message if access is missing
+      logger.info('Verifying private key access for withdrawal', {
+        sharedWalletId,
+        userId,
+        userStatus: userMember.status,
+        userRole: userMember.role
+      }, 'ConsolidatedTransactionService');
+
       // Get shared wallet private key
+      // This internally verifies the user is in the participants list in the private key document
+      // If the user is not a participant, getSharedWalletPrivateKey will return an error
       const privateKeyResult = await SharedWalletService.getSharedWalletPrivateKey(sharedWalletId, userId);
       if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        logger.error('Failed to get shared wallet private key', {
+          error: privateKeyResult.error,
+          sharedWalletId,
+          userId,
+          userStatus: userMember.status,
+          userRole: userMember.role,
+          note: 'This may indicate the user is not in the private key participants list. Ensure inviteToSharedWallet properly grants access.'
+        }, 'ConsolidatedTransactionService');
+        
+        // Provide a more helpful error message if access is denied
+        if (privateKeyResult.error?.includes('not a participant') || 
+            privateKeyResult.error?.includes('not found')) {
+          return {
+            success: false,
+            error: 'You do not have access to the shared wallet private key. Please contact the wallet creator to grant you access, or try accepting the invitation again.'
+          };
+        }
+        
         return {
           success: false,
-          error: privateKeyResult.error || 'Failed to access shared wallet private key'
+          error: privateKeyResult.error || 'Failed to access shared wallet private key. Please ensure you are an active member with proper access.'
         };
       }
+
+      // Log private key format info (without exposing the actual key)
+      const privateKey = privateKeyResult.privateKey;
+      const keyLength = privateKey.length;
+      const keyPreview = privateKey.substring(0, 10);
+      const isBase64Like = /^[A-Za-z0-9+/=]+$/.test(privateKey);
+      const isJsonLike = privateKey.trim().startsWith('[');
+      const isHexLike = /^[0-9a-fA-F]+$/.test(privateKey);
+      
+      logger.debug('Private key format analysis', {
+        keyLength,
+        keyPreview: keyPreview + '...',
+        isBase64Like,
+        isJsonLike,
+        isHexLike,
+        firstChars: keyPreview,
+        sharedWalletId
+      }, 'ConsolidatedTransactionService');
 
       // Execute blockchain transaction using the shared wallet's private key
       // We need to create a custom transaction since the shared wallet is the sender
       const { createSolanaConnection } = await import('../connection/connectionFactory');
       const connectionInstance = await createSolanaConnection();
 
-      const { PublicKey, Keypair, Transaction } = await import('@solana/web3.js');
+      const { PublicKey, Transaction } = await import('@solana/web3.js');
       const { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction, getAccount } = await import('../secureTokenUtils');
       const { USDC_CONFIG } = await import('../../shared/walletConstants');
 
       const fromPublicKey = new PublicKey(wallet.walletAddress);
-      const toPublicKey = new PublicKey(destinationAddress);
+      const toPublicKey = new PublicKey(finalDestinationAddress);
       const mintPublicKey = new PublicKey(USDC_CONFIG.mintAddress);
 
       const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromPublicKey);
@@ -1325,9 +1386,67 @@ class ConsolidatedTransactionService {
       );
 
       // Sign and send transaction
-      const fromKeypair = Keypair.fromSecretKey(
-        Uint8Array.from(JSON.parse(privateKeyResult.privateKey))
-      );
+      // Use KeypairUtils to handle both base64 and JSON array formats
+      const { KeypairUtils } = await import('../../shared/keypairUtils');
+      
+      logger.info('Creating keypair from private key', {
+        keyLength: privateKey.length,
+        keyPreview: privateKey.substring(0, 15) + '...',
+        keyEnd: '...' + privateKey.substring(Math.max(0, privateKey.length - 10)),
+        isBase58Like: /^[1-9A-HJ-NP-Za-km-z]+$/.test(privateKey.trim()),
+        isBase64Like: /^[A-Za-z0-9+/=]+$/.test(privateKey.trim()),
+        sharedWalletId,
+        userId
+      }, 'ConsolidatedTransactionService');
+      
+      const keypairResult = KeypairUtils.createKeypairFromSecretKey(privateKey);
+      
+      if (!keypairResult.success || !keypairResult.keypair) {
+        logger.error('Failed to create keypair from private key', {
+          error: keypairResult.error,
+          keyLength: privateKey.length,
+          keyPreview: privateKey.substring(0, 20) + '...',
+          detectedFormat: keypairResult.format,
+          isBase58Like: /^[1-9A-HJ-NP-Za-km-z]+$/.test(privateKey.trim()),
+          isBase64Like: /^[A-Za-z0-9+/=]+$/.test(privateKey.trim()),
+          sharedWalletId,
+          userId
+        }, 'ConsolidatedTransactionService');
+        return {
+          success: false,
+          error: keypairResult.error || 'Failed to create keypair from private key. Please try again or contact support if the issue persists.'
+        };
+      }
+      
+      logger.info('Keypair created successfully from private key', {
+        format: keypairResult.format,
+        publicKey: keypairResult.keypair.publicKey.toBase58(),
+        sharedWalletId,
+        userId
+      }, 'ConsolidatedTransactionService');
+      
+      // Verify the keypair matches the expected wallet address
+      const derivedAddress = keypairResult.keypair.publicKey.toBase58();
+      if (derivedAddress !== wallet.walletAddress) {
+        logger.error('Keypair address mismatch', {
+          expected: wallet.walletAddress,
+          derived: derivedAddress,
+          sharedWalletId,
+          userId
+        }, 'ConsolidatedTransactionService');
+        return {
+          success: false,
+          error: 'Private key does not match shared wallet address'
+        };
+      }
+      
+      logger.info('Keypair created successfully', {
+        format: keypairResult.format,
+        publicKey: derivedAddress,
+        sharedWalletId
+      }, 'ConsolidatedTransactionService');
+      
+      const fromKeypair = keypairResult.keypair;
 
       transaction.feePayer = fromPublicKey;
       const latestBlockhash = await connectionInstance.getLatestBlockhash();
@@ -1349,14 +1468,20 @@ class ConsolidatedTransactionService {
       const { db } = await import('../../../config/firebase/firebase');
       const { doc, runTransaction, addDoc, collection, serverTimestamp } = await import('firebase/firestore');
 
-      // Get wallet document ID
-      const walletDocId = (wallet as any).firebaseDocId;
+      // Get wallet document ID - fetch it if not already in wallet object
+      let walletDocId = wallet.firebaseDocId;
       if (!walletDocId) {
-        logger.error('Wallet document ID not found', { sharedWalletId }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: 'Failed to update wallet data'
-        };
+        // Fetch wallet document to get the Firebase document ID
+        const { getSharedWalletDocById } = await import('../../sharedWallet/utils');
+        const walletDocResult = await getSharedWalletDocById(sharedWalletId);
+        if (!walletDocResult) {
+          logger.error('Wallet document ID not found', { sharedWalletId }, 'ConsolidatedTransactionService');
+          return {
+            success: false,
+            error: 'Failed to find wallet document'
+          };
+        }
+        walletDocId = walletDocResult.walletDocId;
       }
 
       // Use Firestore transaction to ensure atomic balance updates
@@ -1427,7 +1552,7 @@ class ConsolidatedTransactionService {
         memo: memo,
         createdAt: new Date().toISOString(),
         confirmedAt: new Date().toISOString(),
-        destination: destinationAddress,
+        destination: finalDestinationAddress,
       };
 
       await addDoc(collection(db, 'sharedWalletTransactions'), transactionData);

@@ -494,6 +494,30 @@ export class SharedWalletService {
         updatedAt: serverTimestamp(),
       });
 
+      // CRITICAL: Ensure the user has private key access after accepting invitation
+      // The user should already be in the participants list from inviteToSharedWallet,
+      // but we verify and sync to prevent access issues during withdrawal
+      const { SplitWalletSecurity } = await import('../split/SplitWalletSecurity');
+      const syncResult = await SplitWalletSecurity.syncSharedPrivateKeyParticipants(
+        sharedWalletId,
+        updatedMembers.map(m => ({ userId: m.userId, name: m.name }))
+      );
+
+      if (!syncResult.success) {
+        logger.warn('Failed to sync private key participants after invitation acceptance', {
+          sharedWalletId,
+          userId,
+          error: syncResult.error
+        }, 'SharedWalletService');
+        // Don't fail the acceptance - the user might still have access from the original invite
+        // But log it for monitoring
+      } else {
+        logger.info('Private key participants synced after invitation acceptance', {
+          sharedWalletId,
+          userId
+        }, 'SharedWalletService');
+      }
+
       logger.info('Shared wallet invitation accepted', {
         sharedWalletId,
         userId,
