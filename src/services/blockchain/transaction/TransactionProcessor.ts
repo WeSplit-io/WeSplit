@@ -7,8 +7,6 @@ import {
   Connection, 
   PublicKey, 
   Keypair, 
-  LAMPORTS_PER_SOL,
-  SystemProgram,
   Transaction,
   VersionedTransaction,
   TransactionInstruction,
@@ -24,7 +22,7 @@ import {
 import { USDC_CONFIG } from '../../shared/walletConstants';
 import { getConfig } from '../../../config/unified';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';  
-import { FeeService, COMPANY_WALLET_CONFIG } from '../../../config/constants/feeConfig';
+import { FeeService } from '../../../config/constants/feeConfig';
 import { transactionUtils } from '../../shared/transactionUtils';
 import { logger } from '../../analytics/loggingService';
 import { TransactionParams, TransactionResult } from './types';
@@ -35,19 +33,15 @@ import {
   BLOCKHASH_MAX_AGE_MS, 
   shouldRebuildTransaction 
 } from '../../shared/blockhashUtils';
-import { verifyTransactionOnBlockchain } from '../../shared/transactionUtils';
 import { 
   rebuildTransactionBeforeFirebase, 
   rebuildTransactionWithFreshBlockhash 
 } from '../../shared/transactionUtils';
 
 export class TransactionProcessor {
-  private isProduction: boolean;
-
   constructor() {
     // Connection management now handled by transactionUtils
     // This ensures we use optimized RPC endpoints with rotation and rate limit handling
-    this.isProduction = !__DEV__;
   }
 
   /**
@@ -61,7 +55,7 @@ export class TransactionProcessor {
    * SOL transactions are not supported in WeSplit app
    * Only USDC transfers are allowed within the app
    */
-  async sendSolTransaction(params: TransactionParams): Promise<TransactionResult> {
+  async sendSolTransaction(_params: TransactionParams): Promise<TransactionResult> {
     return {
       signature: '',
       txId: '',
@@ -87,7 +81,7 @@ export class TransactionProcessor {
 
       // Calculate company fee using centralized service with transaction type
       const transactionType = params.transactionType || 'send';
-      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
+      const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
       
       // Reduced logging for performance
       const fromPublicKey = keypair.publicKey;
@@ -342,14 +336,16 @@ export class TransactionProcessor {
       try {
         if (serializedTransaction instanceof Uint8Array) {
           txArray = serializedTransaction;
-        } else if (serializedTransaction instanceof Buffer) {
-          // Convert Buffer to Uint8Array
-          txArray = new Uint8Array(serializedTransaction);
+        } else if (typeof Buffer !== 'undefined' && (serializedTransaction as any).constructor?.name === 'Buffer') {
+          // Convert Buffer to Uint8Array (check constructor name to avoid instanceof issues)
+          txArray = new Uint8Array(serializedTransaction as any);
         } else if (Array.isArray(serializedTransaction)) {
           txArray = new Uint8Array(serializedTransaction);
-        } else if (serializedTransaction instanceof ArrayBuffer) {
-          txArray = new Uint8Array(serializedTransaction);
-          } else {
+        } else if (serializedTransaction && typeof serializedTransaction === 'object' && 'buffer' in serializedTransaction) {
+          // Handle ArrayBuffer-like objects
+          const buffer = (serializedTransaction as any).buffer;
+          txArray = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : new Uint8Array(serializedTransaction as any);
+        } else {
           throw new Error(`Invalid serialized transaction type: ${typeof serializedTransaction}. Expected Uint8Array or Buffer.`);
         }
 
@@ -493,27 +489,60 @@ export class TransactionProcessor {
       // Use Firebase Function to add company wallet signature
       // Use processUsdcTransfer which combines signing and submission in one Firebase call
       // This minimizes blockhash expiration risk and reduces network round trips
-      let signature: string;
+      let signature: string | undefined;
       let submissionAttempts = 0;
       const maxSubmissionAttempts = 3; // Retry up to 3 times with fresh blockhash for better reliability
       
-      // Get network info for timeout handling
+      // Track transaction submission to prevent duplicates
+      logger.info('Starting transaction submission process', {
+        recipientAmount,
+        companyFee,
+        totalAmount: recipientAmount + companyFee,
+        transactionSize: currentTxArray.length,
+        note: 'This transaction will be submitted once. Retries only occur on specific errors.'
+      }, 'TransactionProcessor');
+      
+      // Get network info for logging (unified logic for both networks)
       const config = getConfig();
       const isMainnet = config.blockchain.network === 'mainnet';
+      const networkNameForSubmission = isMainnet ? 'mainnet' : 'devnet';
       
       while (submissionAttempts < maxSubmissionAttempts) {
         try {
+          // Log transaction details before submission to track duplicates
+          const transactionForLogging = VersionedTransaction.deserialize(currentTxArray);
+          // Access instructions from compiled message - VersionedMessage doesn't have instructions directly
+          const compiledMessage = transactionForLogging.message;
+          const instructions = 'instructions' in compiledMessage 
+            ? (compiledMessage as any).instructions 
+            : [];
+          const transferInstructions = instructions.filter((ix: any) => {
+            // Check if instruction is a token transfer (has token program)
+            return ix.programId && ix.programId.equals && ix.programId.equals(TOKEN_PROGRAM_ID);
+          });
+          
           logger.info('Processing USDC transfer (sign and submit)', {
             transactionSize: currentTxArray.length,
             attempt: submissionAttempts + 1,
             maxAttempts: maxSubmissionAttempts,
             blockhashAge: Date.now() - currentBlockhashTimestamp,
-            isMainnet
+            isMainnet,
+            transferInstructionsCount: transferInstructions.length,
+            totalInstructionsCount: instructions.length,
+            recipientAmount,
+            companyFee,
+            note: submissionAttempts > 0 ? 'RETRY ATTEMPT - previous attempt may have succeeded' : 'Initial submission'
           }, 'TransactionProcessor');
           
           const result = await processUsdcTransfer(currentTxArray);
           signature = result.signature;
-          logger.info('Transaction processed successfully', { signature }, 'TransactionProcessor');
+          logger.info('Transaction processed successfully', { 
+            signature,
+            attempt: submissionAttempts + 1,
+            recipientAmount,
+            companyFee,
+            totalAmount: recipientAmount + companyFee
+          }, 'TransactionProcessor');
           break; // Success, exit retry loop
         } catch (submissionError) {
           const errorMessage = submissionError instanceof Error ? submissionError.message : String(submissionError);
@@ -538,37 +567,101 @@ export class TransactionProcessor {
             // Try to extract signature from the transaction to check if it was submitted
             // If we can't extract signature, check recent transactions from the wallet
             try {
-              // Get connection to check transaction status
-              const checkConnection = await this.getConnection();
-              
-              // Check if we can get the transaction signature from the serialized transaction
-              // Note: We can't get signature before submission, but we can check recent transactions
-              // For now, on timeout in production, don't retry - just verify later
-              if (isMainnet) {
-                logger.warn('Mainnet timeout - not retrying to prevent duplicate submission', {
-                  errorMessage,
-                  note: 'Transaction may have succeeded. User should check transaction history. Retrying could cause duplicate submission.'
+              // UNIFIED TIMEOUT HANDLING: Same logic for both mainnet and devnet
+              // Check if transaction was actually submitted before retrying
+              // Extract signature from error message if available
+              const signatureMatch = errorMessage.match(/Signature:\s*([A-Za-z0-9]{88})/);
+              const possibleSignature = signatureMatch?.[1];
+              if (possibleSignature) {
+                logger.warn(`${networkNameForSubmission} timeout but signature found in error - checking if transaction succeeded`, {
+                  signature: possibleSignature,
+                  network: networkNameForSubmission,
+                  attempt: submissionAttempts + 1,
+                  note: 'Transaction may have succeeded. Checking on-chain before retrying.'
                 }, 'TransactionProcessor');
-                // Don't retry on mainnet timeout - transaction likely succeeded
-                throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again.`);
-              } else {
-                // On devnet, allow one retry but log warning
-                if (submissionAttempts < maxSubmissionAttempts - 1) {
-                  logger.warn('Devnet timeout - allowing one retry', {
-                    attempt: submissionAttempts + 1,
-                    maxAttempts: maxSubmissionAttempts
+                
+                try {
+                  // Check if transaction exists on-chain
+                  const checkConnection = await this.getConnection();
+                  const status = await checkConnection.getSignatureStatus(possibleSignature, {
+                    searchTransactionHistory: true
+                  });
+                  
+                  if (status.value) {
+                    if (status.value.err) {
+                      // Transaction failed - allow retry
+                      logger.warn('Transaction found on-chain but failed - allowing retry', {
+                        signature: possibleSignature,
+                        network: networkNameForSubmission,
+                        error: status.value.err
+                      }, 'TransactionProcessor');
+                    } else {
+                      // Transaction succeeded! Don't retry
+                      logger.info('Transaction found on-chain and succeeded - not retrying', {
+                        signature: possibleSignature,
+                        network: networkNameForSubmission,
+                        confirmationStatus: status.value.confirmationStatus
+                      }, 'TransactionProcessor');
+                      signature = possibleSignature;
+                      break; // Success, exit retry loop
+                    }
+                  }
+                } catch (checkError) {
+                  logger.warn('Failed to check transaction status - allowing retry', {
+                    network: networkNameForSubmission,
+                    error: checkError instanceof Error ? checkError.message : String(checkError)
                   }, 'TransactionProcessor');
+                }
+              }
+              
+              // UNIFIED RETRY LOGIC: Same for both networks
+              // Only retry if we didn't find a successful transaction
+              if (!signature && submissionAttempts < maxSubmissionAttempts - 1) {
+                logger.warn(`${networkNameForSubmission} timeout - checking recent transactions before retrying`, {
+                  network: networkNameForSubmission,
+                  attempt: submissionAttempts + 1,
+                  maxAttempts: maxSubmissionAttempts,
+                  note: '⚠️ WARNING: Retrying may cause duplicate transaction if first attempt succeeded. Checking on-chain first.'
+                }, 'TransactionProcessor');
+                
+                // Wait a bit and check recent transactions to see if one succeeded
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                try {
+                  const checkConnection = await this.getConnection();
+                  // Check recent signatures from the wallet (last 10 transactions)
+                  const recentSignatures = await checkConnection.getSignaturesForAddress(fromPublicKey, { limit: 10 });
+                  const recentTx = recentSignatures.find(tx => {
+                    const txTime = tx.blockTime ? tx.blockTime * 1000 : 0;
+                    return Date.now() - txTime < 30000; // Within last 30 seconds
+                  });
+                  if (recentTx && !recentTx.err) {
+                    logger.warn('Recent successful transaction found - not retrying to prevent duplicate', {
+                      signature: recentTx.signature,
+                      network: networkNameForSubmission,
+                      blockTime: recentTx.blockTime
+                    }, 'TransactionProcessor');
+                    signature = recentTx.signature;
+                    break; // Use the found signature, don't retry
+                  }
+                } catch (checkError) {
+                  logger.debug('Could not check recent transactions, proceeding with retry', {
+                    network: networkNameForSubmission,
+                    error: checkError instanceof Error ? checkError.message : String(checkError)
+                  }, 'TransactionProcessor');
+                }
+                
+                if (!signature) {
                   submissionAttempts++;
                   await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
-                  continue; // Retry once
-                } else {
-                  throw new Error(`Transaction processing timed out after ${maxSubmissionAttempts} attempts. Please check your transaction history.`);
+                  continue; // Retry once (same for both networks)
                 }
+              } else if (!signature) {
+                throw new Error(`Transaction processing timed out after ${maxSubmissionAttempts} attempts. Please check your transaction history.`);
               }
             } catch (checkError) {
               // If checking fails, don't retry on timeout
               logger.error('Failed to check transaction status on timeout', {
-                error: checkError,
+                error: checkError instanceof Error ? checkError.message : String(checkError),
                 errorMessage
               }, 'TransactionProcessor');
               throw new Error(`Transaction processing timed out. Please check your transaction history to see if the transaction succeeded.`);
@@ -633,245 +726,155 @@ export class TransactionProcessor {
         }
       }
 
-      // CRITICAL: On mainnet, we need to properly verify the transaction succeeded
-      // Don't assume success just because we got a signature - verify it actually confirmed
-      // Note: isMainnet is already defined above
-      
-      if (isMainnet) {
-        // On mainnet, use proper verification with delayed check
-        logger.info('Mainnet transaction submitted, verifying confirmation', {
-          signature,
-          transactionType,
-          note: 'Will verify transaction status on mainnet'
-        }, 'TransactionProcessor');
-        
-        // Wait a moment for transaction to be processed
-        // NOTE: This delay is AFTER transaction submission, so it doesn't affect blockhash expiration
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Verify transaction with proper mainnet-aware logic using shared utility
-        const verificationResult = await verifyTransactionOnBlockchain(connection, signature);
-        
-        if (!verificationResult.success) {
-          // On mainnet, if verification fails but we got a signature, assume success
-          // RPC indexing delays are common and don't mean the transaction failed
-          // The verification utility now returns success: true on mainnet for indexing delays
-          logger.warn('Transaction verification failed on mainnet (may be RPC indexing delay)', {
-            signature,
-            error: verificationResult.error,
-            transactionType,
-            note: verificationResult.note || 'Transaction was submitted successfully. Verification may have failed due to RPC indexing delay.'
-          }, 'TransactionProcessor');
-          
-          // Don't return error - transaction was submitted successfully
-          // User can check Solana Explorer to verify
-          logger.info('Transaction submitted successfully despite verification timeout', {
-            signature,
-            note: 'Transaction was accepted by network. Verification timeout likely due to RPC indexing delay.'
-          }, 'TransactionProcessor');
-        } else {
-          logger.info('Transaction verified successfully on mainnet', {
-            signature,
-            transactionType,
-            confirmationStatus: verificationResult.confirmationStatus,
-            note: verificationResult.note
-          }, 'TransactionProcessor');
-        }
-      } else {
-        // On devnet, verify transaction exists before showing success
-        // Do 4 attempts over 3-4 seconds - if transaction not found, fail (don't assume indexing delay)
-        logger.info('Devnet transaction submitted, verifying on blockchain', {
-          signature,
-          note: 'Verifying transaction exists before showing success (4 attempts, ~3-4 seconds)'
-        }, 'TransactionProcessor');
-        
-        try {
-          const connection = await this.getConnection();
-          let verified = false;
-          let transactionFound = false;
-          
-          // Verification: 4 attempts with 800ms delay each (max 3-4 seconds total)
-          // This ensures transaction actually exists before showing success
-          for (let attempt = 0; attempt < 4; attempt++) {
-            if (attempt > 0) {
-              await new Promise(resolve => setTimeout(resolve, 800)); // Wait 800ms between attempts
-            }
-            
-            try {
-              const status = await Promise.race([
-                connection.getSignatureStatus(signature, {
-                  searchTransactionHistory: true
-                }),
-                new Promise<null>((_, reject) => 
-                  setTimeout(() => reject(new Error('Verification timeout')), 2500)
-                )
-              ]) as any;
-              
-              if (status && status.value) {
-                transactionFound = true;
-                
-                if (status.value.err) {
-                  // Transaction failed on blockchain - fail immediately
-                  logger.error('Transaction failed on blockchain', {
-                    signature,
-                    error: status.value.err,
-                    attempt: attempt + 1,
-                    note: 'Transaction was submitted but failed during execution'
-                  }, 'TransactionProcessor');
-                  throw new Error(`Transaction failed on blockchain: ${JSON.stringify(status.value.err)}`);
-                }
-                
-                // Transaction found and no error - verified!
-                verified = true;
-                logger.info('Transaction verified on blockchain', {
-                  signature,
-                  confirmationStatus: status.value.confirmationStatus,
-                  attempt: attempt + 1,
-                  slot: status.value.slot
-                }, 'TransactionProcessor');
-                break;
-              }
-            } catch (statusError) {
-              // If it's a transaction failure error, re-throw it
-              if (statusError instanceof Error && statusError.message.includes('failed on blockchain')) {
-                throw statusError;
-              }
-              // If timeout, continue to next attempt
-              if (statusError instanceof Error && statusError.message.includes('timeout')) {
-                logger.debug('Verification attempt timed out, retrying', {
-                  signature,
-                  attempt: attempt + 1
-                }, 'TransactionProcessor');
-                continue;
-              }
-              // Other errors - log and continue
-              logger.debug('Verification attempt failed, retrying', {
-                signature,
-                attempt: attempt + 1,
-                error: statusError instanceof Error ? statusError.message : String(statusError)
-              }, 'TransactionProcessor');
-            }
-          }
-          
-          if (!transactionFound) {
-            // Transaction not found after 4 attempts - fail the transaction
-            // Don't assume indexing delay - if transaction doesn't exist, it likely failed
-            logger.error('Transaction not found on blockchain after verification attempts', {
-              signature,
-              attempts: 4,
-              note: 'Transaction was submitted but not found on blockchain. This likely indicates the transaction failed.'
-            }, 'TransactionProcessor');
-            throw new Error('Transaction not found on blockchain after verification. Transaction may have failed.');
-          }
-          
-          if (!verified) {
-            // This shouldn't happen (transactionFound but not verified), but handle it
-            logger.warn('Transaction found but verification incomplete', {
-              signature,
-              note: 'Transaction exists but verification status unclear'
-            }, 'TransactionProcessor');
-            throw new Error('Transaction verification incomplete');
-          }
-        } catch (verifyError) {
-          // If verification fails, throw the error (don't show success)
-          logger.error('Transaction verification failed', {
-            signature,
-            error: verifyError instanceof Error ? verifyError.message : String(verifyError),
-            note: 'Transaction verification failed. Not showing success state.'
-          }, 'TransactionProcessor');
-          throw verifyError;
-        }
+      // UNIFIED VERIFICATION: Same logic for both mainnet and devnet
+      // Verify transaction exists on blockchain before showing success
+      // This prevents false positives where we show success but transaction doesn't exist
+      if (!signature) {
+        throw new Error('Transaction signature is missing - cannot verify transaction');
       }
 
-      // Return success - transaction was submitted and verified (or assumed successful)
-      return {
+      const networkNameForVerification = isMainnet ? 'mainnet' : 'devnet';
+      const maxAttempts = 6; // Same for both networks
+      const attemptDelay = 1000; // 1 second between attempts (same for both)
+      const timeoutPerAttempt = 2500; // 2.5 seconds per attempt (same for both)
+      const initialWait = 1000; // 1 second initial wait (same for both)
+      
+      logger.info(`${networkNameForVerification} transaction submitted, verifying on blockchain`, {
         signature,
-        txId: signature,
+        network: networkNameForVerification,
+        note: `Verifying transaction exists before showing success (${maxAttempts} attempts, ~${maxAttempts * attemptDelay / 1000 + initialWait / 1000} seconds)`
+      }, 'TransactionProcessor');
+      
+      try {
+        const connection = await this.getConnection();
+        let verified = false;
+        let transactionFound = false;
+        
+        // Initial wait for RPC indexing (same for both networks)
+        await new Promise(resolve => setTimeout(resolve, initialWait));
+        
+        // Unified verification: Same attempts and delays for both networks
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          if (attempt > 0) {
+            await new Promise(resolve => setTimeout(resolve, attemptDelay));
+          }
+          
+          try {
+            const status = await Promise.race([
+              connection.getSignatureStatus(signature, {
+                searchTransactionHistory: true
+              }),
+              new Promise<null>((_, reject) => 
+                setTimeout(() => reject(new Error('Verification timeout')), timeoutPerAttempt)
+              )
+            ]) as any;
+            
+            if (status && status.value) {
+              transactionFound = true;
+              
+              if (status.value.err) {
+                // Transaction failed on blockchain - fail immediately
+                logger.error('Transaction failed on blockchain', {
+                  signature,
+                  error: status.value.err,
+                  attempt: attempt + 1,
+                  network: networkNameForVerification,
+                  note: 'Transaction was submitted but failed during execution'
+                }, 'TransactionProcessor');
+                throw new Error(`Transaction failed on blockchain: ${JSON.stringify(status.value.err)}`);
+              }
+              
+              // Transaction found and no error - verified!
+              verified = true;
+              logger.info('Transaction verified on blockchain', {
+                signature,
+                confirmationStatus: status.value.confirmationStatus,
+                attempt: attempt + 1,
+                network: networkNameForVerification,
+                slot: status.value.slot
+              }, 'TransactionProcessor');
+              break;
+            }
+          } catch (statusError) {
+            // If it's a transaction failure error, re-throw it
+            if (statusError instanceof Error && statusError.message.includes('failed on blockchain')) {
+              throw statusError;
+            }
+            // If timeout, continue to next attempt
+            if (statusError instanceof Error && statusError.message.includes('timeout')) {
+              logger.debug('Verification attempt timed out, retrying', {
+                signature,
+                attempt: attempt + 1,
+                network: networkNameForVerification
+              }, 'TransactionProcessor');
+              continue;
+            }
+            // Other errors - log and continue
+            logger.debug('Verification attempt failed, retrying', {
+              signature,
+              attempt: attempt + 1,
+              network: networkNameForVerification,
+              error: statusError instanceof Error ? statusError.message : String(statusError)
+            }, 'TransactionProcessor');
+          }
+        }
+        
+        if (!transactionFound) {
+          // Transaction not found after all attempts - fail the transaction
+          // Same behavior for both networks: strict verification, no false positives
+          logger.error('Transaction not found on blockchain after verification attempts', {
+            signature,
+            attempts: maxAttempts,
+            network: networkNameForVerification,
+            note: 'Transaction was submitted but not found on blockchain. This likely indicates the transaction failed.'
+          }, 'TransactionProcessor');
+          throw new Error(`Transaction not found on blockchain after ${maxAttempts} attempts. Transaction may have failed. Network: ${networkNameForVerification}`);
+        }
+        
+        if (!verified) {
+          // This shouldn't happen (transactionFound but not verified), but handle it
+          logger.warn('Transaction found but verification incomplete', {
+            signature,
+            network: networkNameForVerification,
+            note: 'Transaction exists but verification status unclear'
+          }, 'TransactionProcessor');
+          throw new Error('Transaction verification incomplete');
+        }
+      } catch (verifyError) {
+        // If verification fails, throw the error (don't show success)
+        // Same strict behavior for both networks
+        logger.error('Transaction verification failed', {
+          signature,
+          network: networkNameForVerification,
+          error: verifyError instanceof Error ? verifyError.message : String(verifyError),
+          note: 'Transaction verification failed. Not showing success state.'
+        }, 'TransactionProcessor');
+        throw verifyError;
+      }
+
+      // Return success - transaction was submitted and verified
+      return {
+        signature: signature!,
+        txId: signature!,
         success: true,
         companyFee,
         netAmount: recipientAmount
       };
 
     } catch (error) {
-      logger.error('USDC transaction failed', error, 'TransactionProcessor');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      logger.error('USDC transaction failed', {
+        error: errorMessage,
+        errorName: error instanceof Error ? error.name : 'Unknown'
+      }, 'TransactionProcessor');
       return {
         signature: '',
         txId: '',
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: errorMessage
       };
     }
   }
-
-  /**
-   * Verify transaction in background (non-blocking)
-   * Used for devnet transactions that may have indexing delays
-   */
-  private async verifyTransactionInBackground(
-    signature: string,
-    connection: Connection
-  ): Promise<void> {
-    // Background verification: check a few times over 10 seconds
-    for (let attempt = 0; attempt < 5; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds between attempts
-      
-      try {
-        const status = await connection.getSignatureStatus(signature, {
-          searchTransactionHistory: true
-        });
-        
-        if (status.value) {
-          if (status.value.err) {
-            logger.error('Background verification: Transaction failed on blockchain', {
-              signature,
-              error: status.value.err,
-              attempt: attempt + 1,
-              note: 'Transaction was submitted but failed during execution'
-            }, 'TransactionProcessor');
-            // Don't throw - just log, transaction already returned success
-            return;
-          }
-          
-          // Transaction found and no error
-          logger.info('Background verification: Transaction confirmed on blockchain', {
-            signature,
-            confirmationStatus: status.value.confirmationStatus,
-            attempt: attempt + 1
-          }, 'TransactionProcessor');
-          return;
-        }
-      } catch (error) {
-        logger.debug('Background verification attempt failed', {
-          signature,
-          attempt: attempt + 1,
-          error: error instanceof Error ? error.message : String(error)
-        }, 'TransactionProcessor');
-      }
-    }
-    
-    logger.warn('Background verification: Transaction not found after all attempts', {
-      signature,
-      attempts: 5,
-      note: 'Transaction may have failed or there is a significant RPC indexing delay'
-    }, 'TransactionProcessor');
-  }
-
-  /**
-   * @deprecated Use shared verifyTransactionOnBlockchain from transactionVerificationUtils instead
-   * This method is kept for backward compatibility but will be removed
-   */
-  private async verifyTransactionOnBlockchain(
-    signature: string, 
-    transactionType: string
-  ): Promise<{ success: boolean; error?: string }> {
-    // Use shared verification utility for consistent behavior
-    const connection = await this.getConnection();
-    const result = await verifyTransactionOnBlockchain(connection, signature);
-              return {
-      success: result.success,
-      error: result.error
-    };
-          }
   
 
   /**
@@ -896,7 +899,11 @@ export class TransactionProcessor {
 
       return baseFee;
     } catch (error) {
-      logger.error('Failed to estimate transaction fee', error, 'TransactionProcessor');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to estimate transaction fee', {
+        error: errorMessage,
+        errorName: error instanceof Error ? error.name : 'Unknown'
+      }, 'TransactionProcessor');
       return 0.001; // Fallback fee
     }
   }

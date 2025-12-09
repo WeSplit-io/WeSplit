@@ -219,7 +219,7 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     isEventBadge: true,
     isCommunityBadge: true,
     showNextToName: true, // Display next to user name
-    redeemCode: 'WESPLIT'
+    redeemCode: 'WS24X9K'
   },
   'community_superteamfrance': {
     badgeId: 'community_superteamfrance',
@@ -233,7 +233,7 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     isEventBadge: true,
     isCommunityBadge: true,
     showNextToName: true,
-    redeemCode: 'SUPERTEAMFRANCE'
+    redeemCode: 'STF24M8P'
   },
   'community_monkedao': {
     badgeId: 'community_monkedao',
@@ -247,7 +247,7 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     isEventBadge: true,
     isCommunityBadge: true,
     showNextToName: true,
-    redeemCode: 'MONKEDAO'
+    redeemCode: 'MKD24N2Q'
   },
   'community_diggers': {
     badgeId: 'community_diggers',
@@ -261,7 +261,21 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     isEventBadge: true,
     isCommunityBadge: true,
     showNextToName: true,
-    redeemCode: 'DIGGERS'
+    redeemCode: 'DGR24K7R'
+  },
+  'event_solana_breakpoint_2025': {
+    badgeId: 'event_solana_breakpoint_2025',
+    title: 'Solana Breakpoint 2025',
+    description: 'Solana Breakpoint 2025 attendee',
+    icon: '🎯',
+    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/BP2025-badge.png',
+    category: 'event',
+    rarity: 'epic',
+    points: 500,
+    isEventBadge: true,
+    isCommunityBadge: false,
+    showNextToName: false,
+    redeemCode: 'BP25X9K'
   },
 };
 

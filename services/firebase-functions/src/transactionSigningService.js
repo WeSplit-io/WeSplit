@@ -995,29 +995,36 @@ class TransactionSigningService {
       // Network-aware verification: devnet is faster, mainnet needs more time
       const verificationStartTime = Date.now();
       
-      // Network-aware verification timing
-      // Mainnet: Transactions can take 1-5 seconds to be indexed by RPCs, especially during high traffic
-      // Devnet: Transactions appear faster, but RPC can be unreliable/slow
-      // Reuse isMainnet from earlier in function
+      // UNIFIED VERIFICATION: Same logic for both mainnet and devnet
+      // Use consistent verification timing to ensure same behavior across networks
+      // This prevents network-specific bugs and ensures consistent user experience
+      const networkName = isMainnet ? 'mainnet' : 'devnet';
       
-      // Mainnet needs MORE initial wait - RPCs can be slow to index during high traffic
-      const initialWait = isMainnet ? 2000 : 500; // Mainnet: 2s (increased for slow RPC indexing), Devnet: 500ms
+      // Unified timing: Same for both networks
+      const initialWait = 1000; // 1 second initial wait (same for both)
+      const maxVerificationAttempts = 6; // Same number of attempts for both
+      const verificationDelay = 1000; // 1 second between attempts (same for both)
+      const verificationTimeout = 2500; // 2.5 seconds per attempt (same for both)
+      
+      console.log('Starting unified transaction verification', {
+        network: networkName,
+        maxAttempts: maxVerificationAttempts,
+        initialWait,
+        verificationDelay,
+        verificationTimeout,
+        note: 'Using same verification logic for both mainnet and devnet'
+      });
+      
       await new Promise(resolve => setTimeout(resolve, initialWait));
       
       let transactionFound = false;
       let transactionError = null;
-      // Mainnet needs more attempts - RPC indexing can be slow
-      const maxVerificationAttempts = isMainnet ? 8 : 5; // Mainnet: 8 attempts, Devnet: 5 attempts
-      // Mainnet needs longer delays between attempts - give RPC time to index
-      const verificationDelay = isMainnet ? 1500 : 500; // Mainnet: 1.5s, Devnet: 500ms
-      // Mainnet needs longer timeout per attempt - RPC can be slow during high traffic
-      const verificationTimeout = isMainnet ? 3000 : 1500; // Mainnet: 3s, Devnet: 1.5s
       
-      // Try multiple times to find the transaction
-      // On mainnet, transactions can take 1-5 seconds to be indexed
-      // Best Practice: Use retry logic with exponential backoff
+      // UNIFIED VERIFICATION: Try multiple times to find the transaction
+      // Same logic for both mainnet and devnet - consistent behavior
       const verifyTimer = performanceMonitor.startOperation('verifyTransaction');
       try {
+        // Use unified retry logic (same for both networks)
         const status = await retryRpcOperation(
           () => Promise.race([
             this.connection.getSignatureStatus(signature, {
@@ -1076,20 +1083,70 @@ class TransactionSigningService {
           // CRITICAL: Don't return signature if transaction not found
           // If sendTransaction returned a signature but we can't find it, the transaction likely failed
           // This prevents false positives where we return success but transaction doesn't exist
-          console.error('❌ Transaction not found on blockchain after verification attempts', {
-            signature,
-            verificationTimeMs: verificationTime,
-            maxAttempts: maxVerificationAttempts,
-            isMainnet,
-            note: 'Transaction was submitted (signature returned) but not found on blockchain. This likely indicates the transaction was rejected or failed.'
-          });
           
-          // Throw error instead of returning signature
-          // This ensures we don't show success for transactions that don't exist
-          throw handleError(
-            new Error(`Transaction not found on blockchain after ${verificationTime}ms and ${maxVerificationAttempts} attempts. Transaction may have been rejected. Signature: ${signature}`),
-            { signature, operation: 'verifyTransaction', verificationTimeMs: verificationTime }
-          );
+          // Check if we can find the transaction on a different RPC endpoint (might be RPC indexing issue)
+          let foundOnAlternateRpc = false;
+          if (this.rpcEndpoints && this.rpcEndpoints.length > 1) {
+            try {
+              const alternateIndex = (this.currentEndpointIndex + 1) % this.rpcEndpoints.length;
+              const alternateRpc = this.rpcEndpoints[alternateIndex];
+              const alternateConnection = new (require('@solana/web3.js').Connection)(alternateRpc, {
+                commitment: 'confirmed'
+              });
+              const alternateStatus = await alternateConnection.getSignatureStatus(signature, {
+                searchTransactionHistory: true
+              });
+              if (alternateStatus.value) {
+                foundOnAlternateRpc = true;
+                console.log('✅ Transaction found on alternate RPC endpoint', {
+                  signature,
+                  alternateRpc: alternateRpc.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***'),
+                  status: alternateStatus.value.confirmationStatus,
+                  err: alternateStatus.value.err
+                });
+                
+                if (alternateStatus.value.err) {
+                  // Transaction failed on alternate RPC too
+                  throw handleError(
+                    new Error(`Transaction failed on blockchain: ${JSON.stringify(alternateStatus.value.err)}. Signature: ${signature}`),
+                    { signature, operation: 'verifyTransaction', verificationTimeMs: verificationTime }
+                  );
+                }
+                
+                // Transaction found and successful on alternate RPC - return success
+                return {
+                  signature,
+                  confirmation: alternateStatus.value.confirmationStatus,
+                  note: 'Transaction verified on alternate RPC endpoint'
+                };
+              }
+            } catch (alternateError) {
+              // Alternate RPC check failed - continue with original error
+              console.debug('Alternate RPC check failed', {
+                error: alternateError.message,
+                signature
+              });
+            }
+          }
+          
+          if (!foundOnAlternateRpc) {
+            console.error('❌ Transaction not found on blockchain after verification attempts', {
+              signature,
+              verificationTimeMs: verificationTime,
+              maxAttempts: maxVerificationAttempts,
+              isMainnet,
+              network: isMainnet ? 'mainnet' : 'devnet',
+              rpcUrl: this.rpcUrl ? this.rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***') : 'unknown',
+              note: 'Transaction was submitted (signature returned) but not found on blockchain. This likely indicates the transaction was rejected, failed, or there is a network/RPC mismatch.'
+            });
+            
+            // Throw error instead of returning signature
+            // This ensures we don't show success for transactions that don't exist
+            throw handleError(
+              new Error(`Transaction not found on blockchain after ${verificationTime}ms and ${maxVerificationAttempts} attempts. Transaction may have been rejected or there may be a network/RPC mismatch. Network: ${isMainnet ? 'mainnet' : 'devnet'}. Signature: ${signature}. Check transaction on Solana Explorer: https://solscan.io/tx/${signature}?cluster=${isMainnet ? 'mainnet' : 'devnet'}`),
+              { signature, operation: 'verifyTransaction', verificationTimeMs: verificationTime, network: isMainnet ? 'mainnet' : 'devnet' }
+            );
+          }
         }
       } catch (verifyError) {
         verifyTimer.end();

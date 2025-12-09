@@ -757,11 +757,40 @@ class BadgeService {
    */
   async claimEventBadge(userId: string, redeemCode: string): Promise<BadgeClaimResult> {
     try {
+      // Stricter validation: trim whitespace and validate format
+      const trimmedCode = redeemCode.trim();
+      
+      // Validate code format: minimum length, no empty strings
+      if (!trimmedCode || trimmedCode.length < 4) {
+        return {
+          success: false,
+          badgeId: '',
+          error: 'Invalid redeem code format'
+        };
+      }
+
+      // Case-sensitive exact match (more secure than case-insensitive)
       // Find badge by redeem code (supports both event and community badges)
-      const badgeInfo = Object.values(BADGE_DEFINITIONS).find(
-        badge => badge.redeemCode?.toUpperCase() === redeemCode.toUpperCase() && 
+      // Also supports backward compatibility with old codes
+      let badgeInfo = Object.values(BADGE_DEFINITIONS).find(
+        badge => badge.redeemCode === trimmedCode && 
                  (badge.isEventBadge || badge.category === 'event' || badge.category === 'community')
       );
+
+      // Backward compatibility: check old codes if new code doesn't match
+      if (!badgeInfo) {
+        const oldCodeMappings: Record<string, string> = {
+          'WESPLIT': 'community_wesplit',
+          'SUPERTEAMFRANCE': 'community_superteamfrance',
+          'MONKEDAO': 'community_monkedao',
+          'DIGGERS': 'community_diggers'
+        };
+        
+        const badgeId = oldCodeMappings[trimmedCode];
+        if (badgeId) {
+          badgeInfo = BADGE_DEFINITIONS[badgeId];
+        }
+      }
 
       if (!badgeInfo) {
         return {
@@ -791,7 +820,7 @@ class BadgeService {
         points: badgeInfo.points || 0,
         title: badgeInfo.title,
         description: badgeInfo.description,
-        redeemCode: redeemCode.toUpperCase()
+        redeemCode: trimmedCode
       });
 
       // Award points if badge has points

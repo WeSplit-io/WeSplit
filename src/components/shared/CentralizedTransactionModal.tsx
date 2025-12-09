@@ -327,17 +327,20 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
       return;
     }
 
-    // Validate transaction
-    const validation = await centralizedTransactionHandler.validateTransaction(params);
-    if (!validation.canExecute) {
-      setValidationError(validation.error || 'Transaction validation failed');
-      return;
-    }
-
-    // ✅ CRITICAL: Set execution flag BEFORE setting processing state
+    // ✅ CRITICAL: Set loading state IMMEDIATELY (before validation for faster UX)
+    // This ensures user sees loading feedback right away
     isExecutingRef.current = true;
     setIsProcessing(true);
     setValidationError(null);
+
+    // Validate transaction (fast check, should complete quickly)
+    const validation = await centralizedTransactionHandler.validateTransaction(params);
+    if (!validation.canExecute) {
+      setIsProcessing(false);
+      isExecutingRef.current = false;
+      setValidationError(validation.error || 'Transaction validation failed');
+      return;
+    }
 
     try {
       logger.info('Calling centralized transaction handler', {

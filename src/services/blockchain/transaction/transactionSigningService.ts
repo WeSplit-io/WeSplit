@@ -1000,10 +1000,49 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
             note: 'Successfully fell back to production Functions'
           }, 'TransactionSigningService');
           
+          // Warn if there's a network mismatch (client on devnet, production functions on mainnet)
+          const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
+          const isClientDevnet = !isProduction && networkEnv.toLowerCase() !== 'mainnet' && getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') !== 'true';
+          if (isClientDevnet) {
+            logger.warn('⚠️ Network mismatch detected', {
+              clientNetwork: 'devnet',
+              firebaseFunctionNetwork: 'mainnet (production)',
+              note: 'Client is on devnet but using production Functions which force mainnet. Transactions will be submitted to mainnet. Consider using the emulator for devnet testing.'
+            }, 'TransactionSigningService');
+          }
+          
           // Continue with normal flow below - result is set, so we'll process it normally
         } catch (prodError: any) {
           const prodErrorCode = prodError?.code || 'NO_CODE';
           const prodErrorMessage = prodError?.message || 'No error message';
+          
+          // Check if error mentions transaction not found (network mismatch issue)
+          const isTransactionNotFound = prodErrorMessage.includes('Transaction not found on blockchain') || 
+                                        prodErrorMessage.includes('Transaction may have been rejected');
+          
+          // Check for network mismatch
+          const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
+          const isClientDevnet = !isProduction && networkEnv.toLowerCase() !== 'mainnet' && getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') !== 'true';
+          
+          if (isTransactionNotFound && isClientDevnet) {
+            logger.error('❌ Transaction not found - possible network mismatch', {
+              errorCode: prodErrorCode,
+              errorMessage: prodErrorMessage,
+              clientNetwork: 'devnet',
+              firebaseFunctionNetwork: 'mainnet (production)',
+              note: 'Client is on devnet but production Functions use mainnet. Transaction was submitted to mainnet but verification may be failing. Check the transaction signature on Solana Explorer for mainnet.'
+            }, 'TransactionSigningService');
+            
+            // Extract signature from error message if available
+            const signatureMatch = prodErrorMessage.match(/Signature:\s*([A-Za-z0-9]{88})/);
+            const signature = signatureMatch ? signatureMatch[1] : 'unknown';
+            
+            throw new Error(
+              `Transaction not found on blockchain. This may be due to a network mismatch: your client is on devnet but production Functions use mainnet. ` +
+              `The transaction was submitted to mainnet. Please check the transaction on Solana Explorer: https://solscan.io/tx/${signature}?cluster=mainnet. ` +
+              `If testing on devnet, use the Firebase Functions emulator instead.`
+            );
+          }
           
           logger.error('❌ Production Functions call also failed', {
             errorCode: prodErrorCode,
