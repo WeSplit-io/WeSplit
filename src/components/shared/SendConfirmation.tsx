@@ -19,6 +19,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import Modal from './Modal';
 import AppleSlider from './AppleSlider';
+import Avatar from './Avatar';
 import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 
 export interface SendConfirmationProps {
@@ -28,6 +29,9 @@ export interface SendConfirmationProps {
   // Recipient info
   recipientName: string;
   recipientImageUrl?: string; // Image URL for recipient avatar
+  recipientUserId?: string; // User ID for Avatar component (for basic sends)
+  recipientUserName?: string; // User name for Avatar component (for basic sends)
+  isSplit?: boolean; // Whether this is a split transaction (SP3ND) or basic send
   
   // Amount
   amount: number;
@@ -55,6 +59,9 @@ const SendConfirmation: React.FC<SendConfirmationProps> = ({
   onClose,
   recipientName,
   recipientImageUrl,
+  recipientUserId,
+  recipientUserName,
+  isSplit = false,
   amount,
   currency = 'USDC',
   networkFeePercentage = 0.03, // 3% by default
@@ -73,7 +80,7 @@ const SendConfirmation: React.FC<SendConfirmationProps> = ({
   // Default gradient colors (green)
   const defaultGradientColors = gradientColors || [colors.green, colors.greenBlue];
 
-  // Default recipient image (SP3ND icon)
+  // Default recipient image (SP3ND icon) - only for splits
   const defaultRecipientImageUrl = recipientImageUrl || 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fpartners%2Fsp3nd-icon.png?alt=media&token=3b2603eb-57cb-4dc6-aafd-0fff463f1579';
 
   return (
@@ -87,13 +94,26 @@ const SendConfirmation: React.FC<SendConfirmationProps> = ({
       <View style={styles.container}>
         {/* Recipient Avatar */}
         <View style={styles.iconContainer}>
-          <View style={styles.iconCircle}>
-            <Image
-              source={{ uri: defaultRecipientImageUrl }}
-              style={styles.recipientImage}
-              resizeMode="contain"
+          {isSplit ? (
+            // For splits: use SP3ND icon
+            <View style={styles.iconCircle}>
+              <Image
+                source={{ uri: defaultRecipientImageUrl }}
+                style={styles.recipientImage}
+                resizeMode="contain"
+              />
+            </View>
+          ) : (
+            // For basic sends: use Avatar component without border
+            <Avatar
+              userId={recipientUserId}
+              userName={recipientUserName || recipientName}
+              avatarUrl={recipientImageUrl}
+              size={60}
+              showBorder={false}
+              showProfileBorder={false}
             />
-          </View>
+          )}
         </View>
 
         {/* "Sending to" Text */}

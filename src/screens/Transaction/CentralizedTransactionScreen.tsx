@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, Alert, ScrollView, StyleSheet } from 'react-native';
-import { Header, Container, ModernLoader } from '../../components/shared';
+import { View, Text, Alert, ScrollView, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Header, Container, ModernLoader, Modal } from '../../components/shared';
 import SendComponent, { type RecipientInfo, type WalletInfo } from '../../components/shared/SendComponent';
+import SendConfirmation from '../../components/shared/SendConfirmation';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
@@ -200,6 +202,8 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
   const [amount, setAmount] = useState(prefilledAmount && prefilledAmount > 0 ? formatAmountWithComma(prefilledAmount) : '0');
   const [note, setNote] = useState(prefilledNote || '');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // ✅ CRITICAL: Prevent multiple transaction executions (debouncing)
   const isExecutingRef = useRef(false);
@@ -740,6 +744,77 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
           />
         )}
       </ScrollView>
+
+      {/* Send Confirmation Modal */}
+      {sendComponentRecipientInfo && (
+        <SendConfirmation
+          visible={showConfirmationModal}
+          onClose={() => setShowConfirmationModal(false)}
+          recipientName={sendComponentRecipientInfo.name}
+          recipientImageUrl={sendComponentRecipientInfo.avatarUrl}
+          recipientUserId={sendComponentRecipientInfo.userId}
+          recipientUserName={sendComponentRecipientInfo.name}
+          isSplit={context === 'fair_split_contribution' || context === 'degen_split_lock' || context === 'spend_split_payment'}
+          amount={parseFloat(amount.replace(',', '.')) || 0}
+          currency="USDC"
+          networkFeePercentage={0.03}
+          showNetworkFee={true}
+          onSlideComplete={() => {
+            setShowConfirmationModal(false);
+            handleExecuteTransaction();
+          }}
+          disabled={!canExecute || isProcessing}
+          loading={isProcessing}
+          insufficientFunds={!canExecute && parseFloat(amount.replace(',', '.')) > 0}
+        />
+      )}
+
+      {/* Success Modal - Shown by default for design */}
+      <Modal
+        visible={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        showHandle={true}
+        closeOnBackdrop={true}
+        maxHeight={400}
+      >
+        <View style={paymentScreenStyles.successContainer}>
+          {/* Success Icon */}
+          <Image
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsucess-icon-new.png?alt=media&token=5ee14802-562e-45d1-bc4a-deeb584d2904' }}
+            style={paymentScreenStyles.successIcon}
+            resizeMode="contain"
+          />
+
+          {/* Success Title */}
+          <Text style={paymentScreenStyles.successTitle}>
+            Transaction Successful!
+          </Text>
+
+          {/* Success Message */}
+          <Text style={paymentScreenStyles.successMessage}>
+            You have successfully sent {formatAmountWithComma(parseFloat(amount.replace(',', '.')) || 0)} USDC
+            {sendComponentRecipientInfo && ` to ${sendComponentRecipientInfo.name}`}!
+          </Text>
+
+          {/* Done Button */}
+          <TouchableOpacity
+            style={paymentScreenStyles.successButtonContainer}
+            onPress={() => setShowSuccessModal(false)}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[colors.green, colors.greenBlue]}
+              style={paymentScreenStyles.successButton}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={paymentScreenStyles.successButtonText}>
+                Done
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </Container>
   );
 };
@@ -795,6 +870,44 @@ const paymentScreenStyles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     marginBottom: spacing.sm,
+  },
+  successContainer: {
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  successIcon: {
+    width: 80,
+    height: 80,
+  },
+  successTitle: {
+    fontSize: typography.fontSize.xxl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: typography.fontSize.md,
+    color: colors.white70,
+    textAlign: 'center',
+    lineHeight: typography.fontSize.md * 1.5,
+    paddingHorizontal: spacing.sm,
+  },
+  successButtonContainer: {
+    width: '100%',
+    marginTop: spacing.sm,
+  },
+  successButton: {
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.black,
   },
 });
 

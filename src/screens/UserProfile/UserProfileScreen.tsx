@@ -556,8 +556,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   avatar: {
-    borderWidth: 2,
-    borderColor: colors.white5,
   },
   nameContainer: {
     alignItems: 'center',
