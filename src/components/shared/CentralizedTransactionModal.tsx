@@ -1,11 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Alert, Image, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { View, Text, Alert, StyleSheet, ScrollView } from 'react-native';
 import Modal from './Modal';
-import { PhosphorIcon, ModernLoader } from './index';
-import Avatar from './Avatar';
-import { colors } from '../../theme';
-import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
+import { ModernLoader } from './index';
+import SendComponent, { type RecipientInfo, type WalletInfo } from './SendComponent';
 import { logger } from '../../services/analytics/loggingService';
 import {
   centralizedTransactionHandler
@@ -16,6 +13,9 @@ import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 import { formatWalletAddress } from '../../utils/spend/spendDataUtils';
 import { useWallet } from '../../context/WalletContext';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
+import { colors } from '../../theme';
+import { spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 
 export interface TransactionModalConfig {
   // Modal configuration
@@ -73,17 +73,12 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   currentUser: propCurrentUser,
   isSettlement,
   requestId,
-  ...props
 }) => {
   // State management
   const [amount, setAmount] = useState(config.prefilledAmount && config.prefilledAmount > 0 ? formatAmountWithComma(config.prefilledAmount) : '0');
-  const [showNote, setShowNote] = useState(!!config.prefilledNote || config.showMemoInput);
   const [note, setNote] = useState(config.prefilledNote || '');
-  const [selectedChip, setSelectedChip] = useState<'25' | '50' | '100' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [isAmountFocused, setIsAmountFocused] = useState(false);
-  const amountInputRef = useRef<TextInput>(null);
 
   // ✅ CRITICAL: Prevent multiple transaction executions (debouncing)
   const isExecutingRef = useRef(false);
@@ -195,87 +190,6 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   };
 
   const displayRecipientInfo = getRecipientInfo();
-
-  // Handle keypad input (matching SpendPaymentModal)
-  const handleKeypadPress = (value: string) => {
-    if (value === '⌫') {
-      // Backspace
-      setAmount((prev) => {
-        const newAmount = prev.slice(0, -1) || '0';
-        const numAmount = parseFloat(newAmount.replace(',', '.'));
-        if (!isNaN(numAmount)) {
-          // Amount changed, validation will be handled by parent
-        }
-        return newAmount;
-      });
-    } else if (value === ',') {
-      // Decimal separator (comma for European format)
-      if (!amount.includes(',') && !amount.includes('.')) {
-        const newAmount = amount === '0' ? '0,' : amount + ',';
-        setAmount(newAmount);
-      } else if (amount.includes('.')) {
-        // Convert period to comma if present
-        setAmount(amount.replace('.', ','));
-      }
-    } else {
-      // Number
-      let newAmount = amount === '0' ? value : amount + value;
-      
-      // Limit to 2 decimal places (handle both comma and period)
-      if (newAmount.includes(',') || newAmount.includes('.')) {
-        const separator = newAmount.includes(',') ? ',' : '.';
-        const parts = newAmount.split(separator);
-        if (parts[1] && parts[1].length > 2) {
-          newAmount = parts[0] + separator + parts[1].substring(0, 2);
-        }
-        // Normalize to comma
-        if (separator === '.') {
-          newAmount = newAmount.replace('.', ',');
-        }
-      }
-      
-      setAmount(newAmount);
-      const numAmount = parseFloat(newAmount.replace(',', '.'));
-      if (!isNaN(numAmount)) {
-        // Amount changed
-      }
-    }
-  };
-
-  // Amount input validation (for TextInput)
-  const handleAmountChange = (text: string) => {
-    // Allow only numbers and comma
-    const cleaned = text.replace(/[^0-9,]/g, '');
-    
-    // Handle comma as decimal separator
-    let newAmount = cleaned;
-    if (cleaned.includes(',')) {
-      const parts = cleaned.split(',');
-      if (parts.length > 2) {
-        // Only allow one comma
-        newAmount = parts[0] + ',' + parts.slice(1).join('');
-      }
-      // Limit to 2 decimal places
-      if (parts[1] && parts[1].length > 2) {
-        newAmount = parts[0] + ',' + parts[1].substring(0, 2);
-      }
-    }
-    
-    setAmount(newAmount);
-    const numAmount = parseFloat(newAmount.replace(',', '.')) || 0;
-    setSelectedChip(null);
-    setValidationError(null);
-  };
-
-  // Quick amount selection
-  const handleChipPress = (percentage: '25' | '50' | '100') => {
-    if (effectiveBalance !== null && effectiveBalance !== undefined) {
-      const percentageValue = parseInt(percentage);
-      const calculatedAmount = (effectiveBalance * percentageValue) / 100;
-      setAmount(formatAmountWithComma(calculatedAmount));
-      setSelectedChip(percentage);
-    }
-  };
 
   // Build transaction parameters
   const buildTransactionParams = (): TransactionParams | null => {
@@ -523,30 +437,117 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     }
   };
 
+  // Map recipient info to SendComponent format
+  const sendComponentRecipientInfo: RecipientInfo | null = useMemo(() => {
+    if (!displayRecipientInfo) return null;
+
   // Determine recipient display name - never show "N/A"
-  const getRecipientDisplayName = () => {
-    if (!displayRecipientInfo) return '';
+    let recipientName = '';
     
     // For merchant, split, or shared types, use the name directly
     if (displayRecipientInfo.type === 'merchant' || 
         displayRecipientInfo.type === 'split' || 
         displayRecipientInfo.type === 'shared') {
-      return displayRecipientInfo.name;
+      recipientName = displayRecipientInfo.name;
     }
-    
     // For friend/external transfers, use recipient name (never "Order #N/A")
-    if (displayRecipientInfo.name && displayRecipientInfo.name !== 'N/A') {
-      return displayRecipientInfo.name;
+    else if (displayRecipientInfo.name && displayRecipientInfo.name !== 'N/A') {
+      recipientName = displayRecipientInfo.name;
     }
-    
     // Fallback: use wallet address if name is not available
-    if (displayRecipientInfo.walletAddress) {
-      return formatWalletAddress(displayRecipientInfo.walletAddress);
+    else if (displayRecipientInfo.walletAddress) {
+      recipientName = formatWalletAddress(displayRecipientInfo.walletAddress);
+    }
+    // Last resort: use contact name or generic
+    else {
+      recipientName = contact?.name || 'Recipient';
     }
     
-    // Last resort: use contact name or generic
-    return contact?.name || 'Recipient';
-  };
+    // Determine icon and image based on type
+    let icon: RecipientInfo['icon'];
+    let iconColor: string | undefined;
+    let imageUrl: string | undefined;
+
+    if (displayRecipientInfo.type === 'merchant') {
+      imageUrl = 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkast-logo.png?alt=media&token=e338e812-0bb1-4725-b6ef-2a59b2bd696f';
+    } else if (displayRecipientInfo.type === 'split') {
+      icon = 'Users';
+      iconColor = colors.blue;
+    } else if (displayRecipientInfo.type === 'shared') {
+      icon = 'Wallet';
+      iconColor = colors.blue;
+    } else if (displayRecipientInfo.type === 'friend') {
+      // Friend type - will use Avatar component
+    } else {
+      icon = 'CurrencyDollar';
+      iconColor = colors.green;
+    }
+
+    return {
+      name: recipientName,
+      address: displayRecipientInfo.walletAddress || displayRecipientInfo.address || '',
+      avatarUrl: displayRecipientInfo.avatar,
+      userId: contact?.id?.toString(),
+      icon,
+      iconColor,
+      imageUrl,
+    };
+  }, [displayRecipientInfo, contact]);
+
+  // Map wallet info to SendComponent format
+  const walletInfo: WalletInfo = useMemo(() => {
+    return {
+      name: 'WeSplit Wallet',
+      balance: effectiveBalance !== null && effectiveBalance !== undefined ? effectiveBalance : 0,
+      balanceFormatted: effectiveBalance !== null && effectiveBalance !== undefined 
+        ? formatAmountWithComma(effectiveBalance) 
+        : '0,00',
+      icon: 'Wallet',
+      iconColor: colors.green,
+    };
+  }, [effectiveBalance]);
+
+  // Handle amount change from SendComponent
+  const handleAmountChange = useCallback((newAmount: string) => {
+    setAmount(newAmount);
+    setValidationError(null);
+  }, []);
+
+  // Handle note change from SendComponent
+  const handleNoteChange = useCallback((newNote: string) => {
+    setNote(newNote);
+  }, []);
+
+  // Handle recipient change
+  const handleRecipientChange = useCallback(() => {
+    if (config.onClose) {
+      config.onClose();
+    }
+  }, [config]);
+
+  // Handle wallet change
+  const handleWalletChange = useCallback(() => {
+    if (config.onClose) {
+      config.onClose();
+    }
+  }, [config]);
+
+  // Don't render SendComponent if recipient info is not available
+  if (!sendComponentRecipientInfo && config.showAmountInput) {
+    return (
+      <Modal
+        visible={visible}
+        onClose={handleClose}
+        title={config.title}
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Unable to load recipient information</Text>
+        </View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -556,288 +557,88 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
       showHandle={true}
       closeOnBackdrop={true}
     >
-      <View style={paymentModalStyles.container}>
-        {/* Send to Section */}
-          {displayRecipientInfo && (
-          <View style={paymentModalStyles.sendToSection}>
-            <Text style={paymentModalStyles.sendToLabel}>Send to</Text>
-            <View style={paymentModalStyles.recipientCard}>
-              <View style={paymentModalStyles.recipientIcon}>
-                {displayRecipientInfo.type === 'merchant' ? (
-                  <Image
-                    source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkast-logo.png?alt=media&token=e338e812-0bb1-4725-b6ef-2a59b2bd696f' }}
-                    style={{ width: 24, height: 24 }}
-                  />
-                ) : displayRecipientInfo.type === 'friend' && displayRecipientInfo.avatar ? (
-                  <Avatar
-                    userId={contact?.id?.toString() || ''}
-                    userName={displayRecipientInfo.name}
-                    size={24}
-                    avatarUrl={displayRecipientInfo.avatar}
-                    style={{ width: 24, height: 24, borderRadius: 12 }}
-                  />
-                ) : displayRecipientInfo.type === 'split' ? (
-                  <PhosphorIcon name="Users" size={24} color={colors.white} weight="fill" />
-                ) : displayRecipientInfo.type === 'shared' ? (
-                  <PhosphorIcon name="Wallet" size={24} color={colors.white} weight="fill" />
-                ) : (
-                  <PhosphorIcon name="CurrencyDollar" size={24} color={colors.white} weight="fill" />
-                )}
-              </View>
-              <View style={paymentModalStyles.recipientInfo}>
-                <Text style={paymentModalStyles.recipientOrder}>
-                  {getRecipientDisplayName()}
-                </Text>
-                {displayRecipientInfo.walletAddress && (
-                  <Text style={paymentModalStyles.recipientAddress}>
-                    {formatWalletAddress(displayRecipientInfo.walletAddress)}
-                </Text>
-              )}
-              </View>
-            </View>
-            </View>
-          )}
-
-        {/* Amount Input Area */}
-          {config.showAmountInput && (
-          <View style={paymentModalStyles.amountSection}>
-            <TextInput
-              ref={amountInputRef}
-              style={paymentModalStyles.amountInput}
-                  value={amount}
-                  onChangeText={handleAmountChange}
-              onFocus={() => setIsAmountFocused(true)}
-              onBlur={() => setIsAmountFocused(false)}
-              keyboardType="decimal-pad"
-              returnKeyType="done"
-                  placeholder="0"
-              placeholderTextColor={colors.white70}
-              selectTextOnFocus
-                  editable={!isProcessing && config.context !== 'spend_split_payment'}
-            />
-            <Text style={paymentModalStyles.amountCurrency}>USDC</Text>
-            {config.showMemoInput && !showNote && (
-              <TouchableOpacity onPress={() => setShowNote(true)} style={paymentModalStyles.addNoteButton}>
-                <Text style={paymentModalStyles.addNoteText}>Add note</Text>
-                    </TouchableOpacity>
-            )}
-            {config.showMemoInput && showNote && (
-                      <TextInput
-                style={paymentModalStyles.noteInput}
-                        value={note}
-                        onChangeText={setNote}
-                        placeholder="Add note"
-                placeholderTextColor={colors.white70}
-                autoFocus
-                      />
-            )}
-                    </View>
-                  )}
-
-        {/* Wallet Information */}
-        <View style={paymentModalStyles.walletCard}>
-          <View style={paymentModalStyles.walletIcon}>
-            <PhosphorIcon name="Wallet" size={24} color={colors.white} weight="fill" />
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Processing Indicator for Auto-Transactions */}
+        {config.context === 'spend_split_payment' && isProcessing && (
+          <View style={styles.processingContainer}>
+            <ModernLoader size="small" text="Processing payment to merchant..." />
           </View>
-          <View style={paymentModalStyles.walletInfo}>
-            <Text style={paymentModalStyles.walletName}>WeSplit Wallet</Text>
-            <Text style={paymentModalStyles.walletBalance}>
-              Balance {effectiveBalance !== null && effectiveBalance !== undefined ? formatAmountWithComma(effectiveBalance) : '0,00'} USDC
-            </Text>
-          </View>
-          {config.allowExternalDestinations && (
-            <TouchableOpacity 
-              style={[
-                paymentModalStyles.changeButton,
-                (isProcessing) && paymentModalStyles.changeButtonDisabled,
-              ]}
-              onPress={() => {
-                if (config.onClose) {
-                  config.onClose();
-                }
-              }}
-              disabled={isProcessing}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={[paymentModalStyles.changeButtonText, (isProcessing) && paymentModalStyles.changeButtonTextDisabled]}>Change</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
 
-        {/* Balance Error */}
+        {/* SendComponent - Main UI */}
+        {sendComponentRecipientInfo && config.showAmountInput && (
+          <SendComponent
+            recipient={sendComponentRecipientInfo}
+            onRecipientChange={config.allowExternalDestinations ? handleRecipientChange : undefined}
+            showRecipientChange={config.allowExternalDestinations}
+            amount={amount}
+            onAmountChange={handleAmountChange}
+            currency="USDC"
+            note={note}
+            onNoteChange={config.showMemoInput ? handleNoteChange : undefined}
+            showAddNote={config.showMemoInput}
+            wallet={walletInfo}
+            onWalletChange={config.allowExternalDestinations ? handleWalletChange : undefined}
+            showWalletChange={config.allowExternalDestinations}
+            onSendPress={handleExecuteTransaction}
+            sendButtonDisabled={!canExecute || isProcessing}
+            sendButtonLoading={isProcessing}
+            sendButtonTitle={isProcessing ? 'Processing...' : 'Send'}
+            containerStyle={styles.sendComponentContainer}
+          />
+        )}
+
+        {/* Validation Error - After SendComponent, matching SpendPaymentModal order */}
         {validationError && (
-          <View style={paymentModalStyles.errorCard}>
-            <Text style={paymentModalStyles.errorText}>{validationError}</Text>
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{validationError}</Text>
           </View>
         )}
 
-        {/* Network Fee and Total */}
+        {/* Network Fee and Total - After wallet info, matching SpendPaymentModal order */}
         {config.showAmountInput && (
-          <View style={paymentModalStyles.feeSection}>
-            <View style={paymentModalStyles.feeRow}>
-              <Text style={paymentModalStyles.feeLabel}>Network Fee (3%)</Text>
-              <Text style={paymentModalStyles.feeAmount}>{formatAmountWithComma(networkFee)} USDC</Text>
+          <View style={styles.feeSection}>
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>Network Fee (3%)</Text>
+              <Text style={styles.feeAmount}>{formatAmountWithComma(networkFee)} USDC</Text>
             </View>
-            <View style={paymentModalStyles.feeRow}>
-              <Text style={paymentModalStyles.feeLabel}>Total paid</Text>
-              <Text style={paymentModalStyles.feeTotal}>{formatAmountWithComma(totalPaid)} USDC</Text>
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>Total paid</Text>
+              <Text style={styles.feeTotal}>{formatAmountWithComma(totalPaid)} USDC</Text>
             </View>
-            </View>
-          )}
-
-          {/* Processing Indicator for Auto-Transactions */}
-          {config.context === 'spend_split_payment' && isProcessing && (
-          <View style={paymentModalStyles.processingContainer}>
-              <ModernLoader size="small" text="Processing payment to merchant..." />
-            </View>
-          )}
-
-        {/* Send Button */}
-        {config.showAmountInput && (
-          <TouchableOpacity
-            style={[
-              paymentModalStyles.sendButton,
-              (!canExecute || isProcessing) && paymentModalStyles.sendButtonDisabled,
-            ]}
-            onPress={handleExecuteTransaction}
-            disabled={!canExecute || isProcessing}
-          >
-            <Text style={paymentModalStyles.sendButtonText}>
-              {isProcessing ? 'Processing...' : 'Send'}
-            </Text>
-          </TouchableOpacity>
+          </View>
         )}
-      </View>
+      </ScrollView>
     </Modal>
   );
 };
 
-const paymentModalStyles = StyleSheet.create({
-  container: {
+const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: spacing.md,
     gap: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  sendToSection: {
-    gap: spacing.sm,
-  },
-  sendToLabel: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.white,
-  },
-  recipientCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white10,
-    borderRadius: 12,
+  errorContainer: {
     padding: spacing.md,
-    gap: spacing.md,
-  },
-  recipientIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.blue + '30',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    minHeight: 200,
   },
-  recipientInfo: {
-    flex: 1,
-  },
-  recipientOrder: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    marginBottom: spacing.xs / 2,
-  },
-  recipientAddress: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-    fontFamily: typography.fontFamily.mono,
-  },
-  amountSection: {
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  amountInput: {
-    fontSize: typography.fontSize.xxxl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textAlign: 'center',
-    minWidth: 100,
-    padding: 0,
-    margin: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-  },
-  amountCurrency: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-  },
-  addNoteButton: {
-    marginTop: spacing.sm,
-  },
-  addNoteText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white,
-    textDecorationLine: 'underline',
-  },
-  noteInput: {
-    marginTop: spacing.sm,
-    fontSize: typography.fontSize.sm,
-    color: colors.white,
-    textAlign: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.white30,
-    paddingBottom: spacing.xs,
-    minWidth: 100,
-  },
-  walletCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white10,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  walletIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: colors.green + '30',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  walletInfo: {
-    flex: 1,
-  },
-  walletName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.white,
-    marginBottom: spacing.xs / 2,
-  },
-  walletBalance: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-  },
-  changeButton: {
-    backgroundColor: colors.white5,
-    borderRadius: 8,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  changeButtonDisabled: {
-    opacity: 0.5,
-  },
-  changeButtonText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white,
-    fontWeight: typography.fontWeight.medium,
-  },
-  changeButtonTextDisabled: {
-    color: colors.white70,
+  sendComponentContainer: {
+    flex: 0,
+    width: '100%',
+    justifyContent: 'flex-start',
   },
   errorCard: {
     backgroundColor: colors.red + '20',
@@ -875,25 +676,7 @@ const paymentModalStyles = StyleSheet.create({
   processingContainer: {
     alignItems: 'center',
     padding: spacing.md,
-  },
-  sendButton: {
-    width: '100%',
-    backgroundColor: colors.green,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md,
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.white10,
-    opacity: 0.5,
-  },
-  sendButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.black,
+    marginBottom: spacing.sm,
   },
 });
 

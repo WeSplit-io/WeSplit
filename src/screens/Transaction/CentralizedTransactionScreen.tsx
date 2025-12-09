@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Alert, Image, StyleSheet } from 'react-native';
-import { Header, Container, PhosphorIcon, ModernLoader } from '../../components/shared';
+import { View, Text, Alert, ScrollView, StyleSheet } from 'react-native';
+import { Header, Container, ModernLoader } from '../../components/shared';
+import SendComponent, { type RecipientInfo, type WalletInfo } from '../../components/shared/SendComponent';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
@@ -8,7 +9,6 @@ import { colors } from '../../theme';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { transactionSharedStyles as styles } from '../../components/shared/styles/TransactionSharedStyles';
-import Avatar from '../../components/shared/Avatar';
 import { logger } from '../../services/analytics/loggingService';
 import {
   centralizedTransactionHandler
@@ -199,12 +199,8 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
 
   // State management
   const [amount, setAmount] = useState(prefilledAmount && prefilledAmount > 0 ? formatAmountWithComma(prefilledAmount) : '0');
-  const [showNote, setShowNote] = useState(!!prefilledNote || config.showMemoInput);
   const [note, setNote] = useState(prefilledNote || '');
-  const [selectedChip, setSelectedChip] = useState<'25' | '50' | '100' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isAmountFocused, setIsAmountFocused] = useState(false);
-  const amountInputRef = useRef<TextInput>(null);
 
   // ✅ CRITICAL: Prevent multiple transaction executions (debouncing)
   const isExecutingRef = useRef(false);
@@ -375,39 +371,16 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
     }
   }, [currentUser?.id, appWalletBalance, liveBalance, ensureAppWallet]);
 
-  // Amount input validation (for TextInput)
-  const handleAmountChange = (text: string) => {
-    // Allow only numbers and comma
-    const cleaned = text.replace(/[^0-9,]/g, '');
-    
-    // Handle comma as decimal separator
-    let newAmount = cleaned;
-    if (cleaned.includes(',')) {
-      const parts = cleaned.split(',');
-      if (parts.length > 2) {
-        // Only allow one comma
-        newAmount = parts[0] + ',' + parts.slice(1).join('');
-      }
-      // Limit to 2 decimal places
-      if (parts[1] && parts[1].length > 2) {
-        newAmount = parts[0] + ',' + parts[1].substring(0, 2);
-      }
-    }
-    
+  // Handle amount change from SendComponent
+  const handleAmountChange = useCallback((newAmount: string) => {
     setAmount(newAmount);
-    setSelectedChip(null);
     setValidationError(null);
-  };
+  }, []);
 
-  // Quick amount selection
-  const handleChipPress = (percentage: '25' | '50' | '100') => {
-    if (effectiveBalance !== null && effectiveBalance !== undefined) {
-      const percentageValue = parseInt(percentage);
-      const calculatedAmount = (effectiveBalance * percentageValue) / 100;
-      setAmount(formatAmountWithComma(calculatedAmount));
-      setSelectedChip(percentage);
-    }
-  };
+  // Handle note change from SendComponent
+  const handleNoteChange = useCallback((newNote: string) => {
+    setNote(newNote);
+  }, []);
 
   // Build transaction parameters
   const buildTransactionParams = (): TransactionParams | null => {
@@ -636,30 +609,75 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
   const isAmountValid = amount.length > 0 && numAmount > 0;
   const canExecute = isAmountValid && !isProcessing && !validationError;
 
-  // Determine recipient display name - never show "N/A"
-  const getRecipientDisplayName = () => {
-    if (!finalRecipientInfo) return '';
+  // Map recipient info to SendComponent format
+  const sendComponentRecipientInfo: RecipientInfo | null = useMemo(() => {
+    if (!finalRecipientInfo) return null;
+
+    // Determine recipient display name - never show "N/A"
+    let recipientName = '';
     
     // For merchant, split, or shared types, use the name directly
     if (finalRecipientInfo.type === 'merchant' || 
         finalRecipientInfo.type === 'split' || 
         finalRecipientInfo.type === 'shared') {
-      return finalRecipientInfo.name || 'Recipient';
+      recipientName = finalRecipientInfo.name || 'Recipient';
     }
-    
     // For friend/external transfers, use recipient name (never "Order #N/A")
-    if (finalRecipientInfo.name && finalRecipientInfo.name !== 'N/A') {
-      return finalRecipientInfo.name;
+    else if (finalRecipientInfo.name && finalRecipientInfo.name !== 'N/A') {
+      recipientName = finalRecipientInfo.name;
     }
-    
     // Fallback: use wallet address if name is not available
-    if (finalRecipientInfo.walletAddress) {
-      return formatWalletAddress(finalRecipientInfo.walletAddress);
+    else if (finalRecipientInfo.walletAddress) {
+      recipientName = formatWalletAddress(finalRecipientInfo.walletAddress);
+    }
+    // Last resort: use contact name or generic
+    else {
+      recipientName = contact?.name || 'Recipient';
     }
     
-    // Last resort: use contact name or generic
-    return contact?.name || 'Recipient';
-  };
+    // Determine icon and image based on type
+    let icon: RecipientInfo['icon'];
+    let iconColor: string | undefined;
+    let imageUrl: string | undefined;
+
+    if (finalRecipientInfo.type === 'merchant') {
+      imageUrl = 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkast-logo.png?alt=media&token=e338e812-0bb1-4725-b6ef-2a59b2bd696f';
+    } else if (finalRecipientInfo.type === 'split') {
+      icon = 'Users';
+      iconColor = colors.blue;
+    } else if (finalRecipientInfo.type === 'shared') {
+      icon = 'Wallet';
+      iconColor = colors.blue;
+    } else if (finalRecipientInfo.type === 'friend') {
+      // Friend type - will use Avatar component
+    } else {
+      icon = 'CurrencyDollar';
+      iconColor = colors.green;
+    }
+
+    return {
+      name: recipientName,
+      address: finalRecipientInfo.walletAddress || finalRecipientInfo.address || '',
+      avatarUrl: finalRecipientInfo.avatar,
+      userId: contact?.id?.toString(),
+      icon,
+      iconColor,
+      imageUrl,
+    };
+  }, [finalRecipientInfo, contact]);
+
+  // Map wallet info to SendComponent format
+  const walletInfo: WalletInfo = useMemo(() => {
+    return {
+      name: 'WeSplit Wallet',
+      balance: effectiveBalance !== null && effectiveBalance !== undefined ? effectiveBalance : 0,
+      balanceFormatted: effectiveBalance !== null && effectiveBalance !== undefined 
+        ? formatAmountWithComma(effectiveBalance) 
+        : '0,00',
+      icon: 'Wallet',
+      iconColor: colors.green,
+    };
+  }, [effectiveBalance]);
 
   return (
     <Container>
@@ -672,121 +690,51 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
         <Text style={styles.subtitle}>{config.subtitle}</Text>
       )}
 
-      <View style={paymentScreenStyles.container}>
-        {/* Send to Section */}
-          {finalRecipientInfo && (
-          <View style={paymentScreenStyles.sendToSection}>
-            <Text style={paymentScreenStyles.sendToLabel}>Send to</Text>
-            <View style={paymentScreenStyles.recipientCard}>
-              <View style={paymentScreenStyles.recipientIcon}>
-                {finalRecipientInfo.type === 'merchant' ? (
-                  <Image
-                    source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkast-logo.png?alt=media&token=e338e812-0bb1-4725-b6ef-2a59b2bd696f' }}
-                    style={{ width: 24, height: 24 }}
-                  />
-                ) : finalRecipientInfo.type === 'friend' && finalRecipientInfo.avatar ? (
-                  <Avatar
-                    userId={contact?.id?.toString() || ''}
-                    userName={finalRecipientInfo.name}
-                    size={24}
-                    avatarUrl={finalRecipientInfo.avatar}
-                    style={{ width: 24, height: 24, borderRadius: 12 }}
-                  />
-                ) : finalRecipientInfo.type === 'split' ? (
-                  <PhosphorIcon name="Users" size={24} color={colors.white} weight="fill" />
-                ) : finalRecipientInfo.type === 'shared' ? (
-                  <PhosphorIcon name="Wallet" size={24} color={colors.white} weight="fill" />
-                ) : (
-                  <PhosphorIcon name="CurrencyDollar" size={24} color={colors.white} weight="fill" />
-                )}
-              </View>
-              <View style={paymentScreenStyles.recipientInfo}>
-                <Text style={paymentScreenStyles.recipientOrder}>
-                  {getRecipientDisplayName()}
-                </Text>
-                {finalRecipientInfo.walletAddress && (
-                  <Text style={paymentScreenStyles.recipientAddress}>
-                    {formatWalletAddress(finalRecipientInfo.walletAddress)}
-                </Text>
-              )}
-              </View>
-            </View>
-            </View>
-          )}
-
-        {/* Amount Input Area */}
-          {config.showAmountInput && (
-          <View style={paymentScreenStyles.amountSection}>
-            <TextInput
-              ref={amountInputRef}
-              style={paymentScreenStyles.amountInput}
-                  value={amount}
-                  onChangeText={handleAmountChange}
-              onFocus={() => setIsAmountFocused(true)}
-              onBlur={() => setIsAmountFocused(false)}
-              keyboardType="decimal-pad"
-              returnKeyType="done"
-                  placeholder="0"
-              placeholderTextColor={colors.white70}
-              selectTextOnFocus
-                  editable={!isProcessing && context !== 'spend_split_payment'}
-            />
-            <Text style={paymentScreenStyles.amountCurrency}>USDC</Text>
-            {config.showMemoInput && !showNote && (
-              <TouchableOpacity onPress={() => setShowNote(true)} style={paymentScreenStyles.addNoteButton}>
-                <Text style={paymentScreenStyles.addNoteText}>Add note</Text>
-                    </TouchableOpacity>
-            )}
-            {config.showMemoInput && showNote && (
-                      <TextInput
-                style={paymentScreenStyles.noteInput}
-                        value={note}
-                        onChangeText={setNote}
-                        placeholder="Add note"
-                placeholderTextColor={colors.white70}
-                autoFocus
-                      />
-            )}
-                    </View>
-                  )}
-
-        {/* Wallet Information */}
-        <View style={paymentScreenStyles.walletCard}>
-          <View style={paymentScreenStyles.walletIcon}>
-            <PhosphorIcon name="Wallet" size={24} color={colors.white} weight="fill" />
+      <ScrollView
+        style={paymentScreenStyles.scrollView}
+        contentContainerStyle={paymentScreenStyles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Processing Indicator for Auto-Transactions */}
+        {context === 'spend_split_payment' && isProcessing && (
+          <View style={paymentScreenStyles.processingContainer}>
+            <ModernLoader size="small" text="Processing payment to merchant..." />
           </View>
-          <View style={paymentScreenStyles.walletInfo}>
-            <Text style={paymentScreenStyles.walletName}>WeSplit Wallet</Text>
-            <Text style={paymentScreenStyles.walletBalance}>
-              Balance {effectiveBalance !== null && effectiveBalance !== undefined ? formatAmountWithComma(effectiveBalance) : '0,00'} USDC
-            </Text>
-          </View>
-          {config.allowExternalDestinations && (
-            <TouchableOpacity 
-              style={[
-                paymentScreenStyles.changeButton,
-                (isProcessing) && paymentScreenStyles.changeButtonDisabled,
-              ]}
-              onPress={() => {
-                // Handle wallet change
-              }}
-              disabled={isProcessing}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={[paymentScreenStyles.changeButtonText, (isProcessing) && paymentScreenStyles.changeButtonTextDisabled]}>Change</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
 
-        {/* Balance Error */}
+        {/* Validation Error */}
         {validationError && (
           <View style={paymentScreenStyles.errorCard}>
             <Text style={paymentScreenStyles.errorText}>{validationError}</Text>
           </View>
         )}
 
-        {/* Network Fee and Total */}
+        {/* SendComponent - Main UI */}
+        {sendComponentRecipientInfo && config.showAmountInput && (
+          <SendComponent
+            recipient={sendComponentRecipientInfo}
+            onRecipientChange={config.allowExternalDestinations ? () => navigation.goBack() : undefined}
+            showRecipientChange={config.allowExternalDestinations}
+            amount={amount}
+            onAmountChange={handleAmountChange}
+            currency="USDC"
+            note={note}
+            onNoteChange={config.showMemoInput ? handleNoteChange : undefined}
+            showAddNote={config.showMemoInput}
+            wallet={walletInfo}
+            onWalletChange={config.allowExternalDestinations ? () => navigation.goBack() : undefined}
+            showWalletChange={config.allowExternalDestinations}
+            onSendPress={handleExecuteTransaction}
+            sendButtonDisabled={!canExecute || isProcessing}
+            sendButtonLoading={isProcessing}
+            sendButtonTitle={isProcessing ? 'Processing...' : 'Send'}
+            containerStyle={paymentScreenStyles.sendComponentContainer}
+          />
+        )}
+
+        {/* Network Fee and Total - After SendComponent, matching SpendPaymentModal order */}
         {config.showAmountInput && (
           <View style={paymentScreenStyles.feeSection}>
             <View style={paymentScreenStyles.feeRow}>
@@ -797,161 +745,27 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
               <Text style={paymentScreenStyles.feeLabel}>Total paid</Text>
               <Text style={paymentScreenStyles.feeTotal}>{formatAmountWithComma(totalPaid)} USDC</Text>
             </View>
-            </View>
-          )}
-
-          {/* Processing Indicator for Auto-Transactions */}
-          {context === 'spend_split_payment' && isProcessing && (
-          <View style={paymentScreenStyles.processingContainer}>
-              <ModernLoader size="small" text="Processing payment to merchant..." />
-            </View>
-          )}
-
-        {/* Send Button */}
-        {config.showAmountInput && (
-          <TouchableOpacity
-            style={[
-              paymentScreenStyles.sendButton,
-              (!canExecute || isProcessing) && paymentScreenStyles.sendButtonDisabled,
-            ]}
-            onPress={handleExecuteTransaction}
-            disabled={!canExecute || isProcessing}
-          >
-            <Text style={paymentScreenStyles.sendButtonText}>
-              {isProcessing ? 'Processing...' : 'Send'}
-            </Text>
-          </TouchableOpacity>
+          </View>
         )}
-      </View>
+      </ScrollView>
     </Container>
   );
 };
 
 const paymentScreenStyles = StyleSheet.create({
-  container: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: spacing.md,
     gap: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  sendToSection: {
-    gap: spacing.sm,
-  },
-  sendToLabel: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.white,
-  },
-  recipientCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white10,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  recipientIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.blue + '30',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recipientInfo: {
-    flex: 1,
-  },
-  recipientOrder: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    marginBottom: spacing.xs / 2,
-  },
-  recipientAddress: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-    fontFamily: typography.fontFamily.mono,
-  },
-  amountSection: {
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  amountInput: {
-    fontSize: typography.fontSize.xxxl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    textAlign: 'center',
-    minWidth: 100,
-    padding: 0,
-    margin: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-  },
-  amountCurrency: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-  },
-  addNoteButton: {
-    marginTop: spacing.sm,
-  },
-  addNoteText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white,
-    textDecorationLine: 'underline',
-  },
-  noteInput: {
-    marginTop: spacing.sm,
-    fontSize: typography.fontSize.sm,
-    color: colors.white,
-    textAlign: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.white30,
-    paddingBottom: spacing.xs,
-    minWidth: 100,
-  },
-  walletCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white10,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  walletIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: colors.green + '30',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  walletInfo: {
-    flex: 1,
-  },
-  walletName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.white,
-    marginBottom: spacing.xs / 2,
-  },
-  walletBalance: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-  },
-  changeButton: {
-    backgroundColor: colors.white5,
-    borderRadius: 8,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  changeButtonDisabled: {
-    opacity: 0.5,
-  },
-  changeButtonText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white,
-    fontWeight: typography.fontWeight.medium,
-  },
-  changeButtonTextDisabled: {
-    color: colors.white70,
+  sendComponentContainer: {
+    flex: 0,
+    width: '100%',
+    justifyContent: 'flex-start',
   },
   errorCard: {
     backgroundColor: colors.red + '20',
@@ -989,25 +803,7 @@ const paymentScreenStyles = StyleSheet.create({
   processingContainer: {
     alignItems: 'center',
     padding: spacing.md,
-  },
-  sendButton: {
-    width: '100%',
-    backgroundColor: colors.green,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.md,
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.white10,
-    opacity: 0.5,
-  },
-  sendButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.black,
+    marginBottom: spacing.sm,
   },
 });
 
