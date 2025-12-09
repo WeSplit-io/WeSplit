@@ -559,318 +559,52 @@ class TransactionSigningService {
 
   /**
    * Add company signature to a partially signed transaction
+   * Simplified version - only essential validations
    */
   async addCompanySignature(serializedTransaction) {
     try {
       await this.ensureInitialized();
       
-      if (!this.companyKeypair) {
-        const errorDetails = {
-          initialized: this.initialized,
-          hasConnection: !!this.connection,
-          hasAddress: !!process.env.COMPANY_WALLET_ADDRESS,
-          hasSecretKey: !!process.env.COMPANY_WALLET_SECRET_KEY,
-          addressLength: process.env.COMPANY_WALLET_ADDRESS?.length || 0,
-          secretKeyLength: process.env.COMPANY_WALLET_SECRET_KEY?.length || 0
-        };
-        console.error('❌ Company keypair not initialized', errorDetails);
-        throw new Error(
-          `Company keypair not initialized. ` +
-          `This usually means COMPANY_WALLET_SECRET_KEY is missing or invalid in Firebase Secrets. ` +
-          `Check: firebase functions:secrets:access COMPANY_WALLET_SECRET_KEY`
-        );
+      if (!this.companyKeypair || !this.connection) {
+        throw new Error('Service not initialized');
       }
 
-      if (!this.connection) {
-        throw new Error('Connection not initialized');
-      }
+      // Convert to Buffer and deserialize
+      const buffer = Buffer.isBuffer(serializedTransaction) 
+        ? serializedTransaction 
+        : Buffer.from(serializedTransaction);
+      const transaction = VersionedTransaction.deserialize(buffer);
 
-      // Convert to Buffer if needed (client sends Uint8Array)
-      let transactionBuffer;
-      if (Buffer.isBuffer(serializedTransaction)) {
-        transactionBuffer = serializedTransaction;
-      } else if (serializedTransaction instanceof Uint8Array) {
-        transactionBuffer = Buffer.from(serializedTransaction);
-      } else if (Array.isArray(serializedTransaction)) {
-        transactionBuffer = Buffer.from(serializedTransaction);
-      } else {
-        throw new Error('Invalid transaction buffer format');
-      }
-
-      // Deserialize the transaction
-      const transaction = VersionedTransaction.deserialize(transactionBuffer);
-
-      // CRITICAL: Verify blockhash is present before signing
-      // This ensures we're signing the transaction with the correct blockhash
-      let blockhashBeforeSigning;
-      if (transaction.message && 'recentBlockhash' in transaction.message) {
-        blockhashBeforeSigning = transaction.message.recentBlockhash;
-      } else if (transaction.message && transaction.message.recentBlockhash) {
-        blockhashBeforeSigning = transaction.message.recentBlockhash;
-      }
-      
-      if (!blockhashBeforeSigning) {
-        throw new Error('Cannot add company signature: transaction missing blockhash');
-      }
-
-      // CRITICAL: Validate company wallet is a required signer BEFORE attempting to sign
-      // This prevents "Cannot sign with non signer key" errors
-      const companyWalletAddress = this.companyKeypair.publicKey.toBase58();
+      // Essential validations only (3 checks)
+      const companyWallet = this.companyKeypair.publicKey.toBase58();
       const staticAccountKeys = transaction.message.staticAccountKeys;
       const numRequiredSignatures = transaction.message.header.numRequiredSignatures;
-      const feePayer = staticAccountKeys[0];
-      
-      // Log transaction structure for debugging
-      console.log('Validating transaction structure before signing', {
-        messageVersion: transaction.version,
-        numSignatures: transaction.signatures.length,
-        numRequiredSignatures,
-        staticAccountKeysCount: staticAccountKeys.length,
-        feePayerAddress: feePayer?.toBase58(),
-        companyWalletAddress,
-        feePayerMatchesCompany: feePayer?.toBase58() === companyWalletAddress,
-        requiredSignerAccounts: staticAccountKeys.slice(0, numRequiredSignatures).map(key => key.toBase58()),
-        companyWalletInRequiredSigners: staticAccountKeys.slice(0, numRequiredSignatures).some(key => key.toBase58() === companyWalletAddress),
-        blockhash: blockhashBeforeSigning.toString().substring(0, 8) + '...'
-      });
+      const feePayer = staticAccountKeys[0]?.toBase58();
 
-      // Validate fee payer is company wallet
-      // CRITICAL: For certain transaction types (like shared wallet withdrawals), the fee payer might be different
-      // However, ALL transactions that go through Firebase Functions MUST have company wallet as fee payer
-      // If fee payer is not company wallet, this transaction should not be using Firebase Functions
-      if (!feePayer || feePayer.toBase58() !== companyWalletAddress) {
-        console.error('❌ Transaction fee payer is not company wallet', {
-          feePayerAddress: feePayer?.toBase58(),
-          companyWalletAddress,
-          staticAccountKeys: staticAccountKeys.map(key => key.toBase58()),
-          numRequiredSignatures,
-          note: 'This transaction should not be using Firebase Functions if fee payer is not company wallet. Transactions with different fee payers should be signed locally.'
-        });
-        throw new Error(
-          `Transaction fee payer is not company wallet. ` +
-          `Expected: ${companyWalletAddress}, ` +
-          `Got: ${feePayer?.toBase58() || 'undefined'}. ` +
-          `The transaction must have the company wallet (${companyWalletAddress}) as the fee payer. ` +
-          `If this is a shared wallet or split wallet withdrawal, it should be signed locally, not through Firebase Functions.`
-        );
+      // 1. Validate fee payer is company wallet (security critical)
+      if (feePayer !== companyWallet) {
+        throw new Error(`Fee payer must be company wallet. Expected: ${companyWallet}, Got: ${feePayer}`);
       }
 
-      // Validate company wallet is in required signers (should be at index 0)
-      const requiredSignerAccounts = staticAccountKeys.slice(0, numRequiredSignatures);
-      const companyWalletIndex = staticAccountKeys.findIndex(key => key.toBase58() === companyWalletAddress);
-      const companyWalletInRequiredSigners = companyWalletIndex >= 0 && companyWalletIndex < numRequiredSignatures;
-      
-      if (!companyWalletInRequiredSigners) {
-        console.error('❌ Company wallet is not in required signers list', {
-          companyWalletAddress,
-          companyWalletIndex,
-          numRequiredSignatures,
-          requiredSignerAccounts: requiredSignerAccounts.map(key => key.toBase58()),
-          allStaticAccountKeys: staticAccountKeys.map(key => key.toBase58()),
-          feePayerIndex: 0,
-          feePayerAddress: feePayer.toBase58(),
-          staticAccountKeysWithIndices: staticAccountKeys.map((key, idx) => ({
-            index: idx,
-            address: key.toBase58(),
-            isCompany: key.toBase58() === companyWalletAddress,
-            isRequired: idx < numRequiredSignatures
-          }))
-        });
-        throw new Error(
-          `Company wallet (${companyWalletAddress}) is not in the required signers list. ` +
-          `Found at index: ${companyWalletIndex >= 0 ? companyWalletIndex : 'NOT_FOUND'}, ` +
-          `but required signers are at indices 0-${numRequiredSignatures - 1}. ` +
-          `Fee payer is at index 0: ${feePayer.toBase58()}. ` +
-          `Required signers: ${requiredSignerAccounts.map(key => key.toBase58()).join(', ')}. ` +
-          `This usually means the transaction was not properly compiled with the company wallet as fee payer.`
-        );
-      }
-      
-      // CRITICAL: Verify company wallet is at index 0 (fee payer position)
-      // In Solana, the fee payer MUST be at index 0 in staticAccountKeys
-      // The signature for the fee payer goes to signatures[0]
-      if (companyWalletIndex !== 0) {
-        console.error('❌ Company wallet is not at index 0 (fee payer position)', {
-          companyWalletAddress,
-          companyWalletIndex,
-          expectedIndex: 0,
-          feePayerAt0: feePayer.toBase58(),
-          note: 'In Solana, the fee payer MUST be at index 0. The transaction structure is invalid.'
-        });
-        throw new Error(
-          `Company wallet (${companyWalletAddress}) is not at index 0 (fee payer position). ` +
-          `Found at index: ${companyWalletIndex}, but fee payer must be at index 0. ` +
-          `Current fee payer at index 0: ${feePayer.toBase58()}. ` +
-          `The transaction was not properly compiled with the company wallet as fee payer.`
-        );
+      // 2. Validate blockhash exists
+      if (!transaction.message.recentBlockhash) {
+        throw new Error('Transaction missing blockhash');
       }
 
-      // CRITICAL: Sign immediately - no validation delays here
-      // Validation happens before Firestore checks and right before submission
-      // Every millisecond counts to prevent blockhash expiration
-      console.log('✅ Transaction validation passed, adding company signature', {
-        messageVersion: transaction.version,
-        numSignatures: transaction.signatures.length,
-        numRequiredSignatures,
-        companyWalletAddress,
-        feePayerAddress: feePayer.toBase58(),
-        blockhash: blockhashBeforeSigning.toString().substring(0, 8) + '...',
-        note: 'Signing transaction with blockhash from client. This blockhash will be validated before submission.'
-      });
-
-      // CRITICAL: Check if transaction is already fully signed
-      // If all required signatures are present, check if company signature is already there
-      // Note: companyWalletIndex is already defined above (should be 0)
-      if (transaction.signatures.length >= numRequiredSignatures) {
-        // Company wallet is at index 0 (fee payer), so check signatures[0]
-        if (companyWalletIndex === 0 && transaction.signatures.length > 0) {
-          const existingSignature = transaction.signatures[0];
-          // Check if signature is not empty (all zeros means not signed)
-          const isSigned = existingSignature && !existingSignature.every(byte => byte === 0);
-          
-          if (isSigned) {
-            console.log('✅ Company signature already present in transaction at index 0', {
-              companyWalletAddress,
-              companyWalletIndex: 0,
-              numSignatures: transaction.signatures.length,
-              numRequiredSignatures,
-              note: 'Transaction already has company signature, skipping re-signing'
-            });
-            // Transaction is already signed by company wallet, serialize and return
-            const fullySignedTransaction = transaction.serialize();
-            return fullySignedTransaction;
-          } else {
-            // Signature slot exists but is empty, we need to sign
-            console.log('⚠️ Company signature slot at index 0 exists but is empty, signing now', {
-              companyWalletAddress,
-              companyWalletIndex: 0,
-              numSignatures: transaction.signatures.length
-            });
-          }
-        } else {
-          console.warn('⚠️ Unexpected transaction state', {
-            companyWalletAddress,
-            companyWalletIndex,
-            numSignatures: transaction.signatures.length,
-            numRequiredSignatures,
-            staticAccountKeys: staticAccountKeys.map(key => key.toBase58())
-          });
+      // 3. Validate user signature is present (if multiple signers required)
+      if (numRequiredSignatures > 1) {
+        const userSig = transaction.signatures[1];
+        if (!userSig || userSig.every(byte => byte === 0)) {
+          const userAccount = staticAccountKeys[1]?.toBase58();
+          throw new Error(`User signature missing at index 1. User account: ${userAccount || 'unknown'}`);
         }
       }
 
-      // Add company signature - this is fast (~1-5ms)
-      // CRITICAL: VersionedTransaction.sign() automatically places signatures at the correct index
-      // based on the signer's position in staticAccountKeys
-      // The company wallet is at index 0 (fee payer), so its signature goes to signatures[0]
-      try {
-        // Log signature state before signing
-        const signaturesBefore = transaction.signatures.map((sig, idx) => ({
-          index: idx,
-          account: staticAccountKeys[idx]?.toBase58(),
-          isSigned: sig && !sig.every(byte => byte === 0),
-          signaturePreview: sig ? sig.slice(0, 4).join(',') + '...' : 'empty'
-        }));
-        
-        console.log('Signing transaction with company keypair', {
-          companyWalletAddress,
-          companyWalletIndex: 0, // Fee payer is always at index 0
-          signaturesBefore,
-          numRequiredSignatures
-        });
+      // 4. Sign with company keypair
+      transaction.sign([this.companyKeypair]);
 
-        transaction.sign([this.companyKeypair]);
-        
-        // Log signature state after signing
-        const signaturesAfter = transaction.signatures.map((sig, idx) => ({
-          index: idx,
-          account: staticAccountKeys[idx]?.toBase58(),
-          isSigned: sig && !sig.every(byte => byte === 0),
-          signaturePreview: sig ? sig.slice(0, 4).join(',') + '...' : 'empty'
-        }));
-        
-        console.log('✅ Company signature added successfully', {
-          companyWalletAddress,
-          numSignaturesAfter: transaction.signatures.length,
-          numRequiredSignatures,
-          signaturesAfter,
-          companySignatureIndex: 0,
-          companySignatureIsSigned: signaturesAfter[0]?.isSigned
-        });
-      } catch (signError) {
-        // Enhanced error logging with transaction structure details
-        const signaturesState = transaction.signatures.map((sig, idx) => ({
-          index: idx,
-          account: staticAccountKeys[idx]?.toBase58(),
-          isSigned: sig && !sig.every(byte => byte === 0),
-          isCompanyWallet: staticAccountKeys[idx]?.toBase58() === companyWalletAddress
-        }));
-        
-        console.error('❌ Failed to add company signature', {
-          error: signError.message,
-          errorName: signError.name,
-          errorCode: signError.code,
-          errorStack: signError.stack?.substring(0, 500),
-          companyWalletAddress,
-          hasKeypair: !!this.companyKeypair,
-          keypairPublicKey: this.companyKeypair?.publicKey?.toBase58(),
-          numSignatures: transaction.signatures.length,
-          numRequiredSignatures,
-          feePayerAddress: feePayer?.toBase58(),
-          feePayerIsCompany: feePayer?.toBase58() === companyWalletAddress,
-          requiredSignerAccounts: staticAccountKeys.slice(0, numRequiredSignatures).map(key => key.toBase58()),
-          signaturesState,
-          staticAccountKeysOrder: staticAccountKeys.map((key, idx) => ({
-            index: idx,
-            address: key.toBase58(),
-            isCompany: key.toBase58() === companyWalletAddress,
-            isRequiredSigner: idx < numRequiredSignatures
-          }))
-        });
-        
-        // Provide more specific error message based on error type
-        let errorMessage = `Failed to sign transaction with company wallet: ${signError.message}. `;
-        
-        if (signError.message && signError.message.includes('non signer')) {
-          errorMessage += `The company wallet (${companyWalletAddress}) is not in the required signers list. ` +
-            `Required signers: ${staticAccountKeys.slice(0, numRequiredSignatures).map(key => key.toBase58()).join(', ')}. ` +
-            `This means the transaction was not properly compiled with the company wallet as fee payer.`;
-        } else if (signError.message && signError.message.includes('already signed')) {
-          errorMessage += `The transaction appears to already be signed. ` +
-            `Current signatures: ${transaction.signatures.length}, Required: ${numRequiredSignatures}.`;
-        } else {
-          errorMessage += `Company wallet: ${companyWalletAddress}. ` +
-            `Fee payer: ${feePayer?.toBase58() || 'undefined'}. ` +
-            `This usually means the company wallet is not properly configured as the fee payer or the transaction structure is invalid.`;
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      // CRITICAL: Verify blockhash is still the same after signing
-      // Signing should not change the blockhash
-      let blockhashAfterSigning;
-      if (transaction.message && 'recentBlockhash' in transaction.message) {
-        blockhashAfterSigning = transaction.message.recentBlockhash;
-      } else if (transaction.message && transaction.message.recentBlockhash) {
-        blockhashAfterSigning = transaction.message.recentBlockhash;
-      }
-      
-      if (!blockhashAfterSigning || blockhashAfterSigning.toString() !== blockhashBeforeSigning.toString()) {
-        console.error('CRITICAL: Blockhash changed during signing!', {
-          before: blockhashBeforeSigning?.toString().substring(0, 8) + '...',
-          after: blockhashAfterSigning?.toString().substring(0, 8) + '...',
-          note: 'This should never happen - signing should not change blockhash'
-        });
-        throw new Error('Blockhash changed during signing - transaction integrity compromised');
-      }
-
-      // Serialize the fully signed transaction - this is also fast (~1-5ms)
-      const fullySignedTransaction = transaction.serialize();
-
-      // Signature added successfully - total time should be <10ms
-      // Blockhash is preserved in the serialized transaction
-
-      return fullySignedTransaction;
+      // 5. Return serialized transaction
+      return transaction.serialize();
 
     } catch (error) {
       console.error('Failed to add company signature:', error);

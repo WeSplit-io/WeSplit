@@ -419,7 +419,8 @@ exports.processUsdcTransfer = functions.runWith({
   timeoutSeconds: 60, // Increased from 30s to 60s for production/mainnet (transactions can take longer)
   memory: '512MB'
 }).https.onCall(async (data, context) => {
-  // CRITICAL: Use try-catch at the very top level to catch ANY errors before they become "internal"
+  // CRITICAL: Wrap entire function in try-catch to catch ANY errors, including initialization errors
+  let functionStartTime;
   try {
     // CRITICAL: Log immediately at function entry - this helps diagnose if function is being called
     console.log('🔵 processUsdcTransfer FUNCTION CALLED', {
@@ -431,17 +432,21 @@ exports.processUsdcTransfer = functions.runWith({
       contextAuth: context?.auth ? 'authenticated' : 'not authenticated',
       contextRawRequest: context?.rawRequest ? 'present' : 'missing',
       nodeVersion: process.version,
-      functionName: 'processUsdcTransfer'
+      functionName: 'processUsdcTransfer',
+      hasTransactionSigningService: !!require('./transactionSigningService').transactionSigningService
     });
   } catch (logError) {
     // Even logging can fail - catch it and log to stderr
     console.error('❌ CRITICAL: Failed to log function entry', {
       error: logError.message,
-      errorStack: logError.stack
+      errorStack: logError.stack,
+      errorName: logError.name,
+      errorCode: logError.code
     });
+    // Still try to continue - don't fail on logging errors
   }
   
-  const functionStartTime = Date.now();
+  functionStartTime = Date.now();
   
   try {
     // Log data structure before processing
@@ -613,7 +618,7 @@ exports.processUsdcTransfer = functions.runWith({
       confirmation: result.confirmation
     };
   } catch (error) {
-    const totalTime = Date.now() - functionStartTime;
+    const totalTime = functionStartTime ? Date.now() - functionStartTime : 0;
     
     // CRITICAL: Log error immediately with full details
     console.error('❌ processUsdcTransfer: ERROR CAUGHT', {
@@ -625,11 +630,19 @@ exports.processUsdcTransfer = functions.runWith({
       isHttpsError: error instanceof functions.https.HttpsError,
       httpsErrorCode: error instanceof functions.https.HttpsError ? error.code : 'N/A',
       httpsErrorMessage: error instanceof functions.https.HttpsError ? error.message : 'N/A',
-      errorStack: error?.stack ? error.stack.substring(0, 1000) : 'No stack trace',
+      errorStack: error?.stack ? error.stack.substring(0, 2000) : 'No stack trace',
       totalTimeMs: totalTime,
       errorDetails: error?.details || error?.context || {},
       hasSerializedTransaction: !!data?.serializedTransaction,
-      serializedTransactionLength: data?.serializedTransaction?.length
+      serializedTransactionLength: data?.serializedTransaction?.length,
+      hasTransactionSigningService: !!transactionSigningService,
+      transactionSigningServiceType: typeof transactionSigningService,
+      // Check if it's an initialization error
+      isInitializationError: error?.message?.includes('initialize') || error?.message?.includes('Connection not initialized'),
+      // Check if it's a secret error
+      isSecretError: error?.message?.includes('COMPANY_WALLET') || error?.message?.includes('secret') || error?.message?.includes('Secret'),
+      // Full error for debugging
+      fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)).substring(0, 500)
     });
     
     // If it's already an HttpsError, re-throw it (it already has proper formatting)

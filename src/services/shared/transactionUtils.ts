@@ -273,6 +273,7 @@ class TransactionUtils {
 /**
  * Rebuild transaction with fresh blockhash right before Firebase submission
  * This is critical for mainnet reliability - Firebase processing takes 4-5 seconds
+ * Returns serialized VersionedTransaction ready for Firebase Functions
  */
 export async function rebuildTransactionBeforeFirebase(
   originalTransaction: Transaction,
@@ -302,7 +303,9 @@ export async function rebuildTransactionBeforeFirebase(
       }, 'TransactionRebuild');
     }
 
-    // Create new transaction with fresh blockhash
+    // Create new transaction with company wallet as fee payer
+    // CRITICAL: The company wallet signature will be added by Firebase Functions
+    // We only sign with the user keypair here
     const rebuiltTransaction = new Transaction({
       recentBlockhash: freshBlockhash,
       feePayer: feePayerPublicKey
@@ -311,17 +314,28 @@ export async function rebuildTransactionBeforeFirebase(
     // Copy all instructions from original transaction
     rebuiltTransaction.instructions = [...originalTransaction.instructions];
 
-    // Sign with user keypair
-    rebuiltTransaction.sign(userKeypair);
+    // CRITICAL: Convert to VersionedTransaction BEFORE signing
+    // This ensures proper signature array initialization and allows partial signing
+    // Transaction.serialize() would verify all signatures, but VersionedTransaction allows partial signing
+    const compiledMessage = rebuiltTransaction.compileMessage();
+    const versionedTransaction = new VersionedTransaction(compiledMessage);
 
-    // Serialize for Firebase storage
-    const serializedTransaction = rebuiltTransaction.serialize();
+    // Sign with user keypair only (company wallet will sign in Firebase Functions)
+    // CRITICAL: VersionedTransaction.sign() automatically places signatures at correct indices
+    // This allows us to have a partially signed transaction (user only)
+    versionedTransaction.sign([userKeypair]);
+
+    // Serialize the partially signed transaction (user signed, company not yet)
+    const serializedTransaction = versionedTransaction.serialize();
 
     logger.info('Transaction rebuilt successfully for Firebase', {
       freshBlockhash: freshBlockhash.substring(0, 8) + '...',
       newBlockhashTimestamp,
       serializedSize: serializedTransaction.length,
-      instructionCount: rebuiltTransaction.instructions.length
+      instructionCount: rebuiltTransaction.instructions.length,
+      feePayer: feePayerPublicKey.toBase58().substring(0, 8) + '...',
+      userAddress: userKeypair.publicKey.toBase58().substring(0, 8) + '...',
+      note: 'Transaction is partially signed (user only). Company signature will be added by Firebase Functions.'
     }, 'TransactionRebuild');
 
     return {
@@ -331,7 +345,10 @@ export async function rebuildTransactionBeforeFirebase(
   } catch (error) {
     logger.error('Failed to rebuild transaction for Firebase', {
       error: error instanceof Error ? error.message : String(error),
-      currentBlockhashTimestamp
+      errorName: error instanceof Error ? error.name : 'Unknown',
+      currentBlockhashTimestamp,
+      feePayer: feePayerPublicKey.toBase58().substring(0, 8) + '...',
+      userAddress: userKeypair.publicKey.toBase58().substring(0, 8) + '...'
     }, 'TransactionRebuild');
     throw error;
   }
@@ -339,19 +356,27 @@ export async function rebuildTransactionBeforeFirebase(
 
 /**
  * Rebuild transaction with fresh blockhash and new signature
+ * Returns serialized VersionedTransaction ready for Firebase Functions
  */
 export async function rebuildTransactionWithFreshBlockhash(
   originalTransaction: Transaction,
   connection: Connection,
   feePayerPublicKey: PublicKey,
   userKeypair: Keypair
-): Promise<{ transaction: Transaction; blockhashTimestamp: number }> {
+): Promise<{ serializedTransaction: Uint8Array; blockhashTimestamp: number }> {
   try {
+    logger.debug('Rebuilding transaction before Firebase submission', {
+      originalRecentBlockhash: originalTransaction.recentBlockhash?.substring(0, 8) + '...',
+      feePayer: feePayerPublicKey.toBase58().substring(0, 8) + '...'
+    }, 'TransactionRebuild');
+
     // Get fresh blockhash
     const blockhashData = await getFreshBlockhash(connection, 'confirmed');
     const freshBlockhash = blockhashData.blockhash;
 
-    // Create new transaction
+    // Create new transaction with company wallet as fee payer
+    // CRITICAL: The company wallet signature will be added by Firebase Functions
+    // We only sign with the user keypair here
     const rebuiltTransaction = new Transaction({
       recentBlockhash: freshBlockhash,
       feePayer: feePayerPublicKey
@@ -360,16 +385,37 @@ export async function rebuildTransactionWithFreshBlockhash(
     // Copy instructions
     rebuiltTransaction.instructions = [...originalTransaction.instructions];
 
-    // Sign with user keypair
-    rebuiltTransaction.sign(userKeypair);
+    // CRITICAL: Convert to VersionedTransaction BEFORE signing
+    // This ensures proper signature array initialization
+    const compiledMessage = rebuiltTransaction.compileMessage();
+    const versionedTransaction = new VersionedTransaction(compiledMessage);
+
+    // Sign with user keypair only (company wallet will sign in Firebase Functions)
+    // CRITICAL: VersionedTransaction.sign() automatically places signatures at correct indices
+    versionedTransaction.sign([userKeypair]);
+
+    // Serialize the partially signed transaction (user signed, company not yet)
+    const serializedTransaction = versionedTransaction.serialize();
+
+    logger.info('Transaction rebuilt successfully for Firebase', {
+      newBlockhash: freshBlockhash.substring(0, 8) + '...',
+      blockhashTimestamp: blockhashData.timestamp,
+      transactionSize: serializedTransaction.length,
+      feePayer: feePayerPublicKey.toBase58().substring(0, 8) + '...',
+      userAddress: userKeypair.publicKey.toBase58().substring(0, 8) + '...',
+      note: 'Transaction is partially signed (user only). Company signature will be added by Firebase Functions.'
+    }, 'TransactionRebuild');
 
     return {
-      transaction: rebuiltTransaction,
+      serializedTransaction,
       blockhashTimestamp: blockhashData.timestamp
     };
   } catch (error) {
-    logger.error('Failed to rebuild transaction with fresh blockhash', {
-      error: error instanceof Error ? error.message : String(error)
+    logger.error('Failed to rebuild transaction for Firebase', {
+      error: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : 'Unknown',
+      feePayer: feePayerPublicKey.toBase58().substring(0, 8) + '...',
+      userAddress: userKeypair.publicKey.toBase58().substring(0, 8) + '...'
     }, 'TransactionRebuild');
     throw error;
   }

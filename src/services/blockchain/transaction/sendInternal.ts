@@ -769,7 +769,7 @@ class InternalTransferService {
         );
         
         currentTxArray = preFirebaseRebuild.serializedTransaction;
-        currentBlockhashTimestamp = preFirebaseRebuild.blockhashTimestamp;
+        currentBlockhashTimestamp = preFirebaseRebuild.newBlockhashTimestamp;
       } else {
         // Fallback: Manual rebuild if function not available
         logger.warn('rebuildTransactionBeforeFirebase not available - using fallback. Please clear Metro cache.', null, 'InternalTransferService');

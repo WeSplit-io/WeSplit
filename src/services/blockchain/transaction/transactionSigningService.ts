@@ -200,6 +200,12 @@ const getFirebaseFunctions = () => {
       }, 'TransactionSigningService');
     }
     
+    // CRITICAL: Store emulator connection state for error handling
+    // This allows us to detect emulator failures and fallback to production
+    (functions as any)._emulatorConnected = emulatorConnected;
+    (functions as any)._emulatorHost = emulatorHost;
+    (functions as any)._emulatorPort = emulatorPort;
+    
     // Cache the instance
     firebaseFunctionsInstance = functions;
     return functions;
@@ -901,50 +907,187 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
         errorMessage.toLowerCase().includes('deadline exceeded') ||
         errorMessage.toLowerCase().includes('timed out');
       
-      logger.error('❌ Firebase Function processUsdcTransfer FAILED', {
-        error: firebaseError,
-        errorMessage,
-        errorName: firebaseError?.name || 'Unknown',
-        errorCode,
-        isTimeout,
-        errorDetails: firebaseError?.details || {},
-        errorStack: firebaseError?.stack ? firebaseError.stack.substring(0, 500) : 'No stack trace',
-        isFirebaseError: firebaseError?.code !== undefined,
-        base64Length: base64Transaction.length,
-        base64Preview: base64Transaction.substring(0, 50) + '...',
-        functionType: typeof processUsdcTransferFunction,
-        note: isTimeout ? 'This may be a timeout - transaction might have succeeded on backend. Check Firebase logs.' : 'Standard error'
-      }, 'TransactionSigningService');
+      // CRITICAL: Check if emulator is configured but not running
+      // If we get an "internal" error or connection error, try production
+      // Note: "internal" error from emulator usually means emulator not running or function crashed
+      // "internal" error from production usually means actual function error
+      const isInternalError = errorCode === 'functions/internal' || errorCode === 'internal';
+      const isConnectionError = 
+        errorCode === 'unavailable' ||
+        errorCode === 'unreachable' ||
+        errorCode === 'deadline-exceeded' ||
+        errorMessage.toLowerCase().includes('connection') ||
+        errorMessage.toLowerCase().includes('network') ||
+        errorMessage.toLowerCase().includes('fetch failed') ||
+        errorMessage.toLowerCase().includes('econnrefused') ||
+        errorMessage.toLowerCase().includes('econnreset') ||
+        errorMessage.toLowerCase().includes('econnaborted') ||
+        errorMessage.toLowerCase().includes('socket hang up') ||
+        errorMessage.toLowerCase().includes('timeout') ||
+        errorMessage.toLowerCase().includes('ecanceled');
       
-      // For timeout errors, provide more helpful error message
-      // CRITICAL: Don't suggest retrying immediately - transaction may have succeeded
-      // User should check transaction history first to avoid duplicate submissions
-      if (isTimeout) {
-        // ✅ CRITICAL: Use same production detection logic as timeout configuration
-        const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
-        const appEnv = getEnvVar('APP_ENV');
-        const isProduction = buildProfile === 'production' || 
-                            appEnv === 'production' ||
-                            process.env.NODE_ENV === 'production' ||
-                            !__DEV__;
+      const functions = getFirebaseFunctions();
+      const wasUsingEmulator = (functions as any)?._emulatorConnected === true;
+      
+      // If emulator was configured but call failed with connection/internal error, try production
+      if (wasUsingEmulator && (isInternalError || isConnectionError) && __DEV__) {
+        logger.warn('⚠️ Emulator call failed, attempting fallback to production Functions', {
+          errorCode,
+          errorMessage,
+          emulatorHost: (functions as any)?._emulatorHost,
+          emulatorPort: (functions as any)?._emulatorPort,
+          isInternalError,
+          isConnectionError,
+          note: 'Emulator may not be running. Falling back to production Functions.'
+        }, 'TransactionSigningService');
         
-        const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
-        const forceMainnet = getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
-        
-        // ✅ CRITICAL: Production builds ALWAYS use mainnet (obligatory)
-        const isMainnet = isProduction 
-          ? true  // Production always mainnet
-          : (networkEnv.toLowerCase() === 'mainnet' || forceMainnet);
-        
-        if (isMainnet) {
-          throw new Error(`Transaction processing timed out on mainnet. The transaction may have succeeded on the blockchain. Please check your transaction history before trying again. If the transaction didn't go through, wait a few moments and try again. (Error: ${errorCode})`);
-        } else {
-          throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again. (Error: ${errorCode})`);
+        try {
+          // CRITICAL: Create a completely new Firebase app instance for production
+          // This ensures no emulator connection is inherited
+          // Once connectFunctionsEmulator is called on an app, all Functions instances from that app use emulator
+          // So we need a fresh app instance
+          logger.info('🔄 Creating fresh Firebase app for production Functions', {
+            note: 'Creating new app instance to avoid emulator connection'
+          }, 'TransactionSigningService');
+          
+          // Create a new Firebase app instance specifically for production Functions
+          // Use a different name to avoid conflicts
+          let prodApp;
+          try {
+            const { getApp } = require('firebase/app');
+            try {
+              // Try to get a production-specific app instance
+              prodApp = getApp('production-functions');
+            } catch {
+              // Create new app instance for production Functions
+              prodApp = initializeApp(firebaseConfig, 'production-functions');
+              logger.info('✅ Created new Firebase app instance for production Functions', {
+                appName: 'production-functions'
+              }, 'TransactionSigningService');
+            }
+          } catch (appError: any) {
+            // If app already exists, get it
+            if (appError.code === 'app/duplicate-app') {
+              const { getApp } = require('firebase/app');
+              prodApp = getApp('production-functions');
+            } else {
+              throw appError;
+            }
+          }
+          
+          // Create Functions instance from the new app (no emulator connection)
+          const prodFunctionsInstance = getFunctions(prodApp, 'us-central1');
+          // CRITICAL: Do NOT call connectFunctionsEmulator on this instance
+          
+          // Update cached instance to use production
+          firebaseFunctionsInstance = prodFunctionsInstance;
+          emulatorConnected = false;
+          
+          logger.info('🔄 Retrying with production Functions', {
+            note: 'Emulator unavailable, using production Functions with fresh app instance'
+          }, 'TransactionSigningService');
+          
+          // Retry with production Functions
+          const prodProcessUsdcTransferFunction = httpsCallable(prodFunctionsInstance, 'processUsdcTransfer', {
+            timeout: 90000
+          });
+          
+          result = await prodProcessUsdcTransferFunction({ serializedTransaction: base64Transaction });
+          
+          logger.info('✅ Production Functions call succeeded', {
+            hasResult: !!result,
+            hasData: !!result?.data,
+            note: 'Successfully fell back to production Functions'
+          }, 'TransactionSigningService');
+          
+          // Continue with normal flow below - result is set, so we'll process it normally
+        } catch (prodError: any) {
+          const prodErrorCode = prodError?.code || 'NO_CODE';
+          const prodErrorMessage = prodError?.message || 'No error message';
+          
+          logger.error('❌ Production Functions call also failed', {
+            errorCode: prodErrorCode,
+            errorMessage: prodErrorMessage,
+            errorName: prodError?.name,
+            originalErrorCode: errorCode,
+            originalErrorMessage: errorMessage,
+            isSameError: prodErrorCode === errorCode && prodErrorMessage === errorMessage,
+            note: prodErrorCode === errorCode 
+              ? 'Both emulator and production Functions returned the same error. This indicates a real function error, not a connection issue. Check Firebase Functions logs for details.'
+              : 'Both emulator and production Functions failed with different errors. Check Firebase Functions deployment and logs.'
+          }, 'TransactionSigningService');
+          
+          // If both returned "internal" error, it's likely a real function error
+          // Provide a more helpful error message
+          if (prodErrorCode === 'functions/internal' && errorCode === 'functions/internal') {
+            throw new Error(
+              `Firebase Function error: Both emulator and production Functions returned "internal" error. ` +
+              `This indicates the function itself is failing, not a connection issue. ` +
+              `Please check Firebase Functions logs for details. ` +
+              `Original error: ${errorMessage}`
+            );
+          }
+          
+          // Re-throw the original error (not the production error)
+          throw firebaseError;
         }
+      } else {
+        // Not an emulator connection issue, or emulator wasn't being used
+        logger.error('❌ Firebase Function processUsdcTransfer FAILED', {
+          error: firebaseError,
+          errorMessage,
+          errorName: firebaseError?.name || 'Unknown',
+          errorCode,
+          isTimeout,
+          isInternalError,
+          isConnectionError,
+          wasUsingEmulator,
+          errorDetails: firebaseError?.details || {},
+          errorStack: firebaseError?.stack ? firebaseError.stack.substring(0, 500) : 'No stack trace',
+          isFirebaseError: firebaseError?.code !== undefined,
+          base64Length: base64Transaction.length,
+          base64Preview: base64Transaction.substring(0, 50) + '...',
+          functionType: typeof processUsdcTransferFunction,
+          note: isTimeout ? 'This may be a timeout - transaction might have succeeded on backend. Check Firebase logs.' : 'Standard error'
+        }, 'TransactionSigningService');
+        
+        // Re-throw the error
+        throw firebaseError;
       }
       
-      // Re-throw with more context for other errors
-      throw new Error(`Firebase Function error (${errorCode}): ${errorMessage}`);
+      // If we successfully fell back to production, result is set and we continue normally
+      // Otherwise, handle timeout and other errors
+      if (!result) {
+        // For timeout errors, provide more helpful error message
+        // CRITICAL: Don't suggest retrying immediately - transaction may have succeeded
+        // User should check transaction history first to avoid duplicate submissions
+        if (isTimeout) {
+          // ✅ CRITICAL: Use same production detection logic as timeout configuration
+          const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
+          const appEnv = getEnvVar('APP_ENV');
+          const isProduction = buildProfile === 'production' || 
+                              appEnv === 'production' ||
+                              process.env.NODE_ENV === 'production' ||
+                              !__DEV__;
+          
+          const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
+          const forceMainnet = getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
+          
+          // ✅ CRITICAL: Production builds ALWAYS use mainnet (obligatory)
+          const isMainnet = isProduction 
+            ? true  // Production always mainnet
+            : (networkEnv.toLowerCase() === 'mainnet' || forceMainnet);
+          
+          if (isMainnet) {
+            throw new Error(`Transaction processing timed out on mainnet. The transaction may have succeeded on the blockchain. Please check your transaction history before trying again. If the transaction didn't go through, wait a few moments and try again. (Error: ${errorCode})`);
+          } else {
+            throw new Error(`Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history. If the transaction didn't go through, please try again. (Error: ${errorCode})`);
+          }
+        }
+        
+        // Re-throw with more context for other errors (only if result is not set)
+        throw new Error(`Firebase Function error (${errorCode}): ${errorMessage}`);
+      }
     }
     
     const response = result.data as { success: boolean; signature: string; confirmation: any };

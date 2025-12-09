@@ -12,7 +12,11 @@
     "shell": "firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "test:transaction": "node test-transaction-processing.js",
+    "test:fee-collection": "node test-fee-collection.js",
+    "test:company-wallet": "node test-getCompanyWalletAddress.js",
+    "test:secrets": "node test-secrets.js"
   },
   "engines": {
     "node": "20"
