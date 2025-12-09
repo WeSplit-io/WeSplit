@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SvgUri } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -106,9 +107,23 @@ const getBorderScaleForSize = (assetId?: string | null, sizeValue = 100): number
   return asset.borderScale;
 };
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({ visible, onClose, assetType, maxHeight = '80%' }) => {
   const { state, updateUser, refreshUser } = useApp();
   const { currentUser } = state;
+  
+  // Convert percentage string to number if needed
+  const resolvedMaxHeight = useMemo(() => {
+    if (typeof maxHeight === 'number') {
+      return maxHeight;
+    }
+    if (typeof maxHeight === 'string' && maxHeight.endsWith('%')) {
+      const percentage = parseFloat(maxHeight.replace('%', ''));
+      return (SCREEN_HEIGHT * percentage) / 100;
+    }
+    return SCREEN_HEIGHT * 0.8; // Default to 80% if invalid
+  }, [maxHeight]);
   
   const [loading, setLoading] = useState<string | null>(null);
   const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
@@ -503,7 +518,8 @@ const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({ visible, onCl
       onClose={onClose}
       title={getModalTitle()}
       showHandle={true}
-      maxHeight={maxHeight}
+      maxHeight={resolvedMaxHeight}
+      enableSwipe={false}
     >
       <ScrollView 
         style={styles.scrollView} 

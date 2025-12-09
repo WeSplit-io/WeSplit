@@ -255,13 +255,23 @@ const getProcessUsdcTransferFunction = () => {
     }
     
     // Production/mainnet needs longer timeout - transactions can take 30-60 seconds
-    const isProduction = !__DEV__;
+    // Detect production using same logic as network config
+    const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
+    const appEnv = getEnvVar('APP_ENV');
+    const isProduction = buildProfile === 'production' || 
+                        appEnv === 'production' ||
+                        process.env.NODE_ENV === 'production' ||
+                        !__DEV__;
+    
     // Check network from environment variable (synchronous, no await needed)
     const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
     const forceMainnet = getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
-    const isMainnet = networkEnv.toLowerCase() === 'mainnet' || 
-                      forceMainnet ||
-                      (isProduction && !networkEnv); // Default to mainnet in production if not set
+    
+    // ✅ CRITICAL: Production builds ALWAYS use mainnet (obligatory)
+    const isMainnet = isProduction 
+      ? true  // Production always mainnet
+      : (networkEnv.toLowerCase() === 'mainnet' || forceMainnet);
+    
     const timeout = (isProduction && isMainnet) ? 120000 : 90000; // 120s for production mainnet, 90s otherwise
     
     const callableFunction = httpsCallable(functions, 'processUsdcTransfer', {
@@ -910,9 +920,21 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
       // CRITICAL: Don't suggest retrying immediately - transaction may have succeeded
       // User should check transaction history first to avoid duplicate submissions
       if (isTimeout) {
+        // ✅ CRITICAL: Use same production detection logic as timeout configuration
+        const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
+        const appEnv = getEnvVar('APP_ENV');
+        const isProduction = buildProfile === 'production' || 
+                            appEnv === 'production' ||
+                            process.env.NODE_ENV === 'production' ||
+                            !__DEV__;
+        
         const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
-        const isMainnet = networkEnv.toLowerCase() === 'mainnet' || 
-                          (!__DEV__ && !networkEnv);
+        const forceMainnet = getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
+        
+        // ✅ CRITICAL: Production builds ALWAYS use mainnet (obligatory)
+        const isMainnet = isProduction 
+          ? true  // Production always mainnet
+          : (networkEnv.toLowerCase() === 'mainnet' || forceMainnet);
         
         if (isMainnet) {
           throw new Error(`Transaction processing timed out on mainnet. The transaction may have succeeded on the blockchain. Please check your transaction history before trying again. If the transaction didn't go through, wait a few moments and try again. (Error: ${errorCode})`);

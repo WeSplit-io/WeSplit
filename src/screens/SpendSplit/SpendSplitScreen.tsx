@@ -18,7 +18,6 @@ import {
   Alert,
   StatusBar,
   TouchableOpacity,
-  Dimensions,
   Share,
 } from 'react-native';
 import { colors } from '../../theme/colors';
@@ -26,11 +25,10 @@ import { spacing, typography } from '../../theme';
 import { SplitWalletService, SplitWallet } from '../../services/split';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
-import { SpendPaymentModeService, SpendMerchantPaymentService } from '../../services/integrations/spend';
+import { SpendPaymentModeService } from '../../services/integrations/spend';
 import { SpendPaymentStatus, SpendPaymentSuccessModal } from '../../components/spend';
-import { SendComponent, SendConfirmation } from '../../components/shared';
+import CentralizedTransactionModal, { type TransactionModalConfig } from '../../components/shared/CentralizedTransactionModal';
 import { WalletSelectorModal } from '../../components/wallet';
-import { useWallet } from '../../context/WalletContext';
 import { Container, Header, Button, ModernLoader } from '../../components/shared';
 import Modal from '../../components/shared/Modal';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -42,11 +40,9 @@ import { SplitParticipantInvitationService } from '../../services/splits/SplitPa
 import { extractOrderData, findUserParticipant, calculatePaymentTotals } from '../../utils/spend/spendDataUtils';
 import { createSpendSplitWallet } from '../../utils/spend/spendWalletUtils';
 import { createMockSpendOrderData } from '../../services/integrations/spend/SpendMockData';
-import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 import { SplitInvitationShare } from '../../components/split';
 import { SplitInvitationService, SplitInvitationData } from '../../services/splits/splitInvitationService';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface SpendSplitScreenProps {
   navigation: any;
@@ -60,7 +56,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   // Context hooks - always called first
   const { state } = useApp();
   const { currentUser } = state;
-  const walletContext = useWallet();
 
   // Core data - memoized to prevent unnecessary recalculations
   const splitData = useMemo(() => routeSplitData, [routeSplitData]);
@@ -78,21 +73,16 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   const [error, setError] = useState<string | null>(null);
 
   // Payment state
-  const [isSendingPayment, setIsSendingPayment] = useState(false);
+  const [isSendingPayment] = useState(false);
   const [isCheckingCompletion, setIsCheckingCompletion] = useState(false);
   
   // Payment modal state
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
+  const [transactionModalConfig, setTransactionModalConfig] = useState<TransactionModalConfig | null>(null);
   const [balanceCheckError, setBalanceCheckError] = useState<string | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState(0);
-  const [paymentAmountString, setPaymentAmountString] = useState('0');
-  const [paymentNote, setPaymentNote] = useState('');
 
-  // Success/confirmation modals
+  // Success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successPaymentAmount, setSuccessPaymentAmount] = useState(0);
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   
   // Additional modals
   const [showWalletSelector, setShowWalletSelector] = useState(false);
@@ -514,7 +504,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             userId: currentUser?.id || '',
             amount: wallet.totalAmount,
             currency: 'USDC',
-            destinationType: 'merchant',
+            destinationType: 'external',
             splitId: splitData.id,
             splitWalletId: wallet.id
           });
@@ -557,7 +547,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
                       userId: currentUser?.id || '',
                       amount: wallet.totalAmount,
                       currency: 'USDC',
-                      destinationType: 'merchant',
+                      destinationType: 'external',
                       splitId: splitData.id,
                       splitWalletId: wallet.id
                     });
@@ -604,7 +594,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     if (!currentUser) return;
 
     try {
-      setIsCheckingBalance(true);
       setBalanceCheckError(null);
       
       // Use live balance if available and recent (avoid unnecessary API calls)
@@ -618,7 +607,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         } else {
           setBalanceCheckError(null);
         }
-        setIsCheckingBalance(false);
         return;
       }
 
@@ -643,8 +631,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         error: error instanceof Error ? error.message : String(error)
       }, 'SpendSplitScreen');
       setBalanceCheckError('Could not verify balance. You can still attempt to pay.');
-    } finally {
-      setIsCheckingBalance(false);
     }
   }, [currentUser, liveBalance]);
 
@@ -721,15 +707,65 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     const { roundUsdcAmount } = await import('../../utils/ui/format/formatUtils');
     const roundedRemainingAmount = roundUsdcAmount(remainingAmount);
     
-    // Set initial payment amount
-    setPaymentAmount(roundedRemainingAmount);
-    setPaymentAmountString(formatAmountWithComma(roundedRemainingAmount));
-    setPaymentNote('');
-    
-    // Show modal immediately
-    setBalanceCheckError(null);
-    setIsCheckingBalance(true);
-    setShowPaymentModal(true);
+    // Show centralized transaction modal
+    const modalConfig: TransactionModalConfig = {
+      title: 'Pay Merchant',
+      subtitle: `Complete payment to SPEND merchant`,
+      showAmountInput: true,
+      showMemoInput: false,
+      showQuickAmounts: false,
+      allowExternalDestinations: false,
+      allowFriendDestinations: false,
+      context: 'spend_split_payment',
+      prefilledAmount: roundedRemainingAmount,
+      customRecipientInfo: {
+        name: uiData.orderNumber || uiData.orderId ? `Order #${uiData.orderNumber || uiData.orderId}` : 'SPEND Merchant',
+        address: wallet?.walletAddress || processedSplitData.orderData?.user_wallet || currentUser?.wallet_address || '',
+        type: 'split',
+        avatar: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fpartners%2Fsp3nd-icon.png?alt=media&token=3b2603eb-57cb-4dc6-aafd-0fff463f1579'
+      },
+      onSuccess: async (result) => {
+        logger.info('Payment sent successfully', {
+          splitWalletId: wallet?.id,
+          amount: roundedRemainingAmount,
+          transactionSignature: result.signature,
+        }, 'SpendSplitScreen');
+
+        setTransactionModalConfig(null);
+        setSuccessPaymentAmount(roundedRemainingAmount);
+        setShowSuccessModal(true);
+
+        // Reload split wallet to get updated participant status
+        if (wallet?.id) {
+          const updatedWalletResult = await SplitWalletService.getSplitWallet(wallet.id);
+          if (updatedWalletResult.success && updatedWalletResult.wallet) {
+            setSplitWallet(updatedWalletResult.wallet);
+          }
+        }
+
+        // Trigger payment completion check
+        setTimeout(() => checkPaymentCompletion(), 2000);
+      },
+      onError: (error) => {
+        logger.error('Payment failed', {
+          splitWalletId: wallet?.id,
+          amount: roundedRemainingAmount,
+          error,
+        }, 'SpendSplitScreen');
+
+        Alert.alert(
+          'Payment Failed',
+          error || 'Failed to send payment. Please try again.',
+          [{ text: 'OK' }]
+        );
+        setTransactionModalConfig(null);
+      },
+      onClose: () => {
+        setTransactionModalConfig(null);
+      }
+    };
+
+    setTransactionModalConfig(modalConfig);
 
     // Check balance in the background
     checkUserBalance(roundedRemainingAmount).catch(error => {
@@ -739,160 +775,6 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
     });
   };
 
-  // Handle payment modal close
-  const handlePaymentModalClose = () => {
-    setShowPaymentModal(false);
-    setBalanceCheckError(null);
-    setIsCheckingBalance(false);
-  };
-
-  // Handle payment confirmation
-  const handlePaymentModalConfirm = async () => {
-    if (!currentUser || !splitData) {
-      Alert.alert('Error', 'Unable to process payment');
-      return;
-    }
-
-    // Ensure split wallet exists - create if needed
-    let wallet: SplitWallet | null = splitWallet;
-    if (!wallet && splitData.walletId) {
-      const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
-      if (walletResult.success && walletResult.wallet) {
-        wallet = walletResult.wallet;
-        setSplitWallet(wallet);
-      }
-    }
-
-    // If still no wallet, we need to create one (this shouldn't happen for SPEND splits, but handle it)
-    if (!wallet) {
-      Alert.alert(
-        'Wallet Required',
-        'The split wallet needs to be created first. Please contact support.',
-        [{ text: 'OK' }]
-      );
-      setIsSendingPayment(false);
-      return;
-    }
-
-    // Get participants from wallet if available, otherwise from splitData
-    const allParticipants = wallet.participants || splitData.participants || [];
-    const userParticipant = findUserParticipant(allParticipants, currentUser.id.toString());
-    
-    if (!userParticipant) {
-      Alert.alert('Error', 'You are not a participant in this split');
-      setIsSendingPayment(false);
-      return;
-    }
-
-    const amountOwed = (userParticipant as any).amountOwed || 0;
-    const amountPaid = (userParticipant as any).amountPaid || 0;
-    const remainingAmount = amountOwed - amountPaid;
-    
-    const { roundUsdcAmount } = await import('../../utils/ui/format/formatUtils');
-    // Use paymentAmount from modal if set, otherwise use remainingAmount
-    const amount = paymentAmount > 0 ? roundUsdcAmount(paymentAmount) : roundUsdcAmount(remainingAmount);
-    
-    if (amount <= 0) {
-      Alert.alert('Invalid Amount', 'You have no remaining balance to pay');
-      setIsSendingPayment(false);
-      return;
-    }
-
-    setIsCheckingBalance(false);
-    setIsSendingPayment(true);
-    setShowPaymentModal(false);
-    
-    try {
-      // Ensure user has a wallet
-      const { walletService } = await import('../../services/blockchain/wallet');
-      const userWallet = await walletService.getWalletInfo(currentUser.id.toString());
-      if (!userWallet || !userWallet.secretKey) {
-        Alert.alert(
-          'Wallet Required',
-          'You need to set up a wallet before making payments. Would you like to create one now?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Create Wallet', 
-              onPress: async () => {
-                try {
-                  const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
-                  if (walletResult.success) {
-                    Alert.alert('Wallet Created', 'Your wallet has been created successfully. You can now make payments.');
-                  } else {
-                    Alert.alert('Error', walletResult.error || 'Failed to create wallet');
-                  }
-                } catch (error) {
-                  Alert.alert('Error', 'Failed to create wallet. Please try again.');
-                }
-              }
-            }
-          ]
-        );
-        setIsSendingPayment(false);
-        return;
-      }
-      
-      // Process payment (wallet is guaranteed to exist at this point)
-      if (!wallet) {
-        Alert.alert('Error', 'Wallet not available');
-        setIsSendingPayment(false);
-        return;
-      }
-      
-      const result = await SplitWalletService.payParticipantShare(
-        wallet.id,
-        currentUser.id.toString(),
-        amount
-      );
-      
-      if (result.success) {
-        logger.info('Payment sent successfully', {
-          splitWalletId: wallet.id,
-          amount,
-          transactionSignature: result.transactionSignature,
-        }, 'SpendSplitScreen');
-
-        // Close confirmation modal and show success modal
-        setShowConfirmationModal(false);
-        setSuccessPaymentAmount(amount);
-        setShowSuccessModal(true);
-
-        // Reload split wallet to get updated participant status
-        const updatedWalletResult = await SplitWalletService.getSplitWallet(wallet.id);
-        if (updatedWalletResult.success && updatedWalletResult.wallet) {
-          setSplitWallet(updatedWalletResult.wallet);
-        }
-
-        // Trigger payment completion check
-        setTimeout(() => checkPaymentCompletion(), 2000);
-      } else {
-        logger.error('Payment failed', {
-          splitWalletId: wallet.id,
-          amount,
-          error: result.error,
-        }, 'SpendSplitScreen');
-
-        Alert.alert(
-          'Payment Failed',
-          result.error || 'Failed to send payment. Please try again.',
-          [{ text: 'OK' }]
-        );
-      }
-    } catch (error) {
-      logger.error('Error processing payment', {
-        error: error instanceof Error ? error.message : String(error),
-      }, 'SpendSplitScreen');
-
-      Alert.alert(
-        'Error',
-        'An unexpected error occurred while processing your payment. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setIsSendingPayment(false);
-    }
-  };
 
   // Show loader if initializing OR if splitData is not available yet OR if not ready
   // This prevents flashing content before loader appears
@@ -1051,76 +933,14 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         );
       })()}
 
-      {/* Payment Modal - "Send to" Screen */}
-      <Modal
-        visible={showPaymentModal}
-        onClose={handlePaymentModalClose}
-        showHandle={true}
-        closeOnBackdrop={true}
-        maxHeight={SCREEN_HEIGHT * 0.9}
-      >
-        <View style={{ flex: 1, paddingBottom: spacing.md }}>
-          <SendComponent
-            recipient={{
-              name: `Order #${uiData.orderNumber || uiData.orderId || 'N/A'}`,
-              address: splitWallet?.walletAddress || processedSplitData.orderData?.user_wallet || currentUser?.wallet_address || undefined,
-              imageUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fpartners%2Fsp3nd-icon.png?alt=media&token=3b2603eb-57cb-4dc6-aafd-0fff463f1579',
-            }}
-            onRecipientChange={undefined}
-            showRecipientChange={false}
-            amount={paymentAmountString}
-            onAmountChange={(newAmountString) => {
-              setPaymentAmountString(newAmountString);
-              // Convert string to number (handle comma as decimal separator)
-              const numAmount = parseFloat(newAmountString.replace(',', '.')) || 0;
-              setPaymentAmount(numAmount);
-              // Re-check balance when amount changes
-              if (numAmount > 0) {
-                checkUserBalance(numAmount).catch(() => {});
-              }
-            }}
-            currency="USDC"
-            note={paymentNote}
-            onNoteChange={setPaymentNote}
-            showAddNote={false}
-            wallet={{
-              name: walletContext.walletName || 'WeSplit Wallet',
-              balance: liveBalance?.usdcBalance || 0,
-              balanceFormatted: liveBalance?.usdcBalance !== undefined ? formatAmountWithComma(liveBalance.usdcBalance) : undefined,
-              imageUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-new.png?alt=media&token=f42ea1b1-5f23-419e-a499-931862819cbf',
-            }}
-            onWalletChange={() => setShowWalletSelector(true)}
-            showWalletChange={false}
-            onSendPress={() => {
-              setShowPaymentModal(false);
-              setShowConfirmationModal(true);
-            }}
-            sendButtonDisabled={isSendingPayment || isCheckingBalance || paymentAmount <= 0}
-            sendButtonLoading={isSendingPayment || isCheckingBalance}
-            sendButtonTitle={isSendingPayment || isCheckingBalance ? 'Processing...' : 'Send'}
-            sendButtonGradientColors={[colors.spendGradientStart, colors.spendGradientEnd]}
-          />
-        </View>
-      </Modal>
-
-      {/* Payment Confirmation Modal */}
-      <SendConfirmation
-        visible={showConfirmationModal}
-        onClose={() => setShowConfirmationModal(false)}
-        recipientName={`Order #${uiData.orderNumber || uiData.orderId || 'N/A'}`}
-        amount={paymentAmount}
-        currency="USDC"
-        onSlideComplete={handlePaymentModalConfirm}
-        disabled={isSendingPayment || isCheckingBalance}
-        loading={isSendingPayment || isCheckingBalance}
-        gradientColors={[colors.spendGradientStart, colors.spendGradientEnd]}
-        insufficientFunds={
-          liveBalance?.usdcBalance !== null && 
-          liveBalance?.usdcBalance !== undefined && 
-          paymentAmount > 0 && 
-          liveBalance.usdcBalance < (paymentAmount + paymentAmount * 0.03)
-        }
-      />
+      {/* Payment Modal - Centralized Transaction Modal */}
+      {transactionModalConfig && (
+        <CentralizedTransactionModal
+          visible={!!transactionModalConfig}
+          config={transactionModalConfig}
+          currentUser={currentUser}
+        />
+      )}
 
       {/* Payment Success Modal */}
       <Modal

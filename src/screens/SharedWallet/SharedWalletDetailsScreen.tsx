@@ -415,8 +415,8 @@ const SharedWalletDetailsScreen: React.FC = () => {
                 })(),
                 customRecipientInfo: {
                   name: 'Your Personal Wallet',
-                  address: userWalletAddress || 'Your Wallet',
-                  type: 'personal'
+                  address: userWalletAddress || '',
+                  type: 'wallet'
                 },
                 onSuccess: async (result) => {
                   logger.info('Shared wallet withdrawal successful', { result });

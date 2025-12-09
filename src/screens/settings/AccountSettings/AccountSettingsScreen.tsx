@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp } from '../../../context/AppContext';
@@ -34,14 +34,16 @@ interface AccountSettingsScreenProps {
 }
 
 const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigation }) => {
-  const { state, updateUser, logoutUser } = useApp();
+  const { state, updateUser, logoutUser, refreshUser } = useApp();
   const { currentUser } = state;
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
+  
+  // Track last refresh time to avoid excessive refreshes
+  const lastRefreshRef = useRef<number>(0);
 
   // Determine auth method
   const authMethod = state.authMethod || 'email';
-  const isPhoneAuth = authMethod === 'phone';
 
   // Form states
   const [pseudo, setPseudo] = useState(currentUser?.name || '');
@@ -116,6 +118,42 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
 
     loadBorderPreview();
   }, [currentUser?.active_profile_border]);
+
+  // Refresh user data when screen comes into focus (throttled to avoid excessive calls)
+  useFocusEffect(
+    React.useCallback(() => {
+      const refreshUserData = async () => {
+        const now = Date.now();
+        // Only refresh if it's been more than 30 seconds since last refresh
+        if (now - lastRefreshRef.current < 30000) {
+          return;
+        }
+        lastRefreshRef.current = now;
+
+        try {
+          logger.debug('Refreshing user data on AccountSettingsScreen focus', {
+            currentProfileBorders: currentUser?.profile_borders,
+            currentWalletBackgrounds: currentUser?.wallet_backgrounds,
+            currentUserId: currentUser?.id
+          }, 'AccountSettingsScreen');
+
+          await refreshUser();
+
+          logger.debug('User data refreshed on AccountSettingsScreen focus', {
+            newProfileBorders: currentUser?.profile_borders,
+            newWalletBackgrounds: currentUser?.wallet_backgrounds,
+            currentUserId: currentUser?.id
+          }, 'AccountSettingsScreen');
+        } catch (error) {
+          logger.error('Failed to refresh user data on focus', { error }, 'AccountSettingsScreen');
+          // Reset timestamp on error so we can retry sooner
+          lastRefreshRef.current = 0;
+        }
+      };
+
+      refreshUserData();
+    }, [refreshUser, currentUser?.id])
+  );
 
   // Track changes
   useEffect(() => {
@@ -308,7 +346,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           await AuthPersistenceService.saveEmail(email.trim());
           logger.info('Email saved to persistence after profile update', { email: email.trim() }, 'AccountSettingsScreen');
         } catch (emailSaveError) {
-          logger.warn('Failed to save email to persistence after profile update (non-critical)', emailSaveError, 'AccountSettingsScreen');
+          logger.warn('Failed to save email to persistence after profile update (non-critical)', emailSaveError as Record<string, unknown>, 'AccountSettingsScreen');
           // Non-critical, continue with profile update
         }
       }
@@ -847,14 +885,18 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                         fontSize: typography.fontSize.md,
                         fontWeight: typography.fontWeight.medium,
                       }}>
-                        {currentUser?.active_profile_border ? getAssetInfo(currentUser.active_profile_border)?.name || 'WeSplit Border' : 'WeSplit Border'}
+                        {currentUser?.active_profile_border 
+                          ? (getAssetInfo(currentUser.active_profile_border)?.name || 'Custom Border')
+                          : 'No Border'}
                       </Text>
                       <Text style={{
                         color: colors.white50,
                         fontSize: typography.fontSize.sm,
                         marginTop: 2,
                       }}>
-                        Exclusive border for active users
+                        {currentUser?.profile_borders && currentUser.profile_borders.length > 0
+                          ? `${currentUser.profile_borders.length} border${currentUser.profile_borders.length > 1 ? 's' : ''} available`
+                          : 'Claim borders from the Advent Calendar'}
                       </Text>
                     </View>
                   </View>
@@ -919,14 +961,18 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                         fontSize: typography.fontSize.md,
                         fontWeight: typography.fontWeight.medium,
                       }}>
-                        {currentUser?.active_wallet_background ? getAssetInfo(currentUser.active_wallet_background)?.name || 'XXX Land' : 'XXX Land'}
+                        {currentUser?.active_wallet_background 
+                          ? (getAssetInfo(currentUser.active_wallet_background)?.name || 'Custom Background')
+                          : 'Default Background'}
                       </Text>
                       <Text style={{
                         color: colors.white50,
                         fontSize: typography.fontSize.sm,
                         marginTop: 2,
                       }}>
-                        Exclusive border for active users
+                        {currentUser?.wallet_backgrounds && currentUser.wallet_backgrounds.length > 0
+                          ? `${currentUser.wallet_backgrounds.length} background${currentUser.wallet_backgrounds.length > 1 ? 's' : ''} available`
+                          : 'Claim backgrounds from the Advent Calendar'}
                       </Text>
                     </View>
                   </View>
@@ -960,9 +1006,19 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
       {showAssetSelectionModal && assetSelectionType && (
         <AssetSelectionModal
           visible={showAssetSelectionModal}
-          onClose={() => {
+          onClose={async () => {
             setShowAssetSelectionModal(false);
             setAssetSelectionType(null);
+            // Refresh user data after closing modal to get updated assets
+            try {
+              await refreshUser();
+              logger.debug('User data refreshed after asset selection modal closed', {
+                profileBorders: currentUser?.profile_borders,
+                walletBackgrounds: currentUser?.wallet_backgrounds
+              }, 'AccountSettingsScreen');
+            } catch (error) {
+              logger.warn('Failed to refresh user data after asset selection', { error }, 'AccountSettingsScreen');
+            }
           }}
           assetType={assetSelectionType}
           maxHeight="60%"

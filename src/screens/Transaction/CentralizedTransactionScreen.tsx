@@ -1,23 +1,22 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { Header, Button, Container, PhosphorIcon, AppleSlider, ModernLoader, TransactionAmountInput } from '../../components/shared';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, TextInput, Alert, Image, StyleSheet } from 'react-native';
+import { Header, Container, PhosphorIcon, ModernLoader } from '../../components/shared';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { colors } from '../../theme';
+import { spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 import { transactionSharedStyles as styles } from '../../components/shared/styles/TransactionSharedStyles';
 import Avatar from '../../components/shared/Avatar';
-import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import { logger } from '../../services/analytics/loggingService';
 import {
-  centralizedTransactionHandler,
-  type TransactionContext,
-  type TransactionParams,
-  type DestinationType,
-  type SourceType
+  centralizedTransactionHandler
 } from '../../services/transactions/CentralizedTransactionHandler';
-import type { UserContact, User } from '../../types';
+import type { TransactionContext, TransactionParams } from '../../services/transactions/types';
+import type { UserContact } from '../../types';
+import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
+import { formatWalletAddress } from '../../utils/spend/spendDataUtils';
 
 // Screen configuration based on transaction context
 interface TransactionScreenConfig {
@@ -199,11 +198,13 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
   const config = getScreenConfig(context);
 
   // State management
-  const [amount, setAmount] = useState(prefilledAmount ? prefilledAmount.toString() : '');
-  const [showAddNote, setShowAddNote] = useState(!!prefilledNote || config.showMemoInput);
+  const [amount, setAmount] = useState(prefilledAmount && prefilledAmount > 0 ? formatAmountWithComma(prefilledAmount) : '0');
+  const [showNote, setShowNote] = useState(!!prefilledNote || config.showMemoInput);
   const [note, setNote] = useState(prefilledNote || '');
   const [selectedChip, setSelectedChip] = useState<'25' | '50' | '100' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAmountFocused, setIsAmountFocused] = useState(false);
+  const amountInputRef = useRef<TextInput>(null);
 
   // ✅ CRITICAL: Prevent multiple transaction executions (debouncing)
   const isExecutingRef = useRef(false);
@@ -253,12 +254,26 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
   const getRecipientInfo = () => {
     // Custom recipient info takes precedence
     if (customRecipientInfo) {
+      // Fill address from route params if empty
+      let address = customRecipientInfo.address;
+      if (!address || address === '') {
+        // Try to get address from route params based on context
+        if (context === 'fair_split_contribution' || context === 'degen_split_lock' || context === 'spend_split_payment') {
+          // For split contexts, we need the split wallet address (will be loaded by handler)
+          // For now, use recipientAddress if provided
+          address = recipientAddress || '';
+        } else if (context === 'shared_wallet_funding' || context === 'shared_wallet_withdrawal') {
+          // For shared wallet, use sharedWalletId as address identifier
+          address = sharedWalletId || recipientAddress || '';
+        }
+      }
+      
       return {
-        name: customRecipientInfo.name,
-        address: customRecipientInfo.address,
+        name: customRecipientInfo.name || 'Recipient',
+        address: address,
         avatar: customRecipientInfo.avatar,
         type: customRecipientInfo.type,
-        walletAddress: customRecipientInfo.address
+        walletAddress: address
       };
     }
 
@@ -269,8 +284,9 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
 
     // Contact-based recipient
     if (contact) {
+      const contactName = contact.name || contact.email?.split('@')[0] || `User ${contact.id}`;
       return {
-        name: contact.name || `User ${contact.id}`,
+        name: contactName,
         address: contact.email || '',
         avatar: contact.avatar || contact.photoURL,
         walletAddress: contact.wallet_address,
@@ -280,8 +296,9 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
 
     // Wallet-based recipient
     if (wallet) {
+      const walletName = wallet.label || wallet.name || (wallet.address ? `Wallet ${formatWalletAddress(wallet.address)}` : 'External Wallet');
       return {
-        name: wallet.label || `Wallet ${wallet.address?.substring(0, 6)}...`,
+        name: walletName,
         address: wallet.address || '',
         avatar: null,
         walletAddress: wallet.address,
@@ -294,6 +311,63 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
 
   const recipientInfo = getRecipientInfo();
 
+  // Load split/shared wallet address if needed
+  const [loadedRecipientAddress, setLoadedRecipientAddress] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const loadRecipientAddress = async () => {
+      // Only load if customRecipientInfo has empty address and we have splitWalletId or sharedWalletId
+      if (!customRecipientInfo || customRecipientInfo.address) {
+        setLoadedRecipientAddress(null);
+        return;
+      }
+
+      try {
+        if (context === 'fair_split_contribution' || context === 'degen_split_lock' || context === 'spend_split_payment') {
+          if (splitWalletId) {
+            const { SplitWalletService } = await import('../../services/split');
+            const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
+            if (walletResult.success && walletResult.wallet?.walletAddress) {
+              setLoadedRecipientAddress(walletResult.wallet.walletAddress);
+              logger.info('Loaded split wallet address', {
+                splitWalletId,
+                address: walletResult.wallet.walletAddress
+              }, 'CentralizedTransactionScreen');
+            }
+          }
+        } else if (context === 'shared_wallet_funding' || context === 'shared_wallet_withdrawal') {
+          if (sharedWalletId) {
+            // For shared wallets, the ID is the address identifier
+            // The actual wallet address will be resolved by the transaction handler
+            setLoadedRecipientAddress(sharedWalletId);
+            logger.info('Shared wallet context', { sharedWalletId }, 'CentralizedTransactionScreen');
+          }
+        }
+      } catch (error) {
+        logger.warn('Failed to load recipient address', { error }, 'CentralizedTransactionScreen');
+        setLoadedRecipientAddress(null);
+      }
+    };
+
+    loadRecipientAddress();
+  }, [context, splitWalletId, sharedWalletId, customRecipientInfo]);
+
+  // Update recipient info with loaded address
+  const finalRecipientInfo = useMemo(() => {
+    if (!recipientInfo) return null;
+    
+    // If address is empty but we loaded one, use it
+    if ((!recipientInfo.walletAddress || recipientInfo.walletAddress === '') && loadedRecipientAddress) {
+      return {
+        ...recipientInfo,
+        address: loadedRecipientAddress,
+        walletAddress: loadedRecipientAddress
+      };
+    }
+    
+    return recipientInfo;
+  }, [recipientInfo, loadedRecipientAddress]);
+
   // Initialize wallet on mount
   useEffect(() => {
     if (currentUser?.id && !appWalletBalance && !liveBalance) {
@@ -301,17 +375,26 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
     }
   }, [currentUser?.id, appWalletBalance, liveBalance, ensureAppWallet]);
 
-  // Amount input validation
-  const handleAmountChange = (value: string) => {
-    let cleaned = value.replace(/,/g, '.');
-    cleaned = cleaned.replace(/[^0-9.]/g, '');
-
-    const parts = cleaned.split('.');
-    if (parts.length > 2) return;
-
-    if (parts.length === 2 && parts[1].length > 2) return;
-
-    setAmount(cleaned);
+  // Amount input validation (for TextInput)
+  const handleAmountChange = (text: string) => {
+    // Allow only numbers and comma
+    const cleaned = text.replace(/[^0-9,]/g, '');
+    
+    // Handle comma as decimal separator
+    let newAmount = cleaned;
+    if (cleaned.includes(',')) {
+      const parts = cleaned.split(',');
+      if (parts.length > 2) {
+        // Only allow one comma
+        newAmount = parts[0] + ',' + parts.slice(1).join('');
+      }
+      // Limit to 2 decimal places
+      if (parts[1] && parts[1].length > 2) {
+        newAmount = parts[0] + ',' + parts[1].substring(0, 2);
+      }
+    }
+    
+    setAmount(newAmount);
     setSelectedChip(null);
     setValidationError(null);
   };
@@ -321,7 +404,7 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
     if (effectiveBalance !== null && effectiveBalance !== undefined) {
       const percentageValue = parseInt(percentage);
       const calculatedAmount = (effectiveBalance * percentageValue) / 100;
-      setAmount(calculatedAmount.toFixed(2));
+      setAmount(formatAmountWithComma(calculatedAmount));
       setSelectedChip(percentage);
     }
   };
@@ -330,9 +413,13 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
   const buildTransactionParams = (): TransactionParams | null => {
     if (!currentUser?.id) return null;
 
+    // Parse amount with comma replaced by period for calculation
+    const numAmount = parseFloat(amount.replace(',', '.'));
+    if (isNaN(numAmount) || numAmount <= 0) return null;
+
     const baseParams = {
       userId: currentUser.id.toString(),
-      amount: parseFloat(amount),
+      amount: numAmount,
       currency: 'USDC',
       memo: note.trim(),
       context
@@ -340,16 +427,16 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
 
     switch (context) {
       case 'send_1to1':
-        if (!recipientInfo?.walletAddress) return null;
+        if (!finalRecipientInfo?.walletAddress) return null;
         return {
           ...baseParams,
           context: 'send_1to1',
           destinationType: contact ? 'friend' : 'external',
-          recipientAddress: recipientInfo.walletAddress,
+          recipientAddress: finalRecipientInfo.walletAddress,
           recipientInfo: {
-            name: recipientInfo.name,
-            email: recipientInfo.address,
-            avatar: recipientInfo.avatar
+            name: finalRecipientInfo.name,
+            email: finalRecipientInfo.address,
+            avatar: finalRecipientInfo.avatar
           },
           requestId,
           isSettlement
@@ -367,14 +454,14 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
         } as any;
 
       case 'fair_split_withdrawal':
-        if (!splitWalletId || !recipientInfo?.walletAddress) return null;
+        if (!splitWalletId || !finalRecipientInfo?.walletAddress) return null;
         return {
           ...baseParams,
           context: 'fair_split_withdrawal',
           sourceType: 'split_wallet',
           destinationType: 'external',
           splitWalletId,
-          destinationAddress: recipientInfo.walletAddress,
+          destinationAddress: finalRecipientInfo.walletAddress,
           splitId,
           billId
         } as any;
@@ -411,14 +498,14 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
         } as any;
 
       case 'shared_wallet_withdrawal':
-        if (!sharedWalletId || !recipientInfo?.walletAddress) return null;
+        if (!sharedWalletId || !finalRecipientInfo?.walletAddress) return null;
         return {
           ...baseParams,
           context: 'shared_wallet_withdrawal',
           sourceType: 'shared_wallet',
           destinationType: 'external',
           sharedWalletId,
-          destinationAddress: recipientInfo.walletAddress,
+          destinationAddress: finalRecipientInfo.walletAddress,
           destinationId: wallet?.id
         } as any;
 
@@ -434,8 +521,9 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
       logger.warn('Transaction already in progress - ignoring duplicate execution', {}, 'CentralizedTransactionScreen');
       return;
     }
-    const numAmount = parseFloat(amount);
-    if (!numAmount || numAmount <= 0) {
+    // Parse amount with comma replaced by period for calculation
+    const numAmount = parseFloat(amount.replace(',', '.'));
+    if (!numAmount || numAmount <= 0 || isNaN(numAmount)) {
       Alert.alert('Error', 'Please enter a valid amount');
       return;
     }
@@ -488,7 +576,26 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
         error: error instanceof Error ? error.message : String(error)
       }, 'CentralizedTransactionScreen');
 
-      Alert.alert('Transaction Error', 'An unexpected error occurred. Please try again.');
+      // ✅ CRITICAL: Detect timeout errors and provide helpful guidance
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      const isTimeout = errorMessage.toLowerCase().includes('timeout') || 
+                       errorMessage.toLowerCase().includes('timed out') ||
+                       errorMessage.toLowerCase().includes('deadline exceeded');
+      
+      if (isTimeout) {
+        // Timeout error - transaction may have succeeded
+        const timeoutMessage = 'Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history before trying again.';
+        logger.warn('Transaction timeout detected', {
+          context,
+          amount: parseFloat(amount.replace(',', '.')),
+          note: 'Transaction may have succeeded despite timeout'
+        }, 'CentralizedTransactionScreen');
+        
+        Alert.alert('Transaction Timeout', timeoutMessage);
+      } else {
+        // Regular error
+        Alert.alert('Transaction Error', errorMessage);
+      }
     } finally {
       // ✅ CRITICAL: Reset execution flag AFTER processing state
       setIsProcessing(false);
@@ -514,14 +621,45 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
       });
 
       // Auto-execute for notification-based transactions
-      if (amount && parseFloat(amount) > 0) {
+      const numAmount = parseFloat(amount.replace(',', '.'));
+      if (amount && numAmount > 0) {
         handleExecuteTransaction();
       }
     }
   }, [contact, prefilledAmount, currentUser?.id, amount]);
 
-  const isAmountValid = amount.length > 0 && parseFloat(amount) > 0;
+  // Calculate network fee (3%)
+  const numAmount = parseFloat(amount.replace(',', '.')) || 0;
+  const networkFee = numAmount * 0.03; // 3% network fee
+  const totalPaid = numAmount + networkFee;
+
+  const isAmountValid = amount.length > 0 && numAmount > 0;
   const canExecute = isAmountValid && !isProcessing && !validationError;
+
+  // Determine recipient display name - never show "N/A"
+  const getRecipientDisplayName = () => {
+    if (!finalRecipientInfo) return '';
+    
+    // For merchant, split, or shared types, use the name directly
+    if (finalRecipientInfo.type === 'merchant' || 
+        finalRecipientInfo.type === 'split' || 
+        finalRecipientInfo.type === 'shared') {
+      return finalRecipientInfo.name || 'Recipient';
+    }
+    
+    // For friend/external transfers, use recipient name (never "Order #N/A")
+    if (finalRecipientInfo.name && finalRecipientInfo.name !== 'N/A') {
+      return finalRecipientInfo.name;
+    }
+    
+    // Fallback: use wallet address if name is not available
+    if (finalRecipientInfo.walletAddress) {
+      return formatWalletAddress(finalRecipientInfo.walletAddress);
+    }
+    
+    // Last resort: use contact name or generic
+    return contact?.name || 'Recipient';
+  };
 
   return (
     <Container>
@@ -534,163 +672,343 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
         <Text style={styles.subtitle}>{config.subtitle}</Text>
       )}
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 0, paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Recipient Info */}
-          {recipientInfo && (
-            <View style={styles.recipientAvatarContainer}>
-              <View style={styles.recipientAvatar}>
-                {recipientInfo.type === 'friend' && recipientInfo.avatar ? (
-                  <Avatar
-                    userId={contact?.id?.toString() || ''}
-                    userName={recipientInfo.name}
-                    size={70}
-                    avatarUrl={recipientInfo.avatar}
-                    style={{ width: '100%', height: '100%', borderRadius: 999 }}
-                  />
-                ) : recipientInfo.type === 'wallet' || recipientInfo.type === 'card' ? (
-                  <View style={styles.recipientWalletIcon}>
-                    <PhosphorIcon
-                      name="Wallet"
-                      size={24}
-                      color={colors.white}
-                      style={styles.recipientWalletIconImage}
-                    />
-                  </View>
-                ) : recipientInfo.type === 'merchant' ? (
+      <View style={paymentScreenStyles.container}>
+        {/* Send to Section */}
+          {finalRecipientInfo && (
+          <View style={paymentScreenStyles.sendToSection}>
+            <Text style={paymentScreenStyles.sendToLabel}>Send to</Text>
+            <View style={paymentScreenStyles.recipientCard}>
+              <View style={paymentScreenStyles.recipientIcon}>
+                {finalRecipientInfo.type === 'merchant' ? (
                   <Image
                     source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkast-logo.png?alt=media&token=e338e812-0bb1-4725-b6ef-2a59b2bd696f' }}
-                    style={styles.recipientKastIcon}
+                    style={{ width: 24, height: 24 }}
                   />
+                ) : finalRecipientInfo.type === 'friend' && finalRecipientInfo.avatar ? (
+                  <Avatar
+                    userId={contact?.id?.toString() || ''}
+                    userName={finalRecipientInfo.name}
+                    size={24}
+                    avatarUrl={finalRecipientInfo.avatar}
+                    style={{ width: 24, height: 24, borderRadius: 12 }}
+                  />
+                ) : finalRecipientInfo.type === 'split' ? (
+                  <PhosphorIcon name="Users" size={24} color={colors.white} weight="fill" />
+                ) : finalRecipientInfo.type === 'shared' ? (
+                  <PhosphorIcon name="Wallet" size={24} color={colors.white} weight="fill" />
                 ) : (
-                  <View style={styles.recipientWalletIcon}>
-                    <PhosphorIcon
-                      name={recipientInfo.type === 'split' ? 'Users' : 'Wallet'}
-                      size={24}
-                      color={colors.white}
-                      style={styles.recipientWalletIconImage}
-                    />
-                  </View>
+                  <PhosphorIcon name="CurrencyDollar" size={24} color={colors.white} weight="fill" />
                 )}
               </View>
-              <Text style={styles.recipientName}>
-                {recipientInfo.name}
-              </Text>
-              {recipientInfo.address && (
-                <Text style={styles.recipientEmail}>
-                  {recipientInfo.address.length > 20
-                    ? `${recipientInfo.address.substring(0, 10)}...${recipientInfo.address.slice(-8)}`
-                    : recipientInfo.address
-                  }
+              <View style={paymentScreenStyles.recipientInfo}>
+                <Text style={paymentScreenStyles.recipientOrder}>
+                  {getRecipientDisplayName()}
+                </Text>
+                {finalRecipientInfo.walletAddress && (
+                  <Text style={paymentScreenStyles.recipientAddress}>
+                    {formatWalletAddress(finalRecipientInfo.walletAddress)}
                 </Text>
               )}
+              </View>
+            </View>
             </View>
           )}
 
-          {/* Amount Input */}
+        {/* Amount Input Area */}
           {config.showAmountInput && (
-            <View style={styles.amountCardMockup}>
-              <View style={styles.amountCardHeader}>
-                <Text style={styles.amountCardLabel}>Enter amount</Text>
-
-                <TransactionAmountInput
+          <View style={paymentScreenStyles.amountSection}>
+            <TextInput
+              ref={amountInputRef}
+              style={paymentScreenStyles.amountInput}
                   value={amount}
                   onChangeText={handleAmountChange}
+              onFocus={() => setIsAmountFocused(true)}
+              onBlur={() => setIsAmountFocused(false)}
+              keyboardType="decimal-pad"
+              returnKeyType="done"
                   placeholder="0"
+              placeholderTextColor={colors.white70}
+              selectTextOnFocus
                   editable={!isProcessing && context !== 'spend_split_payment'}
-                  autoFocus={true}
-                  maxLength={12}
-                  currency="USDC"
-                  showQuickAmounts={config.showQuickAmounts && effectiveBalance !== null && effectiveBalance !== undefined}
-                  onQuickAmountPress={handleChipPress}
-                  selectedQuickAmount={selectedChip}
-                  containerStyle={{ width: '100%' }}
-                  inputStyle={styles.amountCardInput}
-                  currencyStyle={styles.amountCardCurrency}
-                />
-              </View>
-
-              {/* Add Note Section */}
-              {config.showMemoInput && !isProcessing && (
-                <>
-                  {!showAddNote ? (
-                    <TouchableOpacity
-                      style={[styles.amountCardAddNoteRow, { justifyContent: 'center' }]}
-                      onPress={() => setShowAddNote(true)}
-                    >
-                      <PhosphorIcon name="message-circle" size={16} color={colors.white50} />
-                      <Text style={styles.amountCardAddNoteText}>Add note</Text>
+            />
+            <Text style={paymentScreenStyles.amountCurrency}>USDC</Text>
+            {config.showMemoInput && !showNote && (
+              <TouchableOpacity onPress={() => setShowNote(true)} style={paymentScreenStyles.addNoteButton}>
+                <Text style={paymentScreenStyles.addNoteText}>Add note</Text>
                     </TouchableOpacity>
-                  ) : (
-                    <View style={[styles.amountCardAddNoteRow, { justifyContent: 'center' }]}>
-                      <PhosphorIcon name="message-circle" size={16} color={colors.white50} />
+            )}
+            {config.showMemoInput && showNote && (
                       <TextInput
-                        style={[
-                          styles.amountCardAddNoteText,
-                          {
-                            color: 'white',
-                            marginLeft: 8,
-                            paddingVertical: 0,
-                            paddingHorizontal: 0,
-                            width: '80%',
-                            textAlign: 'center',
-                          },
-                        ]}
+                style={paymentScreenStyles.noteInput}
                         value={note}
                         onChangeText={setNote}
                         placeholder="Add note"
-                        placeholderTextColor={colors.white50}
-                        multiline={false}
-                        maxLength={100}
-                        returnKeyType="done"
-                        blurOnSubmit={true}
+                placeholderTextColor={colors.white70}
+                autoFocus
                       />
+            )}
                     </View>
                   )}
-                </>
-              )}
+
+        {/* Wallet Information */}
+        <View style={paymentScreenStyles.walletCard}>
+          <View style={paymentScreenStyles.walletIcon}>
+            <PhosphorIcon name="Wallet" size={24} color={colors.white} weight="fill" />
+          </View>
+          <View style={paymentScreenStyles.walletInfo}>
+            <Text style={paymentScreenStyles.walletName}>WeSplit Wallet</Text>
+            <Text style={paymentScreenStyles.walletBalance}>
+              Balance {effectiveBalance !== null && effectiveBalance !== undefined ? formatAmountWithComma(effectiveBalance) : '0,00'} USDC
+            </Text>
+          </View>
+          {config.allowExternalDestinations && (
+            <TouchableOpacity 
+              style={[
+                paymentScreenStyles.changeButton,
+                (isProcessing) && paymentScreenStyles.changeButtonDisabled,
+              ]}
+              onPress={() => {
+                // Handle wallet change
+              }}
+              disabled={isProcessing}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={[paymentScreenStyles.changeButtonText, (isProcessing) && paymentScreenStyles.changeButtonTextDisabled]}>Change</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Balance Error */}
+        {validationError && (
+          <View style={paymentScreenStyles.errorCard}>
+            <Text style={paymentScreenStyles.errorText}>{validationError}</Text>
+          </View>
+        )}
+
+        {/* Network Fee and Total */}
+        {config.showAmountInput && (
+          <View style={paymentScreenStyles.feeSection}>
+            <View style={paymentScreenStyles.feeRow}>
+              <Text style={paymentScreenStyles.feeLabel}>Network Fee (3%)</Text>
+              <Text style={paymentScreenStyles.feeAmount}>{formatAmountWithComma(networkFee)} USDC</Text>
+            </View>
+            <View style={paymentScreenStyles.feeRow}>
+              <Text style={paymentScreenStyles.feeLabel}>Total paid</Text>
+              <Text style={paymentScreenStyles.feeTotal}>{formatAmountWithComma(totalPaid)} USDC</Text>
+            </View>
             </View>
           )}
 
           {/* Processing Indicator for Auto-Transactions */}
           {context === 'spend_split_payment' && isProcessing && (
-            <View style={styles.processingContainer}>
+          <View style={paymentScreenStyles.processingContainer}>
               <ModernLoader size="small" text="Processing payment to merchant..." />
             </View>
           )}
 
-          {/* Validation Error */}
-          {validationError && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{validationError}</Text>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Apple Slider for Transaction Confirmation */}
+        {/* Send Button */}
         {config.showAmountInput && (
-          <View style={styles.appleSliderContainer}>
-            <AppleSlider
-              onSlideComplete={handleExecuteTransaction}
-              disabled={!canExecute}
-              loading={isProcessing}
-              text={isProcessing ? "Processing..." : "Slide to Confirm Transaction"}
-              gradientColors={[colors.green, colors.green]}
-            />
-          </View>
+          <TouchableOpacity
+            style={[
+              paymentScreenStyles.sendButton,
+              (!canExecute || isProcessing) && paymentScreenStyles.sendButtonDisabled,
+            ]}
+            onPress={handleExecuteTransaction}
+            disabled={!canExecute || isProcessing}
+          >
+            <Text style={paymentScreenStyles.sendButtonText}>
+              {isProcessing ? 'Processing...' : 'Send'}
+            </Text>
+          </TouchableOpacity>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </Container>
   );
 };
+
+const paymentScreenStyles = StyleSheet.create({
+  container: {
+    padding: spacing.md,
+    gap: spacing.lg,
+  },
+  sendToSection: {
+    gap: spacing.sm,
+  },
+  sendToLabel: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
+  },
+  recipientCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white10,
+    borderRadius: 12,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  recipientIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.blue + '30',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recipientInfo: {
+    flex: 1,
+  },
+  recipientOrder: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    marginBottom: spacing.xs / 2,
+  },
+  recipientAddress: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+    fontFamily: typography.fontFamily.mono,
+  },
+  amountSection: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  amountInput: {
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    textAlign: 'center',
+    minWidth: 100,
+    padding: 0,
+    margin: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
+  amountCurrency: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+  },
+  addNoteButton: {
+    marginTop: spacing.sm,
+  },
+  addNoteText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white,
+    textDecorationLine: 'underline',
+  },
+  noteInput: {
+    marginTop: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    color: colors.white,
+    textAlign: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.white30,
+    paddingBottom: spacing.xs,
+    minWidth: 100,
+  },
+  walletCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white10,
+    borderRadius: 12,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  walletIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: colors.green + '30',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  walletInfo: {
+    flex: 1,
+  },
+  walletName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
+    marginBottom: spacing.xs / 2,
+  },
+  walletBalance: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+  },
+  changeButton: {
+    backgroundColor: colors.white5,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  changeButtonDisabled: {
+    opacity: 0.5,
+  },
+  changeButtonText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white,
+    fontWeight: typography.fontWeight.medium,
+  },
+  changeButtonTextDisabled: {
+    color: colors.white70,
+  },
+  errorCard: {
+    backgroundColor: colors.red + '20',
+    borderRadius: 12,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.red + '40',
+  },
+  errorText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.red,
+  },
+  feeSection: {
+    gap: spacing.sm,
+  },
+  feeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  feeLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+  },
+  feeAmount: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white,
+    fontWeight: typography.fontWeight.medium,
+  },
+  feeTotal: {
+    fontSize: typography.fontSize.md,
+    color: colors.white,
+    fontWeight: typography.fontWeight.bold,
+  },
+  processingContainer: {
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  sendButton: {
+    width: '100%',
+    backgroundColor: colors.green,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+  },
+  sendButtonDisabled: {
+    backgroundColor: colors.white10,
+    opacity: 0.5,
+  },
+  sendButtonText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.black,
+  },
+});
 
 export default CentralizedTransactionScreen;

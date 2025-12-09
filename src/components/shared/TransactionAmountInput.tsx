@@ -83,7 +83,7 @@ export const TransactionAmountInput: React.FC<TransactionAmountInputProps> = ({
                   paddingVertical: 8,
                   borderRadius: 20,
                   borderWidth: 1,
-                  borderColor: colors.white20,
+                  borderColor: colors.white30,
                   backgroundColor: colors.cardBackground,
                 },
                 selectedQuickAmount === percentage && {

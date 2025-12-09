@@ -163,7 +163,22 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         // This ensures proper fee calculation and transaction type mapping
         const { consolidatedTransactionService } = await import('../../services/blockchain/transaction');
         
-        // ✅ CRITICAL: Add timeout wrapper (60 seconds max) - aligned with SendConfirmationScreen
+        // ✅ CRITICAL: Use production-aware timeout (120s for production mainnet, 90s otherwise)
+        // Detect production using same logic as centralized components
+        const buildProfile = process.env.EAS_BUILD_PROFILE;
+        const appEnv = process.env.APP_ENV;
+        const isProduction = buildProfile === 'production' || 
+                            appEnv === 'production' ||
+                            process.env.NODE_ENV === 'production' ||
+                            !__DEV__;
+        
+        const networkEnv = process.env.EXPO_PUBLIC_NETWORK || process.env.EXPO_PUBLIC_DEV_NETWORK || '';
+        const isMainnet = isProduction 
+          ? true  // Production always mainnet
+          : (networkEnv.toLowerCase() === 'mainnet');
+        
+        const timeoutMs = (isProduction && isMainnet) ? 120000 : 90000; // 120s for production mainnet, 90s otherwise
+        
         const transactionPromise = consolidatedTransactionService.sendUSDCTransaction({
           to: externalWalletAddress || walletAddress, // Send to external wallet
           amount: safeTotalWithdraw, // Send the amount after fees
@@ -175,7 +190,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         });
         
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Transaction timeout - please check transaction history')), 60000);
+          setTimeout(() => reject(new Error('Transaction timeout - please check transaction history')), timeoutMs);
         });
         
         try {
@@ -186,9 +201,12 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
             (timeoutError.message.includes('timeout') || timeoutError.message.includes('Transaction timeout'));
           
           if (isTimeout) {
-            logger.info('Timeout detected, verifying withdrawal transaction on-chain', {
+            // ✅ CRITICAL: Timeout error - transaction may have succeeded
+            const timeoutMessage = 'Transaction processing timed out. The transaction may have succeeded on the blockchain. Please check your transaction history before trying again.';
+            logger.warn('Timeout detected, verifying withdrawal transaction on-chain', {
               to: externalWalletAddress || walletAddress,
-              amount: safeTotalWithdraw
+              amount: safeTotalWithdraw,
+              note: 'Transaction may have succeeded despite timeout'
             }, 'WithdrawConfirmationScreen');
             
             try {

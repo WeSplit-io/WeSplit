@@ -34,7 +34,7 @@ export const useTransactionModal = (): UseTransactionModalResult => {
       customRecipientInfo: {
         name: 'Shared Wallet',
         address: walletId,
-        type: 'shared_wallet'
+        type: 'shared'
       },
       onSuccess: async (result) => {
         logger.info('Shared wallet funding successful - starting UI refresh', {
@@ -84,8 +84,8 @@ export const useTransactionModal = (): UseTransactionModalResult => {
       })(),
       customRecipientInfo: {
         name: 'Your Personal Wallet',
-        address: userWalletAddress || 'Your Wallet',
-        type: 'personal'
+        address: userWalletAddress || '',
+        type: 'wallet'
       },
       onSuccess: async (result) => {
         logger.info('Shared wallet withdrawal successful', { result });

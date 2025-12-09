@@ -1,6 +1,10 @@
 /**
  * SendConfirmation - Réutilisable Send Confirmation Modal Component
  * Modal de confirmation avant l'envoi avec slide to pay
+ * 
+ * ⚠️ DEPRECATED: This component is deprecated in favor of CentralizedTransactionModal with confirmation flow
+ * Still in use in: SpendSplitScreen.tsx
+ * Migration: Should be replaced with CentralizedTransactionModal for consistency
  */
 
 import React from 'react';

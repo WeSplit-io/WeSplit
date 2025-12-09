@@ -45,21 +45,36 @@ class TransactionSigningService {
       }
 
       // Create connection - use network from environment, match Firebase Functions logic
-      // Primary: SOLANA_NETWORK (matches client EXPO_PUBLIC_NETWORK)
-      // Secondary: EXPO_PUBLIC_NETWORK (matches client)
-      // Fallback: Legacy env vars for backward compatibility
-      let network = 'devnet'; // Default to devnet for safety
+      // ✅ CRITICAL: Production MUST use mainnet (obligatory), dev/emulator can use devnet
+      // ✅ MULTIPLE LAYERS OF PROTECTION: No exceptions for production
       
+      // ✅ LAYER 1: Detect environment with multiple indicators
+      const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
+      const nodeEnv = process.env.NODE_ENV;
+      const isProduction = !isEmulator && nodeEnv === 'production';
+      
+      // ✅ LAYER 2: Default based on environment: production = mainnet, emulator/dev = devnet
+      let network = isProduction ? 'mainnet' : 'devnet';
+      
+      // ✅ LAYER 3: Check explicit network setting (but production ALWAYS overrides devnet)
       if (process.env.SOLANA_NETWORK) {
         const solanaNetwork = (process.env.SOLANA_NETWORK || '').trim().toLowerCase();
-        if (solanaNetwork === 'mainnet' || solanaNetwork === 'mainnet-beta') {
-          network = 'mainnet';
-        } else if (solanaNetwork === 'devnet') {
-          network = 'devnet';
-        } else if (solanaNetwork === 'testnet') {
-          network = 'testnet';
+        
+        // ✅ CRITICAL: Production builds CANNOT use devnet (security violation)
+        if (isProduction && solanaNetwork === 'devnet') {
+          console.error('🚨 SECURITY CRITICAL: Production environment detected but SOLANA_NETWORK=devnet!');
+          console.error('🚨 This is a security violation. FORCING mainnet. Production builds MUST use mainnet.');
+          network = 'mainnet'; // ✅ FORCE mainnet - no exceptions
         } else {
-          network = solanaNetwork;
+          if (solanaNetwork === 'mainnet' || solanaNetwork === 'mainnet-beta') {
+            network = 'mainnet';
+          } else if (solanaNetwork === 'devnet') {
+            network = 'devnet';
+          } else if (solanaNetwork === 'testnet') {
+            network = 'testnet';
+          } else {
+            network = solanaNetwork;
+          }
         }
       } else if (process.env.EXPO_PUBLIC_NETWORK) {
         const expoNetwork = (process.env.EXPO_PUBLIC_NETWORK || '').trim().toLowerCase();
@@ -90,6 +105,25 @@ class TransactionSigningService {
         } else {
           network = frontendNetwork;
         }
+      }
+      
+      // ✅ LAYER 4: FINAL SAFETY CHECK - Prevent devnet in production (NO EXCEPTIONS)
+      // ✅ CRITICAL: Even if env vars try to set devnet, production MUST use mainnet
+      if (isProduction && network === 'devnet') {
+        console.error('🚨 SECURITY CRITICAL: Production environment detected but network is devnet!');
+        console.error('🚨 This is a security violation. FORCING mainnet. Production builds MUST use mainnet.');
+        console.error('🚨 Environment details:', {
+          FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
+          NODE_ENV: process.env.NODE_ENV,
+          SOLANA_NETWORK: process.env.SOLANA_NETWORK,
+          EXPO_PUBLIC_NETWORK: process.env.EXPO_PUBLIC_NETWORK,
+          isEmulator,
+          isProduction,
+          requestedNetwork: network,
+          overridden: 'mainnet',
+          note: 'Production builds CANNOT use devnet - this is a security requirement'
+        });
+        network = 'mainnet'; // ✅ FORCE mainnet - no exceptions, no overrides
       }
       
       let rpcUrl = process.env.HELIUS_RPC_URL;

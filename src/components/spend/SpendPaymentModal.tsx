@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     color: colors.white,
     textAlign: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: colors.white20,
+    borderBottomColor: colors.white30,
     paddingBottom: spacing.xs,
     minWidth: 100,
   },

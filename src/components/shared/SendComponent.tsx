@@ -1,6 +1,10 @@
 /**
  * SendComponent - Réutilisable Send Component
  * Composant réutilisable pour l'écran d'envoi avec clavier numérique
+ * 
+ * ⚠️ DEPRECATED: This component is deprecated in favor of CentralizedTransactionModal/CentralizedTransactionScreen
+ * Still in use in: SpendSplitScreen.tsx
+ * Migration: Should be replaced with CentralizedTransactionModal for consistency
  */
 
 import React, { useState } from 'react';

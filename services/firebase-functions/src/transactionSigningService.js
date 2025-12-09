@@ -250,14 +250,20 @@ class TransactionSigningService {
       }
 
       // Create connection - use network from environment
-      // CRITICAL: Production must use mainnet, emulator can use devnet
-      // Priority: SOLANA_NETWORK > environment detection > EXPO_PUBLIC_FORCE_MAINNET > FORCE_MAINNET > EXPO_PUBLIC_DEV_NETWORK > DEV_NETWORK > default based on environment
+      // ✅ CRITICAL: Production MUST use mainnet (obligatory), emulator can use devnet
+      // ✅ MULTIPLE LAYERS OF PROTECTION: No exceptions for production
       
-      // Detect environment: emulator = dev, production = mainnet
+      // ✅ LAYER 1: Detect environment with multiple indicators
       const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true';
-      const isProduction = !isEmulator && (process.env.NODE_ENV === 'production' || process.env.GCLOUD_PROJECT?.includes('prod'));
+      const nodeEnv = process.env.NODE_ENV;
+      const gcloudProject = process.env.GCLOUD_PROJECT;
+      const isProduction = !isEmulator && (
+        nodeEnv === 'production' || 
+        gcloudProject?.includes('prod') ||
+        gcloudProject?.includes('production')
+      );
       
-      // Default based on environment: production = mainnet, emulator/dev = devnet
+      // ✅ LAYER 2: Default based on environment: production = mainnet, emulator/dev = devnet
       let actualNetwork = isProduction ? 'mainnet' : 'devnet';
       
       // Debug: Log all relevant environment variables
@@ -276,11 +282,21 @@ class TransactionSigningService {
         defaultNetwork: actualNetwork
       });
       
-      // Check explicit network setting (highest priority)
+      // ✅ LAYER 3: Check explicit network setting (but production ALWAYS overrides devnet)
       // Trim whitespace/newlines from environment variables to handle Firebase Secrets formatting
       if (process.env.SOLANA_NETWORK) {
-        actualNetwork = (process.env.SOLANA_NETWORK || '').trim().toLowerCase();
-        console.log('Using SOLANA_NETWORK:', actualNetwork);
+        const requestedNetwork = (process.env.SOLANA_NETWORK || '').trim().toLowerCase();
+        
+        // ✅ CRITICAL: Production builds CANNOT use devnet (security violation)
+        if (isProduction && requestedNetwork === 'devnet') {
+          console.error('🚨 SECURITY CRITICAL: Production environment detected but SOLANA_NETWORK=devnet!');
+          console.error('🚨 This is a security violation. FORCING mainnet. Production builds MUST use mainnet.');
+          console.error('🚨 If you need to test mainnet locally, use the emulator with devnet instead.');
+          actualNetwork = 'mainnet'; // ✅ FORCE mainnet - no exceptions
+        } else {
+          actualNetwork = requestedNetwork;
+          console.log('Using SOLANA_NETWORK:', actualNetwork);
+        }
       } else if (process.env.NETWORK) {
         actualNetwork = (process.env.NETWORK || '').trim().toLowerCase();
         console.log('Using NETWORK:', actualNetwork);
@@ -358,11 +374,23 @@ class TransactionSigningService {
         }
       }
       
-      // SAFETY CHECK: Prevent devnet in production (unless explicitly overridden)
-      if (isProduction && actualNetwork === 'devnet' && !process.env.SOLANA_NETWORK) {
-        console.error('⚠️  WARNING: Production environment detected but network is devnet!');
-        console.error('⚠️  This is unsafe. Setting to mainnet. Set SOLANA_NETWORK=mainnet explicitly to suppress this warning.');
-        actualNetwork = 'mainnet';
+      // ✅ LAYER 4: FINAL SAFETY CHECK - Prevent devnet in production (NO EXCEPTIONS)
+      // ✅ CRITICAL: Even if SOLANA_NETWORK=devnet is set, production MUST use mainnet
+      if (isProduction && actualNetwork === 'devnet') {
+        console.error('🚨 SECURITY CRITICAL: Production environment detected but network is devnet!');
+        console.error('🚨 This is a security violation. FORCING mainnet. Production builds MUST use mainnet.');
+        console.error('🚨 Environment details:', {
+          FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
+          NODE_ENV: process.env.NODE_ENV,
+          GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
+          SOLANA_NETWORK: process.env.SOLANA_NETWORK,
+          isEmulator,
+          isProduction,
+          requestedNetwork: actualNetwork,
+          overridden: 'mainnet',
+          note: 'Production builds CANNOT use devnet - this is a security requirement'
+        });
+        actualNetwork = 'mainnet'; // ✅ FORCE mainnet - no exceptions, no overrides
       }
       
       // Validate network value

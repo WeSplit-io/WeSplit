@@ -37,7 +37,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      buildNumber: "33",
+      buildNumber: "40",
       deploymentTarget: "15.1",
       googleServicesFile: "./GoogleService-Info.plist", // Uncomment when file is added
       infoPlist: {
@@ -68,7 +68,7 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      versionCode: 11233,
+      versionCode: 11240,
       googleServicesFile: "./google-services.json", // Uncomment when file is added
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
@@ -196,12 +196,46 @@ module.exports = {
       EXPO_PUBLIC_TWITTER_CLIENT_ID: getEnvVar('EXPO_PUBLIC_TWITTER_CLIENT_ID'),
       
       // Solana Configuration
-      // Primary network selection (recommended)
-      EXPO_PUBLIC_NETWORK: getEnvVar('EXPO_PUBLIC_NETWORK'),
-      // Legacy network configuration (backward compatibility)
+      // ✅ CRITICAL: Production builds MUST use mainnet (obligatory)
+      // ✅ CRITICAL: Dev builds MUST use devnet (obligatory)
+      // Multiple layers of protection prevent accidental network misconfiguration
+      ...(() => {
+        // ✅ LAYER 1: Detect production build using multiple indicators
+        const buildProfile = process.env.EAS_BUILD_PROFILE;
+        const appEnv = process.env.APP_ENV;
+        const nodeEnv = process.env.NODE_ENV;
+        const isProduction = buildProfile === 'production' || 
+                            appEnv === 'production' ||
+                            nodeEnv === 'production';
+        
+        // ✅ LAYER 2: Production ALWAYS uses mainnet (no exceptions, no env var override)
+        if (isProduction) {
+          // Log warning if someone tries to override with devnet
+          const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK');
+          if (networkEnv && networkEnv.toLowerCase() === 'devnet') {
+            console.warn('⚠️ SECURITY WARNING: Production build attempted to use devnet. FORCING mainnet.');
+          }
+          
+          return {
+            EXPO_PUBLIC_NETWORK: 'mainnet',  // ✅ FORCED: Production always mainnet
+            EXPO_PUBLIC_FORCE_MAINNET: 'true',  // ✅ FORCED: Always true in production
+            EXPO_PUBLIC_DEV_NETWORK: 'mainnet',  // ✅ FORCED: Even dev network is mainnet in production
+          };
+        }
+        
+        // ✅ LAYER 3: Development builds use devnet by default
+        // Allow env var override for dev builds only (for testing mainnet locally)
+        const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK');
+        const finalNetwork = networkEnv || 'devnet';  // Dev defaults to devnet
+        
+        return {
+          EXPO_PUBLIC_NETWORK: finalNetwork,
+          // Legacy network configuration (backward compatibility)
+          EXPO_PUBLIC_FORCE_MAINNET: getEnvVar('EXPO_PUBLIC_FORCE_MAINNET', 'false'),
+          EXPO_PUBLIC_DEV_NETWORK: getEnvVar('EXPO_PUBLIC_DEV_NETWORK', 'devnet'),
+        };
+      })(),
       EXPO_PUBLIC_HELIUS_API_KEY: getEnvVar('EXPO_PUBLIC_HELIUS_API_KEY'),
-      EXPO_PUBLIC_FORCE_MAINNET: getEnvVar('EXPO_PUBLIC_FORCE_MAINNET', 'false'),
-      EXPO_PUBLIC_DEV_NETWORK: getEnvVar('EXPO_PUBLIC_DEV_NETWORK', 'devnet'),
       
       // Company Fee Structure
       EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE: getEnvVar('EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE'),

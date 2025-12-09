@@ -149,8 +149,23 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
                   groupId: undefined
                 });
                 
+                // ✅ CRITICAL: Use production-aware timeout (120s for production mainnet, 90s otherwise)
+                const buildProfile = process.env.EAS_BUILD_PROFILE;
+                const appEnv = process.env.APP_ENV;
+                const isProduction = buildProfile === 'production' || 
+                                    appEnv === 'production' ||
+                                    process.env.NODE_ENV === 'production' ||
+                                    !__DEV__;
+                
+                const networkEnv = process.env.EXPO_PUBLIC_NETWORK || process.env.EXPO_PUBLIC_DEV_NETWORK || '';
+                const isMainnet = isProduction 
+                  ? true  // Production always mainnet
+                  : (networkEnv.toLowerCase() === 'mainnet');
+                
+                const timeoutMs = (isProduction && isMainnet) ? 120000 : 90000; // 120s for production mainnet, 90s otherwise
+                
                 const timeoutPromise = new Promise((_, reject) => {
-                  setTimeout(() => reject(new Error('Transaction timeout - please check transaction history')), 60000);
+                  setTimeout(() => reject(new Error('Transaction timeout - please check transaction history')), timeoutMs);
                 });
                 
                 let transactionResult;

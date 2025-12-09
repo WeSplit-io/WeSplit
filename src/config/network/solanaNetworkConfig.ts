@@ -83,21 +83,28 @@ function getEnvVar(key: string): string | undefined {
 
 /**
  * Determine if this is a production build
+ * ✅ CRITICAL: Multiple checks to ensure accurate production detection
  */
 function isProductionBuild(): boolean {
-  // Check EAS build profile
+  // ✅ LAYER 1: Check EAS build profile (most reliable)
   const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
-  if (buildProfile === 'production') {
+  if (buildProfile === 'production' || buildProfile === 'testflight' || buildProfile === 'mass-distribution') {
     return true;
   }
   
-  // Check APP_ENV
+  // ✅ LAYER 2: Check APP_ENV
   const appEnv = getEnvVar('APP_ENV');
   if (appEnv === 'production') {
     return true;
   }
   
-  // Check if __DEV__ is false (production bundle)
+  // ✅ LAYER 3: Check NODE_ENV
+  const nodeEnv = getEnvVar('NODE_ENV');
+  if (nodeEnv === 'production') {
+    return true;
+  }
+  
+  // ✅ LAYER 4: Check if __DEV__ is false (production bundle)
   return !__DEV__;
 }
 
@@ -162,27 +169,67 @@ function getNetworkFromEnv(): SolanaNetwork | null {
 
 /**
  * Get network with production-safe defaults
+ * 
+ * CRITICAL: Production builds ALWAYS use mainnet (obligatory)
+ * Dev builds use devnet by default
  */
 async function determineNetwork(): Promise<SolanaNetwork> {
   const isProduction = isProductionBuild();
   
-  // 1. Check environment variable
-  const envNetwork = getNetworkFromEnv();
-  if (envNetwork) {
-    // Validate production builds don't use devnet
-    if (isProduction && envNetwork === 'devnet') {
-      logger.warn(
-        'Production build attempted to use devnet. Defaulting to mainnet.',
-        { envNetwork },
+  // ✅ CRITICAL: Production builds MUST use mainnet (obligatory)
+  // ✅ MULTIPLE LAYERS OF PROTECTION: No exceptions, no overrides
+  if (isProduction) {
+    // ✅ LAYER 1: Check if environment variable tries to set devnet (SECURITY RISK)
+    const envNetwork = getNetworkFromEnv();
+    if (envNetwork === 'devnet') {
+      logger.error(
+        '🚨 SECURITY CRITICAL: Production build attempted to use devnet. FORCING mainnet.',
+        { 
+          envNetwork, 
+          overridden: 'mainnet',
+          buildProfile: getEnvVar('EAS_BUILD_PROFILE'),
+          appEnv: getEnvVar('APP_ENV'),
+          nodeEnv: getEnvVar('NODE_ENV'),
+          note: 'This is a security violation. Production builds MUST use mainnet.'
+        },
         'solanaNetworkConfig'
       );
+      // ✅ FORCE mainnet - no exceptions
       return 'mainnet';
+    }
+    
+    // ✅ LAYER 2: If env var sets mainnet, use it (but we'd use mainnet anyway)
+    if (envNetwork === 'mainnet' || envNetwork === 'mainnet-beta') {
+      logger.info('Production build using mainnet (from env)', null, 'solanaNetworkConfig');
+      return 'mainnet';
+    }
+    
+    // ✅ LAYER 3: Production ALWAYS defaults to mainnet regardless of any env vars
+    // This is the final safety net - even if all checks fail, production = mainnet
+    logger.info('Production build defaulting to mainnet (obligatory)', {
+      buildProfile: getEnvVar('EAS_BUILD_PROFILE'),
+      appEnv: getEnvVar('APP_ENV'),
+      nodeEnv: getEnvVar('NODE_ENV'),
+      note: 'Production builds ALWAYS use mainnet - no exceptions'
+    }, 'solanaNetworkConfig');
+    return 'mainnet';
+  }
+  
+  // ✅ Development builds: Check environment variable first
+  // ✅ NOTE: Dev builds can use mainnet for testing, but devnet is the default
+  const envNetwork = getNetworkFromEnv();
+  if (envNetwork) {
+    // ✅ SAFETY CHECK: Even in dev builds, log if someone tries to use devnet in production-like environment
+    if (envNetwork === 'devnet') {
+      logger.info(`Development build using devnet (from env)`, null, 'solanaNetworkConfig');
+    } else {
+      logger.info(`Development build using network from env: ${envNetwork}`, null, 'solanaNetworkConfig');
     }
     return envNetwork;
   }
   
-  // 2. Check runtime override (dev only)
-  if (!isProduction && __DEV__) {
+  // Check runtime override (dev only)
+  if (__DEV__) {
     try {
       const override = await AsyncStorage.getItem('NETWORK_OVERRIDE');
       if (override && ['devnet', 'mainnet', 'testnet'].includes(override)) {
@@ -194,12 +241,7 @@ async function determineNetwork(): Promise<SolanaNetwork> {
     }
   }
   
-  // 3. Default based on build type
-  if (isProduction) {
-    logger.info('Production build defaulting to mainnet', null, 'solanaNetworkConfig');
-    return 'mainnet';
-  }
-  
+  // Development defaults to devnet
   logger.info('Development build defaulting to devnet', null, 'solanaNetworkConfig');
   return 'devnet';
 }

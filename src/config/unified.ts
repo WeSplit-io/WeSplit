@@ -155,28 +155,52 @@ export function getUnifiedConfig(): UnifiedConfig {
     // Try to get cached config (if already initialized)
     networkConfig = getNetworkConfigSync();
     network = networkConfig.network;
-  } catch {
-    // Fallback to legacy logic if network config not initialized yet
-    // This ensures backward compatibility during module load
-    const devNetwork = getEnvVar('DEV_NETWORK');
-    const forceMainnet = getEnvVar('FORCE_MAINNET') === 'true' || getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
-    
-    if (forceMainnet) {
-      network = 'mainnet';
-    } else if (devNetwork) {
-      // Normalize the network value
-      const normalized = devNetwork.toLowerCase().trim();
-      if (normalized === 'mainnet' || normalized === 'mainnet-beta') {
+    } catch {
+      // Fallback to legacy logic if network config not initialized yet
+      // This ensures backward compatibility during module load
+      // ✅ CRITICAL: Even in fallback, production MUST use mainnet
+      const devNetwork = getEnvVar('DEV_NETWORK');
+      const forceMainnet = getEnvVar('FORCE_MAINNET') === 'true' || getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') === 'true';
+      
+      if (forceMainnet) {
         network = 'mainnet';
-      } else if (normalized === 'testnet') {
-        network = 'testnet';
-      } else {
-        network = 'devnet';
+      } else if (devNetwork) {
+        // Normalize the network value
+        const normalized = devNetwork.toLowerCase().trim();
+        
+        // ✅ CRITICAL: Production builds CANNOT use devnet (security violation)
+        if (isProduction && normalized === 'devnet') {
+          logger.error('🚨 SECURITY CRITICAL: Production build attempted to use devnet in fallback. FORCING mainnet.', {
+            devNetwork: normalized,
+            overridden: 'mainnet',
+            note: 'This is a security violation. Production builds MUST use mainnet.'
+          }, 'UnifiedConfig');
+          network = 'mainnet'; // ✅ FORCE mainnet - no exceptions
+        } else if (normalized === 'mainnet' || normalized === 'mainnet-beta') {
+          network = 'mainnet';
+        } else if (normalized === 'testnet') {
+          network = 'testnet';
+        } else {
+          network = 'devnet';
+        }
+      } else if (isProduction) {
+        // ✅ CRITICAL: Production ALWAYS defaults to mainnet (no exceptions)
+        // This is a fallback safety net - should never be reached if solanaNetworkConfig is working
+        logger.warn('Using fallback production detection - forcing mainnet', {
+          note: 'This should not happen if solanaNetworkConfig is properly initialized'
+        }, 'UnifiedConfig');
+        network = 'mainnet';
       }
-    } else if (isProduction) {
-      // Production defaults to mainnet
-      network = 'mainnet';
-    }
+      
+      // ✅ FINAL SAFETY CHECK: Even in fallback, production cannot use devnet
+      if (isProduction && network === 'devnet') {
+        logger.error('🚨 SECURITY CRITICAL: Production build fallback attempted to use devnet. FORCING mainnet.', {
+          requestedNetwork: network,
+          overridden: 'mainnet',
+          note: 'Production builds CANNOT use devnet - this is a security requirement'
+        }, 'UnifiedConfig');
+        network = 'mainnet'; // ✅ FORCE mainnet - no exceptions
+      }
     
     // Build network config from legacy logic (temporary fallback)
     // This will be replaced once solanaNetworkConfig is initialized
