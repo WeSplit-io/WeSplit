@@ -41,7 +41,6 @@ const getScreenConfig = (context: TransactionContext): TransactionScreenConfig =
     case 'send_1to1':
       return {
         title: 'Send',
-        subtitle: 'Send USDC to friends or external wallets',
         showRecipientSelection: true,
         showAmountInput: true,
         showMemoInput: true,
@@ -679,6 +678,7 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
         : '0,00',
       icon: 'Wallet',
       iconColor: colors.green,
+      imageUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-new.png?alt=media&token=f42ea1b1-5f23-419e-a499-931862819cbf',
     };
   }, [effectiveBalance]);
 
@@ -719,7 +719,7 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
           <SendComponent
             recipient={sendComponentRecipientInfo}
             onRecipientChange={config.allowExternalDestinations ? () => navigation.goBack() : undefined}
-            showRecipientChange={config.allowExternalDestinations}
+            showRecipientChange={false}
             amount={amount}
             onAmountChange={handleAmountChange}
             currency="USDC"
@@ -728,7 +728,10 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
             showAddNote={config.showMemoInput}
             wallet={walletInfo}
             onWalletChange={config.allowExternalDestinations ? () => navigation.goBack() : undefined}
-            showWalletChange={config.allowExternalDestinations}
+            showWalletChange={false}
+            networkFee={networkFee}
+            totalPaid={totalPaid}
+            showNetworkFee={true}
             onSendPress={handleExecuteTransaction}
             sendButtonDisabled={!canExecute || isProcessing}
             sendButtonLoading={isProcessing}
@@ -736,20 +739,6 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
             containerStyle={paymentScreenStyles.sendComponentContainer}
           />
         )}
-
-        {/* Network Fee and Total - After SendComponent, matching SpendPaymentModal order */}
-        {config.showAmountInput && (
-          <View style={paymentScreenStyles.feeSection}>
-            <View style={paymentScreenStyles.feeRow}>
-              <Text style={paymentScreenStyles.feeLabel}>Network Fee (3%)</Text>
-              <Text style={paymentScreenStyles.feeAmount}>{formatAmountWithComma(networkFee)} USDC</Text>
-            </View>
-            <View style={paymentScreenStyles.feeRow}>
-              <Text style={paymentScreenStyles.feeLabel}>Total paid</Text>
-              <Text style={paymentScreenStyles.feeTotal}>{formatAmountWithComma(totalPaid)} USDC</Text>
-            </View>
-            </View>
-          )}
       </ScrollView>
     </Container>
   );
@@ -761,7 +750,6 @@ const paymentScreenStyles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: spacing.md,
     gap: spacing.lg,
     paddingBottom: spacing.xl,
   },

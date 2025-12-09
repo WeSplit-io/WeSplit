@@ -296,25 +296,30 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const timeString = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    // Replace colon with dot for format like "11.30 AM"
+    return timeString.replace(':', '.');
   };
 
   const renderInteraction = (interaction: UserInteraction) => {
     let iconName: any = 'Circle';
-    let iconColor = colors.white70;
+    let title = interaction.title;
+    let showNote = false;
 
     switch (interaction.type) {
       case 'transaction':
-        iconName = interaction.metadata?.isSent ? 'PaperPlaneTilt' : 'ArrowLineDown';
-        iconColor = interaction.metadata?.isSent ? colors.green : colors.white70;
+        // For transactions, use CurrencyDollar for sent, Wallet for received
+        iconName = interaction.metadata?.isSent ? 'CurrencyDollar' : 'Wallet';
+        title = interaction.metadata?.isSent ? 'Request Send' : 'Receive';
+        showNote = true;
         break;
       case 'split':
         iconName = 'Users';
-        iconColor = colors.green;
+        showNote = false;
         break;
       case 'shared_wallet':
         iconName = 'Wallet';
-        iconColor = colors.green;
+        showNote = false;
         break;
     }
 
@@ -322,35 +327,28 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
       <View key={interaction.id} style={styles.interactionCard}>
         <View style={styles.interactionHeader}>
           <View style={styles.interactionIconContainer}>
-            <PhosphorIcon name={iconName} size={20} color={iconColor} />
+            <PhosphorIcon name={iconName} size={24} color={colors.white} />
           </View>
           <View style={styles.interactionInfo}>
-            <Text style={styles.interactionTitle}>{interaction.title}</Text>
-            {interaction.description && (
-              <Text style={styles.interactionDescription}>{interaction.description}</Text>
+            <Text style={styles.interactionTitle}>{title}</Text>
+            {showNote && interaction.description && (
+              <Text style={styles.interactionDescription}>
+                Note : {interaction.description}
+              </Text>
             )}
           </View>
           {interaction.amount !== undefined && (
-            <Text style={styles.interactionAmount}>
-              {interaction.metadata?.isSent ? '-' : '+'}${interaction.amount.toFixed(2)}
-            </Text>
-          )}
-        </View>
-        <View style={styles.interactionFooter}>
-          {interaction.status && (
-            <View style={[
-              styles.statusBadge,
-              interaction.status === 'Paid' || interaction.status === 'completed' 
-                ? styles.statusBadgePaid 
-                : null
-            ]}>
-              <Text style={styles.statusBadgeText}>{interaction.status}</Text>
-            </View>
-          )}
-          <Text style={styles.interactionTime}>
+            <View style={styles.interactionAmountContainer}>
+              <Text style={styles.interactionAmount}>
+                ${interaction.amount.toFixed(2)}
+              </Text>
+              <Text style={styles.interactionTime}>
             {formatTime(interaction.createdAt)}
           </Text>
+            </View>
+          )}
         </View>
+        
       </View>
     );
   };
@@ -507,7 +505,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
             <Text style={styles.sectionTitle}>Activity</Text>
             {loadingInteractions ? (
               <View style={styles.loadingInteractions}>
-                <ActivityIndicator size="small" color={colors.green} />
+                <ActivityIndicator size="small" color={colors.white} />
               </View>
             ) : interactions.length > 0 ? (
               <View style={styles.interactionsList}>
@@ -551,7 +549,7 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: 'center',
-    paddingTop: spacing.xs,
+    paddingTop: spacing.xl,
     paddingBottom: spacing.xl,
   },
   avatarContainer: {
@@ -667,31 +665,31 @@ const styles = StyleSheet.create({
   },
   interactionCard: {
     backgroundColor: colors.white5,
-    borderRadius: 12,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white10,
+    borderRadius: spacing.md,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   interactionHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   interactionIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.white10,
+    backgroundColor: 'rgba(76, 175, 80, 0.2)', // Dark green background
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
   },
   interactionInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   interactionTitle: {
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
     marginBottom: spacing.xs / 2,
   },
@@ -699,15 +697,24 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.white70,
   },
+  interactionAmountContainer: {
+    alignSelf: 'flex-end',
+    marginTop: 0,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.xs,
+  },
   interactionAmount: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
     color: colors.white,
   },
   interactionFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
+    marginTop: spacing.xs,
   },
   statusBadge: {
     backgroundColor: colors.white10,

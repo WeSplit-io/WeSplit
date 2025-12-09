@@ -103,7 +103,7 @@ export const ASSET_DEFINITIONS: Record<string, AssetInfo> = {
       base: 1.5,
       gt60: 1.6,
       gt80: 1.7,
-      gt100: 1.8,
+      gt100: 1.6,
       gt150: 1.9,
       gt200: 2.0,
     },

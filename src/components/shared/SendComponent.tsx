@@ -7,7 +7,7 @@
  * Migration: Should be replaced with CentralizedTransactionModal for consistency
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
   StyleSheet,
   Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from './Button';
 import PhosphorIcon, { PhosphorIconName } from './PhosphorIcon';
 import Avatar from './Avatar';
@@ -63,6 +64,11 @@ interface SendComponentProps {
   onWalletChange?: () => void;
   showWalletChange?: boolean;
 
+  // Network fee
+  networkFee?: number;
+  totalPaid?: number;
+  showNetworkFee?: boolean;
+
   // Send button
   onSendPress: () => void;
   sendButtonDisabled?: boolean;
@@ -77,7 +83,7 @@ interface SendComponentProps {
 const SendComponent: React.FC<SendComponentProps> = ({
   recipient,
   onRecipientChange,
-  showRecipientChange = true,
+  showRecipientChange = false,
   amount,
   onAmountChange,
   currency = 'USDC',
@@ -86,7 +92,10 @@ const SendComponent: React.FC<SendComponentProps> = ({
   showAddNote = true,
   wallet,
   onWalletChange,
-  showWalletChange = true,
+  showWalletChange = false,
+  networkFee,
+  totalPaid,
+  showNetworkFee = false,
   onSendPress,
   sendButtonDisabled = false,
   sendButtonLoading = false,
@@ -95,6 +104,17 @@ const SendComponent: React.FC<SendComponentProps> = ({
   containerStyle,
 }) => {
   const [showNoteInput, setShowNoteInput] = useState(!!note);
+  const amountInputRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
+
+  // Auto-focus amount input to open keyboard by default
+  useEffect(() => {
+    // Small delay to ensure component is fully mounted
+    const timer = setTimeout(() => {
+      amountInputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleAmountTextChange = (text: string) => {
     // Allow only numbers and comma/period
@@ -130,58 +150,6 @@ const SendComponent: React.FC<SendComponentProps> = ({
     onAmountChange(cleaned);
   };
 
-  const handleKeypadPress = (value: string) => {
-    if (value === 'backspace') {
-      // Backspace
-      const newAmount = amount.slice(0, -1) || '0';
-      onAmountChange(newAmount);
-    } else if (value === 'clear') {
-      // Clear all
-      onAmountChange('0');
-    } else if (value === ',') {
-      // Decimal separator (comma)
-      if (!amount.includes(',') && !amount.includes('.')) {
-        const newAmount = amount === '0' ? '0,' : amount + ',';
-        onAmountChange(newAmount);
-      } else if (amount.includes('.')) {
-        // Convert period to comma if present
-        onAmountChange(amount.replace('.', ','));
-      }
-    } else {
-      // Number - handle pre-filled amounts intelligently
-      let newAmount;
-
-      // If amount is '0' or empty, replace with the digit
-      if (amount === '0' || amount === '') {
-        newAmount = value;
-      }
-      // If amount ends with ',00' (formatted default amount like "33,00"), replace it
-      else if (amount.match(/^\d+,\d{2}$/)) {
-        // This is a formatted amount like "33,00" - replace with new digit
-        newAmount = value;
-      }
-      // Otherwise, append the digit
-      else {
-        newAmount = amount + value;
-      }
-
-      // Limit to 2 decimal places (handle both comma and period)
-      if (newAmount.includes(',') || newAmount.includes('.')) {
-        const separator = newAmount.includes(',') ? ',' : '.';
-        const parts = newAmount.split(separator);
-        if (parts[1] && parts[1].length > 2) {
-          newAmount = parts[0] + separator + parts[1].substring(0, 2);
-        }
-        // Normalize to comma
-        if (separator === '.') {
-          newAmount = newAmount.replace('.', ',');
-        }
-      }
-
-      onAmountChange(newAmount);
-    }
-  };
-
   const formatWalletAddress = (address: string) => {
     if (!address) return '';
     if (address.length <= 8) return address;
@@ -192,20 +160,13 @@ const SendComponent: React.FC<SendComponentProps> = ({
     return balance.toFixed(2).replace('.', ',');
   };
 
-  // Keypad layout
-  const keypadRows = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    [',', '0', 'backspace'],
-  ];
-
   const isAmountValid = amount.length > 0 && parseFloat(amount.replace(',', '.')) > 0;
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {/* Send to Section */}
-      <View style={styles.sendToSection}>
+      <View style={styles.contentWrapper}>
+        {/* Send to Section */}
+        <View style={styles.sendToSection}>
         <View style={styles.sendToHeader}>
           <Text style={styles.sendToLabel}>Send to</Text>
           {showRecipientChange && onRecipientChange && (
@@ -233,6 +194,8 @@ const SendComponent: React.FC<SendComponentProps> = ({
               size={48}
               avatarUrl={recipient.avatarUrl}
               style={styles.recipientAvatar}
+              showBorder={false}
+              showProfileBorder={false}
             />
           ) : recipient.icon ? (
             <View style={[styles.recipientIcon, { backgroundColor: (recipient.iconColor || colors.green) + '30' }]}>
@@ -267,6 +230,7 @@ const SendComponent: React.FC<SendComponentProps> = ({
       {/* Amount Input Section */}
       <View style={styles.amountSection}>
         <TextInput
+          ref={amountInputRef}
           style={styles.amountInput}
           value={amount}
           placeholder="0"
@@ -276,9 +240,10 @@ const SendComponent: React.FC<SendComponentProps> = ({
           maxLength={12}
           returnKeyType="done"
           blurOnSubmit={true}
-          editable={false}
-          showSoftInputOnFocus={false}
-          pointerEvents="none"
+          keyboardType="numeric"
+          editable={true}
+          onChangeText={handleAmountTextChange}
+          autoFocus={true}
         />
         <Text style={styles.amountCurrency}>{currency}</Text>
 
@@ -308,8 +273,7 @@ const SendComponent: React.FC<SendComponentProps> = ({
         )}
       </View>
 
-      <View style={styles.sendContainerBottom}>
-
+      <View style={styles.middleSection}>
         {/* Wallet Information */}
         <View style={styles.walletCard}>
           {wallet.imageUrl ? (
@@ -354,43 +318,28 @@ const SendComponent: React.FC<SendComponentProps> = ({
           )}
         </View>
 
-        {/* Numeric Keypad */}
-        <View style={styles.keypadContainer}>
-          {keypadRows.map((row, rowIndex) => (
-            <View key={rowIndex} style={styles.keypadRow}>
-              {row.map((key) => (
-                <TouchableOpacity
-                  key={key}
-                  style={styles.keypadButton}
-                  onPress={() => handleKeypadPress(key)}
-                  onLongPress={key === 'backspace' ? () => onAmountChange('0') : undefined}
-                  activeOpacity={0.6}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  {key === 'backspace' ? (
-                    <PhosphorIcon
-                      name="ArrowLeft"
-                      size={20}
-                      color={colors.white}
-                      weight="bold"
-                    />
-                  ) : key === 'clear' ? (
-                    <PhosphorIcon
-                      name="X"
-                      size={20}
-                      color={colors.white}
-                      weight="bold"
-                    />
-                  ) : (
-                    <Text style={styles.keypadButtonText}>{key}</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+        {/* Network Fee and Total - Between wallet and send button */}
+        {showNetworkFee && networkFee !== undefined && totalPaid !== undefined && (
+          <View style={styles.feeSection}>
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>Network Fee (3%)</Text>
+              <Text style={styles.feeAmount}>
+                {formatBalance(networkFee)} {currency}
+              </Text>
             </View>
-          ))}
-        </View>
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>Total paid</Text>
+              <Text style={styles.feeTotal}>
+                {formatBalance(totalPaid)} {currency}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+      </View>
 
-        {/* Send Button */}
+      {/* Send Button - Fixed at bottom */}
+      <View style={[styles.sendButtonContainer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
         <Button
           title={sendButtonTitle}
           onPress={onSendPress}
@@ -402,17 +351,20 @@ const SendComponent: React.FC<SendComponentProps> = ({
           gradientColors={sendButtonGradientColors}
         />
       </View>
-
-
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    position: 'relative',
+    minHeight: '100%',
     padding: spacing.sm,
-    justifyContent: 'space-between',
+    paddingBottom: 0,
+  },
+  contentWrapper: {
+    minHeight: '100%',
+    paddingBottom: 120, // Space for button + safe area
   },
   sendToSection: {
     gap: spacing.sm,
@@ -468,37 +420,38 @@ const styles = StyleSheet.create({
   },
   amountSection: {
     alignItems: 'center',
-    gap: spacing.xs / 2,
-    marginVertical: spacing.lg,
+    gap: spacing.sm,
+    marginVertical: spacing.xl,
+    justifyContent: 'center',
+    minHeight: 200,
   },
   amountInput: {
-    fontSize: typography.fontSize.xxl + typography.fontSize.xxl,
+    fontSize: (typography.fontSize.xxl + typography.fontSize.xxl) * 1.5,
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
     textAlign: 'center',
-    minWidth: 100,
-    padding: 0,
+    minWidth: 200,
+    padding: spacing.md,
     margin: 0,
+    minHeight: 80,
   },
   amountCurrency: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     color: colors.white70,
+    marginTop: spacing.xs,
   },
   addNoteButton: {
     marginTop: spacing.xs,
   },
   addNoteText: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     color: colors.white,
-    textDecorationLine: 'underline',
   },
   noteInput: {
     marginTop: spacing.xs,
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     color: colors.white,
     textAlign: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.white50,
     paddingBottom: spacing.xs / 2,
     minWidth: 100,
   },
@@ -547,35 +500,47 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: typography.fontWeight.medium,
   },
-  keypadContainer: {
-    gap: spacing.xs,
+  middleSection: {
+    gap: spacing.md,
+  },
+  sendButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.black,
+  },
+  sendButton: {
+    marginTop: 0,
+    width: '100%',
+  },
+  feeSection: {
     backgroundColor: colors.white5,
     borderRadius: spacing.radiusMd,
     padding: spacing.md,
+    gap: spacing.sm,
   },
-  keypadRow: {
+  feeRow: {
     flexDirection: 'row',
-    gap: spacing.xs,
     justifyContent: 'space-between',
-  },
-  keypadButton: {
-    flex: 1,
-    backgroundColor: colors.white10,
-    borderRadius: 100,
-    justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 50,
   },
-  keypadButtonText: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.semibold,
+  feeLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+  },
+  feeAmount: {
+    fontSize: typography.fontSize.sm,
     color: colors.white,
+    fontWeight: typography.fontWeight.medium,
   },
-  sendButton: {
-    marginTop: spacing.sm,
-  },
-  sendContainerBottom: {
-    gap: spacing.md,
+  feeTotal: {
+    fontSize: typography.fontSize.md,
+    color: colors.white,
+    fontWeight: typography.fontWeight.bold,
   },
 });
 

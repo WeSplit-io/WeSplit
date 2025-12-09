@@ -507,6 +507,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
         : '0,00',
       icon: 'Wallet',
       iconColor: colors.green,
+      imageUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-new.png?alt=media&token=f42ea1b1-5f23-419e-a499-931862819cbf',
     };
   }, [effectiveBalance]);
 
@@ -579,7 +580,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
           <SendComponent
             recipient={sendComponentRecipientInfo}
             onRecipientChange={config.allowExternalDestinations ? handleRecipientChange : undefined}
-            showRecipientChange={config.allowExternalDestinations}
+            showRecipientChange={false}
             amount={amount}
             onAmountChange={handleAmountChange}
             currency="USDC"
@@ -588,7 +589,10 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             showAddNote={config.showMemoInput}
             wallet={walletInfo}
             onWalletChange={config.allowExternalDestinations ? handleWalletChange : undefined}
-            showWalletChange={config.allowExternalDestinations}
+            showWalletChange={false}
+            networkFee={networkFee}
+            totalPaid={totalPaid}
+            showNetworkFee={true}
             onSendPress={handleExecuteTransaction}
             sendButtonDisabled={!canExecute || isProcessing}
             sendButtonLoading={isProcessing}
@@ -603,20 +607,6 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             <Text style={styles.errorText}>{validationError}</Text>
           </View>
         )}
-
-        {/* Network Fee and Total - After wallet info, matching SpendPaymentModal order */}
-        {config.showAmountInput && (
-          <View style={styles.feeSection}>
-            <View style={styles.feeRow}>
-              <Text style={styles.feeLabel}>Network Fee (3%)</Text>
-              <Text style={styles.feeAmount}>{formatAmountWithComma(networkFee)} USDC</Text>
-            </View>
-            <View style={styles.feeRow}>
-              <Text style={styles.feeLabel}>Total paid</Text>
-              <Text style={styles.feeTotal}>{formatAmountWithComma(totalPaid)} USDC</Text>
-            </View>
-            </View>
-          )}
       </ScrollView>
     </Modal>
   );
