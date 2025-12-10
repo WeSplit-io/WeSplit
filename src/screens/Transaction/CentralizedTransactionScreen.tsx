@@ -455,12 +455,14 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
 
       case 'spend_split_payment':
         if (!splitId || !splitWalletId) return null;
+        if (!finalRecipientInfo?.walletAddress) return null;
         return {
           ...baseParams,
           context: 'spend_split_payment',
           destinationType: 'merchant',
           splitId,
-          splitWalletId
+          splitWalletId,
+          merchantAddress: finalRecipientInfo.walletAddress  // ✅ CRITICAL: Pass merchant address
         } as any;
 
       case 'shared_wallet_funding':
@@ -587,7 +589,7 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
     if (context === 'spend_split_payment' && splitId && splitWalletId) {
       handleExecuteTransaction();
     }
-  }, [context, splitId, splitWalletId]);
+  }, [context, splitId, splitWalletId, handleExecuteTransaction]);
 
   // For pre-filled data from notifications
   useEffect(() => {

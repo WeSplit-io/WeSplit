@@ -114,6 +114,7 @@ export class SplitWalletSecurity {
 
   /**
    * Encrypt split wallet private key using AES-256-CBC
+   * CRITICAL: Private keys are typically base64 strings, so we preserve that format
    */
   private static encryptPrivateKey(
     splitWalletId: string,
@@ -123,8 +124,40 @@ export class SplitWalletSecurity {
     const iv = CryptoJS.lib.WordArray.random(IV_SIZE_BYTES);
     // Use v2 fast HMAC-based key derivation
     const derivedKey = this.deriveEncryptionKey(splitWalletId, salt, undefined, ENCRYPTION_VERSION);
+    
+    // CRITICAL: Detect if the key is already base64-encoded
+    // If it's a valid base64 string, parse it as base64, otherwise treat as UTF8
+    let keyWordArray: CryptoJS.lib.WordArray;
+    try {
+      // Check if it's a valid base64 string (base64 chars only, proper length)
+      const isBase64 = /^[A-Za-z0-9+/=]+$/.test(privateKey.trim()) && privateKey.trim().length % 4 === 0;
+      if (isBase64) {
+        // Try to parse as base64 first (most common format for Solana keys)
+        try {
+          keyWordArray = CryptoJS.enc.Base64.parse(privateKey.trim());
+          logger.debug('Encrypting private key as Base64', {
+            splitWalletId,
+            keyLength: privateKey.length
+          }, 'SplitWalletSecurity');
+        } catch {
+          // If base64 parse fails, fall back to UTF8
+          keyWordArray = CryptoJS.enc.Utf8.parse(privateKey.trim());
+        }
+      } else {
+        // Not base64, treat as UTF8 (for JSON array format like "[1,2,3,...]")
+        keyWordArray = CryptoJS.enc.Utf8.parse(privateKey.trim());
+      }
+    } catch (parseError) {
+      // Fallback to UTF8 if anything fails
+      logger.warn('Failed to parse private key, using UTF8', {
+        splitWalletId,
+        error: parseError instanceof Error ? parseError.message : String(parseError)
+      }, 'SplitWalletSecurity');
+      keyWordArray = CryptoJS.enc.Utf8.parse(privateKey.trim());
+    }
+    
     const encrypted = CryptoJS.AES.encrypt(
-      CryptoJS.enc.Utf8.parse(privateKey),
+      keyWordArray,
       derivedKey,
       {
         iv,
@@ -175,13 +208,50 @@ export class SplitWalletSecurity {
         padding: CryptoJS.pad.Pkcs7
       });
 
-      let privateKey = CryptoJS.enc.Utf8.stringify(decrypted);
+      // CRITICAL: Try to get the original format - private keys are typically base64 strings
+      // First try UTF8 (for text-based keys), then Base64 (for binary keys stored as base64)
+      let privateKey: string;
+      try {
+        // Try UTF8 first (for legacy keys that were stored as text)
+        privateKey = CryptoJS.enc.Utf8.stringify(decrypted);
+        // If UTF8 produces invalid characters or empty result, try Base64
+        if (!privateKey || privateKey.trim().length === 0 || /[\x00-\x08\x0B-\x0C\x0E-\x1F]/.test(privateKey)) {
+          // Try Base64 encoding instead (private keys are often stored as base64)
+          const base64Key = CryptoJS.enc.Base64.stringify(decrypted);
+          if (base64Key && base64Key.length > 0) {
+            privateKey = base64Key;
+            logger.debug('Using Base64 encoding for decrypted private key', {
+              splitWalletId,
+              keyLength: privateKey.length
+            }, 'SplitWalletSecurity');
+          }
+        }
+      } catch (utf8Error) {
+        // If UTF8 fails, try Base64
+        try {
+          privateKey = CryptoJS.enc.Base64.stringify(decrypted);
+          logger.debug('Fell back to Base64 encoding for decrypted private key', {
+            splitWalletId,
+            keyLength: privateKey.length
+          }, 'SplitWalletSecurity');
+        } catch (base64Error) {
+          logger.error('Failed to decode decrypted private key', {
+            splitWalletId,
+            utf8Error: utf8Error instanceof Error ? utf8Error.message : String(utf8Error),
+            base64Error: base64Error instanceof Error ? base64Error.message : String(base64Error)
+          }, 'SplitWalletSecurity');
+          return { success: false, error: 'Failed to decode decrypted private key' };
+        }
+      }
+
       if (!privateKey || privateKey.trim().length === 0) {
         return { success: false, error: 'Decrypted private key is empty - decryption may have failed' };
       }
 
       // Trim whitespace and any control characters that might have been added during encryption/decryption
       privateKey = privateKey.trim();
+      // Remove any null bytes or other control characters that might corrupt the key
+      privateKey = privateKey.replace(/\0/g, '').replace(/[\x00-\x1F\x7F-\x9F]/g, '');
       
       // Validate the decrypted key looks like a valid format (base64, JSON array, or hex)
       const isValidFormat = 

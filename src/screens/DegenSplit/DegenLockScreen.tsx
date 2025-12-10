@@ -253,22 +253,8 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     }
   }, [degenState.splitWallet, currentUser?.id, degenLogic]);
   
-  const insets = useSafeAreaInsets();
-  const isResultReady = degenState.splitWallet?.status === 'spinning_completed' || degenState.splitWallet?.status === 'completed';
-
-  // Show loader while split is initializing
-  if (degenState.isInitializing || (!splitData && !billData)) {
-    return (
-      <Container>
-        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ModernLoader size="large" text="Loading split..." />
-        </View>
-      </Container>
-    );
-  }
-
   // Memoize the bill date to prevent excessive FallbackDataService calls
+  // CRITICAL: This hook must be called BEFORE any early returns to comply with React's Rules of Hooks
   const billDate = useMemo(() => {
     try {
       return FallbackDataService.getBillDate();
@@ -280,6 +266,81 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       });
     }
   }, []);
+  
+  const insets = useSafeAreaInsets();
+  const isResultReady = degenState.splitWallet?.status === 'spinning_completed' || degenState.splitWallet?.status === 'completed';
+
+  // Initialize the degen split when component mounts
+  // CRITICAL FIX: Also reload wallet when participants change (e.g., after inviting users)
+  useEffect(() => {
+    const initialize = async () => {
+      // Set initializing state to show loader
+      degenState.setIsInitializing(true);
+      
+      try {
+        // Refresh participant data first
+        const refreshedParticipants = await degenInit.refreshParticipantData(participants);
+        setParticipants(refreshedParticipants);
+        
+        // Initialize the degen split
+        await degenInit.initializeDegenSplit(splitData, currentUser, refreshedParticipants, totalAmount);
+      } finally {
+        // Initialization will set isInitializing to false when done, but ensure it's cleared here too
+        degenState.setIsInitializing(false);
+      }
+    };
+
+    // OPTIMIZED: Real-time updates will handle wallet refreshes automatically
+    // Only initialize if we have the required data and haven't initialized yet
+    if (splitData && currentUser && participants && totalAmount && !degenState.splitWallet) {
+      initialize();
+    }
+    // Note: Real-time updates will automatically refresh wallet when participants change
+    // No need for manual reload - this prevents duplicate calls and conflicts
+  }, [splitData?.id, currentUser?.id, totalAmount, participants?.length]); // CRITICAL FIX: Add participants.length dependency
+
+  // Pre-fetch private key payload when wallet loads to speed up "View Private Key" action
+  useEffect(() => {
+    if (degenState.splitWallet?.id && currentUser?.id) {
+      const { SplitWalletService } = require('../../services/split');
+      // Pre-fetch in background - don't await, let it happen asynchronously
+      SplitWalletService.preFetchPrivateKeyPayload(degenState.splitWallet.id).catch(() => {
+        // Silently fail - pre-fetch is optional optimization
+      });
+    }
+  }, [degenState.splitWallet?.id, currentUser?.id]);
+
+  // Start periodic checks
+  useEffect(() => {
+    const cleanupLockCheck = degenInit.startPeriodicLockCheck(
+      degenState.splitWallet,
+      currentUser,
+      participants
+    );
+
+    const cleanupWalletCheck = degenInit.startPeriodicWalletCheck(
+      splitData,
+      currentUser
+    );
+
+    return () => {
+      cleanupLockCheck();
+      cleanupWalletCheck();
+    };
+  }, [degenState.splitWallet, degenState.isLocked, degenState.allParticipantsLocked]);
+
+  // Show loader while split is initializing
+  // CRITICAL: All hooks must be called before any early returns
+  if (degenState.isInitializing || (!splitData && !billData)) {
+    return (
+      <Container>
+        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ModernLoader size="large" text="Loading split..." />
+        </View>
+      </Container>
+    );
+  }
 
   // Get category image based on data
   const getCategoryImage = () => {
@@ -318,6 +379,17 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   };
 
   const handleSendMyShare = () => {
+    // Ensure split wallet exists before showing modal
+    if (!degenState.splitWallet) {
+      Alert.alert('Error', 'Split wallet not found. Please wait for the split to be created.');
+      return;
+    }
+
+    if (!degenState.splitWallet.walletAddress) {
+      Alert.alert('Error', 'Split wallet address not found. Please wait for the wallet to be initialized.');
+      return;
+    }
+
     // Show centralized transaction modal
     const modalConfig: TransactionModalConfig = {
       title: `Lock ${formatUsdcForDisplay(totalAmount)} USDC to split the Bill`,
@@ -329,9 +401,13 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       allowFriendDestinations: false,
       context: 'degen_split_lock',
       prefilledAmount: totalAmount,
+      // Pass split IDs in config for consistency (will also be passed as props)
+      splitWalletId: degenState.splitWallet.id,
+      splitId: splitData?.id,
+      billId: splitData?.billId,
       customRecipientInfo: {
         name: 'Degen Split Wallet',
-        address: degenState.splitWallet?.walletAddress || '',
+        address: degenState.splitWallet.walletAddress,
         type: 'split'
       },
       onSuccess: (result) => {
@@ -393,65 +469,6 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       degenLogic.handleCopyPrivateKey(degenState.privateKey);
     }
   };
-
-  // Initialize the degen split when component mounts
-  // CRITICAL FIX: Also reload wallet when participants change (e.g., after inviting users)
-  useEffect(() => {
-    const initialize = async () => {
-      // Set initializing state to show loader
-      degenState.setIsInitializing(true);
-      
-      try {
-        // Refresh participant data first
-        const refreshedParticipants = await degenInit.refreshParticipantData(participants);
-        setParticipants(refreshedParticipants);
-        
-        // Initialize the degen split
-        await degenInit.initializeDegenSplit(splitData, currentUser, refreshedParticipants, totalAmount);
-      } finally {
-        // Initialization will set isInitializing to false when done, but ensure it's cleared here too
-        degenState.setIsInitializing(false);
-      }
-    };
-
-    // OPTIMIZED: Real-time updates will handle wallet refreshes automatically
-    // Only initialize if we have the required data and haven't initialized yet
-    if (splitData && currentUser && participants && totalAmount && !degenState.splitWallet) {
-      initialize();
-    }
-    // Note: Real-time updates will automatically refresh wallet when participants change
-    // No need for manual reload - this prevents duplicate calls and conflicts
-  }, [splitData?.id, currentUser?.id, totalAmount, participants?.length]); // CRITICAL FIX: Add participants.length dependency
-
-  // Pre-fetch private key payload when wallet loads to speed up "View Private Key" action
-  useEffect(() => {
-    if (degenState.splitWallet?.id && currentUser?.id) {
-      const { SplitWalletService } = require('../../services/split');
-      // Pre-fetch in background - don't await, let it happen asynchronously
-      SplitWalletService.preFetchPrivateKeyPayload(degenState.splitWallet.id).catch(() => {
-        // Silently fail - pre-fetch is optional optimization
-      });
-    }
-  }, [degenState.splitWallet?.id, currentUser?.id]);
-
-  // Start periodic checks
-  useEffect(() => {
-    const cleanupLockCheck = degenInit.startPeriodicLockCheck(
-      degenState.splitWallet,
-      currentUser,
-      participants
-    );
-
-    const cleanupWalletCheck = degenInit.startPeriodicWalletCheck(
-      splitData,
-      currentUser
-    );
-
-    return () => {
-      cleanupLockCheck();
-      cleanupWalletCheck();
-    };
-  }, [degenState.splitWallet, degenState.isLocked, degenState.allParticipantsLocked]);
 
     // Calculate progress - check if participants have locked their funds
     // CRITICAL FIX: Only count participants who have actually sent their share
@@ -624,9 +641,9 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           // Not locked yet - show "Send My Share" button
           <Button
             title={degenState.isLocking ? 'Sending Share...' : degenState.isLoadingWallet ? 'Loading...' : 'Send My Share'}
-            onPress={() => degenState.setShowLockModal(true)}
+            onPress={handleSendMyShare}
             variant="primary"
-            disabled={degenState.isLocking || degenState.isLoadingWallet}
+            disabled={degenState.isLocking || degenState.isLoadingWallet || !degenState.splitWallet}
             loading={degenState.isLocking || degenState.isLoadingWallet}
           />
         ) : degenLogic.isCurrentUserCreator(currentUser, splitData) ? (
@@ -728,6 +745,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           splitWalletId={degenState.splitWallet?.id}
           splitId={splitData?.id}
           billId={splitData?.billId}
+          currentUser={currentUser}
         />
       )}
 

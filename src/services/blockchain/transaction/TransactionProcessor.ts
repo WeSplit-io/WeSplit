@@ -116,11 +116,23 @@ export class TransactionProcessor {
         logger.debug('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'TransactionProcessor');
       } catch (error) {
         // Token account doesn't exist, create it
+        // This is expected behavior for new recipients - not an error
         // Use fee payer (company wallet) as the payer for token account creation
-        logger.info('Recipient USDC token account does not exist, will create it', { 
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('Token account not found') || errorMessage.includes('not found')) {
+          logger.debug('Recipient USDC token account does not exist, will create it', { 
           toTokenAccount: toTokenAccount.toBase58(),
-          recipient: toPublicKey.toBase58()
+            recipient: toPublicKey.toBase58(),
+            note: 'This is expected for new recipients - account will be created automatically'
         }, 'TransactionProcessor');
+        } else {
+          // Unexpected error - log as warning
+          logger.warn('Error checking recipient token account, will attempt to create it', { 
+            toTokenAccount: toTokenAccount.toBase58(),
+            recipient: toPublicKey.toBase58(),
+            error: errorMessage
+          }, 'TransactionProcessor');
+        }
         createRecipientTokenAccountInstruction = createAssociatedTokenAccountInstruction(
           feePayerPublicKey, // payer - use company wallet to pay for token account creation
           toTokenAccount, // associated token account

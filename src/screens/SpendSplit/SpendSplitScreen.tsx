@@ -718,6 +718,9 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       allowFriendDestinations: false,
       context: 'spend_split_payment',
       prefilledAmount: roundedRemainingAmount,
+      // Pass split IDs in config for consistency (will also be passed as props)
+      splitWalletId: wallet?.id,
+      splitId: splitData?.id,
       customRecipientInfo: {
         name: uiData.orderNumber || uiData.orderId ? `Order #${uiData.orderNumber || uiData.orderId}` : 'SPEND Merchant',
         address: wallet?.walletAddress || processedSplitData.orderData?.user_wallet || currentUser?.wallet_address || '',
@@ -938,6 +941,8 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         <CentralizedTransactionModal
           visible={!!transactionModalConfig}
           config={transactionModalConfig}
+          splitWalletId={splitWallet?.id}
+          splitId={splitData?.id}
           currentUser={currentUser}
         />
       )}

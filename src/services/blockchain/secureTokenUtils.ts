@@ -99,6 +99,13 @@ export async function getAccount(
       closeAuthority,
     };
   } catch (error) {
+    // If account doesn't exist, this is expected behavior - don't log as error
+    // The caller will handle it by creating the account
+    if (error instanceof Error && error.message === 'Token account not found') {
+      // Re-throw without logging - this is expected when checking if account exists
+      throw error;
+    }
+    // For other errors, log them
     console.error('Error in secure getAccount:', error);
     throw error;
   }

@@ -293,8 +293,8 @@ const SharedWalletDetailsScreen: React.FC = () => {
           // Get user's wallet address for withdrawal transactions
           if (currentUser?.id) {
             try {
-              const { ConsolidatedTransactionService } = await import('../../services/blockchain/transaction');
-              const userWalletAddress = await ConsolidatedTransactionService.getInstance().getUserWalletAddress(currentUser.id);
+              const { consolidatedTransactionService } = await import('../../services/blockchain/transaction');
+              const userWalletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
               setUserWalletAddress(userWalletAddress || '');
             } catch (error) {
               logger.warn('Failed to get user wallet address', { error }, 'SharedWalletDetailsScreen');
@@ -405,6 +405,8 @@ const SharedWalletDetailsScreen: React.FC = () => {
                 allowExternalDestinations: false,
                 allowFriendDestinations: false,
                 context: 'shared_wallet_withdrawal',
+                // Pass shared wallet ID in config for consistency (will also be passed as props)
+                sharedWalletId: wallet.id,
                 prefilledAmount: (() => {
                   const currentUserMember = wallet.members?.find(m => m.userId === currentUser?.id);
                   if (currentUserMember) {

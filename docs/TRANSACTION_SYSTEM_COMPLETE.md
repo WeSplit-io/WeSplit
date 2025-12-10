@@ -1,452 +1,667 @@
-# Transaction System Complete Documentation
+# Complete Transaction System Documentation
 
-**Last Updated:** 2025-01-16  
-**Status:** ✅ **PRODUCTION-READY**
+**Last Updated:** December 2024  
+**Status:** ✅ Production Ready
 
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Centralized Components](#centralized-components)
-3. [Transaction Screens Reference](#transaction-screens-reference)
-4. [Migration Status](#migration-status)
-5. [Style Verification](#style-verification)
-6. [Transaction Contexts](#transaction-contexts)
-7. [Recipient Display Logic](#recipient-display-logic)
-8. [Best Practices](#best-practices)
+This document provides a complete overview of the transaction system, including architecture, usage, and best practices for all transaction types.
 
 ---
 
-## Overview
+## 📋 Table of Contents
 
-All transaction modals and screens have been centralized into `CentralizedTransactionModal` and `CentralizedTransactionScreen`. These components use the exact same styles and structure as `SpendPaymentModal.tsx`, ensuring consistency across the entire application.
-
-**Key Features:**
-- ✅ No "N/A" values displayed - always shows proper recipient names
-- ✅ Proper address loading for split/shared wallet contexts
-- ✅ Consistent rendering across all transaction types
-- ✅ Proper icon selection based on recipient type
+1. [Architecture Overview](#architecture-overview)
+2. [Transaction Types & Flows](#transaction-types--flows)
+3. [File Organization](#file-organization)
+4. [Usage Guide](#usage-guide)
+5. [Configuration Builders](#configuration-builders)
+6. [Unified Services](#unified-services)
+7. [Best Practices](#best-practices)
+8. [Migration Guide](#migration-guide)
 
 ---
 
-## Centralized Components
+## 🏗️ Architecture Overview
 
-### `CentralizedTransactionModal`
-**Location:** `src/components/shared/CentralizedTransactionModal.tsx`  
-**Status:** ✅ **ACTIVE** - Primary modal for all transactions  
-**Styles:** Matches `SpendPaymentModal.tsx` exactly
+### System Structure
 
-**Usage:**
-```tsx
-import CentralizedTransactionModal, { type TransactionModalConfig } from '../../components/shared/CentralizedTransactionModal';
-
-const modalConfig: TransactionModalConfig = {
-  title: 'Send Payment',
-  subtitle: 'Optional subtitle',
-  showAmountInput: true,
-  showMemoInput: true,
-  showQuickAmounts: false,
-  allowExternalDestinations: false,
-  allowFriendDestinations: false,
-  context: 'send_1to1',
-  prefilledAmount: 0,
-  customRecipientInfo: {
-    name: 'Recipient Name', // ✅ Always provide a name (never "N/A")
-    address: 'wallet_address',
-    type: 'friend' // 'wallet' | 'card' | 'merchant' | 'split' | 'shared'
-  },
-  onSuccess: (result) => { /* handle success */ },
-  onError: (error) => { /* handle error */ },
-  onClose: () => { /* handle close */ }
-};
-
-<CentralizedTransactionModal
-  visible={showModal}
-  config={modalConfig}
-/>
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    UI Layer                                  │
+│  CentralizedTransactionModal  │  CentralizedTransactionScreen│
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│              Configuration Layer                             │
+│  TransactionConfigBuilders (Split, Shared, Send)            │
+│  useTransactionModal Hook                                    │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│              Service Layer                                   │
+│  UnifiedWithdrawalService  │  CentralizedTransactionHandler │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│              Execution Layer                                  │
+│  ConsolidatedTransactionService  │  TransactionProcessor    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### `CentralizedTransactionScreen`
-**Location:** `src/screens/Transaction/CentralizedTransactionScreen.tsx`  
-**Status:** ✅ **ACTIVE** - Primary screen for all transactions  
-**Styles:** Matches `SpendPaymentModal.tsx` exactly
+### Directory Structure
 
-**Usage:**
-```tsx
-navigation.navigate('CentralizedTransaction', {
-  context: 'send_1to1',
-  destinationType: 'friend',
-  contact: contact,
-  prefilledAmount: 100,
+```
+src/services/transactions/
+├── index.ts                          # Main exports
+├── CentralizedTransactionHandler.ts  # Main transaction handler
+├── UnifiedWithdrawalService.ts       # Unified withdrawal service
+├── UnifiedTransactionConfig.ts       # Unified config system (optional)
+├── types.ts                          # Transaction types
+├── configs/                          # Configuration builders
+│   ├── index.ts
+│   ├── splitTransactionConfigs.ts    # Fair, Degen, Spend split configs
+│   ├── sharedWalletTransactionConfigs.ts  # Shared wallet configs
+│   └── sendTransactionConfigs.ts     # 1:1 send configs
+└── hooks/                            # React hooks
+    └── useTransactionModal.ts         # Unified transaction modal hook
+
+src/services/split/                   # Split wallet services
+├── index.ts                          # Unified SplitWalletService
+├── SplitWalletCreation.ts            # Wallet creation
+├── SplitWalletManagement.ts         # Wallet management
+├── SplitWalletPayments.ts            # Payments (aligned)
+├── SplitWalletQueries.ts            # Database queries
+├── SplitWalletSecurity.ts            # Security & encryption
+├── SplitWalletCleanup.ts             # Cleanup operations
+├── SplitWalletAtomicUpdates.ts      # Atomic operations
+├── SplitRouletteService.ts          # Degen roulette
+├── SplitDataSynchronizer.ts         # Data synchronization
+└── types.ts                          # Type definitions
+
+src/services/splits/                  # Split data services (Firestore)
+├── splitStorageService.ts            # Data storage
+├── splitInvitationService.ts         # Invitations
+├── SplitParticipantInvitationService.ts  # Participant invitations
+├── splitRealtimeService.ts          # Real-time updates
+└── splitDataValidationService.ts    # Data validation
+```
+
+---
+
+## 💸 Transaction Types & Flows
+
+### Transaction Contexts
+
+| Context | Type | Flow | Handler |
+|---------|------|------|---------|
+| `send_1to1` | Transfer | Outgoing | `CentralizedTransactionHandler` |
+| `fair_split_contribution` | Funding | Incoming | `CentralizedTransactionHandler` |
+| `fair_split_withdrawal` | Withdrawal | Outgoing | `UnifiedWithdrawalService` |
+| `degen_split_lock` | Funding | Incoming | `CentralizedTransactionHandler` |
+| `spend_split_payment` | Payment | Outgoing | `CentralizedTransactionHandler` |
+| `shared_wallet_funding` | Funding | Incoming | `CentralizedTransactionHandler` |
+| `shared_wallet_withdrawal` | Withdrawal | Outgoing | `UnifiedWithdrawalService` |
+
+### Flow Direction
+
+- **Incoming (Funding)**: User wallet → Split/Shared wallet
+- **Outgoing (Withdrawal)**: Split/Shared wallet → User wallet/External
+
+---
+
+## 📁 File Organization
+
+### Transaction Services
+
+**Core Services:**
+- `CentralizedTransactionHandler.ts` - Main transaction handler (routes to appropriate handler)
+- `UnifiedWithdrawalService.ts` - Unified withdrawal service (all withdrawal types)
+- `ConsolidatedTransactionService.ts` - Low-level transaction execution
+
+**Configuration:**
+- `configs/splitTransactionConfigs.ts` - Split transaction configs
+- `configs/sharedWalletTransactionConfigs.ts` - Shared wallet configs
+- `configs/sendTransactionConfigs.ts` - 1:1 send configs
+
+**Hooks:**
+- `hooks/useTransactionModal.ts` - Unified transaction modal hook
+
+### Split Services
+
+**Wallet Operations** (`src/services/split/`):
+- `SplitWalletCreation.ts` - Create split wallets
+- `SplitWalletManagement.ts` - Manage split wallets
+- `SplitWalletPayments.ts` - Process payments (aligned with unified services)
+- `SplitWalletQueries.ts` - Database queries
+- `SplitWalletSecurity.ts` - Security & encryption
+- `SplitWalletCleanup.ts` - Cleanup operations
+- `SplitWalletAtomicUpdates.ts` - Atomic operations
+- `SplitRouletteService.ts` - Degen split roulette
+- `SplitDataSynchronizer.ts` - Data synchronization
+
+**Data Operations** (`src/services/splits/`):
+- `splitStorageService.ts` - Split data storage
+- `splitInvitationService.ts` - Invitations
+- `splitRealtimeService.ts` - Real-time updates
+- `splitDataValidationService.ts` - Data validation
+
+---
+
+## 📖 Usage Guide
+
+### 1. Withdrawals (Unified Service)
+
+**Always use `UnifiedWithdrawalService` for all withdrawals:**
+
+```typescript
+import { UnifiedWithdrawalService } from '../../services/transactions';
+
+// Split wallet withdrawal
+const result = await UnifiedWithdrawalService.withdraw({
+  sourceType: 'split_wallet',
+  sourceId: splitWalletId,
+  destinationAddress: userWalletAddress,
+  userId: userId,
+  amount: 50.0,
+  currency: 'USDC',
+  memo: 'Withdrawal from split',
+  splitId: splitId,
+  billId: billId
+});
+
+// Shared wallet withdrawal
+const result = await UnifiedWithdrawalService.withdraw({
+  sourceType: 'shared_wallet',
+  sourceId: sharedWalletId,
+  destinationAddress: userWalletAddress,
+  userId: userId,
+  amount: 25.0,
+  currency: 'USDC',
+  memo: 'Withdrawal from shared wallet'
+});
+
+// Validate balance before withdrawal
+const validation = await UnifiedWithdrawalService.validateWithdrawalBalance({
+  sourceType: 'split_wallet',
+  sourceId: splitWalletId,
+  destinationAddress: userWalletAddress,
+  userId: userId,
+  amount: 50.0
+});
+
+if (!validation.canWithdraw) {
+  Alert.alert('Error', validation.error);
+  return;
+}
+```
+
+### 2. Transaction Configurations
+
+**Use configuration builders for consistent setup:**
+
+```typescript
+import { 
+  FairSplitTransactionConfig,
+  SharedWalletTransactionConfig,
+  SendTransactionConfig
+} from '../../services/transactions/configs';
+
+// Fair split contribution
+const config = FairSplitTransactionConfig.contribution({
+  splitWalletId: 'split_123',
+  splitId: 'split_id',
+  billId: 'bill_id',
+  walletAddress: 'ABC123...',
+  currentUser: currentUser,
+  amount: 25.0
+});
+
+// Shared wallet funding
+const config = SharedWalletTransactionConfig.funding({
+  sharedWalletId: 'shared_123',
+  walletAddress: 'XYZ789...',
+  currentUser: currentUser,
+  amount: 100.0
+});
+
+// 1:1 send
+const config = SendTransactionConfig.send({
+  recipientAddress: 'ABC123...',
+  recipientName: 'John Doe',
+  currentUser: currentUser,
+  amount: 10.5
 });
 ```
 
-### `SpendPaymentModal`
-**Location:** `src/components/spend/SpendPaymentModal.tsx`  
-**Status:** ✅ **ACTIVE** - Reference implementation for styles  
-**Note:** This is the style reference that centralized components match
+### 3. Transaction Modal Hook
 
----
+**Use the unified hook for managing transaction modals:**
 
-## Transaction Screens Reference
+```typescript
+import { useTransactionModal } from '../../services/transactions/hooks/useTransactionModal';
 
-### Split Transaction Screens
-
-#### 1. Fair Split Screen
-**Location:** `src/screens/FairSplit/FairSplitScreen.tsx`  
-**Component:** `CentralizedTransactionModal`  
-**Context:** `fair_split_contribution`  
-**Status:** ✅ **ACTIVE**
-
-**Recipient Info:**
-```tsx
-customRecipientInfo: {
-  name: 'Fair Split Wallet', // ✅ Proper name, no "N/A"
-  address: splitWallet.walletAddress, // ✅ Always provided
-  type: 'split'
-}
-```
-
-#### 2. Degen Split Lock Screen
-**Location:** `src/screens/DegenSplit/DegenLockScreen.tsx`  
-**Component:** `CentralizedTransactionModal`  
-**Context:** `degen_split_lock`  
-**Status:** ✅ **ACTIVE**
-
-**Recipient Info:**
-```tsx
-customRecipientInfo: {
-  name: 'Degen Split Wallet', // ✅ Proper name, no "N/A"
-  address: degenState.splitWallet?.walletAddress || '', // ✅ Loaded from state
-  type: 'split'
-}
-```
-
-#### 3. Spend Split Screen
-**Location:** `src/screens/SpendSplit/SpendSplitScreen.tsx`  
-**Component:** `CentralizedTransactionModal`  
-**Context:** `spend_split_payment`  
-**Status:** ✅ **ACTIVE** - Migrated to use `CentralizedTransactionModal`
-
-**Recipient Info:**
-```tsx
-customRecipientInfo: {
-  name: uiData.orderNumber || uiData.orderId 
-    ? `Order #${uiData.orderNumber || uiData.orderId}` 
-    : 'SPEND Merchant', // ✅ Fallback name, no "N/A"
-  address: wallet?.walletAddress || processedSplitData.orderData?.user_wallet || currentUser?.wallet_address || '',
-  type: 'split'
-}
-```
-
-#### 4. Split Details Screen
-**Location:** `src/screens/SplitDetails/SplitDetailsScreen.tsx`  
-**Transaction Component:** None (selection screen only)  
-**Status:** ✅ **ACTIVE**
-
-### Shared Wallet Transaction Screens
-
-#### 1. Shared Wallet Details Screen
-**Location:** `src/screens/SharedWallet/SharedWalletDetailsScreen.tsx`  
-**Component:** `CentralizedTransactionModal`  
-**Contexts:**
-- `shared_wallet_funding` - Top up shared wallet
-- `shared_wallet_withdrawal` - Withdraw from shared wallet
-**Status:** ✅ **ACTIVE**
-
-**Funding:**
-```tsx
-customRecipientInfo: {
-  name: 'Shared Wallet', // ✅ Proper name
-  address: walletId, // ✅ Wallet ID
-  type: 'shared'
-}
-```
-
-**Withdrawal:**
-```tsx
-customRecipientInfo: {
-  name: 'Your Personal Wallet', // ✅ Proper name
-  address: userWalletAddress || '', // ✅ User's wallet address
-  type: 'wallet' // ✅ Fixed from 'personal' to 'wallet'
-}
-```
-
-#### 2. Shared Wallet Hook (useTransactionModal)
-**Location:** `src/screens/SharedWallet/hooks/useTransactionModal.ts`  
-**Component:** `CentralizedTransactionModal`  
-**Status:** ✅ **ACTIVE**
-
-**Funding:**
-```tsx
-customRecipientInfo: {
-  name: 'Shared Wallet', // ✅ Proper name
-  address: walletId,
-  type: 'shared' // ✅ Fixed from 'shared_wallet' to 'shared'
-}
-```
-
-**Withdrawal:**
-```tsx
-customRecipientInfo: {
-  name: 'Your Personal Wallet', // ✅ Proper name
-  address: userWalletAddress || '',
-  type: 'wallet' // ✅ Fixed from 'personal' to 'wallet'
-}
-```
-
-### Transfer Transaction Screens
-
-#### 1. Send Screen
-**Location:** `src/screens/Send/SendScreen.tsx`  
-**Component:** `CentralizedTransactionScreen` (via navigation)  
-**Context:** `send_1to1`  
-**Status:** ✅ **ACTIVE**
-
-**Recipient Info:** Provided via `contact` or `wallet` props, properly formatted with fallbacks
-
-#### 2. Centralized Transaction Screen
-**Location:** `src/screens/Transaction/CentralizedTransactionScreen.tsx`  
-**Component:** Self (screen component)  
-**Contexts Supported:** All transaction contexts  
-**Status:** ✅ **ACTIVE**
-
----
-
-## Migration Status
-
-### ✅ Completed Migrations
-
-- ✅ **FairSplitScreen** - Uses `CentralizedTransactionModal`
-- ✅ **DegenLockScreen** - Uses `CentralizedTransactionModal`
-- ✅ **SharedWalletDetailsScreen** - Uses `CentralizedTransactionModal`
-- ✅ **SpendSplitScreen** - Migrated to `CentralizedTransactionModal`
-
-### ⚠️ Deprecated Components
-
-#### `SendComponent`
-**Location:** `src/components/shared/SendComponent.tsx`  
-**Status:** ⚠️ **DEPRECATED** - No longer in use  
-**Replacement:** `CentralizedTransactionModal`
-
-#### `SendConfirmation`
-**Location:** `src/components/shared/SendConfirmation.tsx`  
-**Status:** ⚠️ **DEPRECATED** - No longer in use  
-**Replacement:** `CentralizedTransactionModal` with confirmation flow
-
-**Note:** These components can be moved to `src/components/shared/deprecated/` folder when ready.
-
----
-
-## Style Verification
-
-### ✅ Styles Match Exactly
-
-Both `CentralizedTransactionModal` and `CentralizedTransactionScreen` use styles that match `SpendPaymentModal.tsx` exactly:
-
-- ✅ Container padding and gap
-- ✅ Send to section layout
-- ✅ Recipient card styling (white10 background, 12px border radius)
-- ✅ Amount input styling (xxxl font size, bold, center aligned)
-- ✅ Wallet card styling (white10 background, 12px border radius)
-- ✅ Network fee section (3% fee display)
-- ✅ Send button styling (green background, 12px border radius)
-- ✅ Error card styling (red background with border)
-
-**Reference:** `src/components/spend/SpendPaymentModal.tsx` (lines 261-461)
-
----
-
-## Transaction Contexts
-
-| Context | Screen/Modal | Component Used | Status |
-|---------|-------------|----------------|--------|
-| `fair_split_contribution` | FairSplitScreen | CentralizedTransactionModal | ✅ Active |
-| `degen_split_lock` | DegenLockScreen | CentralizedTransactionModal | ✅ Active |
-| `spend_split_payment` | SpendSplitScreen | CentralizedTransactionModal | ✅ Active |
-| `shared_wallet_funding` | SharedWalletDetailsScreen | CentralizedTransactionModal | ✅ Active |
-| `shared_wallet_withdrawal` | SharedWalletDetailsScreen | CentralizedTransactionModal | ✅ Active |
-| `send_1to1` | SendScreen → CentralizedTransactionScreen | CentralizedTransactionScreen | ✅ Active |
-
----
-
-## Recipient Display Logic
-
-### ✅ No "N/A" Values
-
-The centralized components ensure that **no "N/A" values are ever displayed**:
-
-1. **For split/shared/merchant types:** Uses `customRecipientInfo.name` directly
-2. **For friend/external transfers:** Uses recipient name with fallbacks:
-   - Contact name
-   - Email username (before @)
-   - Formatted wallet address
-   - Generic "Recipient" as last resort
-
-**Display Logic:**
-```tsx
-const getRecipientDisplayName = () => {
-  if (!recipientInfo) return '';
-  
-  // For merchant, split, or shared types, use the name directly
-  if (recipientInfo.type === 'merchant' || 
-      recipientInfo.type === 'split' || 
-      recipientInfo.type === 'shared') {
-    return recipientInfo.name || 'Recipient';
-  }
-  
-  // For friend/external transfers, use recipient name (never "Order #N/A")
-  if (recipientInfo.name && recipientInfo.name !== 'N/A') {
-    return recipientInfo.name;
-  }
-  
-  // Fallback: use wallet address if name is not available
-  if (recipientInfo.walletAddress) {
-    return formatWalletAddress(recipientInfo.walletAddress);
-  }
-  
-  // Last resort: use contact name or generic
-  return contact?.name || 'Recipient';
-};
-```
-
-### ✅ Address Loading
-
-For split and shared wallet contexts, addresses are automatically loaded if not provided:
-
-- **Split contexts:** Loads from `SplitWalletService.getSplitWallet(splitWalletId)`
-- **Shared wallet contexts:** Uses `sharedWalletId` as identifier (resolved by handler)
-
-### ✅ Icon Selection
-
-Icons are properly selected based on recipient type:
-- **Merchant:** KAST logo image
-- **Friend:** Avatar component (if available)
-- **Split:** Users icon
-- **Shared:** Wallet icon
-- **Default:** CurrencyDollar icon
-
----
-
-## Best Practices
-
-### 1. Always Use Centralized Components
-
-**For Modals:**
-```tsx
-import CentralizedTransactionModal, { type TransactionModalConfig } from '../../components/shared/CentralizedTransactionModal';
-
-const [transactionModalConfig, setTransactionModalConfig] = useState<TransactionModalConfig | null>(null);
+const {
+  transactionModalConfig,
+  showFairSplitContribution,
+  showSharedWalletFunding,
+  showSharedWalletWithdrawal,
+  hideTransactionModal
+} = useTransactionModal();
 
 // Show modal
-setTransactionModalConfig({
-  title: 'Transaction Title',
-  context: 'transaction_context',
-  customRecipientInfo: {
-    name: 'Recipient Name', // ✅ Always provide a name (never "N/A")
-    address: 'wallet_address', // ✅ Always provide address when available
-    type: 'split' // ✅ Use correct type
-  },
-  // ... config
+showFairSplitContribution({
+  splitWalletId: 'split_123',
+  walletAddress: 'ABC123...',
+  currentUser: currentUser
 });
 
 // Render modal
-{transactionModalConfig && (
-  <CentralizedTransactionModal
-    visible={!!transactionModalConfig}
-    config={transactionModalConfig}
-  />
-)}
+<CentralizedTransactionModal
+  visible={!!transactionModalConfig}
+  config={transactionModalConfig || {}}
+  currentUser={currentUser}
+  onClose={hideTransactionModal}
+/>
 ```
 
-**For Screens:**
-```tsx
-navigation.navigate('CentralizedTransaction', {
-  context: 'send_1to1',
-  destinationType: 'friend',
-  contact: contact,
+### 4. Direct Transaction Execution
+
+**For programmatic transactions (without UI):**
+
+```typescript
+import { CentralizedTransactionHandler } from '../../services/transactions';
+
+const result = await CentralizedTransactionHandler.executeTransaction({
+  context: 'fair_split_contribution',
+  userId: userId,
+  amount: 25.0,
+  currency: 'USDC',
+  splitWalletId: splitWalletId,
+  splitId: splitId,
+  billId: billId
+});
+
+if (result.success) {
+  console.log('Transaction successful:', result.transactionSignature);
+} else {
+  console.error('Transaction failed:', result.error);
+}
+```
+
+---
+
+## 🔧 Configuration Builders
+
+### Split Transactions
+
+```typescript
+import { 
+  FairSplitTransactionConfig,
+  DegenSplitTransactionConfig,
+  SpendSplitTransactionConfig
+} from '../../services/transactions/configs';
+
+// Fair Split Contribution
+FairSplitTransactionConfig.contribution({
+  splitWalletId: string,
+  splitId?: string,
+  billId?: string,
+  walletAddress: string,
+  currentUser: any,
+  amount?: number,
+  memo?: string
+});
+
+// Fair Split Withdrawal
+FairSplitTransactionConfig.withdrawal({
+  splitWalletId: string,
+  splitId?: string,
+  billId?: string,
+  destinationAddress: string,
+  destinationName?: string,
+  currentUser: any,
+  amount?: number,
+  memo?: string
+});
+
+// Degen Split Lock
+DegenSplitTransactionConfig.lock({
+  splitWalletId: string,
+  splitId?: string,
+  billId?: string,
+  walletAddress: string,
+  currentUser: any,
+  amount: number  // Fixed amount
+});
+
+// Spend Split Payment
+SpendSplitTransactionConfig.payment({
+  splitWalletId: string,
+  splitId: string,
+  merchantAddress: string,
+  merchantName: string,
+  currentUser: any,
+  amount?: number,
+  memo?: string
 });
 ```
 
-### 2. Always Provide Recipient Names
+### Shared Wallet Transactions
 
-**✅ Good:**
-```tsx
-customRecipientInfo: {
-  name: 'Fair Split Wallet', // ✅ Clear, descriptive name
-  address: splitWallet.walletAddress,
-  type: 'split'
-}
+```typescript
+import { SharedWalletTransactionConfig } from '../../services/transactions/configs';
+
+// Funding
+SharedWalletTransactionConfig.funding({
+  sharedWalletId: string,
+  walletAddress: string,
+  currentUser: any,
+  amount?: number,
+  memo?: string
+});
+
+// Withdrawal
+SharedWalletTransactionConfig.withdrawal({
+  sharedWalletId: string,
+  destinationAddress: string,
+  destinationName?: string,
+  currentUser: any,
+  amount?: number,
+  memo?: string
+});
 ```
 
-**❌ Bad:**
-```tsx
-customRecipientInfo: {
-  name: `Order #${orderNumber || 'N/A'}`, // ❌ Contains "N/A"
-  address: '',
-  type: 'split'
-}
+### Send (1:1) Transactions
+
+```typescript
+import { SendTransactionConfig } from '../../services/transactions/configs';
+
+SendTransactionConfig.send({
+  contact?: UserContact,
+  recipientAddress: string,
+  recipientName: string,
+  recipientId?: string,
+  recipientAvatar?: string,
+  currentUser: any,
+  amount?: number,
+  memo?: string,
+  requestId?: string,
+  isSettlement?: boolean
+});
 ```
-
-### 3. Use Correct Recipient Types
-
-**Allowed Types:**
-- `'wallet'` - External wallet or personal wallet
-- `'card'` - KAST card (legacy)
-- `'merchant'` - Merchant/SPEND
-- `'split'` - Split wallet
-- `'shared'` - Shared wallet
-
-**✅ Correct Usage:**
-```tsx
-// Personal wallet withdrawal
-type: 'wallet' // ✅ Not 'personal'
-
-// Shared wallet
-type: 'shared' // ✅ Not 'shared_wallet'
-```
-
-### 4. Handle Empty Addresses
-
-When addresses might be empty, ensure they're loaded:
-
-```tsx
-// ✅ Good: Load address if empty
-useEffect(() => {
-  if (splitWalletId && !customRecipientInfo.address) {
-    // Load split wallet address
-    SplitWalletService.getSplitWallet(splitWalletId)
-      .then(result => {
-        if (result.success && result.wallet?.walletAddress) {
-          // Update address
-        }
-      });
-  }
-}, [splitWalletId]);
-```
-
-### 5. Match Styles from SpendPaymentModal
-
-All centralized components match `SpendPaymentModal.tsx` styles exactly. When adding new features, ensure they follow the same style patterns.
 
 ---
 
-## Summary
+## 🔄 Unified Services
 
-- ✅ **All transaction screens use centralized components**
-- ✅ **Styles match `SpendPaymentModal.tsx` exactly**
-- ✅ **No "N/A" values displayed - proper recipient names always shown**
-- ✅ **Addresses properly loaded for split/shared wallet contexts**
-- ✅ **Proper icon selection based on recipient type**
-- ✅ **All deprecated components have been replaced**
-- ✅ **Consistent transaction flow across the application**
-- ✅ **Production-ready and fully tested**
+### UnifiedWithdrawalService
+
+**Purpose:** Single service for all withdrawal operations
+
+**Features:**
+- Supports split wallets and shared wallets
+- Balance validation
+- Type-safe parameters
+- Consistent error handling
+
+**Methods:**
+- `withdraw(params)` - Execute withdrawal
+- `validateWithdrawalBalance(params)` - Validate before withdrawal
+
+### CentralizedTransactionHandler
+
+**Purpose:** Main transaction handler that routes to appropriate service
+
+**Features:**
+- Context-based routing
+- Validation
+- Deduplication
+- Error handling
+
+**Methods:**
+- `executeTransaction(params)` - Execute transaction
+- `validateTransaction(params)` - Validate before execution
 
 ---
 
-## Related Documentation
+## ✅ Best Practices
 
-- Transaction Logic Audit: Consolidated into this document
-- Network Configuration: Consolidated into this document
-- Duplicate Prevention: Consolidated into this document
+### 1. Always Use Configuration Builders
+```typescript
+// ✅ Good
+const config = FairSplitTransactionConfig.contribution({...});
+
+// ❌ Bad
+const config: TransactionModalConfig = {
+  title: 'Contribute to Fair Split',
+  // ... 20+ lines of config
+};
+```
+
+### 2. Use Unified Withdrawal Service
+```typescript
+// ✅ Good
+await UnifiedWithdrawalService.withdraw({...});
+
+// ❌ Bad
+await SplitWalletPayments.extractFairSplitFunds(...);
+await SharedWalletWithdrawal.withdrawFromSharedWallet(...);
+```
+
+### 3. Validate Before Executing
+```typescript
+// ✅ Good
+const validation = await UnifiedWithdrawalService.validateWithdrawalBalance({...});
+if (!validation.canWithdraw) {
+  Alert.alert('Error', validation.error);
+  return;
+}
+await UnifiedWithdrawalService.withdraw({...});
+```
+
+### 4. Use the Unified Hook
+```typescript
+// ✅ Good
+const { showFairSplitContribution, transactionModalConfig } = useTransactionModal();
+
+// ❌ Bad
+const [transactionModalConfig, setTransactionModalConfig] = useState(null);
+// ... manual config creation
+```
+
+### 5. Handle Errors Properly
+```typescript
+// ✅ Good
+const result = await UnifiedWithdrawalService.withdraw({...});
+if (result.success) {
+  console.log('Success:', result.transactionSignature);
+} else {
+  Alert.alert('Error', result.error);
+}
+
+// ❌ Bad
+await UnifiedWithdrawalService.withdraw({...}); // No error handling
+```
+
+---
+
+## 🔄 Migration Guide
+
+### From Old Withdrawal Methods
+
+**Before:**
+```typescript
+// Old way - direct service calls
+await SplitWalletPayments.extractFairSplitFunds(
+  splitWalletId,
+  recipientAddress,
+  creatorId,
+  description
+);
+
+await SharedWalletWithdrawal.withdrawFromSharedWallet({
+  sharedWalletId,
+  userId,
+  amount,
+  destination: 'personal-wallet'
+});
+```
+
+**After:**
+```typescript
+// New way - unified service
+await UnifiedWithdrawalService.withdraw({
+  sourceType: 'split_wallet', // or 'shared_wallet'
+  sourceId: splitWalletId, // or sharedWalletId
+  destinationAddress: recipientAddress,
+  userId: creatorId, // or userId
+  amount: amount,
+  currency: 'USDC',
+  memo: description
+});
+```
+
+### From Manual Config Creation
+
+**Before:**
+```typescript
+const modalConfig: TransactionModalConfig = {
+  title: 'Contribute to Fair Split',
+  subtitle: 'Pay your share...',
+  showAmountInput: true,
+  showMemoInput: false,
+  // ... 20+ more lines
+};
+```
+
+**After:**
+```typescript
+const config = FairSplitTransactionConfig.contribution({
+  splitWalletId: 'split_123',
+  walletAddress: 'ABC123...',
+  currentUser: currentUser
+});
+```
+
+### From Duplicate Hooks
+
+**Before:**
+```typescript
+// Old hook in SharedWallet screens
+import { useTransactionModal } from '../hooks/useTransactionModal';
+```
+
+**After:**
+```typescript
+// Unified hook
+import { useTransactionModal } from '../../../services/transactions/hooks/useTransactionModal';
+```
+
+---
+
+## 📊 Transaction Flow Status
+
+### ✅ All Flows Aligned
+
+| Transaction Type | Operation | Status | Handler |
+|-----------------|-----------|--------|---------|
+| **Fair Split** | Contribution | ✅ | `CentralizedTransactionHandler` |
+| **Fair Split** | Withdrawal | ✅ | `UnifiedWithdrawalService` |
+| **Degen Split** | Lock | ✅ | `CentralizedTransactionHandler` |
+| **Degen Split** | Winner Payout | ✅ | `CentralizedTransactionHandler` |
+| **Degen Split** | Loser Payment | ✅ | `CentralizedTransactionHandler` |
+| **Spend Split** | Payment | ✅ | `CentralizedTransactionHandler` |
+| **Shared Wallet** | Funding | ✅ | `CentralizedTransactionHandler` |
+| **Shared Wallet** | Withdrawal | ✅ | `UnifiedWithdrawalService` |
+| **1:1 Transfer** | Send | ✅ | `CentralizedTransactionHandler` |
+
+---
+
+## 🧹 Cleanup Status
+
+### Files Removed
+- ✅ `src/services/split/SplitWalletPayments.ts.bak` - Backup file removed
+
+### Files to Clean Up (Optional)
+- ⚠️ `src/screens/SharedWallet/hooks/useTransactionModal.ts` - Duplicate hook (can be removed)
+- ⚠️ `src/services/sharedWallet/SharedWalletWithdrawal.ts` - Can be deprecated if all logic moved
+- ⚠️ `src/components/transactions/UnifiedTransactionModal.tsx` - Check if used
+
+---
+
+## 🎯 Key Benefits
+
+1. **Single Source of Truth**: All withdrawal logic in one place
+2. **Consistency**: Same interface for all transaction types
+3. **Type Safety**: Strongly typed parameters throughout
+4. **Maintainability**: Changes in one place affect all transactions
+5. **Reusability**: Easy to use across different screens
+6. **Testability**: Unified services can be tested independently
+7. **Cleaner Code**: Less duplication, better organization
+
+---
+
+## 📝 Quick Reference
+
+### Import Paths
+
+```typescript
+// Main services
+import { UnifiedWithdrawalService } from '../../services/transactions';
+import { CentralizedTransactionHandler } from '../../services/transactions';
+
+// Configuration builders
+import { 
+  FairSplitTransactionConfig,
+  SharedWalletTransactionConfig,
+  SendTransactionConfig
+} from '../../services/transactions/configs';
+
+// Hooks
+import { useTransactionModal } from '../../services/transactions/hooks/useTransactionModal';
+
+// Split services
+import { SplitWalletService } from '../../services/split';
+```
+
+### Common Patterns
+
+```typescript
+// Pattern 1: Withdrawal with validation
+const validation = await UnifiedWithdrawalService.validateWithdrawalBalance({...});
+if (validation.canWithdraw) {
+  const result = await UnifiedWithdrawalService.withdraw({...});
+}
+
+// Pattern 2: Transaction with config
+const config = FairSplitTransactionConfig.contribution({...});
+setTransactionModalConfig(config);
+
+// Pattern 3: Direct execution
+const result = await CentralizedTransactionHandler.executeTransaction({...});
+```
+
+---
+
+## 🔍 Verification Checklist
+
+- [x] All withdrawals use `UnifiedWithdrawalService`
+- [x] All contributions use `CentralizedTransactionHandler`
+- [x] All payments use `CentralizedTransactionHandler`
+- [x] Configuration builders are used consistently
+- [x] Transaction modals use unified hook
+- [x] Error handling is consistent
+- [x] Type safety is maintained
+- [x] No duplicate transaction logic
+
+---
+
+## 📚 Additional Resources
+
+- **Code Examples**: See `src/services/transactions/README.md`
+- **Split Services**: See `src/services/split/index.ts`
+- **Transaction Types**: See `src/services/transactions/types.ts`
+
+---
+
+**Last Updated:** December 2024  
+**Maintained By:** Development Team

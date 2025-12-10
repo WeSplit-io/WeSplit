@@ -85,15 +85,25 @@ export class KeypairUtils {
 
     // Trim and clean the key - remove any whitespace, newlines, or control characters
     let trimmedKey = secretKey.trim();
-    // Remove any non-printable characters that might have been added during encryption/decryption
-    trimmedKey = trimmedKey.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+    // Remove any null bytes and other control characters that might corrupt the key
+    // BUT preserve base64 padding characters (=) and base58 characters
+    trimmedKey = trimmedKey.replace(/\0/g, ''); // Remove null bytes
+    // Only remove control characters that aren't part of valid key formats
+    // Keep: base64 chars (A-Za-z0-9+/=), base58 chars, JSON brackets, commas, spaces in JSON arrays
+    trimmedKey = trimmedKey.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+    // Remove any trailing/leading whitespace again after cleaning
+    trimmedKey = trimmedKey.trim();
 
     // Check if it's base58 format first (88 characters, common for Solana private keys)
     // Base58 uses characters: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz
     // Try base58 if length is 88 (standard Solana private key length)
-    // CRITICAL: For 88-character keys, prioritize base58 over base64
-    if (trimmedKey.length === 88) {
-      logger.debug('KeypairUtils: Detected 88-character key, attempting base58 first', {
+    // CRITICAL: For 88-character keys, check format before attempting decode
+    // Base64 keys often end with '=' padding, which is NOT in base58 alphabet
+    // If key contains base64-specific characters (/ or + or =), skip base58 entirely
+    const hasBase64Chars = trimmedKey.includes('/') || trimmedKey.includes('+') || trimmedKey.includes('=');
+    
+    if (trimmedKey.length === 88 && !hasBase64Chars) {
+      logger.debug('KeypairUtils: Detected 88-character key without base64 chars, attempting base58 first', {
         keyPreview: trimmedKey.substring(0, 10) + '...',
         keyEnd: '...' + trimmedKey.substring(trimmedKey.length - 10)
       }, 'KeypairUtils');
@@ -178,6 +188,14 @@ export class KeypairUtils {
           keyLength: trimmedKey.length
         }, 'KeypairUtils');
       }
+    } else if (trimmedKey.length === 88 && hasBase64Chars) {
+      logger.debug('KeypairUtils: Detected 88-character key with base64 chars, skipping base58 and trying base64', {
+        keyPreview: trimmedKey.substring(0, 10) + '...',
+        keyEnd: '...' + trimmedKey.substring(trimmedKey.length - 10),
+        hasSlash: trimmedKey.includes('/'),
+        hasPlus: trimmedKey.includes('+'),
+        hasEquals: trimmedKey.includes('=')
+      }, 'KeypairUtils');
     }
 
     try {

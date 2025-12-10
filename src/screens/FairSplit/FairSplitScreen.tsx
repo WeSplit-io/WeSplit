@@ -2251,6 +2251,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       allowFriendDestinations: false,
       context: 'fair_split_contribution',
       prefilledAmount: remainingAmount,
+      // Pass split IDs in config for consistency (will also be passed as props)
+      splitWalletId: splitWallet.id,
+      splitId: splitData?.id,
+      billId: splitData?.billId,
       customRecipientInfo: {
         name: 'Fair Split Wallet',
         address: splitWallet.walletAddress,
@@ -3579,6 +3583,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           splitWalletId={splitWallet?.id}
           splitId={splitData?.id}
           billId={splitData?.billId}
+          currentUser={currentUser}
         />
       )}
 

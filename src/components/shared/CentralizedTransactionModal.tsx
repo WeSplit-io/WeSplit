@@ -12,6 +12,7 @@ import type { UserContact } from '../../types';
 import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 import { formatWalletAddress } from '../../utils/spend/spendDataUtils';
 import { useWallet } from '../../context/WalletContext';
+import { useApp } from '../../context/AppContext';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { colors } from '../../theme';
 import { spacing } from '../../theme/spacing';
@@ -36,6 +37,12 @@ export interface TransactionModalConfig {
   context: TransactionContext;
   prefilledAmount?: number;
   prefilledNote?: string;
+  // Optional: Direct transaction parameters (will override props if provided)
+  splitWalletId?: string;
+  splitId?: string;
+  billId?: string;
+  sharedWalletId?: string;
+  recipientAddress?: string;
   // UI callbacks
   onSuccess?: (result: any) => void;
   onError?: (error: string) => void;
@@ -83,10 +90,18 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   // ✅ CRITICAL: Prevent multiple transaction executions (debouncing)
   const isExecutingRef = useRef(false);
 
-  // Use currentUser directly from props instead of local state
-  const currentUser = propCurrentUser;
-  const { appWalletBalance } = useWallet();
+  // Get currentUser from props or AppContext
+  const { state: appState } = useApp();
+  const currentUser = propCurrentUser || appState?.currentUser;
+  const { appWalletBalance, ensureAppWallet } = useWallet();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  
+  // Use config values if provided, otherwise fall back to props
+  const effectiveSplitWalletId = config.splitWalletId || splitWalletId;
+  const effectiveSplitId = config.splitId || splitId;
+  const effectiveBillId = config.billId || billId;
+  const effectiveSharedWalletId = config.sharedWalletId || sharedWalletId;
+  const effectiveRecipientAddress = config.recipientAddress || recipientAddress;
 
   // Load wallet address on mount
   useEffect(() => {
@@ -115,6 +130,19 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     }
   );
 
+  // Reset amount and note when config or visible changes (matching screen behavior)
+  useEffect(() => {
+    if (!visible) return; // Only reset when modal becomes visible
+    
+    if (config.prefilledAmount && config.prefilledAmount > 0) {
+      setAmount(formatAmountWithComma(config.prefilledAmount));
+    } else {
+      setAmount('0');
+    }
+    setNote(config.prefilledNote || '');
+    setValidationError(null);
+  }, [visible, config.prefilledAmount, config.prefilledNote, config.context]);
+
   // Log modal visibility changes for debugging
   useEffect(() => {
     if (visible) {
@@ -138,54 +166,68 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
       return;
     }
 
-    if (config.context === 'shared_wallet_withdrawal' && sharedWalletId) {
+    if (config.context === 'shared_wallet_withdrawal' && effectiveSharedWalletId) {
       const loadSharedWalletData = async () => {
         try {
           const { SharedWalletService } = await import('../../services/sharedWallet');
-          const result = await SharedWalletService.getSharedWallet(sharedWalletId);
+          const result = await SharedWalletService.getSharedWallet(effectiveSharedWalletId);
           if (result.success && result.wallet) {
             const balance = result.wallet.totalBalance || 0;
             const address = result.wallet.walletAddress || null; // Get on-chain address, not ID
             setSharedWalletBalance(balance);
             setSharedWalletAddress(address);
             logger.info('Shared wallet data loaded for withdrawal', {
-              sharedWalletId,
+              sharedWalletId: effectiveSharedWalletId,
               balance,
               walletAddress: address
             }, 'CentralizedTransactionModal');
           } else {
-            logger.error('Failed to get shared wallet', { sharedWalletId }, 'CentralizedTransactionModal');
+            logger.error('Failed to get shared wallet', { sharedWalletId: effectiveSharedWalletId }, 'CentralizedTransactionModal');
             setSharedWalletBalance(0);
             setSharedWalletAddress(null);
           }
         } catch (error) {
-          logger.error('Failed to load shared wallet data', { error, sharedWalletId }, 'CentralizedTransactionModal');
+          logger.error('Failed to load shared wallet data', { error, sharedWalletId: effectiveSharedWalletId }, 'CentralizedTransactionModal');
           setSharedWalletBalance(0);
           setSharedWalletAddress(null);
         }
       };
       loadSharedWalletData();
     }
-  }, [visible, config.context, sharedWalletId]);
+  }, [visible, config.context, effectiveSharedWalletId]);
 
   const effectiveBalance = liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined
     ? liveBalance.usdcBalance
     : appWalletBalance;
 
-  // Determine recipient information
+  // Determine recipient information - matching screen logic
   const getRecipientInfo = () => {
     // Custom recipient info takes precedence
     if (config.customRecipientInfo) {
-      // Fill address from props if empty in config
+      // Fill address from config, props, or context-specific sources
       let address = config.customRecipientInfo.address;
       if (!address || address === '') {
-        // Try to get address from props based on context
+        // Try to get address from config or props based on context
         if (config.context === 'fair_split_contribution' || config.context === 'degen_split_lock' || config.context === 'spend_split_payment') {
-          // For split contexts, try to get from recipientAddress prop or split wallet
-          address = recipientAddress || '';
-        } else if (config.context === 'shared_wallet_funding' || config.context === 'shared_wallet_withdrawal') {
-          // For shared wallet, use sharedWalletId as address identifier
-          address = sharedWalletId || recipientAddress || '';
+          // For split contexts, try to get from config, props, or split wallet address
+          address = effectiveRecipientAddress || '';
+          
+          // If still empty and we have splitWalletId, try to load the wallet address
+          if (!address && effectiveSplitWalletId) {
+            // Address will be resolved when split wallet is loaded
+            // For now, use the splitWalletId as a placeholder
+            address = effectiveSplitWalletId;
+          }
+        } else if (config.context === 'shared_wallet_funding') {
+          // For shared wallet funding, use sharedWalletId as address identifier (destination is shared wallet)
+          address = effectiveSharedWalletId || effectiveRecipientAddress || '';
+        } else if (config.context === 'shared_wallet_withdrawal') {
+          // For shared wallet withdrawal, destination is user's wallet (not shared wallet)
+          // Use customRecipientInfo.address if provided, otherwise fall back to recipientAddress
+          address = config.customRecipientInfo?.address || effectiveRecipientAddress || '';
+        } else {
+          // For other contexts (including send_1to1), use recipientAddress
+          address = effectiveRecipientAddress || '';
         }
       }
       
@@ -198,24 +240,24 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
       };
     }
 
-    // Route-provided recipient info
+    // Route-provided recipient info (matching screen)
     if (recipientInfo) {
       return recipientInfo;
     }
 
-    // Contact-based recipient
+    // Contact-based recipient (matching screen logic)
     if (contact) {
       const contactName = contact.name || contact.email?.split('@')[0] || `User ${contact.id}`;
       return {
         name: contactName,
         address: contact.email || '',
-        avatar: contact.avatar,
+        avatar: contact.avatar || contact.photoURL,
         walletAddress: contact.wallet_address,
         type: 'friend' as const
       };
     }
 
-    // Wallet-based recipient
+    // Wallet-based recipient (matching screen logic)
     if (wallet) {
       const walletName = wallet.label || wallet.name || (wallet.address ? `Wallet ${formatWalletAddress(wallet.address)}` : 'External Wallet');
       return {
@@ -232,13 +274,107 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
 
   const displayRecipientInfo = getRecipientInfo();
 
-  // Build transaction parameters
+  // Load split/shared wallet address if needed (matching screen behavior)
+  const [loadedRecipientAddress, setLoadedRecipientAddress] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const loadRecipientAddress = async () => {
+      // Only load if customRecipientInfo has empty address and we have splitWalletId or sharedWalletId
+      if (!config.customRecipientInfo || config.customRecipientInfo.address) {
+        setLoadedRecipientAddress(null);
+        return;
+      }
+
+      try {
+        if (config.context === 'fair_split_contribution' || config.context === 'degen_split_lock' || config.context === 'spend_split_payment') {
+          if (effectiveSplitWalletId) {
+            const { SplitWalletService } = await import('../../services/split');
+            const walletResult = await SplitWalletService.getSplitWallet(effectiveSplitWalletId);
+            if (walletResult.success && walletResult.wallet?.walletAddress) {
+              setLoadedRecipientAddress(walletResult.wallet.walletAddress);
+              logger.info('Loaded split wallet address', {
+                splitWalletId: effectiveSplitWalletId,
+                address: walletResult.wallet.walletAddress
+              }, 'CentralizedTransactionModal');
+            }
+          }
+        } else if (config.context === 'shared_wallet_funding') {
+          if (effectiveSharedWalletId) {
+            // For shared wallet funding, the ID is the address identifier (destination is shared wallet)
+            // The actual wallet address will be resolved by the transaction handler
+            setLoadedRecipientAddress(effectiveSharedWalletId);
+            logger.info('Shared wallet funding context', { sharedWalletId: effectiveSharedWalletId }, 'CentralizedTransactionModal');
+          }
+        } else if (config.context === 'shared_wallet_withdrawal') {
+          // For shared wallet withdrawal, destination is user's wallet
+          // Use customRecipientInfo.address if provided (should be user's wallet address)
+          if (config.customRecipientInfo?.address) {
+            setLoadedRecipientAddress(config.customRecipientInfo.address);
+            logger.info('Shared wallet withdrawal - using custom recipient address', { 
+              address: config.customRecipientInfo.address 
+            }, 'CentralizedTransactionModal');
+          } else if (effectiveRecipientAddress) {
+            setLoadedRecipientAddress(effectiveRecipientAddress);
+            logger.info('Shared wallet withdrawal - using recipient address from props', { 
+              address: effectiveRecipientAddress 
+            }, 'CentralizedTransactionModal');
+          }
+        }
+      } catch (error) {
+        logger.warn('Failed to load recipient address', { error }, 'CentralizedTransactionModal');
+        setLoadedRecipientAddress(null);
+      }
+    };
+
+    if (visible) {
+      loadRecipientAddress();
+    }
+  }, [visible, config.context, effectiveSplitWalletId, effectiveSharedWalletId, config.customRecipientInfo]);
+
+  // Update recipient info with loaded address (matching screen behavior)
+  const finalRecipientInfo = useMemo(() => {
+    if (!displayRecipientInfo) return null;
+    
+    // If address is empty but we loaded one, use it
+    if ((!displayRecipientInfo.walletAddress || displayRecipientInfo.walletAddress === '') && loadedRecipientAddress) {
+      return {
+        ...displayRecipientInfo,
+        address: loadedRecipientAddress,
+        walletAddress: loadedRecipientAddress
+      };
+    }
+    
+    return displayRecipientInfo;
+  }, [displayRecipientInfo, loadedRecipientAddress]);
+
+  // Initialize wallet on mount (matching screen behavior)
+  useEffect(() => {
+    if (currentUser?.id && !appWalletBalance && !liveBalance) {
+      ensureAppWallet(currentUser.id.toString());
+    }
+  }, [currentUser?.id, appWalletBalance, liveBalance, ensureAppWallet]);
+
+  // Build transaction parameters with better validation and error messages
   const buildTransactionParams = (): TransactionParams | null => {
-    if (!currentUser?.id) return null;
+    if (!currentUser?.id) {
+      logger.error('Cannot build transaction params: currentUser is missing', {
+        context: config.context,
+        hasPropCurrentUser: !!propCurrentUser,
+        hasAppStateUser: !!appState?.currentUser
+      }, 'CentralizedTransactionModal');
+      return null;
+    }
 
     // Parse amount with comma replaced by period for calculation
     const numAmount = parseFloat(amount.replace(',', '.'));
-    if (isNaN(numAmount) || numAmount <= 0) return null;
+    if (isNaN(numAmount) || numAmount <= 0) {
+      logger.warn('Invalid amount for transaction', {
+        context: config.context,
+        amount,
+        parsedAmount: numAmount
+      }, 'CentralizedTransactionModal');
+      return null;
+    }
 
     const baseParams = {
       userId: currentUser.id.toString(),
@@ -250,89 +386,165 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
 
     switch (config.context) {
       case 'send_1to1':
-        if (!displayRecipientInfo?.walletAddress) return null;
+        if (!finalRecipientInfo?.walletAddress) {
+          logger.error('Cannot build send_1to1 params: recipient wallet address is missing', {
+            hasDisplayRecipientInfo: !!displayRecipientInfo,
+            hasFinalRecipientInfo: !!finalRecipientInfo,
+            hasWalletAddress: !!finalRecipientInfo?.walletAddress
+          }, 'CentralizedTransactionModal');
+          return null;
+        }
         return {
           ...baseParams,
           context: 'send_1to1',
           destinationType: contact ? 'friend' : 'external',
-          recipientAddress: displayRecipientInfo.walletAddress,
+          recipientAddress: finalRecipientInfo.walletAddress,
           recipientInfo: {
-            name: displayRecipientInfo.name,
-            email: displayRecipientInfo.address,
-            avatar: displayRecipientInfo.avatar
+            name: finalRecipientInfo.name,
+            email: finalRecipientInfo.address,
+            avatar: finalRecipientInfo.avatar
           },
           requestId,
           isSettlement
         } as any;
 
       case 'fair_split_contribution':
-        if (!splitWalletId) return null;
+        if (!effectiveSplitWalletId) {
+          logger.error('Cannot build fair_split_contribution params: splitWalletId is missing', {
+            configSplitWalletId: config.splitWalletId,
+            propSplitWalletId: splitWalletId
+          }, 'CentralizedTransactionModal');
+          return null;
+        }
         return {
           ...baseParams,
           context: 'fair_split_contribution',
           destinationType: 'split_wallet',
-          splitWalletId,
-          splitId,
-          billId
+          splitWalletId: effectiveSplitWalletId,
+          splitId: effectiveSplitId,
+          billId: effectiveBillId
         } as any;
 
       case 'fair_split_withdrawal':
-        if (!splitWalletId || !displayRecipientInfo?.walletAddress) return null;
+        if (!effectiveSplitWalletId) {
+          logger.error('Cannot build fair_split_withdrawal params: splitWalletId is missing', {
+            configSplitWalletId: config.splitWalletId,
+            propSplitWalletId: splitWalletId
+          }, 'CentralizedTransactionModal');
+          return null;
+        }
+        if (!finalRecipientInfo?.walletAddress) {
+          logger.error('Cannot build fair_split_withdrawal params: destination address is missing', {
+            hasDisplayRecipientInfo: !!displayRecipientInfo,
+            hasFinalRecipientInfo: !!finalRecipientInfo,
+            hasWalletAddress: !!finalRecipientInfo?.walletAddress
+          }, 'CentralizedTransactionModal');
+          return null;
+        }
         return {
           ...baseParams,
           context: 'fair_split_withdrawal',
           sourceType: 'split_wallet',
           destinationType: 'external',
-          splitWalletId,
-          destinationAddress: displayRecipientInfo.walletAddress,
-          splitId,
-          billId
+          splitWalletId: effectiveSplitWalletId,
+          destinationAddress: finalRecipientInfo.walletAddress,
+          splitId: effectiveSplitId,
+          billId: effectiveBillId
         } as any;
 
       case 'degen_split_lock':
-        if (!splitWalletId) return null;
+        if (!effectiveSplitWalletId) {
+          logger.error('Cannot build degen_split_lock params: splitWalletId is missing', {
+            configSplitWalletId: config.splitWalletId,
+            propSplitWalletId: splitWalletId
+          }, 'CentralizedTransactionModal');
+          return null;
+        }
         return {
           ...baseParams,
           context: 'degen_split_lock',
           destinationType: 'split_wallet',
-          splitWalletId,
-          splitId,
-          billId
+          splitWalletId: effectiveSplitWalletId,
+          splitId: effectiveSplitId,
+          billId: effectiveBillId
         } as any;
 
       case 'spend_split_payment':
-        if (!splitId || !splitWalletId) return null;
+        if (!effectiveSplitId || !effectiveSplitWalletId) {
+          logger.error('Cannot build spend_split_payment params: splitId or splitWalletId is missing', {
+            configSplitId: config.splitId,
+            propSplitId: splitId,
+            configSplitWalletId: config.splitWalletId,
+            propSplitWalletId: splitWalletId
+          }, 'CentralizedTransactionModal');
+          return null;
+        }
+        if (!finalRecipientInfo?.walletAddress) {
+          logger.error('Cannot build spend_split_payment params: merchant address is missing', {
+            hasFinalRecipientInfo: !!finalRecipientInfo,
+            hasWalletAddress: !!finalRecipientInfo?.walletAddress,
+            hasDisplayRecipientInfo: !!displayRecipientInfo,
+            customRecipientInfoAddress: config.customRecipientInfo?.address
+          }, 'CentralizedTransactionModal');
+          return null;
+        }
         return {
           ...baseParams,
           context: 'spend_split_payment',
           destinationType: 'merchant',
-          splitId,
-          splitWalletId
+          splitId: effectiveSplitId,
+          splitWalletId: effectiveSplitWalletId,
+          merchantAddress: finalRecipientInfo.walletAddress  // ✅ CRITICAL: Pass merchant address
         } as any;
 
       case 'shared_wallet_funding':
-        if (!sharedWalletId) return null;
+        if (!effectiveSharedWalletId) {
+          logger.error('Cannot build shared_wallet_funding params: sharedWalletId is missing', {
+            configSharedWalletId: config.sharedWalletId,
+            propSharedWalletId: sharedWalletId
+          }, 'CentralizedTransactionModal');
+          return null;
+        }
         return {
           ...baseParams,
           context: 'shared_wallet_funding',
           destinationType: 'shared_wallet',
-          sharedWalletId,
+          sharedWalletId: effectiveSharedWalletId,
           sourceType: 'user_wallet'
         } as any;
 
       case 'shared_wallet_withdrawal':
-        if (!sharedWalletId || !displayRecipientInfo?.walletAddress) return null;
+        if (!effectiveSharedWalletId) {
+          logger.error('Cannot build shared_wallet_withdrawal params: sharedWalletId is missing', {
+            configSharedWalletId: config.sharedWalletId,
+            propSharedWalletId: sharedWalletId
+          }, 'CentralizedTransactionModal');
+          return null;
+        }
+        // For shared wallet withdrawal, destination address is optional
+        // The transaction handler will fetch user wallet address if not provided
+        // This allows the transaction to proceed even if userWalletAddress hasn't loaded yet
+        const destinationAddress = finalRecipientInfo?.walletAddress || config.customRecipientInfo?.address || effectiveRecipientAddress || undefined;
+        
+        if (destinationAddress && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(destinationAddress)) {
+          // Invalid address format - let handler fetch it
+          logger.warn('Invalid destination address format for withdrawal, handler will fetch user wallet', {
+            providedAddress: destinationAddress
+          }, 'CentralizedTransactionModal');
+        }
+        
         return {
           ...baseParams,
           context: 'shared_wallet_withdrawal',
           sourceType: 'shared_wallet',
           destinationType: 'external',
-          sharedWalletId,
-          destinationAddress: displayRecipientInfo.walletAddress,
+          sharedWalletId: effectiveSharedWalletId,
+          destinationAddress: destinationAddress, // Can be undefined - handler will fetch
           destinationId: wallet?.id
         } as any;
 
       default:
+        logger.error('Unknown transaction context', { context: config.context }, 'CentralizedTransactionModal');
         return null;
     }
   };
@@ -364,7 +576,16 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
 
     const params = buildTransactionParams();
     if (!params) {
+      // Match screen behavior - show Alert for parameter building errors
       Alert.alert('Error', 'Unable to build transaction parameters');
+      logger.error('Failed to build transaction parameters', {
+        context: config.context,
+        hasCurrentUser: !!currentUser?.id,
+        hasSplitWalletId: !!effectiveSplitWalletId,
+        hasSplitId: !!effectiveSplitId,
+        hasSharedWalletId: !!effectiveSharedWalletId,
+        hasRecipientInfo: !!displayRecipientInfo
+      }, 'CentralizedTransactionModal');
       return;
     }
 
@@ -379,7 +600,8 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     if (!validation.canExecute) {
       setIsProcessing(false);
       isExecutingRef.current = false;
-      setValidationError(validation.error || 'Transaction validation failed');
+      // Match screen behavior - show Alert for validation errors
+      Alert.alert('Transaction Error', validation.error || 'Transaction validation failed');
       return;
     }
 
@@ -454,18 +676,14 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
       setIsProcessing(false);
       isExecutingRef.current = false;
     }
-  }, [config, amount, currentUser, displayRecipientInfo, centralizedTransactionHandler]);
+  }, [amount, config.context, currentUser, finalRecipientInfo, contact, wallet, requestId, isSettlement, effectiveSplitWalletId, effectiveSplitId, effectiveBillId, effectiveSharedWalletId, centralizedTransactionHandler]);
 
-  // For spend split payment, auto-execute when modal opens (only once)
+  // For spend split payment, auto-execute on mount (matching screen behavior)
   useEffect(() => {
-    if (visible && config.context === 'spend_split_payment' && splitId && splitWalletId && !isExecutingRef.current && !isProcessing) {
-      logger.info('Auto-executing spend split payment', {
-        splitId,
-        splitWalletId
-      }, 'CentralizedTransactionModal');
+    if (config.context === 'spend_split_payment' && effectiveSplitId && effectiveSplitWalletId) {
       handleExecuteTransaction();
     }
-  }, [visible, config.context, splitId, splitWalletId]);
+  }, [config.context, effectiveSplitId, effectiveSplitWalletId, handleExecuteTransaction]);
 
   // Calculate network fee (3%)
   const numAmount = parseFloat(amount.replace(',', '.')) || 0;
@@ -481,26 +699,26 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     }
   };
 
-  // Map recipient info to SendComponent format
+  // Map recipient info to SendComponent format (using finalRecipientInfo like screen)
   const sendComponentRecipientInfo: RecipientInfo | null = useMemo(() => {
-    if (!displayRecipientInfo) return null;
+    if (!finalRecipientInfo) return null;
 
-  // Determine recipient display name - never show "N/A"
+  // Determine recipient display name - never show "N/A" (matching screen logic)
     let recipientName = '';
     
     // For merchant, split, or shared types, use the name directly
-    if (displayRecipientInfo.type === 'merchant' || 
-        displayRecipientInfo.type === 'split' || 
-        displayRecipientInfo.type === 'shared') {
-      recipientName = displayRecipientInfo.name;
+    if (finalRecipientInfo.type === 'merchant' || 
+        finalRecipientInfo.type === 'split' || 
+        finalRecipientInfo.type === 'shared') {
+      recipientName = finalRecipientInfo.name || 'Recipient';
     }
     // For friend/external transfers, use recipient name (never "Order #N/A")
-    else if (displayRecipientInfo.name && displayRecipientInfo.name !== 'N/A') {
-      recipientName = displayRecipientInfo.name;
+    else if (finalRecipientInfo.name && finalRecipientInfo.name !== 'N/A') {
+      recipientName = finalRecipientInfo.name;
     }
     // Fallback: use wallet address if name is not available
-    else if (displayRecipientInfo.walletAddress) {
-      recipientName = formatWalletAddress(displayRecipientInfo.walletAddress);
+    else if (finalRecipientInfo.walletAddress) {
+      recipientName = formatWalletAddress(finalRecipientInfo.walletAddress);
     }
     // Last resort: use contact name or generic
     else {
@@ -512,15 +730,15 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     let iconColor: string | undefined;
     let imageUrl: string | undefined;
 
-    if (displayRecipientInfo.type === 'merchant') {
+    if (finalRecipientInfo.type === 'merchant') {
       imageUrl = 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkast-logo.png?alt=media&token=e338e812-0bb1-4725-b6ef-2a59b2bd696f';
-    } else if (displayRecipientInfo.type === 'split') {
+    } else if (finalRecipientInfo.type === 'split') {
       icon = 'Users';
       iconColor = colors.blue;
-    } else if (displayRecipientInfo.type === 'shared') {
+    } else if (finalRecipientInfo.type === 'shared') {
       icon = 'Wallet';
       iconColor = colors.blue;
-    } else if (displayRecipientInfo.type === 'friend') {
+    } else if (finalRecipientInfo.type === 'friend') {
       // Friend type - will use Avatar component
     } else {
       icon = 'CurrencyDollar';
@@ -529,14 +747,14 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
 
     return {
       name: recipientName,
-      address: displayRecipientInfo.walletAddress || displayRecipientInfo.address || '',
-      avatarUrl: displayRecipientInfo.avatar,
+      address: finalRecipientInfo.walletAddress || finalRecipientInfo.address || '',
+      avatarUrl: finalRecipientInfo.avatar,
       userId: contact?.id?.toString(),
       icon,
       iconColor,
       imageUrl,
     };
-  }, [displayRecipientInfo, contact]);
+  }, [finalRecipientInfo, contact]);
 
   // Store shared wallet address for display
   const [sharedWalletAddress, setSharedWalletAddress] = useState<string | null>(null);
@@ -546,7 +764,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   const walletInfo: WalletInfo = useMemo(() => {
     // For withdrawals, ALWAYS show the shared wallet as the source (sender)
     // This is the wallet we're withdrawing FROM
-    if (config.context === 'shared_wallet_withdrawal' && sharedWalletId) {
+    if (config.context === 'shared_wallet_withdrawal' && effectiveSharedWalletId) {
       // Use shared wallet balance if loaded, otherwise show 0 (will update when loaded)
       const balance = sharedWalletBalance !== null ? sharedWalletBalance : 0;
       return {
@@ -571,7 +789,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
       iconColor: colors.green,
       imageUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-new.png?alt=media&token=f42ea1b1-5f23-419e-a499-931862819cbf',
     };
-  }, [effectiveBalance, config.context, sharedWalletId, sharedWalletBalance, sharedWalletAddress]);
+  }, [effectiveBalance, config.context, effectiveSharedWalletId, sharedWalletBalance, sharedWalletAddress]);
 
   // Handle amount change from SendComponent
   const handleAmountChange = useCallback((newAmount: string) => {
@@ -599,7 +817,9 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   }, [config]);
 
   // Don't render SendComponent if recipient info is not available
-  if (!sendComponentRecipientInfo && config.showAmountInput) {
+  // Check if we need recipient info (showAmountInput OR prefilledAmount)
+  const needsRecipientInfo = config.showAmountInput || (config.prefilledAmount && config.prefilledAmount > 0);
+  if (!sendComponentRecipientInfo && needsRecipientInfo) {
     return (
       <Modal
         visible={visible}
@@ -637,14 +857,22 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             </View>
           )}
 
+        {/* Validation Error - Before SendComponent (matching screen order) */}
+        {validationError && (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{validationError}</Text>
+          </View>
+        )}
+
         {/* SendComponent - Main UI */}
-        {sendComponentRecipientInfo && config.showAmountInput && (
+        {/* Show SendComponent if: showAmountInput is true OR we have a prefilled amount (for degen split, etc.) */}
+        {sendComponentRecipientInfo && (config.showAmountInput || (config.prefilledAmount && config.prefilledAmount > 0)) && (
           <SendComponent
             recipient={sendComponentRecipientInfo}
             onRecipientChange={config.allowExternalDestinations ? handleRecipientChange : undefined}
             showRecipientChange={false}
             amount={amount}
-            onAmountChange={handleAmountChange}
+            onAmountChange={config.showAmountInput ? handleAmountChange : undefined}
             currency="USDC"
             note={note}
             onNoteChange={config.showMemoInput ? handleNoteChange : undefined}
@@ -658,16 +886,9 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             onSendPress={handleExecuteTransaction}
             sendButtonDisabled={!canExecute || isProcessing}
             sendButtonLoading={isProcessing}
-            sendButtonTitle={isProcessing ? 'Processing...' : 'Send'}
+            sendButtonTitle={isProcessing ? 'Processing...' : (config.context === 'degen_split_lock' ? 'Lock Funds' : 'Send')}
             containerStyle={styles.sendComponentContainer}
           />
-        )}
-
-        {/* Validation Error - After SendComponent, matching SpendPaymentModal order */}
-        {validationError && (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>{validationError}</Text>
-          </View>
         )}
       </ScrollView>
     </Modal>

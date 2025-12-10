@@ -816,26 +816,24 @@ export class SplitWalletPayments {
         walletAddress: wallet.walletAddress
       }, 'SplitWalletPayments');
 
-      // Execute transaction using centralized handler for proper deduplication and validation
+      // Execute withdrawal using unified withdrawal service for consistency
       // This ensures split wallet withdrawals are protected against race conditions
-      const { CentralizedTransactionHandler } = await import('../transactions/CentralizedTransactionHandler');
-      const transactionResult = await CentralizedTransactionHandler.executeTransaction({
-        context: 'fair_split_withdrawal',
+      const { UnifiedWithdrawalService } = await import('../transactions/UnifiedWithdrawalService');
+      const transactionResult = await UnifiedWithdrawalService.withdraw({
+        sourceType: 'split_wallet',
+        sourceId: splitWalletId,
+        destinationAddress: recipientAddress,
         userId: creatorId.toString(),
         amount: withdrawalAmount,
-        currency: wallet.currency,
-        sourceType: 'split_wallet',
-        destinationType: 'external',
-        splitWalletId,
-        destinationAddress: recipientAddress,
+        currency: wallet.currency as 'USDC' | 'SOL',
+        memo: description || `Fair Split funds extraction for bill ${wallet.billId}`,
         splitId: wallet.splitId,
-        billId: wallet.billId,
-        memo: description || `Fair Split funds extraction for bill ${wallet.billId}`
+        billId: wallet.billId
       });
       
       logger.info('💸 Fair split transaction result', {
         success: transactionResult.success,
-        signature: transactionResult.signature,
+        signature: transactionResult.transactionSignature,
         error: transactionResult.error,
         withdrawalAmount,
         walletAddress: wallet.walletAddress,
@@ -846,7 +844,7 @@ export class SplitWalletPayments {
         logger.error('Fair split withdrawal transaction failed', {
           splitWalletId,
           error: transactionResult.error,
-          signature: transactionResult.signature,
+          signature: transactionResult.transactionSignature,
           withdrawalAmount,
           walletAddress: wallet.walletAddress,
           recipientAddress
@@ -867,7 +865,7 @@ export class SplitWalletPayments {
           userId: creatorId,
           toAddress: recipientAddress,
           amount: withdrawalAmount,
-          signature: transactionResult.signature!,
+          signature: transactionResult.transactionSignature!,
           transactionType: 'split_wallet_withdrawal',
           companyFee: 0, // No fee for withdrawals
           netAmount: withdrawalAmount,
@@ -876,7 +874,7 @@ export class SplitWalletPayments {
         });
         
         logger.info('✅ Fair split withdrawal transaction saved', {
-          signature: transactionResult.signature,
+          signature: transactionResult.transactionSignature,
           creatorId,
           splitWalletId,
           amount: withdrawalAmount
@@ -892,19 +890,19 @@ export class SplitWalletPayments {
         status: 'completed',
         completedAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
-        finalTransactionSignature: transactionResult.signature
+        finalTransactionSignature: transactionResult.transactionSignature
       });
 
       logger.info('✅ Fair split funds extraction completed successfully', {
               splitWalletId,
         recipientAddress,
         amount: withdrawalAmount,
-              transactionSignature: transactionResult.signature
+              transactionSignature: transactionResult.transactionSignature
             }, 'SplitWalletPayments');
 
       return {
         success: true,
-        transactionSignature: transactionResult.signature,
+        transactionSignature: transactionResult.transactionSignature,
         amount: withdrawalAmount
       };
 
@@ -1770,21 +1768,19 @@ export class SplitWalletPayments {
         };
       }
 
-      // Execute transaction using centralized handler for proper deduplication and validation
+      // Execute withdrawal using unified withdrawal service for consistency
       // This ensures split wallet transfers are protected against race conditions
-      const { CentralizedTransactionHandler } = await import('../transactions/CentralizedTransactionHandler');
-      const transactionResult = await CentralizedTransactionHandler.executeTransaction({
-        context: 'fair_split_withdrawal',
+      const { UnifiedWithdrawalService } = await import('../transactions/UnifiedWithdrawalService');
+      const transactionResult = await UnifiedWithdrawalService.withdraw({
+        sourceType: 'split_wallet',
+        sourceId: splitWalletId,
+        destinationAddress: userWallet.address,
         userId: userId.toString(),
         amount: amount,
-        currency: wallet.currency,
-        sourceType: 'split_wallet',
-        destinationType: 'external',
-        splitWalletId,
-        destinationAddress: userWallet.address,
+        currency: wallet.currency as 'USDC' | 'SOL',
+        memo: `User wallet transfer for ${wallet.id}`,
         splitId: wallet.splitId,
-        billId: wallet.billId,
-        memo: `User wallet transfer for ${wallet.id}`
+        billId: wallet.billId
       });
 
       if (!transactionResult.success) {
@@ -1803,7 +1799,7 @@ export class SplitWalletPayments {
           userId: wallet.creatorId,
           toAddress: userWallet.address,
           amount: amount,
-          signature: transactionResult.signature!,
+          signature: transactionResult.transactionSignature!,
           transactionType: 'split_wallet_withdrawal',
           companyFee: 0, // No fee for withdrawals
           netAmount: amount,
@@ -1812,7 +1808,7 @@ export class SplitWalletPayments {
         });
         
         logger.info('✅ User wallet transfer transaction saved', {
-          signature: transactionResult.signature,
+          signature: transactionResult.transactionSignature,
           creatorId: wallet.creatorId,
           splitWalletId,
           amount: amount
@@ -1826,12 +1822,12 @@ export class SplitWalletPayments {
           splitWalletId,
         userId,
         amount,
-        transactionSignature: transactionResult.signature
+        transactionSignature: transactionResult.transactionSignature
         }, 'SplitWalletPayments');
         
       return {
         success: true,
-        transactionSignature: transactionResult.signature,
+        transactionSignature: transactionResult.transactionSignature,
         amount
       };
 
