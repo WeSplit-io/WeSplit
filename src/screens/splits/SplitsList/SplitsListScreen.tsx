@@ -93,18 +93,11 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
   const [knownTotalPages, setKnownTotalPages] = useState<number | null>(null); // Track exact total pages when we reach the last page
   const [isLoadingCount, setIsLoadingCount] = useState(false); // Track if we're loading the total count
   const [hasLoadedCountOnce, setHasLoadedCountOnce] = useState(false); // Track if we've loaded count at least once
-  // Ensure activeTab is never 'sharedWallets' in production builds
-  const [activeTab, setActiveTab] = useState<'splits' | 'sharedWallets'>(__DEV__ ? 'splits' : 'splits'); // NEW: Top-level tab state
+  // Shared wallets are now enabled in production
+  const [activeTab, setActiveTab] = useState<'splits' | 'sharedWallets'>('splits'); // NEW: Top-level tab state
   const [sharedWallets, setSharedWallets] = useState<SharedWallet[]>([]);
   const [isLoadingSharedWallets, setIsLoadingSharedWallets] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  
-  // Safeguard: Reset to splits tab if shared wallets are disabled and activeTab is sharedWallets
-  useEffect(() => {
-    if (!__DEV__ && activeTab === 'sharedWallets') {
-      setActiveTab('splits');
-    }
-  }, [activeTab]);
   const SPLITS_PER_PAGE = 10;
   
   // Refs to prevent infinite loops
@@ -369,10 +362,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     const routeParamsKey = JSON.stringify(currentRouteParams);
     let newInitialTab = currentRouteParams.activeTab as 'splits' | 'sharedWallets' | undefined;
     
-    // If shared wallets are disabled and route tries to set it, default to splits
-    if (!__DEV__ && newInitialTab === 'sharedWallets') {
-      newInitialTab = 'splits';
-    }
+    // Shared wallets are now enabled in production, so no need to override the tab
     
     // Only apply route params if:
     // 1. There's a new tab in route params
@@ -1252,12 +1242,11 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Pools</Text>
           <TouchableOpacity
-            style={[styles.newPoolButton, activeTab === 'sharedWallets' && !__DEV__ && styles.newPoolButtonDisabled]}
-            onPress={activeTab === 'splits' ? handleOpenCreateModal : (__DEV__ && activeTab === 'sharedWallets' ? handleCreateSharedWallet : undefined)}
+            style={styles.newPoolButton}
+            onPress={activeTab === 'splits' ? handleOpenCreateModal : handleCreateSharedWallet}
             activeOpacity={0.8}
-            disabled={activeTab === 'sharedWallets' && !__DEV__}
           >
-              <PhosphorIcon name="Plus" size={16} color={activeTab === 'sharedWallets' && !__DEV__ ? colors.white : colors.white} weight="bold" />
+              <PhosphorIcon name="Plus" size={16} color={colors.white} weight="bold" />
               
           </TouchableOpacity>
         </View>
@@ -1267,13 +1256,11 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         <Tabs
           tabs={[
             { label: 'Splits', value: 'splits' },
-            ...(__DEV__ ? [{ label: 'Shared Wallets', value: 'sharedWallets' }] : []),
+            { label: 'Shared Wallets', value: 'sharedWallets' },
           ]}
           activeTab={activeTab}
           onTabChange={(tab) => {
-            // Only allow sharedWallets tab in dev mode
-            const selectedTab = (tab === 'sharedWallets' && __DEV__) ? 'sharedWallets' : 'splits';
-            setActiveTab(selectedTab as 'splits' | 'sharedWallets');
+            setActiveTab(tab as 'splits' | 'sharedWallets');
             // Mark that user has manually changed the tab
             // This prevents route params from overriding user's choice
             userHasManuallyChangedTabRef.current = true;

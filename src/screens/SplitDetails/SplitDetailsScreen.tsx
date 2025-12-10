@@ -1589,14 +1589,23 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           isDraftToUpdate,
           currentSplitDataStatus: currentSplitData?.status,
           splitDataStatus: splitData?.status,
-          hasProcessedBillData: !!currentProcessedBillData
+          hasProcessedBillData: !!currentProcessedBillData,
+          hasDraftSplit: createdSplitId || currentSplitData?.status === 'draft' || splitData?.status === 'draft',
+          shouldUpdateExisting: (splitIdToUse && !isActuallyNewBill && !isActuallyManualCreation) || 
+                                 ((createdSplitId || currentSplitData?.status === 'draft' || splitData?.status === 'draft') && splitIdToUse)
         }, 'SplitDetailsScreen');
       }
 
       // CRITICAL: Always update if we have a splitIdToUse and it's not a new bill
       // This prevents creating duplicates for draft splits
       // If we have splitIdToUse and it's not a new bill, we should update, not create
-      const shouldUpdateExisting = splitIdToUse && !isActuallyNewBill && !isActuallyManualCreation;
+      // ALSO: If we have a createdSplitId (draft split was just created), always update
+      // ALSO: If currentSplitData has status 'draft', always update
+      const hasDraftSplit = createdSplitId || 
+                            currentSplitData?.status === 'draft' || 
+                            splitData?.status === 'draft';
+      const shouldUpdateExisting = (splitIdToUse && !isActuallyNewBill && !isActuallyManualCreation) || 
+                                   (hasDraftSplit && splitIdToUse);
       
       if (shouldUpdateExisting) {
         // Update existing draft split with split type

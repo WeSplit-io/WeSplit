@@ -38,9 +38,8 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
     onCreateSharedWallet();
   };
 
-  // Enable shared wallet in dev mode, disable in production builds
-  // __DEV__ is false in production builds, true in development
-  const isSharedWalletEnabled = __DEV__;
+  // Shared wallet is now enabled in production
+  const isSharedWalletEnabled = true;
 
   return (
     <Modal
