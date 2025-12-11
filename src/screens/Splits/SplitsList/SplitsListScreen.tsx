@@ -356,7 +356,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
 
   // Handle route params to set active tab (e.g., when navigating from SharedWalletName or SharedWalletDetails)
   // Only apply if user hasn't manually changed the tab and route params have changed
-  // Also ensure sharedWallets tab is only available in dev mode
+  // Shared wallets tab is now available in production
   useEffect(() => {
     const currentRouteParams = route?.params || {};
     const routeParamsKey = JSON.stringify(currentRouteParams);
@@ -1389,8 +1389,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
           </View>
           )
         ) : (
-          /* Shared Wallets List - Only visible in dev mode */
-          __DEV__ ? (
+          /* Shared Wallets List */
           isLoadingSharedWallets ? (
             <View style={styles.loadingContainer}>
               <ModernLoader size="large" text="Loading shared wallets..." />
@@ -1416,7 +1415,6 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
               ))}
             </View>
           )
-          ) : null
         )}
         </ScrollView>
       </View>

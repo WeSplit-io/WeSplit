@@ -71,7 +71,7 @@ const CreateChoiceModal: React.FC<CreateChoiceModalProps> = ({
           </Text>
         </TouchableOpacity>
 
-        {/* Create Shared Wallet Option - Enabled in dev, disabled in production */}
+        {/* Create Shared Wallet Option - Enabled in production */}
         {isSharedWalletEnabled ? (
           <TouchableOpacity
             style={styles.option}

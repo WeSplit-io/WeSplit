@@ -21,6 +21,43 @@ export interface LogEntry {
   source?: string;
 }
 
+// Log level hierarchy
+const LOG_LEVELS = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+} as const;
+
+// Get log level from environment or default to 'warn' in production, 'debug' in dev
+const getLogLevel = (): number => {
+  const envLevel = process.env.LOG_LEVEL || (__DEV__ ? 'debug' : 'warn');
+  const level = envLevel.toLowerCase() as keyof typeof LOG_LEVELS;
+  return LOG_LEVELS[level] ?? LOG_LEVELS.warn;
+};
+
+// Cache log level to avoid repeated lookups
+const currentLogLevel = getLogLevel();
+
+// Sources that should be silenced in production (too verbose)
+const VERBOSE_SOURCES = [
+  'AvatarService',
+  'LiveBalanceService',
+  'useLiveBalance',
+  'SecureVault',
+  'MemoryManager',
+  'FirebaseDataService',
+  'storageUrlService',
+  'WalletRecoveryService',
+  'SimplifiedWalletService',
+  'BalanceUtils',
+  'TransactionUtils',
+  'ConsolidatedTransactionService',
+  'NavigationWrapper',
+  'SplashScreen',
+  'DashboardScreen',
+];
+
 class LoggingService {
   private static instance: LoggingService;
   private logs: LogEntry[] = [];
@@ -35,7 +72,37 @@ class LoggingService {
     return LoggingService.instance;
   }
 
+  private shouldLog(level: string, source?: string): boolean {
+    // In production, completely silence all logs except errors
+    if (!__DEV__) {
+      // Only allow ERROR level logs in production
+      return level.toLowerCase() === 'error';
+    }
+
+    // In development, respect log level configuration
+    const levelNum = LOG_LEVELS[level.toLowerCase() as keyof typeof LOG_LEVELS] ?? LOG_LEVELS.warn;
+    
+    // Check if log level is enabled
+    if (levelNum < currentLogLevel) {
+      return false;
+    }
+
+    // In development, silence verbose sources for DEBUG and INFO if needed
+    if (level === 'debug' || level === 'info') {
+      if (source && VERBOSE_SOURCES.includes(source)) {
+        // Still allow in dev, but could be filtered if needed
+      }
+    }
+
+    return true;
+  }
+
   private log(level: string, message: string, data?: LogData, source?: string): void {
+    // Skip logging if level is too low or source is too verbose
+    if (!this.shouldLog(level, source)) {
+      return;
+    }
+
     const entry: LogEntry = {
       level,
       message,
@@ -51,10 +118,12 @@ class LoggingService {
       this.logs = this.logs.slice(-this.maxLogs);
     }
 
-    // Console output for development
+    // Console output only in development mode
+    // In production, no console output at all (except errors which are handled separately)
     if (__DEV__) {
       console.log(`[${level.toUpperCase()}] ${source ? `[${source}] ` : ''}${message}`, data || '');
     }
+    // Production: No console output - logs are stored internally but not displayed
   }
 
   public debug(message: string, data?: LogData, source?: string): void {

@@ -95,6 +95,7 @@ export const clearUserCache = (): void => {
 
 /**
  * Preload user data for multiple user IDs
+ * Silently handles missing users (common case for deleted/invalid user IDs)
  */
 export const preloadUserData = async (userIds: string[]): Promise<void> => {
   try {
@@ -115,13 +116,20 @@ export const preloadUserData = async (userIds: string[]): Promise<void> => {
           email: user?.email
         });
       } catch (error) {
-        logger.warn('Failed to preload user data', { userId, error }, 'DataUtils');
+        // Silently handle "User not found" errors - this is expected for deleted/invalid users
+        // Only log if it's a different type of error
+        const isUserNotFound = error instanceof Error && error.message === 'User not found';
+        if (!isUserNotFound) {
+          logger.warn('Failed to preload user data', { userId, error }, 'DataUtils');
+        }
+        // Cache as unknown user to prevent repeated lookups
         userCache.set(userId, { name: 'Unknown User' });
       }
     });
 
     await Promise.all(userPromises);
   } catch (error) {
+    // Only log unexpected errors
     logger.error('Failed to preload user data', { userIds, error }, 'DataUtils');
   }
 };

@@ -347,7 +347,11 @@ export const firebaseDataService = {
             
             return user;
           } catch (error) {
-            logger.error('Failed to get current user', { userId: id, error }, 'FirebaseDataService');
+            // Only log error if it's not a "User not found" error (expected case)
+            const isUserNotFound = error instanceof Error && error.message === 'User not found';
+            if (!isUserNotFound) {
+              logger.error('Failed to get current user', { userId: id, error }, 'FirebaseDataService');
+            }
             throw error;
           }
         },
@@ -1080,27 +1084,35 @@ export const firebaseDataService = {
             where('userId', '==', userId)
           );
           querySnapshot = await getDocs(q);
-          console.log('Tried main collection approach:', {
-            size: querySnapshot.size,
-            empty: querySnapshot.empty,
+          if (__DEV__) {
+            console.log('Tried main collection approach:', {
+              size: querySnapshot.size,
+              empty: querySnapshot.empty,
             docs: querySnapshot.docs.length
           });
+          }
         } catch (mainCollectionError) {
-          console.log('Main collection approach failed, trying subcollection:', mainCollectionError);
+          if (__DEV__) {
+            console.log('Main collection approach failed, trying subcollection:', mainCollectionError);
+          }
           // Fallback: subcollection under user document
           const subcollectionRef = collection(db, 'users', userId, 'externalWallets');
           querySnapshot = await getDocs(subcollectionRef);
         }
         
-        console.log('Firebase query snapshot:', {
-          size: querySnapshot.size,
-          empty: querySnapshot.empty,
+        if (__DEV__) {
+          console.log('Firebase query snapshot:', {
+            size: querySnapshot.size,
+            empty: querySnapshot.empty,
           docs: querySnapshot.docs.length
         });
+        }
         
         const linkedWallets = querySnapshot.docs.map(doc => {
           const data = doc.data();
-          console.log('Firebase doc data:', doc.id, data);
+          if (__DEV__) {
+            console.log('Firebase doc data:', doc.id, data);
+          }
           return {
             id: doc.id,
             ...data

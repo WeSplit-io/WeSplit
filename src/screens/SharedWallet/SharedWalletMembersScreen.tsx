@@ -124,16 +124,6 @@ const SharedWalletMembersScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleNext = useCallback(async () => {
-    // DEV FLAG: Shared wallet creation is only available in development
-    if (isCreatingNewWallet && !__DEV__) {
-      Alert.alert(
-        'Feature Unavailable',
-        'Shared wallet creation is only available in development mode.'
-      );
-      setIsSubmitting(false);
-      return;
-    }
-
     // Validation checks
     if (!currentUser?.id) {
       Alert.alert('Error', 'You must be logged in to perform this action');

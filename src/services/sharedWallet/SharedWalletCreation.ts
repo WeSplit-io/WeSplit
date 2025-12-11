@@ -102,19 +102,6 @@ export class SharedWalletCreation {
   static async createSharedWallet(
     params: CreateSharedWalletParams
   ): Promise<SharedWalletResult> {
-    // DEV FLAG: Shared wallet creation is only available in development
-    if (!__DEV__) {
-      logger.warn('Shared wallet creation attempted in production', {
-        creatorId: params.creatorId,
-        name: params.name
-      }, 'SharedWalletCreation');
-      
-      return {
-        success: false,
-        error: 'Shared wallet creation is only available in development mode'
-      };
-    }
-
     try {
       // Validate parameters
       const validation = this.validateCreationParams(params);

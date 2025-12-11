@@ -76,7 +76,7 @@ class AvatarService {
       const user = await this.getUserData(userId);
       
       if (!user) {
-        logger.warn('User not found', { userId }, 'AvatarService');
+        // Silently handle missing users - this is expected for deleted/invalid users
         this.setCachedAvatar(userId, null, false);
         return null;
       }
@@ -300,7 +300,11 @@ class AvatarService {
       this.setCachedUserData(userId, user ?? null);
       return user ?? null;
     } catch (error) {
-      logger.error('Failed to fetch user data', { userId, error }, 'AvatarService');
+      // Silently handle "User not found" errors - this is expected for deleted/invalid users
+      const isUserNotFound = error instanceof Error && error.message === 'User not found';
+      if (!isUserNotFound) {
+        logger.error('Failed to fetch user data', { userId, error }, 'AvatarService');
+      }
       this.setCachedUserData(userId, null);
       return null;
     }

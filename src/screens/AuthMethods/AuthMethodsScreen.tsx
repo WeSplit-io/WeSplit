@@ -414,11 +414,8 @@ const AuthMethodsScreen: React.FC = () => {
       let errorMessage = 'Failed to send SMS. Please try again.';
       if (error instanceof Error) {
         if (error.message.includes('reCAPTCHA') || error.message.includes('external scripts')) {
-          if (__DEV__) {
-            errorMessage = 'Phone authentication needs reCAPTCHA setup. For testing, try: +15551234567, +15559876543, or +15551111111. For production, configure reCAPTCHA in Firebase Console.';
-          } else {
-            errorMessage = 'Phone authentication is temporarily unavailable. Please try email authentication instead.';
-          }
+          // Production-ready error message - phone auth is enabled
+          errorMessage = 'Phone authentication requires reCAPTCHA verification. Please ensure reCAPTCHA is properly configured in Firebase Console. If the issue persists, try email authentication instead.';
         } else if (error.message.includes('invalid-phone-number')) {
           errorMessage = 'Invalid phone number format. Please use international format (e.g., +1234567890).';
         } else if (error.message.includes('too-many-requests')) {

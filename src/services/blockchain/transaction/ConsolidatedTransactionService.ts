@@ -726,23 +726,9 @@ class ConsolidatedTransactionService {
           return this.handleSpendSplitPayment(params as any);
 
         case 'shared_wallet_funding':
-          // DEV FLAG: Shared wallet operations are only available in development
-          if (!__DEV__) {
-            return {
-              success: false,
-              error: 'Shared wallet funding is only available in development mode'
-            };
-          }
           return this.handleSharedWalletFunding(params as any);
 
         case 'shared_wallet_withdrawal':
-          // DEV FLAG: Shared wallet operations are only available in development
-          if (!__DEV__) {
-            return {
-              success: false,
-              error: 'Shared wallet withdrawal is only available in development mode'
-            };
-          }
           return this.handleSharedWalletWithdrawal(params as any);
 
         default:
@@ -919,19 +905,6 @@ class ConsolidatedTransactionService {
    * Handle Shared Wallet funding
    */
   private async handleSharedWalletFunding(params: any): Promise<CentralizedTransactionResult> {
-    // DEV FLAG: Shared wallet operations are only available in development
-    if (!__DEV__) {
-      logger.warn('Shared wallet funding attempted in production', {
-        userId: params.userId,
-        sharedWalletId: params.sharedWalletId
-      }, 'ConsolidatedTransactionService');
-      
-      return {
-        success: false,
-        error: 'Shared wallet funding is only available in development mode'
-      };
-    }
-
     const { userId, amount, sharedWalletId, memo } = params;
 
     try {
@@ -1211,19 +1184,6 @@ class ConsolidatedTransactionService {
    * Handle Shared Wallet withdrawal
    */
   private async handleSharedWalletWithdrawal(params: any): Promise<CentralizedTransactionResult> {
-    // DEV FLAG: Shared wallet operations are only available in development
-    if (!__DEV__) {
-      logger.warn('Shared wallet withdrawal attempted in production', {
-        userId: params.userId,
-        sharedWalletId: params.sharedWalletId
-      }, 'ConsolidatedTransactionService');
-      
-      return {
-        success: false,
-        error: 'Shared wallet withdrawal is only available in development mode'
-      };
-    }
-
     const { userId, amount, sharedWalletId, destinationAddress, memo } = params;
 
     try {

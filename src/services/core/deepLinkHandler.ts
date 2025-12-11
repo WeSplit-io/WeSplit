@@ -113,7 +113,9 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
     switch (action) {
       case 'join':
         if (!params[0]) {
-          console.warn('🔥 Join action missing inviteId parameter');
+          if (__DEV__) {
+            console.warn('🔥 Join action missing inviteId parameter');
+          }
           return null;
         }
         return {
@@ -130,7 +132,9 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       
       case 'profile':
         if (!params[0]) {
-          console.warn('🔥 Profile action missing userId parameter');
+          if (__DEV__) {
+            console.warn('🔥 Profile action missing userId parameter');
+          }
           return null;
         }
         return {
@@ -143,7 +147,9 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       
       case 'send':
         if (!params[0]) {
-          console.warn('🔥 Send action missing recipientWalletAddress parameter');
+          if (__DEV__) {
+            console.warn('🔥 Send action missing recipientWalletAddress parameter');
+          }
           return null;
         }
         return {
@@ -155,7 +161,9 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       
       case 'transfer':
         if (!params[0]) {
-          console.warn('🔥 Transfer action missing recipientWalletAddress parameter');
+          if (__DEV__) {
+            console.warn('🔥 Transfer action missing recipientWalletAddress parameter');
+          }
           return null;
         }
         return {
@@ -193,7 +201,9 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
         const dataParam = urlObj.searchParams.get('data');
 
         if (!dataParam) {
-          console.warn('🔥 Join-split action missing data parameter');
+          if (__DEV__) {
+            console.warn('🔥 Join-split action missing data parameter');
+          }
           return null;
         }
 
@@ -217,7 +227,9 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
         const userId = urlObj.searchParams.get('userId');
 
         if (!splitId) {
-          console.warn('🔥 View-split action missing splitId parameter');
+          if (__DEV__) {
+            console.warn('🔥 View-split action missing splitId parameter');
+          }
           return null;
         }
 
@@ -240,7 +252,9 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
           const signature = urlObj.searchParams.get('signature');
 
           if (!provider || !address) {
-            console.warn('🔥 Wallet-linked action missing required parameters');
+            if (__DEV__) {
+              console.warn('🔥 Wallet-linked action missing required parameters');
+            }
             return null;
           }
 
@@ -272,11 +286,15 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
         }
       
       default:
-        console.warn('🔥 Unknown deep link action:', action);
+        if (__DEV__) {
+          console.warn('🔥 Unknown deep link action:', action);
+        }
         return null;
     }
   } catch (error) {
-    console.error('🔥 Error parsing deep link:', error);
+    if (__DEV__) {
+      console.error('🔥 Error parsing deep link:', error);
+    }
     return null;
   }
 }
@@ -299,7 +317,9 @@ export async function handleJoinGroupDeepLink(inviteId: string, userId: string) 
       message: result.message
     };
   } catch (error) {
-    console.error('🔥 Error joining group via deep link:', error);
+    if (__DEV__) {
+      console.error('🔥 Error joining group via deep link:', error);
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to join group'
@@ -365,7 +385,9 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
         }
       );
     } catch (notificationError) {
-      console.error('🔥 Failed to send contact add notification:', notificationError);
+      if (__DEV__) {
+        console.error('🔥 Failed to send contact add notification:', notificationError);
+      }
       // Don't fail the contact addition if notification fails
     }
     
@@ -376,7 +398,9 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
       message: 'Contact added successfully'
     };
   } catch (error) {
-    console.error('🔥 Error adding contact via deep link:', error);
+    if (__DEV__) {
+      console.error('🔥 Error adding contact via deep link:', error);
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to add contact'
@@ -396,7 +420,9 @@ export function setupDeepLinkListeners(
     
     const linkData = parseWeSplitDeepLink(url);
     if (!linkData) {
-      console.warn('🔥 Invalid deep link format:', url);
+      if (__DEV__) {
+        console.warn('🔥 Invalid deep link format:', url);
+      }
       Alert.alert('Invalid Link', 'This invitation link is not valid.');
       return;
     }
@@ -406,7 +432,9 @@ export function setupDeepLinkListeners(
     switch (linkData.action) {
       case 'join': {
         if (!currentUser?.id) {
-          console.warn('🔥 User not authenticated, cannot join group');
+          if (__DEV__) {
+            console.warn('🔥 User not authenticated, cannot join group');
+          }
           Alert.alert('Authentication Required', 'Please log in to join the group.');
           // Navigate to login if needed
           navigation.navigate('AuthMethods');
@@ -425,7 +453,9 @@ export function setupDeepLinkListeners(
           });
         } else {
           // Show error message
-          console.error('🔥 Failed to join group:', joinResult.error);
+          if (__DEV__) {
+            console.error('🔥 Failed to join group:', joinResult.error);
+          }
           Alert.alert('Error', joinResult.error || 'Failed to join group. Please try again.');
         }
         break;
@@ -433,7 +463,9 @@ export function setupDeepLinkListeners(
       
       case 'profile': {
         if (!currentUser?.id) {
-          console.warn('🔥 User not authenticated, cannot add contact');
+          if (__DEV__) {
+            console.warn('🔥 User not authenticated, cannot add contact');
+          }
           Alert.alert('Authentication Required', 'Please log in to add contacts.');
           navigation.navigate('AuthMethods');
           return;
@@ -448,7 +480,9 @@ export function setupDeepLinkListeners(
           // Navigate to contacts screen
           navigation.navigate('Contacts');
         } else {
-          console.error('🔥 Failed to add contact:', addContactResult.error);
+          if (__DEV__) {
+            console.error('🔥 Failed to add contact:', addContactResult.error);
+          }
           Alert.alert('Error', addContactResult.error || 'Failed to add contact. Please try again.');
         }
         break;
@@ -456,7 +490,9 @@ export function setupDeepLinkListeners(
       
       case 'send': {
         if (!currentUser?.id) {
-          console.warn('🔥 User not authenticated, cannot send money');
+          if (__DEV__) {
+            console.warn('🔥 User not authenticated, cannot send money');
+          }
           Alert.alert('Authentication Required', 'Please log in to send money.');
           navigation.navigate('AuthMethods');
           return;
@@ -475,7 +511,9 @@ export function setupDeepLinkListeners(
       
       case 'transfer': {
         if (!currentUser?.id) {
-          console.warn('🔥 User not authenticated, cannot initiate transfer');
+          if (__DEV__) {
+            console.warn('🔥 User not authenticated, cannot initiate transfer');
+          }
           Alert.alert('Authentication Required', 'Please log in to initiate transfers.');
           navigation.navigate('AuthMethods');
           return;
@@ -510,7 +548,9 @@ export function setupDeepLinkListeners(
         // Handle OAuth callback - this will be processed by the OAuth services
         // The OAuth services will handle the code exchange and user authentication
         if (linkData.oauthError) {
-          console.error('🔥 OAuth callback error:', linkData.oauthError);
+          if (__DEV__) {
+            console.error('🔥 OAuth callback error:', linkData.oauthError);
+          }
           Alert.alert(
             'Authentication Error',
             `OAuth authentication failed: ${linkData.oauthError}`
@@ -553,7 +593,9 @@ export function setupDeepLinkListeners(
       
       case 'join-split':
         if (!linkData.splitInvitationData) {
-          console.warn('🔥 Missing split invitation data');
+          if (__DEV__) {
+            console.warn('🔥 Missing split invitation data');
+          }
           Alert.alert('Invalid Link', 'This split invitation link is not valid.');
           return;
         }
@@ -604,7 +646,9 @@ export function setupDeepLinkListeners(
             splitId: invitationData.splitId 
           }, 'deepLinkHandler');
         } catch (error) {
-          console.error('🔥 Error processing split invitation:', error);
+          if (__DEV__) {
+            console.error('🔥 Error processing split invitation:', error);
+          }
           Alert.alert('Invalid Link', 'This split invitation link is corrupted or invalid.');
         }
         break;
@@ -612,7 +656,9 @@ export function setupDeepLinkListeners(
       case 'view-split':
         // Handle viewing a split from external source (e.g., "spend" integration)
         if (!linkData.splitId) {
-          console.warn('🔥 Missing splitId for view-split action');
+          if (__DEV__) {
+            console.warn('🔥 Missing splitId for view-split action');
+          }
           Alert.alert('Invalid Link', 'This split link is not valid.');
           return;
         }
@@ -639,7 +685,9 @@ export function setupDeepLinkListeners(
         }, 'deepLinkHandler');
 
         if (!linkData.walletProvider || !linkData.walletAddress) {
-          console.warn('🔥 Invalid wallet linking callback - missing required data');
+          if (__DEV__) {
+            console.warn('🔥 Invalid wallet linking callback - missing required data');
+          }
           Alert.alert('Wallet Connection Error', 'Invalid wallet connection data received.');
           return;
         }
@@ -676,7 +724,9 @@ export function setupDeepLinkListeners(
         break;
       
       default:
-        console.warn('🔥 Unknown deep link action:', linkData.action);
+        if (__DEV__) {
+          console.warn('🔥 Unknown deep link action:', linkData.action);
+        }
         Alert.alert('Unknown Action', 'This link is not supported.');
     }
   };

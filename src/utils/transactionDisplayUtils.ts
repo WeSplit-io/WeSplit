@@ -323,12 +323,41 @@ export function deduplicateTransactions<T extends { tx_hash?: string; transactio
 
 /**
  * Generate unique key for transaction list items
+ * Ensures uniqueness by combining all available identifiers with index
  */
-export function getTransactionKey(transaction: { id?: string; tx_hash?: string; transactionSignature?: string }, index: number): string {
+export function getTransactionKey(transaction: { id?: string; tx_hash?: string; transactionSignature?: string; created_at?: any }, index: number): string {
+  // Build a unique key from all available identifiers
+  const parts: string[] = [];
+  
   if (transaction.id) {
-    return `${transaction.id}-${transaction.tx_hash || transaction.transactionSignature || index}`;
+    parts.push(transaction.id);
   }
-  return transaction.tx_hash || transaction.transactionSignature || `tx-${index}`;
+  if (transaction.tx_hash) {
+    parts.push(transaction.tx_hash);
+  }
+  if (transaction.transactionSignature) {
+    parts.push(transaction.transactionSignature);
+  }
+  if (transaction.created_at) {
+    // Use timestamp as part of key for uniqueness
+    const timestamp = typeof transaction.created_at === 'string' 
+      ? new Date(transaction.created_at).getTime()
+      : (transaction.created_at?.toMillis?.() || transaction.created_at?.seconds * 1000 || Date.now());
+    parts.push(String(timestamp));
+  }
+  
+  // Always include index as fallback for uniqueness
+  parts.push(String(index));
+  
+  // Join with separator and ensure it's unique
+  const baseKey = parts.join('-');
+  
+  // If we still don't have enough uniqueness, add a hash
+  if (parts.length < 3) {
+    return `${baseKey}-${index}-${Date.now() % 10000}`;
+  }
+  
+  return baseKey;
 }
 
 /**

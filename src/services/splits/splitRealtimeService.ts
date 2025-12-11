@@ -44,7 +44,9 @@ export class SplitRealtimeService {
     callbacks: SplitRealtimeCallbacks
   ): Promise<() => void> {
     try {
-      console.log('🔍 SplitRealtimeService: Starting listener for split:', splitId);
+      if (__DEV__) {
+        console.log('🔍 SplitRealtimeService: Starting listener for split:', splitId);
+      }
       logger.info('Starting real-time listener for split', { splitId }, 'SplitRealtimeService');
 
       // Stop any existing listener for this split
@@ -60,7 +62,9 @@ export class SplitRealtimeService {
       // Get the document to find the correct firebaseDocId
       const querySnapshot = await getDocs(q);
       if (querySnapshot.empty) {
-        console.log('🔍 SplitRealtimeService: No document found for split:', splitId);
+        if (__DEV__) {
+          console.log('🔍 SplitRealtimeService: No document found for split:', splitId);
+        }
         if (callbacks.onError) {
           callbacks.onError(new Error(`Split with ID ${splitId} not found`));
         }
@@ -69,10 +73,14 @@ export class SplitRealtimeService {
 
       const docSnapshot = querySnapshot.docs[0];
       const firebaseDocId = docSnapshot.id;
-      console.log('🔍 SplitRealtimeService: Found document with firebaseDocId:', firebaseDocId);
+      if (__DEV__) {
+        console.log('🔍 SplitRealtimeService: Found document with firebaseDocId:', firebaseDocId);
+      }
 
       const splitRef = doc(db, this.COLLECTION_NAME, firebaseDocId);
-      console.log('🔍 SplitRealtimeService: Created document reference:', splitRef.path);
+      if (__DEV__) {
+        console.log('🔍 SplitRealtimeService: Created document reference:', splitRef.path);
+      }
       
       const unsubscribe = onSnapshot(
         splitRef,

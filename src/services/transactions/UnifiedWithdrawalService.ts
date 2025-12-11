@@ -238,14 +238,6 @@ export class UnifiedWithdrawalService {
 
         availableBalance = balanceResult.balance || 0;
       } else {
-        // DEV FLAG: Shared wallet operations are only available in development
-        if (!__DEV__) {
-          return {
-            canWithdraw: false,
-            error: 'Shared wallet operations are only available in development mode'
-          };
-        }
-
         // Get shared wallet balance and user's available balance
         const { SharedWalletService } = await import('../sharedWallet');
         const result = await SharedWalletService.getSharedWallet(params.sourceId);

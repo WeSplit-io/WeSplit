@@ -23,6 +23,9 @@ export interface FeatureFlags {
 
 // Environment-specific feature flags
 const getEnvironmentFeatures = (): FeatureFlags => {
+  // Shared wallet is now production-ready and enabled in all environments
+  const sharedWalletEnabled = true;
+
   // In production, disable experimental features by default
   if (!__DEV__) {
     return {
@@ -31,7 +34,7 @@ const getEnvironmentFeatures = (): FeatureFlags => {
       PHANTOM_SPLIT_WALLETS: false,
       PHANTOM_AUTO_CONFIRM: false,
       PHANTOM_MULTI_CHAIN: false,
-      SHARED_WALLET_ENABLED: false,
+      SHARED_WALLET_ENABLED: sharedWalletEnabled, // Enabled in production
     };
   }
 
@@ -42,7 +45,7 @@ const getEnvironmentFeatures = (): FeatureFlags => {
     PHANTOM_SPLIT_WALLETS: isPhantomConfigured() && PHANTOM_CONFIG.features.splitWallets,
     PHANTOM_AUTO_CONFIRM: PHANTOM_CONFIG.features.autoConfirm,
     PHANTOM_MULTI_CHAIN: PHANTOM_CONFIG.features.multiChain,
-    SHARED_WALLET_ENABLED: true, // Enable in dev mode
+    SHARED_WALLET_ENABLED: sharedWalletEnabled, // Enabled in all environments
   };
 };
 
