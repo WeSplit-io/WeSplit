@@ -37,6 +37,7 @@
     "validate:rewards": "npx ts-node tools/scripts/validate-reward-configs.ts",
     "create:spend-api-key": "npx ts-node scripts/create-spend-api-key.ts",
     "test:spend": "npx ts-node scripts/test-spend-integration.ts",
+    "test:spend:emulator": "USE_EMULATOR=true npx ts-node scripts/test-spend-integration.ts",
     "test:spend:live": "npx ts-node scripts/test-spend-integration.ts --live",
     "test:spend:full": "npx ts-node scripts/test-spend-full-flow.ts",
     "test:spend:full:live": "npx ts-node scripts/test-spend-full-flow.ts --live",

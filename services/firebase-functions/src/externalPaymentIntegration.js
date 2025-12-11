@@ -847,6 +847,27 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
       // Create split
       const split = await createSplitFromPayment(user, paymentData);
       
+      // Send webhook notification if webhook URL is provided
+      if (split.externalMetadata?.webhookUrl && split.externalMetadata?.webhookSecret) {
+        try {
+          const { sendWebhookNotification } = require('./spendApiEndpoints');
+          await sendWebhookNotification(split, 'split.created', {
+            total_amount: split.totalAmount,
+            currency: split.currency,
+            creator_id: split.creatorId,
+            participants: (split.participants || []).map(p => ({
+              user_id: p.userId,
+              email: p.email,
+              amount_owed: p.amountOwed
+            }))
+          });
+          console.log('✅ Split creation webhook sent to SPEND');
+        } catch (webhookError) {
+          console.warn('⚠️ Failed to send split creation webhook (non-blocking):', webhookError.message);
+          // Don't fail split creation if webhook fails
+        }
+      }
+      
       // Return success response with redirect URL if callback URL provided
       const response = {
         success: true,
@@ -858,7 +879,8 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
           splitStatus: split.status,
           totalAmount: split.totalAmount,
           currency: split.currency,
-          createdAt: split.createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+          createdAt: split.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+          firebaseDocId: split.firebaseDocId // Include Firebase doc ID for debugging
         }
       };
       

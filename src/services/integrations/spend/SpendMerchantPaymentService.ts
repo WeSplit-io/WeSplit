@@ -122,6 +122,45 @@ export class SpendMerchantPaymentService {
         paymentTransactionSig: paymentResult.transactionSignature,
       });
 
+      // Update split status to 'completed' after successful merchant payment
+      try {
+        const { SplitStorageService } = await import('../../splits');
+        const completedAt = new Date().toISOString();
+        const updateResult = await SplitStorageService.updateSplit(split.id, {
+          status: 'completed' as const,
+          completedAt: completedAt,
+          updatedAt: completedAt,
+        });
+
+        if (updateResult.success) {
+          logger.info('Split status updated to completed after merchant payment', {
+            splitId: split.id,
+            completedAt,
+            transactionSignature: paymentResult.transactionSignature,
+          }, 'SpendMerchantPaymentService');
+        } else {
+          logger.warn('Failed to update split status to completed', {
+            splitId: split.id,
+            error: updateResult.error,
+          }, 'SpendMerchantPaymentService');
+        }
+      } catch (statusUpdateError) {
+        logger.error('Error updating split status to completed', {
+          splitId: split.id,
+          error: statusUpdateError instanceof Error ? statusUpdateError.message : String(statusUpdateError),
+        }, 'SpendMerchantPaymentService');
+        // Don't fail the payment if status update fails
+      }
+
+      // Send notifications to all participants (async, don't block)
+      this.notifyParticipantsAsync(split, paymentResult.transactionSignature, paymentResult.amount || split.totalAmount)
+        .catch((error) => {
+          logger.error('Failed to send participant notifications (non-blocking)', {
+            splitId,
+            error: error instanceof Error ? error.message : String(error),
+          }, 'SpendMerchantPaymentService');
+        });
+
       // Call webhook (async, don't block)
       const webhookUrl = split.externalMetadata?.webhookUrl;
       const webhookSecret = split.externalMetadata?.webhookSecret;
@@ -326,6 +365,67 @@ export class SpendMerchantPaymentService {
         error: error instanceof Error ? error.message : String(error),
       }, 'SpendMerchantPaymentService');
       throw error;
+    }
+  }
+
+  /**
+   * Notify all participants that payment was sent to merchant (async, non-blocking)
+   * 
+   * @param split - The split that was paid
+   * @param transactionSignature - Transaction signature
+   * @param amount - Amount paid
+   */
+  private static async notifyParticipantsAsync(
+    split: Split,
+    transactionSignature: string,
+    amount: number
+  ): Promise<void> {
+    try {
+      const { notificationService } = await import('../../notifications');
+      
+      // Notify all participants
+      const notificationPromises = (split.participants || []).map(async (participant) => {
+        if (!participant.userId) {
+          return;
+        }
+
+        try {
+          await notificationService.instance.sendNotification(
+            participant.userId,
+            'Payment Sent to SPEND ✅',
+            `Payment of ${amount.toFixed(2)} USDC has been sent to SPEND for "${split.title || 'Split'}". Your order will be fulfilled shortly.`,
+            'spend_payment_completed',
+            {
+              splitId: split.id,
+              splitName: split.title,
+              transactionSignature,
+              amount,
+              currency: split.currency || 'USDC',
+              orderId: split.externalMetadata?.orderId,
+              status: 'completed',
+              timestamp: new Date().toISOString(),
+            }
+          );
+        } catch (error) {
+          logger.warn('Failed to send notification to participant', {
+            splitId: split.id,
+            participantId: participant.userId,
+            error: error instanceof Error ? error.message : String(error),
+          }, 'SpendMerchantPaymentService');
+        }
+      });
+
+      await Promise.allSettled(notificationPromises);
+      
+      logger.info('Participant notifications sent', {
+        splitId: split.id,
+        participantCount: split.participants?.length || 0,
+      }, 'SpendMerchantPaymentService');
+    } catch (error) {
+      logger.error('Error sending participant notifications', {
+        splitId: split.id,
+        error: error instanceof Error ? error.message : String(error),
+      }, 'SpendMerchantPaymentService');
     }
   }
 

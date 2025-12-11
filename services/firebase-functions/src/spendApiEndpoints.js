@@ -15,6 +15,7 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 // Initialize Firestore
 const db = admin.firestore();
@@ -45,6 +46,46 @@ const FieldValue = {
 // =============================================================================
 // AUTHENTICATION & VALIDATION HELPERS
 // =============================================================================
+
+/**
+ * Get split by ID with fallback to Firebase document ID
+ * Handles both query by 'id' field and direct document lookup
+ */
+async function getSplitById(splitId) {
+  // Try query by 'id' field first (preferred method)
+  let splitQuery = await db.collection('splits')
+    .where('id', '==', splitId)
+    .limit(1)
+    .get();
+  
+  // If not found by id field, try Firebase document ID (for backward compatibility)
+  if (splitQuery.empty) {
+    try {
+      const splitDoc = await db.collection('splits').doc(splitId).get();
+      if (splitDoc.exists) {
+        // Create a mock query result structure
+        splitQuery = {
+          docs: [splitDoc],
+          empty: false
+        };
+        console.log('Found split by Firebase document ID:', splitId);
+      }
+    } catch (docError) {
+      console.warn('Error checking Firebase document ID:', docError.message);
+    }
+  }
+  
+  if (splitQuery.empty) {
+    console.error('Split not found:', {
+      splitId,
+      searchedBy: 'id field and Firebase document ID',
+      timestamp: new Date().toISOString()
+    });
+    return null;
+  }
+  
+  return splitQuery.docs[0];
+}
 
 /**
  * Validate API key from Authorization header
@@ -110,7 +151,9 @@ async function validateApiKey(authHeader) {
 function isEmulatorMode(req) {
   return process.env.FUNCTIONS_EMULATOR === 'true' || 
          process.env.FIREBASE_EMULATOR_HUB || 
-         req.headers.host?.includes('localhost');
+         req.headers.host?.includes('localhost') ||
+         req.headers.host?.includes('127.0.0.1') ||
+         req.headers['x-forwarded-host']?.includes('localhost');
 }
 
 // =============================================================================
@@ -192,17 +235,17 @@ exports.inviteParticipantsToSplit = functions.https.onRequest(async (req, res) =
       }
       
       // Get the split
-      const splitsRef = db.collection('splits');
-      const splitQuery = await splitsRef.where('id', '==', splitId).limit(1).get();
+      const splitDoc = await getSplitById(splitId);
       
-      if (splitQuery.empty) {
+      if (!splitDoc) {
         return res.status(404).json({
           success: false,
-          error: 'Split not found'
+          error: 'Split not found',
+          message: `No split found with ID: ${splitId}. Please verify the splitId is correct and the split was created successfully.`,
+          splitId: splitId
         });
       }
       
-      const splitDoc = splitQuery.docs[0];
       const splitData = splitDoc.data();
       
       // Verify inviter is the creator
@@ -399,18 +442,18 @@ exports.payParticipantShare = functions.https.onRequest(async (req, res) => {
         });
       }
       
-      // Get the split
-      const splitsRef = db.collection('splits');
-      const splitQuery = await splitsRef.where('id', '==', splitId).limit(1).get();
+      // Get the split using helper function
+      const splitDoc = await getSplitById(splitId);
       
-      if (splitQuery.empty) {
+      if (!splitDoc) {
         return res.status(404).json({
           success: false,
-          error: 'Split not found'
+          error: 'Split not found',
+          message: `No split found with ID: ${splitId}. Please verify the splitId is correct and the split was created successfully.`,
+          splitId: splitId
         });
       }
       
-      const splitDoc = splitQuery.docs[0];
       const splitData = splitDoc.data();
       
       // Find the participant
@@ -580,40 +623,24 @@ exports.searchKnownUsers = functions.https.onRequest(async (req, res) => {
       
       const queryLower = query.toLowerCase();
       const users = [];
+      const seenUserIds = new Set();
       
       // Search by email (prefix match)
-      const emailQuery = await db.collection('users')
-        .where('email', '>=', queryLower)
-        .where('email', '<=', queryLower + '\uf8ff')
-        .where('discoverable', '!=', false) // Only discoverable users
-        .limit(limit)
-        .get();
-      
-      emailQuery.docs.forEach(doc => {
-        const data = doc.data();
-        if (!users.find(u => u.userId === doc.id)) {
-          users.push({
-            userId: doc.id,
-            email: data.email,
-            name: data.name,
-            walletAddress: data.wallet_address || null,
-            avatar: data.avatar || null
-          });
-        }
-      });
-      
-      // Search by name (prefix match) if we need more results
-      if (users.length < limit) {
-        const nameQuery = await db.collection('users')
-          .where('name', '>=', query)
-          .where('name', '<=', query + '\uf8ff')
-          .where('discoverable', '!=', false)
-          .limit(limit - users.length)
+      // Use fallback query first to avoid index requirement
+      // This prevents the FAILED_PRECONDITION error in production
+      try {
+        // Try the indexed query first (if index exists, it's faster)
+        const emailQuery = await db.collection('users')
+          .where('email', '>=', queryLower)
+          .where('email', '<=', queryLower + '\uf8ff')
+          .where('discoverable', '!=', false) // Only discoverable users
+          .limit(limit)
           .get();
         
-        nameQuery.docs.forEach(doc => {
-          const data = doc.data();
-          if (!users.find(u => u.userId === doc.id)) {
+        emailQuery.docs.forEach(doc => {
+          if (!seenUserIds.has(doc.id)) {
+            seenUserIds.add(doc.id);
+            const data = doc.data();
             users.push({
               userId: doc.id,
               email: data.email,
@@ -623,6 +650,148 @@ exports.searchKnownUsers = functions.https.onRequest(async (req, res) => {
             });
           }
         });
+      } catch (indexError) {
+        // If index doesn't exist, use fallback query (no index required)
+        // Check for various error formats: 'index', 'FAILED_PRECONDITION', error code 9
+        const errorMessage = indexError.message || String(indexError) || '';
+        const errorCode = indexError.code || indexError.status || '';
+        const errorString = JSON.stringify(indexError);
+        
+        // Check if this is an index-related error
+        // Handle gRPC error format: "9 FAILED_PRECONDITION: The query requires an index..."
+        const isIndexError = 
+          errorMessage.includes('index') || 
+          errorMessage.includes('FAILED_PRECONDITION') ||
+          errorMessage.includes('requires an index') ||
+          errorMessage.includes('9 FAILED_PRECONDITION') ||
+          errorCode === 9 ||
+          errorCode === '9' ||
+          String(errorCode).includes('FAILED_PRECONDITION') ||
+          errorString.includes('FAILED_PRECONDITION') ||
+          errorString.includes('requires an index') ||
+          errorString.includes('9 FAILED_PRECONDITION');
+        
+        if (isIndexError) {
+          console.warn('Composite index not found, using fallback query (no index required):', errorMessage || errorString);
+          
+          // Fallback: Query without discoverable filter, filter in memory
+          // This query only requires a simple index on 'email' field (usually auto-created)
+          try {
+            const emailQueryFallback = await db.collection('users')
+              .where('email', '>=', queryLower)
+              .where('email', '<=', queryLower + '\uf8ff')
+              .limit(limit * 3) // Get more to filter (some may be filtered out)
+              .get();
+            
+            emailQueryFallback.docs.forEach(doc => {
+              if (users.length >= limit) return;
+              const data = doc.data();
+              // Filter discoverable in memory (default to true if not set)
+              const isDiscoverable = data.discoverable !== false;
+              
+              if (isDiscoverable && !seenUserIds.has(doc.id)) {
+                seenUserIds.add(doc.id);
+                users.push({
+                  userId: doc.id,
+                  email: data.email,
+                  name: data.name,
+                  walletAddress: data.wallet_address || null,
+                  avatar: data.avatar || null
+                });
+              }
+            });
+          } catch (fallbackError) {
+            console.error('Fallback query also failed:', fallbackError);
+            // If fallback also fails, return empty results rather than crashing
+            // This prevents the endpoint from returning 500 errors
+            console.warn('Returning empty results due to query error');
+          }
+        } else {
+          // Re-throw if it's not an index error
+          console.error('Unexpected error in searchKnownUsers email query:', indexError);
+          throw indexError;
+        }
+      }
+      
+      // Search by name (prefix match) if we need more results
+      if (users.length < limit) {
+        try {
+          const nameQuery = await db.collection('users')
+            .where('name', '>=', query)
+            .where('name', '<=', query + '\uf8ff')
+            .where('discoverable', '!=', false)
+            .limit(limit - users.length)
+            .get();
+          
+          nameQuery.docs.forEach(doc => {
+            if (!seenUserIds.has(doc.id)) {
+              seenUserIds.add(doc.id);
+              const data = doc.data();
+              users.push({
+                userId: doc.id,
+                email: data.email,
+                name: data.name,
+                walletAddress: data.wallet_address || null,
+                avatar: data.avatar || null
+              });
+            }
+          });
+        } catch (indexError) {
+          // Fallback for name query (no index required)
+          const errorMessage = indexError.message || String(indexError) || '';
+          const errorCode = indexError.code || indexError.status || '';
+          const errorString = JSON.stringify(indexError);
+          const errorDetails = indexError.details || '';
+          
+          // Check if this is an index-related error (multiple formats)
+          const isIndexError = 
+            errorMessage.includes('index') || 
+            errorMessage.includes('FAILED_PRECONDITION') ||
+            errorMessage.includes('requires an index') ||
+            errorCode === 9 ||
+            errorCode === '9' ||
+            String(errorCode).includes('FAILED_PRECONDITION') ||
+            errorString.includes('FAILED_PRECONDITION') ||
+            errorString.includes('requires an index') ||
+            errorDetails.includes('index') ||
+            errorDetails.includes('FAILED_PRECONDITION');
+          
+          if (isIndexError) {
+            console.warn('Composite index not found for name query, using fallback (no index required):', errorMessage || errorString);
+            try {
+              const nameQueryFallback = await db.collection('users')
+                .where('name', '>=', query)
+                .where('name', '<=', query + '\uf8ff')
+                .limit((limit - users.length) * 3) // Get more to filter
+                .get();
+              
+              nameQueryFallback.docs.forEach(doc => {
+                if (users.length >= limit) return;
+                const data = doc.data();
+                // Filter discoverable in memory (default to true if not set)
+                const isDiscoverable = data.discoverable !== false;
+                
+                if (isDiscoverable && !seenUserIds.has(doc.id)) {
+                  seenUserIds.add(doc.id);
+                  users.push({
+                    userId: doc.id,
+                    email: data.email,
+                    name: data.name,
+                    walletAddress: data.wallet_address || null,
+                    avatar: data.avatar || null
+                  });
+                }
+              });
+            } catch (fallbackError) {
+              console.error('Fallback name query also failed:', fallbackError);
+              // Continue with results found so far
+            }
+          } else {
+            // Re-throw if it's not an index error
+            console.error('Unexpected error in searchKnownUsers name query:', indexError);
+            throw indexError;
+          }
+        }
       }
       
       return res.status(200).json({
@@ -633,6 +802,24 @@ exports.searchKnownUsers = functions.https.onRequest(async (req, res) => {
       
     } catch (error) {
       console.error('Error in searchKnownUsers:', error);
+      
+      // Check if this is an index error that wasn't caught earlier
+      const errorMessage = error.message || String(error) || '';
+      const errorString = JSON.stringify(error);
+      
+      if (errorMessage.includes('FAILED_PRECONDITION') || 
+          errorMessage.includes('requires an index') ||
+          errorString.includes('FAILED_PRECONDITION')) {
+        console.warn('Index error caught at top level, returning empty results:', errorMessage);
+        // Return empty results instead of error to prevent breaking SPEND integration
+        return res.status(200).json({
+          success: true,
+          users: [],
+          total: 0,
+          message: 'Index not configured - results filtered. Please create the composite index for better performance.'
+        });
+      }
+      
       return res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -866,6 +1053,117 @@ async function generateInviteLink(email, splitId) {
   return generateInviteLinkSync(email, splitId);
 }
 
+/**
+ * Create email transporter for sending invitations
+ */
+function createEmailTransporter() {
+  const emailUser = process.env.EMAIL_USER?.trim();
+  const emailPassword = process.env.EMAIL_PASSWORD?.trim();
+  
+  if (!emailUser || !emailPassword) {
+    console.warn('Email credentials not configured. EMAIL_USER and EMAIL_PASSWORD must be set as Firebase Secrets.');
+    return null;
+  }
+  
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: emailUser,
+      pass: emailPassword
+    }
+  });
+}
+
+/**
+ * Generate email template for split invitation
+ */
+function generateSplitInvitationEmailTemplate(inviterName, splitTitle, amountOwed, currency, inviteLink) {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #A5EA15 0%, #53EF97 100%); padding: 48px; text-align: center; color: #061113;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 600; letter-spacing: -0.5px;">WeSplit</h1>
+        <p style="margin: 12px 0 0 0; font-size: 18px; font-weight: 400;">You've been invited to split a bill</p>
+      </div>
+
+      <div style="padding: 48px; background: #061113;">
+        <h2 style="color: #FFFFFF; margin-bottom: 24px; font-size: 32px; font-weight: 600; line-height: 40px; letter-spacing: -0.5px;">Hello!</h2>
+        <p style="color: rgba(255, 255, 255, 0.70); line-height: 24px; margin-bottom: 32px; font-size: 16px; font-weight: 400;">
+          <strong>${inviterName}</strong> has invited you to split <strong>"${splitTitle}"</strong> on WeSplit.
+        </p>
+
+        <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.10); border-radius: 16px; padding: 32px; margin: 32px 0;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <p style="color: rgba(255, 255, 255, 0.50); font-size: 14px; margin: 0 0 8px 0; font-weight: 400;">Your share</p>
+            <h3 style="color: #A5EA15; font-size: 36px; margin: 0; font-weight: 600;">${amountOwed.toFixed(2)} ${currency}</h3>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${inviteLink}" style="display: inline-block; background: linear-gradient(135deg, #A5EA15 0%, #53EF97 100%); color: #061113; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 600; font-size: 16px;">
+            Join Split
+          </a>
+        </div>
+
+        <p style="color: rgba(255, 255, 255, 0.50); font-size: 14px; margin-top: 32px; font-weight: 400; line-height: 20px;">
+          Click the button above to join the split and pay your share. This invitation will expire in 7 days.
+        </p>
+
+        <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.10); text-align: center;">
+          <p style="color: rgba(255, 255, 255, 0.30); font-size: 12px; font-weight: 400;">
+            © 2024 WeSplit. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Send email invitation to a participant
+ */
+async function sendEmailInvitation(email, inviterName, splitTitle, amountOwed, currency, inviteLink) {
+  try {
+    const transporter = createEmailTransporter();
+    
+    if (!transporter) {
+      console.warn('Email transporter not available, skipping email send');
+      return { sent: false, reason: 'Email service not configured' };
+    }
+
+    // Verify transporter connection
+    try {
+      await transporter.verify();
+    } catch (verifyError) {
+      console.error('Email transporter verification failed:', verifyError.message);
+      return { sent: false, reason: 'Email service authentication failed' };
+    }
+
+    const emailUser = process.env.EMAIL_USER?.trim();
+    const mailOptions = {
+      from: emailUser || 'noreply@wesplit.app',
+      to: email,
+      subject: `${inviterName} invited you to split "${splitTitle}" on WeSplit`,
+      html: generateSplitInvitationEmailTemplate(inviterName, splitTitle, amountOwed, currency, inviteLink)
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Split invitation email sent successfully:', {
+      messageId: info.messageId,
+      to: email,
+      splitTitle
+    });
+
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('❌ Error sending split invitation email:', {
+      error: error.message,
+      email,
+      splitTitle
+    });
+    return { sent: false, reason: error.message };
+  }
+}
+
 // =============================================================================
 // BATCH INVITE PARTICIPANTS (Enhanced for SPEND)
 // =============================================================================
@@ -925,20 +1223,18 @@ exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => 
         });
       }
       
-      // Get the split
-      const splitsQuery = await db.collection('splits')
-        .where('id', '==', splitId)
-        .limit(1)
-        .get();
+      // Get the split using helper function
+      const splitDoc = await getSplitById(splitId);
       
-      if (splitsQuery.empty) {
+      if (!splitDoc) {
         return res.status(404).json({
           success: false,
-          error: 'Split not found'
+          error: 'Split not found',
+          message: `No split found with ID: ${splitId}. Please verify the splitId is correct and the split was created successfully.`,
+          splitId: splitId
         });
       }
       
-      const splitDoc = splitsQuery.docs[0];
       const splitData = splitDoc.data();
       
       const results = {
@@ -1034,14 +1330,35 @@ exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => 
           // Store pending invitation
           await db.collection('pending_invitations').add(pendingInvite);
           
+          const inviteLink = generateInviteLinkSync(email, splitId);
+          
           results.pendingInvites.push({
             email: email,
             name: pendingInvite.name,
             amountOwed: amountOwed,
-            inviteLink: generateInviteLinkSync(email, splitId)
+            inviteLink: inviteLink
           });
           
-          // TODO: Send email invitation
+          // Send email invitation if notifications are enabled
+          if (sendNotifications) {
+            const emailResult = await sendEmailInvitation(
+              email,
+              inviterName || splitData.creatorName || 'Someone',
+              splitData.title || 'Split',
+              amountOwed,
+              splitData.currency || 'USDC',
+              inviteLink
+            );
+            
+            if (!emailResult.sent) {
+              console.warn('Failed to send email invitation', {
+                email,
+                reason: emailResult.reason,
+                splitId
+          });
+              // Don't fail the invitation if email fails - log and continue
+            }
+          }
         }
       }
       
@@ -1132,18 +1449,19 @@ exports.getSplitStatus = functions.https.onRequest(async (req, res) => {
         });
       }
       
-      // Get the split
-      const splitsRef = db.collection('splits');
-      const splitQuery = await splitsRef.where('id', '==', splitId).limit(1).get();
+      // Get the split using helper function
+      const splitDoc = await getSplitById(splitId);
       
-      if (splitQuery.empty) {
+      if (!splitDoc) {
         return res.status(404).json({
           success: false,
-          error: 'Split not found'
+          error: 'Split not found',
+          message: `No split found with ID: ${splitId}. Please verify the splitId is correct and the split was created successfully.`,
+          splitId: splitId
         });
       }
       
-      const splitData = splitQuery.docs[0].data();
+      const splitData = splitDoc.data();
       
       // Calculate totals
       const amountCollected = (splitData.participants || [])
