@@ -13,18 +13,8 @@
  */
 
 import { logger } from '../analytics/loggingService';
-import { pointsService } from './pointsService';
-import { questService } from './questService';
-import { badgeService } from './badgeService';
-import { referralService } from './referralService';
-import { splitRewardsService } from './splitRewardsService';
-import { christmasCalendarService } from './christmasCalendarService';
-import { validateAllRewardConfigs, areAllConfigsValid } from './configValidationRunner';
-import { getSeasonReward, validateRewardConfig } from './seasonRewardsConfig';
-import { BADGE_DEFINITIONS, validateBadgeConfig } from './badgeConfig';
-import { ASSET_DEFINITIONS, validateAssetConfig } from './assetConfig';
-import { REFERRAL_REWARDS, validateReferralConfig } from './referralConfig';
-import { seasonService } from './seasonService';
+// Lazy load heavy services to reduce bundle size
+// These will be dynamically imported when needed
 
 export interface VerificationResult {
   category: string;
@@ -102,6 +92,12 @@ class RewardSystemVerification {
    * Verify all configurations are valid
    */
   private async verifyConfigurations(results: VerificationResult[]): Promise<void> {
+    const { validateRewardConfig } = await import('./seasonRewardsConfig');
+    const { validateBadgeConfig, BADGE_DEFINITIONS } = await import('./badgeConfig');
+    const { validateAssetConfig, ASSET_DEFINITIONS } = await import('./assetConfig');
+    const { validateReferralConfig, REFERRAL_REWARDS } = await import('./referralConfig');
+    const { validateAllRewardConfigs } = await import('./configValidationRunner');
+    
     // Check if validation functions exist
     results.push({
       category: 'Configuration',
@@ -162,6 +158,14 @@ class RewardSystemVerification {
    * Verify service integrations
    */
   private async verifyServiceIntegrations(results: VerificationResult[]): Promise<void> {
+    // Dynamically import services to reduce bundle size
+    const { pointsService } = await import('./pointsService');
+    const { questService } = await import('./questService');
+    const { badgeService } = await import('./badgeService');
+    const { referralService } = await import('./referralService');
+    const { splitRewardsService } = await import('./splitRewardsService');
+    const { christmasCalendarService } = await import('./christmasCalendarService');
+    
     // Check all services are available
     const services = {
       pointsService: typeof pointsService !== 'undefined',
@@ -214,6 +218,8 @@ class RewardSystemVerification {
    * Verify points award methods
    */
   private async verifyPointsAwardMethods(results: VerificationResult[]): Promise<void> {
+    const { pointsService } = await import('./pointsService');
+    
     // Check awardSeasonPoints exists and has correct signature
     if (typeof pointsService.awardSeasonPoints === 'function') {
       results.push({
@@ -270,6 +276,10 @@ class RewardSystemVerification {
    * Verify asset management
    */
   private async verifyAssetManagement(results: VerificationResult[]): Promise<void> {
+    const { BADGE_DEFINITIONS } = await import('./badgeConfig');
+    const { ASSET_DEFINITIONS } = await import('./assetConfig');
+    const { REFERRAL_REWARDS } = await import('./referralConfig');
+    
     // Check badge definitions exist
     const badgeCount = Object.keys(BADGE_DEFINITIONS).length;
     results.push({
@@ -305,6 +315,8 @@ class RewardSystemVerification {
    * Verify data flow
    */
   private async verifyDataFlow(results: VerificationResult[]): Promise<void> {
+    const { seasonService } = await import('./seasonService');
+    
     // Check season service is available
     try {
       const currentSeason = seasonService.getCurrentSeason();

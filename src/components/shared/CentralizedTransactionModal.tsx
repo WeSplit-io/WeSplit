@@ -614,14 +614,18 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
 
       const result = await centralizedTransactionHandler.executeTransaction(params);
 
+      // Treat on-chain success (signature present) as success even if backend returns success=false
+      const effectiveSuccess = result.success || !!result.transactionSignature;
+
       logger.info('Transaction handler returned', {
         context: params.context,
         success: result.success,
+        effectiveSuccess,
         hasSignature: !!result.transactionSignature,
         error: result.error?.substring(0, 100)
       }, 'CentralizedTransactionModal');
 
-      if (result.success) {
+      if (effectiveSuccess) {
         // Call success callback if provided
         if (config.onSuccess) {
           config.onSuccess(result);

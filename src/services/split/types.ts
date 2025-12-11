@@ -77,3 +77,51 @@ export interface PaymentResult {
   message?: string;
   signature?: string; // alias used in some call sites
 }
+
+/**
+ * Update data for split wallet status
+ */
+export interface SplitWalletStatusUpdate {
+  status?: string;
+  completedAt?: string;
+  lastUpdated?: string;
+}
+
+/**
+ * Update data for split storage
+ */
+export interface SplitStorageUpdate {
+  status?: string;
+  completedAt?: string;
+  updatedAt?: string;
+  walletId?: string;
+  walletAddress?: string;
+  degenLoser?: SplitWallet['degenLoser'];
+  degenWinner?: SplitWallet['degenWinner'];
+  rouletteAudit?: DegenRouletteAuditEntry[];
+}
+
+/**
+ * Update data for degen split participant
+ */
+export interface DegenSplitParticipantUpdate {
+  status: string;
+  amountPaid: number;
+  amountOwed: number;
+  updatedAt: string;
+  transactionSignature?: string;
+  paidAt?: string;
+}
+
+/**
+ * Split storage participant type
+ */
+export interface SplitStorageParticipant {
+  userId: string;
+  name?: string;
+  status: string;
+  amountPaid: number;
+  amountOwed: number;
+  transactionSignature?: string;
+  paidAt?: string;
+}

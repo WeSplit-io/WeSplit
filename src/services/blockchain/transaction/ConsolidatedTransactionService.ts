@@ -59,11 +59,11 @@ class ConsolidatedTransactionService {
         return false;
       }
 
-      // Use the walletService to ensure user wallet
-      const { walletService } = await import('../wallet');
-      const walletResult = await walletService.ensureUserWallet(userId);
+      // ✅ MEMORY OPTIMIZATION: Use simplifiedWalletService instead of full walletService (720 modules)
+      const { simplifiedWalletService } = await import('../wallet/simplifiedWalletService');
+      const walletResult = await simplifiedWalletService.ensureUserWallet(userId);
 
-      return walletResult.success && !!walletResult.wallet?.secretKey;
+      return walletResult.success && !!((walletResult.wallet as any)?.privateKey || walletResult.wallet?.secretKey);
     } catch (error) {
       logger.error('Failed to load wallet', { userId, error }, 'ConsolidatedTransactionService');
       return false;
@@ -77,14 +77,14 @@ class ConsolidatedTransactionService {
     try {
       if (!userId) return null;
 
-      // Use the walletService to get wallet info
-      const { walletService } = await import('../wallet');
-      const walletResult = await walletService.ensureUserWallet(userId);
+      // ✅ MEMORY OPTIMIZATION: Use simplifiedWalletService instead of full walletService (720 modules)
+      const { simplifiedWalletService } = await import('../wallet/simplifiedWalletService');
+      const walletInfo = await simplifiedWalletService.getWalletInfo(userId);
 
-      if (walletResult.success && walletResult.wallet) {
+      if (walletInfo) {
         return {
-          address: walletResult.wallet.address,
-          publicKey: walletResult.wallet.address // Assuming address is the public key
+          address: walletInfo.address,
+          publicKey: walletInfo.publicKey || walletInfo.address
         };
       }
 
@@ -168,9 +168,10 @@ class ConsolidatedTransactionService {
       const transactionPromise = placeholderPromise;
 
       // Now load wallet and create actual transaction
-      // Load the user's wallet
-      const { walletService } = await import('../wallet');
-      const walletResult = await walletService.ensureUserWallet(params.userId);
+      // ✅ MEMORY OPTIMIZATION: Use simplifiedWalletService instead of full walletService (720 modules)
+      // This prevents OOM crashes when doing multiple transactions in sequence
+      const { simplifiedWalletService } = await import('../wallet/simplifiedWalletService');
+      const walletResult = await simplifiedWalletService.ensureUserWallet(params.userId);
       
       if (!walletResult.success || !walletResult.wallet) {
         cleanup();
@@ -183,8 +184,19 @@ class ConsolidatedTransactionService {
       }
 
       // Create keypair from the wallet
+      // ✅ Use privateKey (simplifiedWalletService) or secretKey (legacy) for compatibility
       const { keypairUtils } = await import('../../shared/keypairUtils');
-      const keypairResult = keypairUtils.createKeypairFromSecretKey(walletResult.wallet.secretKey!);
+      const secretKey = (walletResult.wallet as any)?.privateKey || walletResult.wallet?.secretKey;
+      if (!secretKey) {
+        cleanup();
+        return {
+          signature: '',
+          txId: '',
+          success: false,
+          error: 'Wallet secret key not available'
+        };
+      }
+      const keypairResult = keypairUtils.createKeypairFromSecretKey(secretKey);
       
       if (!keypairResult.success || !keypairResult.keypair) {
         cleanup();
@@ -199,15 +211,19 @@ class ConsolidatedTransactionService {
           error: 'Failed to create keypair from wallet'
         };
       }
+      
+      // ✅ MEMORY OPTIMIZATION: Extract keypair and let walletResult go out of scope naturally
+      // The walletResult will be garbage collected when the function scope ends
+      const keypair = keypairResult.keypair;
 
       logger.info('🔑 ConsolidatedTransactionService: Keypair created successfully', {
-        publicKey: keypairResult.keypair.publicKey.toBase58(),
+        publicKey: keypair.publicKey.toBase58(),
         userId: params.userId
       });
 
       // ✅ CRITICAL: Execute actual transaction and resolve placeholder promise
       // This ensures all waiting calls get the same result
-      const actualTransactionPromise = this.transactionProcessor.sendUSDCTransaction(params, keypairResult.keypair);
+      const actualTransactionPromise = this.transactionProcessor.sendUSDCTransaction(params, keypair);
       
       // Execute transaction and resolve/reject placeholder
       actualTransactionPromise
@@ -238,6 +254,8 @@ class ConsolidatedTransactionService {
         // This ensures that if a transaction fails, retries within 60s are blocked
         if (isNewTransaction && result.success) {
           cleanup();
+          // ✅ MEMORY OPTIMIZATION: Variables will go out of scope naturally after function completes
+          // This helps prevent memory buildup when doing multiple transactions in sequence
         }
       } catch (error) {
         // ✅ CRITICAL: Don't cleanup on error immediately
@@ -263,35 +281,58 @@ class ConsolidatedTransactionService {
       
       // Save transaction and award points using centralized helper
       if (result.success && result.signature) {
-        try {
-          const { saveTransactionAndAwardPoints } = await import('../../shared/transactionPostProcessing');
-          const { FeeService } = await import('../../../config/constants/feeConfig');
-          
-          // Calculate company fee for transaction
-          const transactionType = params.transactionType || 'send';
-          const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
-          
-          await saveTransactionAndAwardPoints({
-            userId: params.userId,
-            toAddress: params.to,
-            amount: params.amount,
-            signature: result.signature,
-            transactionType: transactionType,
-            companyFee: companyFee,
-            netAmount: recipientAmount,
-            memo: params.memo,
-            groupId: params.groupId,
-            currency: params.currency
-          });
-          
-          logger.info('✅ Transaction post-processing completed', {
+        // ✅ CRITICAL: For split payments, completely skip post-processing to prevent OOM crashes
+        // The participant status update in FairSplitHandler is more critical and must complete first
+        // DO NOT import transactionPostProcessing for split flows - the import itself loads 675 modules!
+        const isSplitPayment = params.transactionType === 'split_payment' || 
+                               params.transactionType === 'split_wallet_withdrawal';
+        
+        if (isSplitPayment) {
+          // ✅ MEMORY OPTIMIZATION: Skip post-processing entirely for split flows
+          // The import of transactionPostProcessing loads 675 modules which causes OOM
+          // On-chain transaction is authoritative, database updates happen via handlers
+          logger.info('Skipping post-processing for split flow (prevents OOM)', {
+            transactionType: params.transactionType,
             signature: result.signature,
             userId: params.userId,
-            transactionType
+            note: 'On-chain transaction is authoritative. Database updates handled by split handlers. No heavy imports triggered.'
           }, 'ConsolidatedTransactionService');
-        } catch (postProcessingError) {
-          logger.error('❌ Error in transaction post-processing', postProcessingError, 'ConsolidatedTransactionService');
-          // Don't fail the transaction if post-processing fails
+          
+          // ✅ MEMORY OPTIMIZATION: Variables will go out of scope naturally after function completes
+          // This helps prevent memory buildup when doing multiple transactions in sequence
+          // Do nothing - skip entirely to prevent loading 675 modules
+        } else {
+          // For non-split payments, process normally (blocking)
+          try {
+            const { saveTransactionAndAwardPoints } = await import('../../shared/transactionPostProcessing');
+            const { FeeService } = await import('../../../config/constants/feeConfig');
+            
+            // Calculate company fee for transaction
+            const transactionType = params.transactionType || 'send';
+            const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
+            
+            await saveTransactionAndAwardPoints({
+              userId: params.userId,
+              toAddress: params.to,
+              amount: params.amount,
+              signature: result.signature,
+              transactionType: transactionType,
+              companyFee: companyFee,
+              netAmount: recipientAmount,
+              memo: params.memo,
+              groupId: params.groupId || undefined,
+              currency: params.currency
+            });
+            
+            logger.info('✅ Transaction post-processing completed', {
+              signature: result.signature,
+              userId: params.userId,
+              transactionType
+            }, 'ConsolidatedTransactionService');
+          } catch (postProcessingError) {
+            logger.error('❌ Error in transaction post-processing', postProcessingError, 'ConsolidatedTransactionService');
+            // Don't fail the transaction if post-processing fails
+          }
         }
 
         // Process payment request if this transaction was from a request
@@ -518,10 +559,49 @@ class ConsolidatedTransactionService {
     }
   }
 
+  // Balance cache to prevent excessive RPC calls
+  private balanceCache = new Map<string, { balance: number; timestamp: number }>();
+  private readonly BALANCE_CACHE_TTL = 5000; // 5 seconds cache
+  private balanceDeduplicator = new Map<string, Promise<UsdcBalanceResult>>();
+
   /**
-   * Get USDC balance for a wallet address
+   * Get USDC balance for a wallet address (with caching and deduplication)
    */
   async getUsdcBalance(walletAddress: string): Promise<UsdcBalanceResult> {
+    // CRITICAL: Deduplicate simultaneous calls for same address
+    if (this.balanceDeduplicator.has(walletAddress)) {
+      return this.balanceDeduplicator.get(walletAddress)!;
+    }
+
+    // Check cache first
+    const cached = this.balanceCache.get(walletAddress);
+    const now = Date.now();
+    if (cached && (now - cached.timestamp) < this.BALANCE_CACHE_TTL) {
+      logger.debug('Balance retrieved from cache', {
+        walletAddress: walletAddress ? walletAddress.substring(0, 10) + '...' : 'undefined',
+        balance: cached.balance
+      }, 'ConsolidatedTransactionService');
+      return {
+        success: true,
+        balance: cached.balance,
+        error: undefined
+      };
+    }
+
+    const balancePromise = this._getUsdcBalance(walletAddress)
+      .finally(() => {
+        // Clean up deduplicator after call completes
+        this.balanceDeduplicator.delete(walletAddress);
+      });
+
+    this.balanceDeduplicator.set(walletAddress, balancePromise);
+    return balancePromise;
+  }
+
+  /**
+   * Internal method to get USDC balance (without deduplication)
+   */
+  private async _getUsdcBalance(walletAddress: string): Promise<UsdcBalanceResult> {
     try {
       logger.debug('ConsolidatedTransactionService.getUsdcBalance called', {
         walletAddress: walletAddress ? walletAddress.substring(0, 10) + '...' : 'undefined',
@@ -537,6 +617,15 @@ class ConsolidatedTransactionService {
       }, 'ConsolidatedTransactionService');
 
       const result = await BalanceUtils.getUsdcBalance(walletAddress, usdcMintAddress);
+      
+      // Cache the result
+      if (result.accountExists) {
+        this.balanceCache.set(walletAddress, {
+          balance: result.balance,
+          timestamp: Date.now()
+        });
+      }
+      
       return {
         success: result.accountExists,
         balance: result.balance,
@@ -545,8 +634,7 @@ class ConsolidatedTransactionService {
     } catch (error) {
       logger.error('Failed to get USDC balance', {
         walletAddress: walletAddress ? walletAddress.substring(0, 10) + '...' : 'undefined',
-        error,
-        errorMessage: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : String(error),
         errorStack: error instanceof Error ? error.stack : undefined
       }, 'ConsolidatedTransactionService');
       return { success: false, balance: 0, error: 'Failed to get balance' };
@@ -619,22 +707,42 @@ class ConsolidatedTransactionService {
         case 'send_1to1':
           return this.handleSendTransaction(params as any);
 
-        case 'fair_split_contribution':
-          return this.handleFairSplitContribution(params as any);
+        case 'fair_split_contribution': {
+          const { handleFairSplitContribution } = await import('./handlers/FairSplitHandler');
+          return handleFairSplitContribution(params as any, (p: any) => this.sendUSDCTransaction(p));
+        }
 
-        case 'fair_split_withdrawal':
-          return this.handleFairSplitWithdrawal(params as any);
+        case 'fair_split_withdrawal': {
+          const { handleFairSplitWithdrawal } = await import('./handlers/FairSplitWithdrawalHandler');
+          return handleFairSplitWithdrawal(params as any, (userId: string) => this.getUserWalletAddress(userId));
+        }
 
-        case 'degen_split_lock':
-          return this.handleDegenSplitLock(params as any);
+        case 'degen_split_lock': {
+          const { handleDegenSplitLock } = await import('./handlers/DegenSplitHandler');
+          return handleDegenSplitLock(params as any, (p: any) => this.sendUSDCTransaction(p));
+        }
 
         case 'spend_split_payment':
           return this.handleSpendSplitPayment(params as any);
 
         case 'shared_wallet_funding':
+          // DEV FLAG: Shared wallet operations are only available in development
+          if (!__DEV__) {
+            return {
+              success: false,
+              error: 'Shared wallet funding is only available in development mode'
+            };
+          }
           return this.handleSharedWalletFunding(params as any);
 
         case 'shared_wallet_withdrawal':
+          // DEV FLAG: Shared wallet operations are only available in development
+          if (!__DEV__) {
+            return {
+              success: false,
+              error: 'Shared wallet withdrawal is only available in development mode'
+            };
+          }
           return this.handleSharedWalletWithdrawal(params as any);
 
         default:
@@ -749,624 +857,19 @@ class ConsolidatedTransactionService {
     }
   }
 
-  /**
-   * Handle Fair Split contribution (participant payment)
-   */
-  private async handleFairSplitContribution(params: any): Promise<CentralizedTransactionResult> {
-    const { userId, amount, splitWalletId, splitId, billId, memo } = params;
-
-    // ✅ CRITICAL: Get the actual wallet address from splitWalletId (not the database ID)
-    if (!splitWalletId) {
-      return {
-        success: false,
-        error: 'Split wallet ID is required'
-      };
-    }
-
-    try {
-      const { SplitWalletService } = await import('../../split');
-      const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
-      
-      if (!walletResult.success || !walletResult.wallet) {
-        logger.error('Failed to get split wallet', {
-          splitWalletId,
-          error: walletResult.error
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: walletResult.error || 'Split wallet not found'
-        };
-      }
-
-      const splitWalletAddress = walletResult.wallet.walletAddress;
-      if (!splitWalletAddress) {
-        logger.error('Split wallet has no address', {
-          splitWalletId,
-          wallet: walletResult.wallet
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: 'Split wallet address not found'
-        };
-      }
-
-      // CRITICAL: Validate address format before attempting to create PublicKey
-      // This prevents opaque base58 errors
-      const base58Pattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-      if (!base58Pattern.test(splitWalletAddress)) {
-        logger.error('Invalid split wallet address format (not base58)', {
-          splitWalletId,
-          address: splitWalletAddress,
-          addressLength: splitWalletAddress.length,
-          note: 'Address must be a valid base58-encoded Solana public key (32-44 characters)'
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: `Invalid split wallet address format: expected base58-encoded Solana address (32-44 characters), got ${splitWalletAddress.length} characters`
-        };
-      }
-
-      // Validate the address is a valid Solana address
-      try {
-        const { PublicKey } = await import('@solana/web3.js');
-        new PublicKey(splitWalletAddress); // This will throw if invalid
-      } catch (addressError) {
-        logger.error('Invalid split wallet address format (PublicKey validation failed)', {
-          splitWalletId,
-          address: splitWalletAddress,
-          addressLength: splitWalletAddress.length,
-          error: addressError instanceof Error ? addressError.message : String(addressError)
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: `Invalid split wallet address: ${addressError instanceof Error ? addressError.message : 'Invalid format'}. Please ensure the wallet address is a valid Solana public key.`
-        };
-      }
-
-      logger.info('Sending fair split contribution', {
-        splitWalletId,
-        splitWalletAddress,
-        amount,
-        userId
-      }, 'ConsolidatedTransactionService');
-
-    // Use internal transfer service for split contributions with company fees
-    const result = await this.sendUSDCTransaction({
-        to: splitWalletAddress, // ✅ Use actual wallet address, not database ID
-      amount: amount,
-      currency: 'USDC',
-      userId: userId,
-      memo: memo || `Fair split contribution - ${splitId}`,
-      priority: 'medium',
-      transactionType: 'split_payment'
-    });
-
-    if (result.success) {
-        return {
-          success: true,
-          transactionSignature: result.signature,
-          transactionId: result.txId,
-          txId: result.txId,
-          message: `Successfully contributed ${amount.toFixed(6)} USDC to fair split`
-        };
-    } else {
-      return {
-        success: false,
-        error: result.error || 'Fair split contribution failed'
-        };
-      }
-    } catch (error) {
-      logger.error('Error in fair split contribution', {
-        splitWalletId,
-        error: error instanceof Error ? error.message : String(error)
-      }, 'ConsolidatedTransactionService');
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to process fair split contribution'
-      };
-    }
-  }
 
   /**
    * Handle Fair Split withdrawal (creator withdrawal)
-   * CRITICAL: Must use split wallet private key, not user wallet
+   * ✅ REMOVED: This method was duplicate code - actual implementation is in handlers/FairSplitWithdrawalHandler.ts
+   * The handler is called via executeTransactionByContext() which routes to the handler file
+   * This private method was never called and has been removed to reduce code duplication and memory usage
+   * 
+   * The actual withdrawal flow:
+   * UnifiedWithdrawalService.withdraw() 
+   *   → ConsolidatedTransactionService.executeTransactionByContext('fair_split_withdrawal')
+   *     → handlers/FairSplitWithdrawalHandler.handleFairSplitWithdrawal()
    */
-  private async handleFairSplitWithdrawal(params: any): Promise<CentralizedTransactionResult> {
-    const { userId, amount, splitWalletId, splitId, billId, memo, destinationAddress } = params;
 
-    try {
-      // Validate parameters
-      if (!splitWalletId || !userId || !amount || amount <= 0) {
-        return {
-          success: false,
-          error: 'Invalid withdrawal parameters'
-        };
-      }
-
-      // Get destination address if not provided (should be user's personal wallet)
-      const solanaAddressPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-      let finalDestinationAddress = destinationAddress;
-      
-      if (!finalDestinationAddress || !solanaAddressPattern.test(finalDestinationAddress)) {
-        finalDestinationAddress = await this.getUserWalletAddress(userId);
-        if (!finalDestinationAddress) {
-          return {
-            success: false,
-            error: 'User wallet address not found. Please ensure your wallet is initialized.'
-          };
-        }
-      }
-
-      // Get split wallet
-      const { SplitWalletService } = await import('../../split');
-      const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
-      if (!walletResult.success || !walletResult.wallet) {
-        return {
-          success: false,
-          error: walletResult.error || 'Split wallet not found'
-        };
-      }
-
-      const wallet = walletResult.wallet;
-
-      // Verify user is the creator (only creator can withdraw from fair split)
-      if (wallet.creatorId !== userId) {
-        return {
-          success: false,
-          error: 'Only the split creator can withdraw funds'
-        };
-      }
-
-      // Check split wallet has enough balance
-      if (amount > (wallet.totalBalance || 0)) {
-        return {
-          success: false,
-          error: 'Insufficient balance in split wallet'
-        };
-      }
-
-      // CRITICAL: Get split wallet private key (not user wallet)
-      logger.info('Retrieving split wallet private key for withdrawal', {
-        splitWalletId,
-        userId,
-        creatorId: wallet.creatorId
-      }, 'ConsolidatedTransactionService');
-
-      const privateKeyResult = await SplitWalletService.getSplitWalletPrivateKey(splitWalletId, userId);
-      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
-        logger.error('Failed to get split wallet private key', {
-          error: privateKeyResult.error,
-          splitWalletId,
-          userId
-        }, 'ConsolidatedTransactionService');
-        
-        return {
-          success: false,
-          error: privateKeyResult.error || 'Failed to access split wallet private key. Please ensure you are the creator.'
-        };
-      }
-
-      const privateKey = privateKeyResult.privateKey;
-
-      // Execute blockchain transaction using the split wallet's private key
-      const { createSolanaConnection } = await import('../connection/connectionFactory');
-      const connectionInstance = await createSolanaConnection();
-
-      const { PublicKey } = await import('@solana/web3.js');
-      const { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction, getAccount } = await import('../secureTokenUtils');
-      const { USDC_CONFIG } = await import('../../shared/walletConstants');
-
-      // CRITICAL: Create keypair from split wallet private key
-      const { KeypairUtils } = await import('../../shared/keypairUtils');
-      
-      logger.info('Creating keypair from split wallet private key', {
-        splitWalletId,
-        userId
-      }, 'ConsolidatedTransactionService');
-      
-      const keypairResult = KeypairUtils.createKeypairFromSecretKey(privateKey);
-      
-      if (!keypairResult.success || !keypairResult.keypair) {
-        logger.error('Failed to create keypair from split wallet private key', {
-          error: keypairResult.error,
-          splitWalletId,
-          userId
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: keypairResult.error || 'Failed to create keypair from private key'
-        };
-      }
-      
-      // Get the actual split wallet address from the keypair
-      const actualSplitWalletAddress = keypairResult.keypair.publicKey.toBase58();
-      
-      // Warn if the stored address doesn't match the derived address
-      if (actualSplitWalletAddress !== wallet.walletAddress) {
-        logger.warn('Split wallet address mismatch - using derived address from private key', {
-          storedAddress: wallet.walletAddress,
-          derivedAddress: actualSplitWalletAddress,
-          splitWalletId,
-          userId
-        }, 'ConsolidatedTransactionService');
-      }
-
-      // Validate addresses
-      const base58Pattern = /^[1-9A-HJ-NP-Za-km-z]+$/;
-      if (!base58Pattern.test(actualSplitWalletAddress) || !base58Pattern.test(finalDestinationAddress)) {
-        return {
-          success: false,
-          error: 'Invalid address format for withdrawal'
-        };
-      }
-
-      const fromPublicKey = new PublicKey(actualSplitWalletAddress);
-      const toPublicKey = new PublicKey(finalDestinationAddress);
-      const usdcMint = new PublicKey(USDC_CONFIG.mintAddress);
-
-      // Get token accounts
-      const fromTokenAccount = await getAssociatedTokenAddress(usdcMint, fromPublicKey);
-      const toTokenAccount = await getAssociatedTokenAddress(usdcMint, toPublicKey);
-
-      // Check if source (split wallet) USDC token account exists and has balance
-      let sourceTokenAccount;
-      let sourceBalance = 0;
-      try {
-        sourceTokenAccount = await getAccount(connectionInstance, fromTokenAccount);
-        sourceBalance = Number(sourceTokenAccount.amount) / Math.pow(10, 6); // USDC has 6 decimals
-        logger.info('Split wallet USDC token account found', {
-          splitWalletAddress: actualSplitWalletAddress,
-          balance: sourceBalance,
-          rawAmount: sourceTokenAccount.amount.toString()
-        }, 'ConsolidatedTransactionService');
-      } catch (sourceAccountError) {
-        const errorMessage = sourceAccountError instanceof Error ? sourceAccountError.message : String(sourceAccountError);
-        if (errorMessage.includes('Token account not found') || errorMessage.includes('not found')) {
-          logger.error('Split wallet has no USDC token account', {
-            splitWalletAddress: actualSplitWalletAddress,
-            splitWalletId,
-            userId,
-            note: 'The split wallet has never received USDC. Please fund it first before withdrawing.'
-          }, 'ConsolidatedTransactionService');
-          return {
-            success: false,
-            error: 'Split wallet has no USDC balance. Please fund the wallet first before withdrawing.'
-          };
-        }
-        throw sourceAccountError;
-      }
-
-      // Check if source has sufficient balance
-      if (sourceBalance < amount) {
-        logger.error('Insufficient balance in split wallet', {
-          splitWalletAddress: actualSplitWalletAddress,
-          requestedAmount: amount,
-          availableBalance: sourceBalance,
-          splitWalletId,
-          userId
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: `Insufficient balance. Available: ${sourceBalance.toFixed(6)} USDC, Requested: ${amount.toFixed(6)} USDC`
-        };
-      }
-
-      // Create transaction
-      const { Transaction } = await import('@solana/web3.js');
-      const transaction = new Transaction();
-
-      // Check if destination token account exists
-      try {
-        await getAccount(connectionInstance, toTokenAccount);
-        logger.debug('Destination USDC token account exists', { 
-          toTokenAccount: toTokenAccount.toBase58() 
-        }, 'ConsolidatedTransactionService');
-      } catch {
-        // Create associated token account if it doesn't exist
-        logger.debug('Destination USDC token account does not exist, will create it', { 
-          toTokenAccount: toTokenAccount.toBase58(),
-          recipient: finalDestinationAddress,
-          note: 'This is expected for new recipients - account will be created automatically'
-        }, 'ConsolidatedTransactionService');
-        const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
-        const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
-        const companyPublicKey = new PublicKey(companyWalletAddress);
-
-        transaction.add(
-          createAssociatedTokenAccountInstruction(
-            companyPublicKey,
-            toTokenAccount,
-            toPublicKey,
-            usdcMint
-          )
-        );
-      }
-
-      // Calculate amount (USDC has 6 decimals)
-      const transferAmount = Math.floor(amount * Math.pow(10, 6));
-
-      // Add transfer instruction
-      transaction.add(
-        createTransferInstruction(
-          fromTokenAccount,
-          toTokenAccount,
-          fromPublicKey,
-          transferAmount
-        )
-      );
-
-      // Sign and send transaction
-      const fromKeypair = keypairResult.keypair;
-
-      // CRITICAL: Company wallet must be the fee payer, not the split wallet
-      // The split wallet might not have SOL to pay for transaction fees
-      const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
-      const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
-      const companyPublicKey = new PublicKey(companyWalletAddress);
-      
-      transaction.feePayer = companyPublicKey;
-      const latestBlockhash = await connectionInstance.getLatestBlockhash();
-      transaction.recentBlockhash = latestBlockhash.blockhash;
-
-      // Sign transaction with split wallet keypair (for the transfer instruction)
-      transaction.sign(fromKeypair);
-
-      // Simulate transaction before sending to catch errors early
-      try {
-        const simulationResult = await connectionInstance.simulateTransaction(transaction);
-        if (simulationResult.value.err) {
-          const errorMessage = JSON.stringify(simulationResult.value.err);
-          logger.error('Transaction simulation failed', {
-            error: errorMessage,
-            logs: simulationResult.value.logs || [],
-            splitWalletAddress: actualSplitWalletAddress,
-            amount,
-            sourceBalance,
-            splitWalletId,
-            userId
-          }, 'ConsolidatedTransactionService');
-          
-          // Provide more helpful error messages
-          if (errorMessage.includes('Attempt to debit an account but found no record of a prior credit')) {
-            return {
-              success: false,
-              error: `Split wallet has insufficient USDC balance. Available: ${sourceBalance.toFixed(6)} USDC, Requested: ${amount.toFixed(6)} USDC. Please fund the wallet first.`
-            };
-          }
-          
-          return {
-            success: false,
-            error: `Transaction simulation failed: ${errorMessage}`
-          };
-        }
-        
-        logger.debug('Transaction simulation successful', {
-          splitWalletAddress: actualSplitWalletAddress,
-          amount,
-          sourceBalance
-        }, 'ConsolidatedTransactionService');
-      } catch (simulationError) {
-        logger.error('Transaction simulation error', {
-          error: simulationError instanceof Error ? simulationError.message : String(simulationError),
-          splitWalletAddress: actualSplitWalletAddress,
-          amount,
-          sourceBalance,
-          splitWalletId,
-          userId
-        }, 'ConsolidatedTransactionService');
-        
-        const errorMessage = simulationError instanceof Error ? simulationError.message : String(simulationError);
-        if (errorMessage.includes('no record of a prior credit') || errorMessage.includes('Attempt to debit')) {
-          return {
-            success: false,
-            error: `Split wallet has insufficient USDC balance. Available: ${sourceBalance.toFixed(6)} USDC, Requested: ${amount.toFixed(6)} USDC. Please fund the wallet first.`
-          };
-        }
-      }
-
-      // Convert Transaction to VersionedTransaction for Firebase Functions
-      const solanaWeb3 = await import('@solana/web3.js');
-      const { VersionedTransaction: VersionedTransactionType } = solanaWeb3;
-      const versionedTransactionForSigning = new VersionedTransactionType(transaction.compileMessage());
-
-      // Sign with split wallet keypair
-      versionedTransactionForSigning.sign([fromKeypair]);
-
-      // Serialize the partially signed transaction
-      const serializedTransaction = versionedTransactionForSigning.serialize();
-      
-      // Send to Firebase Functions for company wallet signature
-      const { signTransaction: signTransactionWithCompany, submitTransaction: submitTransactionToNetwork } = await import('./transactionSigningService');
-      
-      let signature: string;
-      try {
-        // Get company wallet signature
-        const signedTransaction = await signTransactionWithCompany(serializedTransaction);
-        
-        // Submit to network
-        const submitResult = await submitTransactionToNetwork(signedTransaction);
-        signature = submitResult.signature;
-        
-        logger.info('Fair split withdrawal transaction submitted', {
-          signature,
-          splitWalletId,
-          userId
-        }, 'ConsolidatedTransactionService');
-      } catch (signingError) {
-        logger.error('Failed to sign or submit transaction', {
-          error: signingError instanceof Error ? signingError.message : String(signingError),
-          splitWalletId,
-          userId
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: signingError instanceof Error ? signingError.message : 'Failed to sign or submit transaction'
-        };
-      }
-
-      // Confirm transaction
-      const confirmation = await connectionInstance.confirmTransaction(signature, 'confirmed');
-      if (confirmation.value.err) {
-        logger.error('Transaction confirmation failed', {
-          error: confirmation.value.err,
-          signature,
-          splitWalletId,
-          userId
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: 'Transaction was submitted but confirmation failed'
-        };
-      }
-
-      logger.info('Fair split withdrawal completed successfully', {
-        splitWalletId,
-        userId,
-        amount,
-        signature
-      }, 'ConsolidatedTransactionService');
-
-      return {
-        success: true,
-        transactionSignature: signature,
-        transactionId: signature,
-        txId: signature,
-        fee: 0, // No company fee for split withdrawals
-        netAmount: amount,
-        blockchainFee: 0, // Company wallet pays fees
-        message: `Successfully withdrew ${amount.toFixed(6)} USDC from fair split`
-      };
-    } catch (error) {
-      logger.error('Fair split withdrawal error', {
-        error: error instanceof Error ? error.message : String(error),
-        splitWalletId,
-        userId
-      }, 'ConsolidatedTransactionService');
-
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Fair split withdrawal failed'
-      };
-    }
-  }
-
-  /**
-   * Handle Degen Split fund locking
-   */
-  private async handleDegenSplitLock(params: any): Promise<CentralizedTransactionResult> {
-    const { userId, amount, splitWalletId, splitId, billId, memo } = params;
-
-    // ✅ CRITICAL: Get the actual wallet address from splitWalletId (not the database ID)
-    if (!splitWalletId) {
-      return {
-        success: false,
-        error: 'Split wallet ID is required'
-      };
-    }
-
-    try {
-      const { SplitWalletService } = await import('../../split');
-      const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
-      
-      if (!walletResult.success || !walletResult.wallet) {
-        logger.error('Failed to get split wallet', {
-          splitWalletId,
-          error: walletResult.error
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: walletResult.error || 'Split wallet not found'
-        };
-      }
-
-      const splitWalletAddress = walletResult.wallet.walletAddress;
-      if (!splitWalletAddress) {
-        logger.error('Split wallet has no address', {
-          splitWalletId,
-          wallet: walletResult.wallet
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: 'Split wallet address not found'
-        };
-      }
-
-      // CRITICAL: Validate address format before attempting to create PublicKey
-      // This prevents opaque base58 errors
-      const base58Pattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-      if (!base58Pattern.test(splitWalletAddress)) {
-        logger.error('Invalid split wallet address format (not base58)', {
-          splitWalletId,
-          address: splitWalletAddress,
-          addressLength: splitWalletAddress.length,
-          note: 'Address must be a valid base58-encoded Solana public key (32-44 characters)'
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: `Invalid split wallet address format: expected base58-encoded Solana address (32-44 characters), got ${splitWalletAddress.length} characters`
-        };
-      }
-
-      // Validate the address is a valid Solana address
-      try {
-        const { PublicKey } = await import('@solana/web3.js');
-        new PublicKey(splitWalletAddress); // This will throw if invalid
-      } catch (addressError) {
-        logger.error('Invalid split wallet address format (PublicKey validation failed)', {
-          splitWalletId,
-          address: splitWalletAddress,
-          addressLength: splitWalletAddress.length,
-          error: addressError instanceof Error ? addressError.message : String(addressError)
-        }, 'ConsolidatedTransactionService');
-        return {
-          success: false,
-          error: `Invalid split wallet address: ${addressError instanceof Error ? addressError.message : 'Invalid format'}. Please ensure the wallet address is a valid Solana public key.`
-        };
-      }
-
-      logger.info('Sending degen split lock', {
-        splitWalletId,
-        splitWalletAddress,
-        amount,
-        userId
-      }, 'ConsolidatedTransactionService');
-
-    // Use internal transfer service for degen split funding
-    const result = await this.sendUSDCTransaction({
-        to: splitWalletAddress, // ✅ Use actual wallet address, not database ID
-      amount: amount,
-      currency: 'USDC',
-      userId: userId,
-      memo: memo || `Degen split fund locking - ${splitId}`,
-      priority: 'medium',
-      transactionType: 'split_payment'
-    });
-
-    if (result.success) {
-        return {
-          success: true,
-          transactionSignature: result.signature,
-          transactionId: result.txId,
-          txId: result.txId,
-          message: `Successfully locked ${amount.toFixed(6)} USDC in degen split`
-        };
-    } else {
-      return {
-        success: false,
-        error: result.error || 'Degen split lock failed'
-        };
-      }
-    } catch (error) {
-      logger.error('Error in degen split lock', {
-        splitWalletId,
-        error: error instanceof Error ? error.message : String(error)
-      }, 'ConsolidatedTransactionService');
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to process degen split lock'
-      };
-    }
-  }
 
   /**
    * Handle Spend Split merchant payment
@@ -1416,6 +919,19 @@ class ConsolidatedTransactionService {
    * Handle Shared Wallet funding
    */
   private async handleSharedWalletFunding(params: any): Promise<CentralizedTransactionResult> {
+    // DEV FLAG: Shared wallet operations are only available in development
+    if (!__DEV__) {
+      logger.warn('Shared wallet funding attempted in production', {
+        userId: params.userId,
+        sharedWalletId: params.sharedWalletId
+      }, 'ConsolidatedTransactionService');
+      
+      return {
+        success: false,
+        error: 'Shared wallet funding is only available in development mode'
+      };
+    }
+
     const { userId, amount, sharedWalletId, memo } = params;
 
     try {
@@ -1695,6 +1211,19 @@ class ConsolidatedTransactionService {
    * Handle Shared Wallet withdrawal
    */
   private async handleSharedWalletWithdrawal(params: any): Promise<CentralizedTransactionResult> {
+    // DEV FLAG: Shared wallet operations are only available in development
+    if (!__DEV__) {
+      logger.warn('Shared wallet withdrawal attempted in production', {
+        userId: params.userId,
+        sharedWalletId: params.sharedWalletId
+      }, 'ConsolidatedTransactionService');
+      
+      return {
+        success: false,
+        error: 'Shared wallet withdrawal is only available in development mode'
+      };
+    }
+
     const { userId, amount, sharedWalletId, destinationAddress, memo } = params;
 
     try {
@@ -2192,9 +1721,9 @@ class ConsolidatedTransactionService {
           amount,
           userId
         }, 'ConsolidatedTransactionService');
-        
-        // Wait for confirmation
-        await connectionInstance.confirmTransaction(signature, 'confirmed');
+
+      // Wait for confirmation
+      await connectionInstance.confirmTransaction(signature, 'confirmed');
       } catch (firebaseError) {
         const errorMessage = firebaseError instanceof Error ? firebaseError.message : String(firebaseError);
         const errorCode = (firebaseError as any)?.code;

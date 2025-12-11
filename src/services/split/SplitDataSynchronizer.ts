@@ -6,6 +6,9 @@
 
 import { logger } from '../core';
 import { SplitStorageService } from '../splits/splitStorageService';
+import { mapSplitWalletStatusToSplitStorage, mapSplitStorageStatusToSplitWallet } from './utils/statusMapper';
+import { VALIDATION_TOLERANCE } from './constants/splitConstants';
+import { db } from '../../config/firebase/firebase';
 import type { SplitWalletParticipant } from './types';
 
 export interface SynchronizationResult {
@@ -15,41 +18,6 @@ export interface SynchronizationResult {
 }
 
 export class SplitDataSynchronizer {
-  /**
-   * Map split wallet participant status to split storage status
-   */
-  private static mapSplitWalletStatusToSplitStorage(splitWalletStatus: string): string {
-    switch (splitWalletStatus) {
-      case 'pending':
-        return 'pending';
-      case 'locked':
-        return 'accepted'; // For degen splits, 'locked' means 'accepted' in split storage
-      case 'paid':
-        return 'paid';
-      case 'failed':
-        return 'pending'; // Failed payments reset to pending
-      default:
-        return 'pending';
-    }
-  }
-
-  /**
-   * Map split storage participant status to split wallet status
-   */
-  private static mapSplitStorageStatusToSplitWallet(splitStorageStatus: string): string {
-    switch (splitStorageStatus) {
-      case 'pending':
-        return 'pending';
-      case 'accepted':
-        return 'locked'; // For degen splits, 'accepted' means 'locked' in split wallet
-      case 'paid':
-        return 'paid';
-      case 'invited':
-        return 'pending'; // Invited users are pending in split wallet
-      default:
-        return 'pending';
-    }
-  }
 
   /**
    * Synchronize participant status from split wallet to split storage
@@ -67,10 +35,55 @@ export class SplitDataSynchronizer {
         amountPaid: splitWalletParticipant.amountPaid
       }, 'SplitDataSynchronizer');
 
-      const splitStorageStatus = this.mapSplitWalletStatusToSplitStorage(splitWalletParticipant.status);
+      const splitStorageStatus = mapSplitWalletStatusToSplitStorage(splitWalletParticipant.status);
+      
+      // CRITICAL: Try to find split by billId first, then by splitId if needed
+      let splitResult = await SplitStorageService.getSplitByBillId(billId);
+      
+      // If not found by billId, try to get splitId from split wallet
+      if (!splitResult.success) {
+        logger.warn('Split not found by billId, attempting to find via split wallet', {
+          billId,
+          participantId
+        }, 'SplitDataSynchronizer');
+        
+        // Try to get split wallet to find splitId
+        const { SplitWalletQueries } = await import('./SplitWalletQueries');
+        const walletResult = await SplitWalletQueries.getSplitWalletByBillId(billId);
+        
+        if (walletResult.success && walletResult.wallet && walletResult.wallet.walletId) {
+          // Try to find split by checking if walletId is stored in split
+          const { collection, query, where, getDocs } = await import('firebase/firestore');
+          const splitsRef = collection(db, 'splits');
+          const q = query(splitsRef, where('walletId', '==', walletResult.wallet.walletId || walletResult.wallet.id));
+          const snapshot = await getDocs(q);
+          
+          if (!snapshot.empty) {
+            const splitDoc = snapshot.docs[0];
+            const splitData = splitDoc.data();
+            splitData.firebaseDocId = splitDoc.id;
+            splitResult = { success: true, split: splitData };
+          }
+        }
+      }
+      
+      if (!splitResult.success || !splitResult.split) {
+        logger.error('Failed to find split for synchronization', {
+          billId,
+          participantId,
+          error: splitResult.error
+        }, 'SplitDataSynchronizer');
+        return {
+          success: false,
+          error: `Split not found: ${splitResult.error || 'Unknown error'}`
+        };
+      }
+
+      // Use the split's ID (not billId) for update
+      const splitId = splitResult.split.id || splitResult.split.firebaseDocId;
       
       const result = await SplitStorageService.updateParticipantStatus(
-        billId,
+        splitId,
         participantId,
         splitStorageStatus as "pending" | "locked" | "paid" | "accepted" | "invited" | "declined",
         splitWalletParticipant.amountPaid,
@@ -80,6 +93,7 @@ export class SplitDataSynchronizer {
       if (result.success) {
         logger.info('Participant synchronized from split wallet to split storage', {
           billId,
+          splitId,
           participantId,
           splitWalletStatus: splitWalletParticipant.status,
           splitStorageStatus,
@@ -88,6 +102,7 @@ export class SplitDataSynchronizer {
       } else {
         logger.error('Failed to synchronize participant from split wallet to split storage', {
           billId,
+          splitId,
           participantId,
           error: result.error
         }, 'SplitDataSynchronizer');
@@ -101,7 +116,8 @@ export class SplitDataSynchronizer {
       logger.error('Error synchronizing participant from split wallet to split storage', {
         billId,
         participantId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       }, 'SplitDataSynchronizer');
       
       return {
@@ -111,10 +127,37 @@ export class SplitDataSynchronizer {
     }
   }
 
+  // Request deduplication for sync operations to prevent memory exhaustion
+  private static syncDeduplicator = new Map<string, Promise<SynchronizationResult>>();
+
   /**
-   * Synchronize all participants from split wallet to split storage
+   * Synchronize all participants from split wallet to split storage (with deduplication)
    */
   static async syncAllParticipantsFromSplitWalletToSplitStorage(
+    billId: string,
+    splitWalletParticipants: SplitWalletParticipant[]
+  ): Promise<SynchronizationResult> {
+    // CRITICAL: Deduplicate sync operations for same billId to prevent memory exhaustion
+    const syncKey = `sync_${billId}`;
+    if (this.syncDeduplicator.has(syncKey)) {
+      logger.debug('Sync already in progress for billId, reusing existing promise', { billId }, 'SplitDataSynchronizer');
+      return this.syncDeduplicator.get(syncKey)!;
+    }
+
+    const syncPromise = this._syncAllParticipantsFromSplitWalletToSplitStorage(billId, splitWalletParticipants)
+      .finally(() => {
+        // Clean up after sync completes
+        this.syncDeduplicator.delete(syncKey);
+      });
+
+    this.syncDeduplicator.set(syncKey, syncPromise);
+    return syncPromise;
+  }
+
+  /**
+   * Internal method to sync all participants (without deduplication)
+   */
+  private static async _syncAllParticipantsFromSplitWalletToSplitStorage(
     billId: string,
     splitWalletParticipants: SplitWalletParticipant[]
   ): Promise<SynchronizationResult> {
@@ -124,22 +167,36 @@ export class SplitDataSynchronizer {
         participantsCount: splitWalletParticipants.length
       }, 'SplitDataSynchronizer');
 
-      let synchronizedCount = 0;
-      const errors: string[] = [];
-
-      for (const participant of splitWalletParticipants) {
-        const result = await this.syncParticipantFromSplitWalletToSplitStorage(
+      // PERFORMANCE: Parallelize participant syncs instead of sequential
+      const syncPromises = splitWalletParticipants.map(participant =>
+        this.syncParticipantFromSplitWalletToSplitStorage(
           billId,
           participant.userId,
           participant
-        );
+        ).then(result => ({ participantId: participant.userId, result }))
+          .catch(error => ({ 
+            participantId: participant.userId, 
+            result: { success: false, error: error instanceof Error ? error.message : String(error) } 
+          }))
+      );
 
+      const syncResults = await Promise.allSettled(syncPromises);
+      
+      let synchronizedCount = 0;
+      const errors: string[] = [];
+
+      syncResults.forEach((settledResult) => {
+        if (settledResult.status === 'fulfilled') {
+          const { participantId, result } = settledResult.value;
         if (result.success) {
           synchronizedCount++;
+          } else {
+            errors.push(`Participant ${participantId}: ${result.error || 'Unknown error'}`);
+          }
         } else {
-          errors.push(`Participant ${participant.userId}: ${result.error}`);
+          errors.push(`Error syncing participant: ${settledResult.reason instanceof Error ? settledResult.reason.message : String(settledResult.reason)}`);
         }
-      }
+      });
 
       const success = synchronizedCount === splitWalletParticipants.length;
       const error = errors.length > 0 ? errors.join('; ') : undefined;
@@ -210,7 +267,7 @@ export class SplitDataSynchronizer {
           splitStorageStatus = 'active';
       }
 
-      const updateData: any = {
+      const updateData: import('./types').SplitStorageUpdate = {
         status: splitStorageStatus,
         updatedAt: new Date().toISOString()
       };
@@ -267,7 +324,7 @@ export class SplitDataSynchronizer {
     }
     
     if (splitStorageStatus) {
-      return this.mapSplitStorageStatusToSplitWallet(splitStorageStatus);
+      return mapSplitStorageStatusToSplitWallet(splitStorageStatus);
     }
     
     return 'pending';
@@ -293,9 +350,9 @@ export class SplitDataSynchronizer {
       };
 
       // Map status appropriately for degen splits
-      const splitStorageStatus = this.mapSplitWalletStatusToSplitStorage(splitWalletParticipant.status);
+      const splitStorageStatus = mapSplitWalletStatusToSplitStorage(splitWalletParticipant.status);
       
-      const updateData: any = {
+      const updateData: import('./types').DegenSplitParticipantUpdate = {
         status: splitStorageStatus,
         amountPaid: splitWalletParticipant.amountPaid,
         amountOwed: totalBillAmount, // Ensure amountOwed is correct for degen splits
@@ -377,7 +434,7 @@ export class SplitDataSynchronizer {
    */
   static validateDataConsistency(
     splitWalletParticipants: SplitWalletParticipant[],
-    splitStorageParticipants: any[]
+    splitStorageParticipants: import('./types').SplitStorageParticipant[]
   ): { isConsistent: boolean; inconsistencies: string[] } {
     const inconsistencies: string[] = [];
 
@@ -396,13 +453,13 @@ export class SplitDataSynchronizer {
       }
 
       // Check status consistency
-      const expectedStorageStatus = this.mapSplitWalletStatusToSplitStorage(walletParticipant.status);
+      const expectedStorageStatus = mapSplitWalletStatusToSplitStorage(walletParticipant.status);
       if (storageParticipant.status !== expectedStorageStatus) {
         inconsistencies.push(`Participant ${walletParticipant.userId} status mismatch: split wallet has '${walletParticipant.status}', split storage has '${storageParticipant.status}', expected '${expectedStorageStatus}'`);
       }
 
       // Check amount consistency
-      if (Math.abs((walletParticipant.amountPaid || 0) - (storageParticipant.amountPaid || 0)) > 0.001) {
+      if (Math.abs((walletParticipant.amountPaid || 0) - (storageParticipant.amountPaid || 0)) > VALIDATION_TOLERANCE.BALANCE) {
         inconsistencies.push(`Participant ${walletParticipant.userId} amount mismatch: split wallet has ${walletParticipant.amountPaid}, split storage has ${storageParticipant.amountPaid}`);
       }
     }

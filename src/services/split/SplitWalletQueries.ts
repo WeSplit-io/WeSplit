@@ -8,13 +8,42 @@ import { logger } from '../core';
 import { doc, getDoc, getDocs, query, where, updateDoc, collection } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
+// CRITICAL: Dynamic import to prevent early bundling and memory exhaustion
+// import { SplitWalletCache } from './SplitWalletCache';
+import { RequestDeduplicator } from './utils/debounceUtils';
 
 export class SplitWalletQueries {
+  // Request deduplication to prevent multiple simultaneous calls for the same wallet
+  private static walletDeduplicator = new RequestDeduplicator<(id: string) => Promise<SplitWalletResult>>();
+  private static walletByBillIdDeduplicator = new RequestDeduplicator<(billId: string) => Promise<SplitWalletResult>>();
+
   /**
-   * Get split wallet by ID
+   * Get split wallet by ID (with caching and deduplication)
    */
   static async getSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
+    // Use deduplication to prevent multiple simultaneous calls
+    return this.walletDeduplicator.execute(
+      splitWalletId,
+      this._getSplitWallet.bind(this),
+      splitWalletId
+    );
+  }
+
+  /**
+   * Internal method to get split wallet (without deduplication)
+   */
+  private static async _getSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
     try {
+      // Check cache first (dynamic import to prevent early bundling)
+      const { SplitWalletCache } = await import('./SplitWalletCache');
+      const cached = await SplitWalletCache.getWalletById(splitWalletId);
+      if (cached) {
+        return {
+          success: true,
+          wallet: cached,
+        };
+      }
+
       logger.debug('Getting split wallet', { splitWalletId }, 'SplitWalletQueries');
 
       // Try to get by Firebase document ID first
@@ -28,17 +57,36 @@ export class SplitWalletQueries {
           firebaseDocId: docSnap.id,
         };
 
-        logger.debug('Split wallet found by Firebase ID', {
-          splitWalletId,
-          firebaseDocId: docSnap.id,
-          status: wallet.status
-        });
-
         logger.info('Split wallet retrieved by Firebase ID', {
           splitWalletId,
           firebaseDocId: docSnap.id,
           status: wallet.status
         }, 'SplitWalletQueries');
+
+        // Cache the wallet (dynamic import to prevent early bundling)
+        const { SplitWalletCache } = await import('./SplitWalletCache');
+        SplitWalletCache.setWallet(wallet);
+
+        // CRITICAL: Sync split storage from split wallet to fix stale data (non-blocking)
+        if (wallet.billId) {
+          // Run sync asynchronously to not block the query
+          (async () => {
+            try {
+              const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
+              await SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
+                wallet.billId,
+                wallet.participants
+              );
+            } catch (syncError) {
+              // Don't fail the query if sync fails, but log it
+              logger.warn('Failed to sync split storage from wallet', {
+                splitWalletId,
+                billId: wallet.billId,
+                error: syncError instanceof Error ? syncError.message : String(syncError)
+              }, 'SplitWalletQueries');
+            }
+          })();
+        }
 
         return {
           success: true,
@@ -61,17 +109,37 @@ export class SplitWalletQueries {
           firebaseDocId: doc.id,
         };
 
-        logger.debug('Split wallet found by custom ID', {
-          splitWalletId,
-          firebaseDocId: doc.id,
-          status: wallet.status
-        });
-
         logger.info('Split wallet retrieved by custom ID', {
           splitWalletId,
           firebaseDocId: doc.id,
           status: wallet.status
         }, 'SplitWalletQueries');
+
+        // Cache the wallet (dynamic import to prevent early bundling)
+        const { SplitWalletCache } = await import('./SplitWalletCache');
+        SplitWalletCache.setWallet(wallet);
+
+        // CRITICAL: Sync split storage from split wallet to fix stale data (non-blocking)
+        // This ensures split storage always has the latest payment data
+        if (wallet.billId) {
+          // Run sync asynchronously to not block the query
+          (async () => {
+            try {
+              const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
+              await SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
+                wallet.billId,
+                wallet.participants
+              );
+            } catch (syncError) {
+              // Don't fail the query if sync fails, but log it
+              logger.warn('Failed to sync split storage from wallet', {
+                splitWalletId,
+                billId: wallet.billId,
+                error: syncError instanceof Error ? syncError.message : String(syncError)
+              }, 'SplitWalletQueries');
+            }
+          })();
+        }
 
         return {
           success: true,
@@ -95,10 +163,32 @@ export class SplitWalletQueries {
   }
 
   /**
-   * Get split wallet by bill ID
+   * Get split wallet by bill ID (with caching and deduplication)
    */
   static async getSplitWalletByBillId(billId: string): Promise<SplitWalletResult> {
+    // Use deduplication to prevent multiple simultaneous calls
+    return this.walletByBillIdDeduplicator.execute(
+      billId,
+      this._getSplitWalletByBillId.bind(this),
+      billId
+    );
+  }
+
+  /**
+   * Internal method to get split wallet by bill ID (without deduplication)
+   */
+  private static async _getSplitWalletByBillId(billId: string): Promise<SplitWalletResult> {
     try {
+      // Check cache first (dynamic import to prevent early bundling)
+      const { SplitWalletCache } = await import('./SplitWalletCache');
+      const cached = await SplitWalletCache.getWalletByBillId(billId);
+      if (cached) {
+        return {
+          success: true,
+          wallet: cached,
+        };
+      }
+
       logger.debug('Getting split wallet by bill ID', { billId }, 'SplitWalletQueries');
 
       const q = query(
@@ -123,19 +213,36 @@ export class SplitWalletQueries {
         firebaseDocId: doc.id,
       };
 
-      logger.debug('Split wallet found by bill ID', {
-        billId,
-        splitWalletId: wallet.id,
-        firebaseDocId: doc.id,
-        status: wallet.status
-      });
-
       logger.info('Split wallet retrieved by bill ID', {
         billId,
         splitWalletId: wallet.id,
         firebaseDocId: doc.id,
         status: wallet.status
       }, 'SplitWalletQueries');
+
+      // Cache the wallet (dynamic import to prevent early bundling)
+      const { SplitWalletCache: SplitWalletCacheForSet } = await import('./SplitWalletCache');
+      SplitWalletCacheForSet.setWallet(wallet);
+
+      // CRITICAL: Sync split storage from split wallet to fix stale data (non-blocking)
+      if (wallet.billId) {
+        // Run sync asynchronously to not block the query
+        (async () => {
+          try {
+            const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
+            await SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
+              wallet.billId,
+              wallet.participants
+            );
+          } catch (syncError) {
+            // Don't fail the query if sync fails, but log it
+            logger.warn('Failed to sync split storage from wallet', {
+              billId,
+              error: syncError instanceof Error ? syncError.message : String(syncError)
+            }, 'SplitWalletQueries');
+          }
+        })();
+      }
 
       return {
         success: true,
@@ -408,10 +515,43 @@ export class SplitWalletQueries {
     }
   }
 
+  // Request deduplication for completion checks to prevent memory exhaustion
+  private static completionDeduplicator = new RequestDeduplicator<(id: string) => Promise<{
+    success: boolean;
+    completionPercentage?: number;
+    totalAmount?: number;
+    collectedAmount?: number;
+    remainingAmount?: number;
+    participantsPaid?: number;
+    totalParticipants?: number;
+    error?: string;
+  }>>();
+
   /**
-   * Get split wallet completion status
+   * Get split wallet completion status (with deduplication)
    */
   static async getSplitWalletCompletion(splitWalletId: string): Promise<{
+    success: boolean;
+    completionPercentage?: number;
+    totalAmount?: number;
+    collectedAmount?: number;
+    remainingAmount?: number;
+    participantsPaid?: number;
+    totalParticipants?: number;
+    error?: string;
+  }> {
+    // Use deduplication to prevent multiple simultaneous calls
+    return this.completionDeduplicator.execute(
+      splitWalletId,
+      this._getSplitWalletCompletion.bind(this),
+      splitWalletId
+    );
+  }
+
+  /**
+   * Internal method to get split wallet completion (without deduplication)
+   */
+  private static async _getSplitWalletCompletion(splitWalletId: string): Promise<{
     success: boolean;
     completionPercentage?: number;
     totalAmount?: number;
@@ -455,7 +595,8 @@ export class SplitWalletQueries {
       // 1. Transaction succeeded on-chain but database wasn't updated (verification timeout)
       // 2. Database is out of sync with blockchain state
       // We always want to use the actual funds available on-chain
-      const tolerance = 0.001; // 0.001 USDC tolerance for rounding differences
+      const { VALIDATION_TOLERANCE } = await import('./constants/splitConstants');
+      const tolerance = VALIDATION_TOLERANCE.BALANCE;
       const isSingleParticipant = wallet.participants.length === 1;
       const isAmountClose = Math.abs(databaseCollectedAmount - actualOnChainBalance) <= tolerance;
       
@@ -478,8 +619,10 @@ export class SplitWalletQueries {
         collectedAmount = Math.min(databaseCollectedAmount, actualOnChainBalance);
       }
       
-      const remainingAmount = totalAmount - collectedAmount;
-      const completionPercentage = totalAmount > 0 ? (collectedAmount / totalAmount) * 100 : 0;
+      const remainingAmount = Math.max(0, totalAmount - collectedAmount);
+      // CRITICAL: Cap completion at 100% to prevent showing >100% when participant paid more than owed
+      const rawCompletionPercentage = totalAmount > 0 ? (collectedAmount / totalAmount) * 100 : 0;
+      const completionPercentage = Math.min(100, Math.max(0, rawCompletionPercentage));
 
       // Calculate participants paid and total participants
       const totalParticipants = wallet.participants.length;
@@ -565,6 +708,21 @@ export class SplitWalletQueries {
         }
       }
 
+      // Fallback guarantee: if collected/on-chain funds cover the full amount,
+      // treat all participants as paid for completion/eligibility calculations
+      // even if participant status fields weren't updated yet.
+      if (collectedAmount >= totalAmount - tolerance && participantsPaid < totalParticipants) {
+        logger.info('Applying fallback paid count from collected amount coverage', {
+          splitWalletId,
+          collectedAmount,
+          totalAmount,
+          tolerance,
+          participantsPaidBefore: participantsPaid,
+          totalParticipants
+        }, 'SplitWalletQueries');
+        participantsPaid = totalParticipants;
+      }
+
       logger.debug('getSplitWalletCompletion calculation', {
         walletId: splitWalletId,
         totalAmount,
@@ -615,10 +773,10 @@ export class SplitWalletQueries {
     }
     
     if (typeof obj === 'object') {
-      const cleaned: any = {};
+      const cleaned: Partial<T> = {};
       for (const [key, value] of Object.entries(obj)) {
         if (value !== undefined) {
-          cleaned[key] = this.removeUndefinedValues(value);
+          (cleaned as Record<string, unknown>)[key] = this.removeUndefinedValues(value as T);
         }
       }
       return cleaned;

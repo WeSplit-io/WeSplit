@@ -15,6 +15,9 @@ export interface FeatureFlags {
   PHANTOM_AUTO_CONFIRM: boolean;
   PHANTOM_MULTI_CHAIN: boolean;
 
+  // Shared Wallet Feature
+  SHARED_WALLET_ENABLED: boolean;
+
   // Other features can be added here
 }
 
@@ -28,6 +31,7 @@ const getEnvironmentFeatures = (): FeatureFlags => {
       PHANTOM_SPLIT_WALLETS: false,
       PHANTOM_AUTO_CONFIRM: false,
       PHANTOM_MULTI_CHAIN: false,
+      SHARED_WALLET_ENABLED: false,
     };
   }
 
@@ -38,6 +42,7 @@ const getEnvironmentFeatures = (): FeatureFlags => {
     PHANTOM_SPLIT_WALLETS: isPhantomConfigured() && PHANTOM_CONFIG.features.splitWallets,
     PHANTOM_AUTO_CONFIRM: PHANTOM_CONFIG.features.autoConfirm,
     PHANTOM_MULTI_CHAIN: PHANTOM_CONFIG.features.multiChain,
+    SHARED_WALLET_ENABLED: true, // Enable in dev mode
   };
 };
 
@@ -49,6 +54,7 @@ export const isPhantomSocialLoginEnabled = (): boolean => FEATURES.PHANTOM_SOCIA
 export const isPhantomSplitWalletsEnabled = (): boolean => FEATURES.PHANTOM_SPLIT_WALLETS;
 export const isPhantomAutoConfirmEnabled = (): boolean => FEATURES.PHANTOM_AUTO_CONFIRM;
 export const isPhantomMultiChainEnabled = (): boolean => FEATURES.PHANTOM_MULTI_CHAIN;
+export const isSharedWalletEnabled = (): boolean => FEATURES.SHARED_WALLET_ENABLED;
 
 // Feature flag overrides (for testing/debugging)
 export const overrideFeatureFlag = (flag: keyof FeatureFlags, value: boolean): void => {

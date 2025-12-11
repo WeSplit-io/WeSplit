@@ -38,7 +38,7 @@ interface DegenResultScreenProps {
 }
 
 const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route }) => {
-  const { totalAmount, selectedParticipant, splitWallet, splitData } = route.params;
+  const { totalAmount, selectedParticipant, splitWallet, splitData, selectedCard } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
   
@@ -56,6 +56,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   const [currentSplitWallet, setCurrentSplitWallet] = React.useState<SplitWallet | null>(splitWallet || null);
   const [linkedDestinations, setLinkedDestinations] = React.useState<LinkedDestinations | null>(null);
   const [isCheckingLinkedDestinations, setIsCheckingLinkedDestinations] = React.useState(false);
+  const [selectedCardId, setSelectedCardId] = React.useState<string | null>(null);
   const linkedDestinationsRequestRef = React.useRef<Promise<LinkedDestinations | null> | null>(null);
 
   const hasActiveKastCard = React.useCallback((destinations?: LinkedDestinations | null) => {
@@ -351,10 +352,39 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   );
   const selectedKastCard = React.useMemo(() => {
     if (!linkedDestinations?.kastCards?.length) {return null;}
+    
+    // If a card is explicitly selected, use that
+    if (selectedCardId) {
+      const selected = linkedDestinations.kastCards.find(
+        (card) => card.id === selectedCardId && (card?.isActive !== false && card?.status === 'active')
+      );
+      if (selected) {return selected;}
+    }
+    
+    // Otherwise, use the first active card
     return linkedDestinations.kastCards.find(
       (card) => card?.isActive !== false && card?.status === 'active'
     ) || null;
-  }, [linkedDestinations?.kastCards]);
+  }, [linkedDestinations?.kastCards, selectedCardId]);
+  
+  // Initialize selectedCardId when linkedDestinations loads or when returning from card selection
+  React.useEffect(() => {
+    // If a card was selected from LinkedCards screen, use that
+    if (selectedCard?.id) {
+      setSelectedCardId(selectedCard.id);
+      return;
+    }
+    
+    // Otherwise, initialize with first active card
+    if (linkedDestinations?.kastCards?.length && !selectedCardId) {
+      const firstActiveCard = linkedDestinations.kastCards.find(
+        (card) => card?.isActive !== false && card?.status === 'active'
+      );
+      if (firstActiveCard) {
+        setSelectedCardId(firstActiveCard.id);
+      }
+    }
+  }, [linkedDestinations?.kastCards, selectedCardId, selectedCard]);
 
   const ensureLinkedDestinationOrPrompt = useCallback(async () => {
     const destinations = linkedDestinations ?? await refreshLinkedDestinations();
@@ -383,8 +413,18 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
   const handleManageLinkedCards = useCallback(() => {
     degenState.setShowPaymentOptionsModal(false);
-    navigation.navigate('LinkedCards');
-  }, [degenState, navigation]);
+    // Navigate to LinkedCards in selection mode so user can select a card
+    navigation.navigate('LinkedCards', {
+      returnRoute: 'DegenResult',
+      returnParams: {
+        totalAmount,
+        selectedParticipant,
+        splitWallet,
+        splitData,
+        selectCardMode: true
+      }
+    });
+  }, [degenState, navigation, totalAmount, selectedParticipant, splitWallet, splitData]);
 
   const handleLinkExternalDestinations = useCallback(() => {
     degenState.setShowPaymentOptionsModal(false);
@@ -425,7 +465,8 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         currentUser!.id.toString(),
         'kast-card', // Payment method
         totalAmount, // Loser receives their locked funds back
-        'Degen Split Loser Payment (KAST Card)'
+        'Degen Split Loser Payment (KAST Card)',
+        selectedKastCard?.id || undefined // Pass the selected card ID as the last parameter
       );
       
       if (result.success) {
@@ -737,19 +778,53 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             ) : (
               <>
                 <View style={styles.selectedCardContainer}>
-                  <Text style={styles.selectedCardLabel}>Selected card</Text>
-                  {selectedKastCard ? (
-                    <>
-                      <Text style={styles.selectedCardName}>{selectedKastCard.label}</Text>
-                      {selectedKastCard.address ? (
-                        <Text style={styles.selectedCardMeta}>
-                          {selectedKastCard.address.slice(0, 6)}...{selectedKastCard.address.slice(-4)}
-                        </Text>
-                      ) : null}
-                    </>
-                  ) : (
-                    <Text style={styles.selectedCardName}>Active KAST card</Text>
-                  )}
+                  <Text style={styles.selectedCardLabel}>Select a card to receive funds</Text>
+                  
+                  {/* List of available cards for selection */}
+                  {linkedDestinations?.kastCards?.filter(
+                    (card) => card?.isActive !== false && card?.status === 'active'
+                  ).map((card) => {
+                    const isSelected = selectedKastCard?.id === card.id;
+                    return (
+                      <TouchableOpacity
+                        key={card.id}
+                        style={[
+                          styles.cardSelectionItem,
+                          isSelected && styles.cardSelectionItemSelected
+                        ]}
+                        onPress={() => {
+                          setSelectedCardId(card.id);
+                          logger.info('Card selected for degen loser payment', {
+                            cardId: card.id,
+                            cardLabel: card.label
+                          }, 'DegenResultScreen');
+                        }}
+                      >
+                        <View style={styles.cardSelectionContent}>
+                          <PhosphorIcon 
+                            name={isSelected ? "CheckCircle" : "Circle"} 
+                            size={20} 
+                            color={isSelected ? colors.green : colors.textSecondary} 
+                            weight={isSelected ? "fill" : "regular"}
+                          />
+                          <View style={styles.cardSelectionInfo}>
+                            <Text style={[
+                              styles.cardSelectionName,
+                              isSelected && styles.cardSelectionNameSelected
+                            ]}>
+                              {card.label}
+                            </Text>
+                            {card.address ? (
+                              <Text style={styles.cardSelectionAddress}>
+                                {card.address.slice(0, 6)}...{card.address.slice(-4)}
+                              </Text>
+                            ) : null}
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  
                   <Button
                     title="Manage linked cards"
                     variant="secondary"

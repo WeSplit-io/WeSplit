@@ -28,10 +28,10 @@ export interface BalanceSubscription {
 class LiveBalanceService {
   private subscriptions = new Map<string, BalanceSubscription>();
   private pollingInterval: ReturnType<typeof setInterval> | null = null;
-  private readonly POLLING_INTERVAL = 10000; // 10 seconds (reduced frequency)
+  private readonly POLLING_INTERVAL = 30000; // 30 seconds (increased to reduce memory pressure)
   private readonly BALANCE_TOLERANCE = 0.000001; // Minimum change to trigger update
   private lastPollTime = 0;
-  private readonly MIN_POLL_INTERVAL = 5000; // Minimum 5 seconds between polls
+  private readonly MIN_POLL_INTERVAL = 10000; // Minimum 10 seconds between polls (increased)
 
   /**
    * Subscribe to balance updates for a specific address
@@ -39,45 +39,57 @@ class LiveBalanceService {
    */
   subscribe(address: string, callback: BalanceUpdateCallback): string {
     const subscriptionId = `balance_${address}_${Date.now()}`;
-    
+
     // Check if we already have subscriptions for this address
     const existingSubscriptions = Array.from(this.subscriptions.values())
       .filter(sub => sub.address === address && sub.isActive);
-    
+
+    // ✅ HARD CAP: Only allow a single active subscription per address to prevent memory blow-ups
+    if (existingSubscriptions.length > 0) {
+      const existing = existingSubscriptions[0];
+      logger.info('Subscribing to balance updates (reusing existing subscription)', {
+        address: typeof address === 'string' ? address.substring(0, 10) + '...' : typeof address,
+        addressType: typeof address,
+        existingSubscriptionId: existing.id,
+        existingSubscriptionsForAddress: existingSubscriptions.length,
+        note: 'Reusing existing subscription to avoid duplicates and memory growth'
+      }, 'LiveBalanceService');
+
+      // Immediately share last known balance if available
+      if (existing.lastBalance) {
+        callback(existing.lastBalance);
+      }
+
+      // Return existing subscription id (no new subscription added)
+      return existing.id;
+    }
+
     logger.info('Subscribing to balance updates', {
       address: typeof address === 'string' ? address.substring(0, 10) + '...' : typeof address,
       addressType: typeof address,
       subscriptionId,
       existingSubscriptionsForAddress: existingSubscriptions.length,
-      note: existingSubscriptions.length > 0 ? 'Address already has active subscriptions - will share balance updates' : 'New subscription for this address'
+      note: 'New subscription for this address'
     }, 'LiveBalanceService');
-    
+
     const subscription: BalanceSubscription = {
       id: subscriptionId,
       address,
       callback,
       isActive: true
     };
-    
+
     this.subscriptions.set(subscriptionId, subscription);
-    
+
     // Start polling if this is the first subscription overall
     if (this.subscriptions.size === 1) {
       this.startPolling();
     }
-    
+
     // Only get initial balance if this is the first subscription for this address
     // Other subscriptions will get updates from polling
-    if (existingSubscriptions.length === 0) {
-      this.updateBalanceForSubscription(subscription);
-    } else {
-      // Share the last known balance immediately if available
-      const lastBalance = existingSubscriptions[0]?.lastBalance;
-      if (lastBalance) {
-        callback(lastBalance);
-      }
-    }
-    
+    this.updateBalanceForSubscription(subscription);
+
     return subscriptionId;
   }
   

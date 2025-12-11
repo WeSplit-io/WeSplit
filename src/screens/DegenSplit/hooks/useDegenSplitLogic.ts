@@ -150,36 +150,167 @@ export const useDegenSplitLogic = (
         participants: participants
       }, 'DegenSplitLogic');
       
-      // Validate participants before proceeding
-      if (!participants || !Array.isArray(participants)) {
-        throw new Error('Participants parameter is required and must be an array');
-      }
+      // Use unified creation service with participant mapper
+      const { UnifiedSplitCreationService } = await import('../../../services/split/UnifiedSplitCreationService');
+      const { mapParticipantsToSplitWallet } = await import('../../../services/split/utils/participantMapper');
       
-      const mappedParticipants = participants.map(p => {
-        // Import roundUsdcAmount to fix precision issues - same as fair split
-        const { roundUsdcAmount } = require('../../../utils/ui/format/formatUtils');
+      // CRITICAL: Ensure all participants have walletAddress before mapping
+      // Fetch wallet addresses for participants that don't have them
+      const participantsWithWalletAddresses = await Promise.all(
+        participants.map(async (p: any) => {
+          // Check if walletAddress is missing or empty
+          const walletAddress = p.walletAddress || p.wallet_address || '';
+          
+          if (!walletAddress || walletAddress.trim() === '') {
+            // Try to fetch from Firebase
+            try {
+              const { firebaseDataService } = await import('../../../services/data');
+              const userData = await firebaseDataService.user.getCurrentUser(p.userId || p.id);
+              const fetchedWalletAddress = userData?.wallet_address || userData?.walletAddress || '';
+              
+              if (!fetchedWalletAddress || fetchedWalletAddress.trim() === '') {
+                logger.error('Participant missing wallet address', {
+                  userId: p.userId || p.id,
+                  name: p.name,
+                  participant: p
+                }, 'DegenSplitLogic');
+                throw new Error(`Participant ${p.name || p.userId || p.id} is missing a wallet address. Please ensure the participant has a wallet configured.`);
+              }
+              
+              return {
+                ...p,
+                walletAddress: fetchedWalletAddress,
+                wallet_address: fetchedWalletAddress
+              };
+            } catch (error) {
+              logger.error('Failed to fetch wallet address for participant', {
+                userId: p.userId || p.id,
+                name: p.name,
+                error: error instanceof Error ? error.message : String(error)
+              }, 'DegenSplitLogic');
+              throw new Error(`Failed to get wallet address for participant ${p.name || p.userId || p.id}. ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }
+          
+          return {
+            ...p,
+            walletAddress: walletAddress,
+            wallet_address: walletAddress
+          };
+        })
+      );
+      
+      // Map participants - each participant needs to lock the full amount for degen split
+      // CRITICAL: Create ParticipantInput objects that match the validation interface exactly
+      const participantInputs: Array<{
+        userId: string;
+        id?: string;
+        name: string;
+        walletAddress: string;
+        wallet_address?: string;
+        amountOwed: number;
+      }> = participantsWithWalletAddresses.map(p => {
+        const userId = p.userId || p.id || '';
+        const name = p.name || 'Unknown';
+        const walletAddress = p.walletAddress || p.wallet_address || '';
+        
+        if (!name || name.trim() === '' || name === 'Unknown') {
+          logger.error('Participant missing name', {
+            userId,
+            participant: p
+          }, 'DegenSplitLogic');
+          throw new Error(`Participant ${userId} is missing a name. Please ensure all participants have names.`);
+        }
+        
+        if (!walletAddress || walletAddress.trim() === '') {
+          logger.error('Participant missing walletAddress', {
+            userId,
+            name,
+            participant: p
+          }, 'DegenSplitLogic');
+          throw new Error(`Participant ${name} (${userId}) is missing a wallet address.`);
+        }
+        
         return {
-          userId: p.userId || p.id,
-          name: p.name,
-          walletAddress: p.walletAddress,
-          amountOwed: roundUsdcAmount(totalAmount), // Each participant needs to lock the full amount for degen split
+          userId,
+          id: userId,
+          name: name.trim(),
+          walletAddress: walletAddress.trim(),
+          wallet_address: walletAddress.trim(),
+          amountOwed: totalAmount, // Each participant needs to lock the full amount for degen split
         };
       });
       
+      // Now map to split wallet format
+      const mappedParticipants = mapParticipantsToSplitWallet(participantInputs);
+      
+      // CRITICAL: Validate mapped participants before creating wallet
+      for (let i = 0; i < mappedParticipants.length; i++) {
+        const p = mappedParticipants[i];
+        logger.debug('Validating mapped participant', {
+          index: i + 1,
+          userId: p.userId,
+          name: p.name,
+          nameType: typeof p.name,
+          nameLength: p.name?.length,
+          walletAddress: p.walletAddress ? `${p.walletAddress.substring(0, 10)}...` : 'MISSING',
+          amountOwed: p.amountOwed,
+          participantKeys: Object.keys(p)
+        }, 'DegenSplitLogic');
+        
+        if (!p.name || p.name.trim() === '') {
+          throw new Error(`Participant ${i + 1}: Participant name is required but was empty. Got: "${p.name}"`);
+        }
+        if (!p.walletAddress || p.walletAddress.trim() === '') {
+          throw new Error(`Participant ${i + 1}: Participant walletAddress is required but was empty`);
+        }
+        if (!p.userId || p.userId.trim() === '') {
+          throw new Error(`Participant ${i + 1}: Participant userId is required but was empty`);
+        }
+      }
+      
       logger.info('Mapped participants for wallet creation', {
         mappedParticipantsCount: mappedParticipants.length,
-        mappedParticipants: mappedParticipants
+        mappedParticipants: mappedParticipants.map(p => ({
+          userId: p.userId,
+          name: p.name,
+          walletAddress: p.walletAddress ? `${p.walletAddress.substring(0, 10)}...` : 'MISSING',
+          amountOwed: p.amountOwed
+        }))
       }, 'DegenSplitLogic');
       
-      const { SplitWalletService } = await import('../../../services/split');
-      const walletResult = await SplitWalletService.createDegenSplitWallet(
-        splitData.billId, // Use billId, not split ID
-        currentUser.id.toString(),
-        currentUser.name || 'Unknown User', // Add creator name
+      // CRITICAL: Ensure participants match ParticipantInput interface for validation
+      // The validation expects ParticipantInput, so we need to ensure the structure matches
+      const participantsForValidation = mappedParticipants.map(p => ({
+        userId: p.userId,
+        id: p.userId, // Also include id field for validation
+        name: p.name || 'Unknown', // Ensure name is never empty
+        walletAddress: p.walletAddress || '',
+        wallet_address: p.walletAddress || '', // Also include wallet_address for validation
+        amountOwed: p.amountOwed,
+      }));
+      
+      logger.debug('Participants prepared for validation', {
+        participantsForValidation: participantsForValidation.map(p => ({
+          userId: p.userId,
+          name: p.name,
+          hasName: !!p.name,
+          nameLength: p.name?.length,
+          walletAddress: p.walletAddress ? `${p.walletAddress.substring(0, 10)}...` : 'MISSING'
+        }))
+      }, 'DegenSplitLogic');
+      
+      // ✅ FIX: Use participantsForValidation which has proper name handling, not participantInputs
+      // The participantsForValidation ensures name is never empty (fallback to 'Unknown')
+      const walletResult = await UnifiedSplitCreationService.createSplitWallet({
+        billId: splitData.billId,
+        creatorId: currentUser.id.toString(),
+        creatorName: currentUser.name || 'Unknown User',
         totalAmount,
-        'USDC',
-        mappedParticipants
-      );
+        currency: 'USDC',
+        splitType: 'degen',
+        participants: participantsForValidation, // Use participantsForValidation which has proper name handling
+      });
       
       if (!walletResult.success || !walletResult.wallet) {
         throw new Error(walletResult.error || 'Failed to create split wallet');
@@ -192,24 +323,7 @@ export const useDegenSplitLogic = (
         showWalletRecapModal: false // Removed popup - wallet created silently
       });
       
-      // Update the split with wallet information
-      const { SplitStorageService } = await import('../../../services/splits/splitStorageService');
-      const updateResult = await SplitStorageService.updateSplit(splitData.id, {
-        walletId: newWallet.id,
-        walletAddress: newWallet.walletAddress,
-        status: 'active' as const
-      });
-      
-      if (updateResult.success) {
-        logger.info('Split updated with wallet information', { 
-          splitId: splitData.id, 
-          walletId: newWallet.id 
-        }, 'DegenSplitLogic');
-      } else {
-        logger.warn('Failed to update split with wallet information', { 
-          error: updateResult.error 
-        }, 'DegenSplitLogic');
-      }
+      // Note: Split document sync is handled by UnifiedSplitCreationService
       
       logger.info('Split wallet created successfully for degen split', { 
         splitWalletId: newWallet.id 

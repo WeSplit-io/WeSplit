@@ -102,6 +102,19 @@ export class SharedWalletCreation {
   static async createSharedWallet(
     params: CreateSharedWalletParams
   ): Promise<SharedWalletResult> {
+    // DEV FLAG: Shared wallet creation is only available in development
+    if (!__DEV__) {
+      logger.warn('Shared wallet creation attempted in production', {
+        creatorId: params.creatorId,
+        name: params.name
+      }, 'SharedWalletCreation');
+      
+      return {
+        success: false,
+        error: 'Shared wallet creation is only available in development mode'
+      };
+    }
+
     try {
       // Validate parameters
       const validation = this.validateCreationParams(params);
@@ -128,14 +141,15 @@ export class SharedWalletCreation {
         currency: params.currency || 'USDC'
       }, 'SharedWalletCreation');
 
-      // Generate new Solana wallet for the shared account
-      const { generateWalletFromMnemonic } = await import('../blockchain/wallet/derive');
-      const walletResult = generateWalletFromMnemonic();
-      
+      // ✅ LIGHTWEIGHT WALLET GEN: avoid heavy wallet/derive import (OOM)
+      // Use direct Keypair.generate to keep bundle small for shared wallets
+      const { Keypair } = await import('@solana/web3.js');
+      const keypair = Keypair.generate();
+      const secretKeyBase64 = Buffer.from(keypair.secretKey).toString('base64');
       const wallet = {
-        address: walletResult.address,
-        publicKey: walletResult.publicKey,
-        secretKey: walletResult.secretKey
+        address: keypair.publicKey.toBase58(),
+        publicKey: keypair.publicKey.toBase58(),
+        secretKey: secretKeyBase64
       };
 
       logger.info('Shared wallet generated', {

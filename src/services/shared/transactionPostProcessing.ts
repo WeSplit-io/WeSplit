@@ -84,23 +84,64 @@ export async function saveTransactionAndAwardPoints(
     try {
       const { firebaseDataService } = await import('../data/firebaseDataService');
       
-      // Find recipient user by wallet address to get their user ID
-      const recipientUser = await firebaseDataService.user.getUserByWalletAddress(params.toAddress);
-      const recipientUserId = recipientUser ? recipientUser.id.toString() : params.toAddress;
+      // ✅ OPTIMIZATION: For split flows, skip recipient lookup (split wallets aren't user wallets)
+      // This prevents memory-intensive queries and OOM crashes
+      const isSplitFlow =
+        params.transactionType === 'split_payment' ||
+        params.transactionType === 'split_wallet_withdrawal';
+      let recipientUser = null;
+      let recipientUserId = params.toAddress;
+      
+      if (!isSplitFlow) {
+        // Only lookup recipient for non-split payments
+        try {
+          recipientUser = await firebaseDataService.user.getUserByWalletAddress(params.toAddress);
+          recipientUserId = recipientUser ? recipientUser.id.toString() : params.toAddress;
+        } catch (lookupError) {
+          logger.warn('Could not lookup recipient user (non-critical)', {
+            toAddress: params.toAddress.substring(0, 10) + '...',
+            error: lookupError instanceof Error ? lookupError.message : String(lookupError)
+          }, 'TransactionPostProcessing');
+          // Continue with wallet address as recipient ID
+        }
+      } else {
+        logger.debug('Skipping recipient lookup for split flow (optimization)', {
+          toAddress: params.toAddress.substring(0, 10) + '...',
+          transactionType: params.transactionType
+        }, 'TransactionPostProcessing');
+      }
 
       // Get user's wallet address for transaction record
+      // ✅ OPTIMIZATION: For split flows, use cached wallet info or skip if not critical
       let fromWalletAddress = params.toAddress; // Fallback (will be overridden)
-      try {
-        const { walletService } = await import('../blockchain/wallet');
-        const walletResult = await walletService.ensureUserWallet(params.userId);
-        if (walletResult.success && walletResult.wallet?.address) {
-          fromWalletAddress = walletResult.wallet.address;
+      if (!isSplitFlow) {
+        // Only fetch wallet for non-split payments to reduce memory usage
+        try {
+          const { walletService } = await import('../blockchain/wallet');
+          const walletResult = await walletService.ensureUserWallet(params.userId);
+          if (walletResult.success && walletResult.wallet?.address) {
+            fromWalletAddress = walletResult.wallet.address;
+          }
+        } catch (walletError) {
+          logger.warn('Could not get user wallet address for transaction record', {
+            userId: params.userId,
+            error: walletError instanceof Error ? walletError.message : String(walletError)
+          }, 'TransactionPostProcessing');
         }
-      } catch (walletError) {
-        logger.warn('Could not get user wallet address for transaction record', {
-          userId: params.userId,
-          error: walletError instanceof Error ? walletError.message : String(walletError)
-        }, 'TransactionPostProcessing');
+      } else {
+        // For split flows, try to get from simplified service (lighter weight)
+        try {
+          const { simplifiedWalletService } = await import('../blockchain/wallet/simplifiedWalletService');
+          const walletInfo = await simplifiedWalletService.getWalletInfo(params.userId);
+          if (walletInfo?.address) {
+            fromWalletAddress = walletInfo.address;
+          }
+        } catch (walletError) {
+          // Non-critical for split payments - use fallback
+          logger.debug('Could not get wallet address for split payment (using fallback)', {
+            userId: params.userId
+          }, 'TransactionPostProcessing');
+        }
       }
 
       // Create sender transaction record
@@ -184,13 +225,15 @@ export async function saveTransactionAndAwardPoints(
       }
 
       // Award points for internal transfers only (not external or withdrawals)
-      // Points are awarded for: send, split_payment (funding), payment_request, settlement
-      // Points are NOT awarded for: external_payment, withdraw, split_wallet_withdrawal
+      // Points are awarded for: send, payment_request, settlement
+      // Points are NOT awarded for: split flows, external_payment, withdraw, split_wallet_withdrawal
+      // ✅ OPTIMIZATION: Skip points for split flows to reduce memory usage (points can be awarded later)
       const shouldAwardPoints = 
-        params.transactionType === 'send' ||
-        params.transactionType === 'split_payment' ||
-        params.transactionType === 'payment_request' ||
-        params.transactionType === 'settlement';
+        !isSplitFlow && (
+          params.transactionType === 'send' ||
+          params.transactionType === 'payment_request' ||
+          params.transactionType === 'settlement'
+        );
 
       if (shouldAwardPoints && recipientUser) {
         // This is an internal wallet-to-wallet transfer, award points
@@ -239,7 +282,9 @@ export async function saveTransactionAndAwardPoints(
       // Create recipient transaction record (only if recipient is a registered user)
       // For deposits, create a 'receive' record for the recipient
       // For withdrawals/external payments, don't create recipient records (they're going to external wallets)
+      // ✅ OPTIMIZATION: Skip recipient record for split flows (split wallets don't need receive records)
       if (recipientUser && 
+          !isSplitFlow &&
           params.transactionType !== 'external_payment' && 
           params.transactionType !== 'withdraw' && 
           params.transactionType !== 'split_wallet_withdrawal') {

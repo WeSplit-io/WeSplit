@@ -166,10 +166,20 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
 
     // Phase 2: Split confirmed - check payment status
+    // CRITICAL: Calculate from split wallet if completion data not available (fallback)
+    let completionPercentage = completionData?.completionPercentage ?? 0;
+    let collectedAmount = completionData?.collectedAmount ?? 0;
+    
+    // Fallback: Calculate from split wallet if completion data is null or stale
+    if (!completionData && splitWallet?.participants) {
+      collectedAmount = splitWallet.participants.reduce((sum: number, p: any) => sum + (p.amountPaid || 0), 0);
+      const totalAmount = splitWallet.totalAmount || totalAmount || 0;
+      const rawPercentage = totalAmount > 0 ? (collectedAmount / totalAmount) * 100 : 0;
+      completionPercentage = Math.min(100, Math.max(0, rawPercentage));
+    }
+    
     const hasCompletionData = completionData !== null;
-    const completionPercentage = completionData?.completionPercentage ?? 0;
-    const collectedAmount = completionData?.collectedAmount ?? 0;
-    const isFullyCovered = hasCompletionData && 
+    const isFullyCovered = (hasCompletionData || splitWallet?.participants) && 
       completionPercentage >= 100 && 
       collectedAmount > 0; // CRITICAL: Must have actual funds collected
     
@@ -628,7 +638,16 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   }, [splitData?.id]); // Removed isInitializing to prevent infinite loops
   
   // Initialize participants from route params or use current user as creator
+  // CRITICAL: If walletId exists, don't initialize from split storage (stale data)
+  // Wait for wallet to load which has the source of truth
   const [participants, setParticipants] = useState<Participant[]>(() => {
+    // If we have a walletId, don't use split storage data (it's stale)
+    // The useEffect will load from wallet (source of truth)
+    if (splitData?.walletId) {
+      // Return empty array - will be populated by useEffect when wallet loads
+      return [];
+    }
+    
     // Priority: splitData.participants > processedBillData.participants > billData.participants > current user only
     let sourceParticipants = null;
     if (splitData?.participants && splitData.participants.length > 0) {
@@ -704,22 +723,37 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   // Get the authoritative price from centralized price management
   // Use consistent bill ID format that matches SplitDetailsScreen
-  const billId = processedBillData?.id || splitData?.billId || `split_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const authoritativePrice = priceManagementService.getBillPrice(billId);
+  // CRITICAL: Memoize billId to prevent unnecessary re-renders
+  const billId = useMemo(() => {
+    return processedBillData?.id || splitData?.billId || `split_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }, [processedBillData?.id, splitData?.billId]);
+  
+  // CRITICAL: Memoize price retrieval to prevent multiple calls
+  const authoritativePrice = useMemo(() => {
+    return priceManagementService.getBillPrice(billId);
+  }, [billId]);
   
   // Use DataSourceService for consistent data access with validation
-  const billInfo = DataSourceService.getBillInfo(splitData, processedBillData, billData);
+  // CRITICAL: Memoize to prevent multiple calls
+  const billInfo = useMemo(() => {
+    return DataSourceService.getBillInfo(splitData, processedBillData, billData);
+  }, [splitData, processedBillData, billData]);
+  
   const totalAmount = billInfo.amount.data;
   
   // Validate data consistency and log warnings if needed
+  // CRITICAL: Only log once per billId change, not on every render
+  useEffect(() => {
   if (__DEV__) {
     logger.debug('FairSplit: Bill info loaded', {
       splitData: splitData?.totalAmount,
       processedBillData: processedBillData?.totalAmount,
       billData: billData?.totalAmount,
-      finalAmount: totalAmount
+        finalAmount: totalAmount,
+        billId
     }, 'FairSplitScreen');
   }
+  }, [billId, totalAmount, splitData?.totalAmount, processedBillData?.totalAmount, billData?.totalAmount]);
   
   // Set authoritative price when component loads
   useEffect(() => {
@@ -743,10 +777,16 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   
   // Total amount calculation - memoized for performance
   const totalLocked = useMemo(() => calculateTotalLocked(), [calculateTotalLocked]);
+  // CRITICAL: Use completion data if available (more accurate), otherwise calculate from locked amounts
+  // CRITICAL: Cap at 100% to prevent showing >100% progress
   const progressPercentage = useMemo(() => {
+    if (completionData?.completionPercentage !== undefined) {
+      return Math.min(100, Math.max(0, Math.round(completionData.completionPercentage)));
+    }
     if (totalAmount <= 0) return 0;
-    return Math.round((totalLocked / totalAmount) * 100);
-  }, [totalLocked, totalAmount]);
+    const calculated = Math.round((totalLocked / totalAmount) * 100);
+    return Math.min(100, Math.max(0, calculated)); // Cap at 100%
+  }, [totalLocked, totalAmount, completionData?.completionPercentage]);
   
   // State for completion tracking
   const [completionData, setCompletionData] = useState<{
@@ -830,6 +870,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }, 100); // 100ms delay to prevent rapid successive calls
     
     // Set up periodic progress updates (only if not completed to avoid infinite loops)
+    // CRITICAL: Increased interval to 60 seconds to reduce memory pressure
     const progressInterval = setInterval(() => {
       if (splitWallet?.status !== 'completed' && !isLoadingRef.current) {
         const now = Date.now();
@@ -841,7 +882,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           });
         }
       }
-    }, 30000); // Update progress every 30 seconds to reduce frequency
+    }, 60000); // Update progress every 60 seconds to reduce memory pressure
     
     const completionInterval = setInterval(() => {
       if (splitWallet?.status !== 'completed' && !isSplitConfirmed && !isCheckingCompletion) {
@@ -851,7 +892,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           checkPaymentCompletion();
         }
       }
-    }, 120000); // Check completion every 2 minutes to reduce frequency
+    }, 180000); // Check completion every 3 minutes to reduce memory pressure
     
     return () => {
       clearTimeout(timeoutId);
@@ -859,6 +900,112 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       clearInterval(completionInterval);
     };
   }, [splitWallet?.id, isSplitConfirmed, isCheckingCompletion]); // Removed isLoadingCompletionData from dependencies to prevent infinite loop
+
+  // CRITICAL: Load split wallet immediately when walletId is available
+  // This ensures we always read from split wallet (source of truth) not split storage
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false);
+  useEffect(() => {
+    const loadWalletIfNeeded = async () => {
+      // If we have a walletId but no splitWallet loaded, load it immediately
+      if (splitData?.walletId && !splitWallet?.id && !isLoadingWallet) {
+        setIsLoadingWallet(true);
+        try {
+          const { SplitWalletService } = await import('../../services/split');
+          const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
+          
+          if (walletResult.success && walletResult.wallet) {
+            setSplitWallet(walletResult.wallet);
+            
+            // CRITICAL: Update participants from split wallet (source of truth)
+            // This overrides stale data from split storage
+            const totalAmount = splitData?.totalAmount || walletResult.wallet.totalAmount || 0;
+            const amountPerPerson = totalAmount / walletResult.wallet.participants.length;
+            
+            const { roundUsdcAmount } = require('../../utils/ui/format/formatUtils');
+            const updatedParticipants = walletResult.wallet.participants.map((p: any) => {
+              const roundedAmountOwed = p.amountOwed > 0 ? roundUsdcAmount(p.amountOwed) : roundUsdcAmount(amountPerPerson);
+              
+              let participantStatus: 'pending' | 'locked' | 'confirmed' | 'accepted' | 'declined' = 'pending';
+              if (p.status === 'paid') {
+                participantStatus = 'accepted';
+              } else if (p.status === 'locked') {
+                participantStatus = 'locked';
+              } else if (p.status === 'accepted') {
+                participantStatus = 'accepted';
+              } else if (p.status === 'declined') {
+                participantStatus = 'declined';
+              }
+              
+              const isFullyPaid = (p.amountPaid || 0) >= roundedAmountOwed;
+              if (isFullyPaid && participantStatus !== 'declined') {
+                participantStatus = 'accepted';
+              }
+              
+              return {
+                id: p.userId,
+                name: p.name,
+                walletAddress: p.walletAddress,
+                amountOwed: roundedAmountOwed,
+                amountPaid: p.amountPaid || 0, // CRITICAL: Use split wallet data, not split storage
+                amountLocked: 0,
+                status: participantStatus,
+                avatar: p.avatar,
+              };
+            });
+            
+            setParticipants(updatedParticipants);
+            
+            // CRITICAL: Load completion data immediately after wallet loads
+            // This ensures progress bar shows correct data
+            try {
+              const completionResult = await SplitWalletService.getSplitWalletCompletion(walletResult.wallet.id);
+              if (completionResult.success) {
+                const rawCompletionPercentage = completionResult.completionPercentage ?? 0;
+                const cappedCompletionPercentage = Math.min(100, Math.max(0, rawCompletionPercentage));
+                
+                setCompletionData({
+                  completionPercentage: cappedCompletionPercentage,
+                  totalAmount: Math.max(0, completionResult.totalAmount ?? walletResult.wallet.totalAmount ?? 0),
+                  collectedAmount: Math.max(0, completionResult.collectedAmount ?? 0),
+                  remainingAmount: Math.max(0, completionResult.remainingAmount ?? (completionResult.totalAmount ?? walletResult.wallet.totalAmount ?? 0)),
+                  participantsPaid: Math.max(0, completionResult.participantsPaid ?? 0),
+                  totalParticipants: Math.max(0, completionResult.totalParticipants ?? walletResult.wallet.participants?.length ?? 0),
+                });
+              }
+            } catch (completionError) {
+              logger.warn('Failed to load completion data on wallet load', {
+                error: completionError instanceof Error ? completionError.message : String(completionError)
+              }, 'FairSplitScreen');
+            }
+            
+            // Sync split storage from split wallet to fix stale data (non-blocking)
+            const { SplitDataSynchronizer } = await import('../../services/split/SplitDataSynchronizer');
+            if (splitData?.billId) {
+              // Run sync asynchronously to not block UI
+              SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
+                splitData.billId,
+                walletResult.wallet.participants
+              ).catch(syncError => {
+                logger.warn('Failed to sync split storage', {
+                  billId: splitData.billId,
+                  error: syncError instanceof Error ? syncError.message : String(syncError)
+                }, 'FairSplitScreen');
+              });
+            }
+          }
+        } catch (error) {
+          logger.error('Failed to load split wallet on mount', {
+            error: error instanceof Error ? error.message : String(error),
+            walletId: splitData?.walletId
+          }, 'FairSplitScreen');
+        } finally {
+          setIsLoadingWallet(false);
+        }
+      }
+    };
+    
+    loadWalletIfNeeded();
+  }, [splitData?.walletId, splitWallet?.id, isLoadingWallet]);
 
   // Load user wallets when component mounts
   useEffect(() => {
@@ -1307,7 +1454,29 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         });
         
         setParticipants(updatedParticipants);
-        loadCompletionData();
+        
+        // CRITICAL: Load completion data immediately after updating participants
+        // This ensures progress bar shows correct data
+        try {
+          const completionResult = await SplitWalletService.getSplitWalletCompletion(walletResult.wallet.id);
+          if (completionResult.success) {
+            const rawCompletionPercentage = completionResult.completionPercentage ?? 0;
+            const cappedCompletionPercentage = Math.min(100, Math.max(0, rawCompletionPercentage));
+            
+            setCompletionData({
+              completionPercentage: cappedCompletionPercentage,
+              totalAmount: Math.max(0, completionResult.totalAmount ?? walletResult.wallet.totalAmount ?? 0),
+              collectedAmount: Math.max(0, completionResult.collectedAmount ?? 0),
+              remainingAmount: Math.max(0, completionResult.remainingAmount ?? (completionResult.totalAmount ?? walletResult.wallet.totalAmount ?? 0)),
+              participantsPaid: Math.max(0, completionResult.participantsPaid ?? 0),
+              totalParticipants: Math.max(0, completionResult.totalParticipants ?? walletResult.wallet.participants?.length ?? 0),
+            });
+          }
+        } catch (completionError) {
+          logger.warn('Failed to load completion data in loadSplitWalletData', {
+            error: completionError instanceof Error ? completionError.message : String(completionError)
+          }, 'FairSplitScreen');
+        }
       }
     } catch (error) {
       logger.error('Failed to reload split wallet data', error as Record<string, unknown>, 'FairSplitScreen');
@@ -1323,19 +1492,24 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       return;
     }
     
-    // Prevent duplicate calls
+    // CRITICAL: Prevent duplicate calls
     if (isLoadingRef.current) {
       return;
     }
     
+    isLoadingRef.current = true;
     setIsLoadingCompletionData(true);
     try {
       const result = await SplitWalletService.getSplitWalletCompletion(splitWallet.id);
       
       if (result.success) {
         // CRITICAL: Ensure all values are properly initialized, defaulting to 0 if undefined
+        // CRITICAL: Cap completion percentage at 100% to prevent showing >100% progress
+        const rawCompletionPercentage = result.completionPercentage ?? 0;
+        const cappedCompletionPercentage = Math.min(100, Math.max(0, rawCompletionPercentage));
+        
         const newCompletionData = {
-          completionPercentage: Math.max(0, result.completionPercentage ?? 0),
+          completionPercentage: cappedCompletionPercentage,
           totalAmount: Math.max(0, result.totalAmount ?? splitWallet.totalAmount ?? 0),
           collectedAmount: Math.max(0, result.collectedAmount ?? 0),
           remainingAmount: Math.max(0, result.remainingAmount ?? (result.totalAmount ?? splitWallet.totalAmount ?? 0)),
@@ -1476,19 +1650,26 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       if (!splitWallet) {
         logger.info('Creating new split wallet for fair split', null, 'FairSplitScreen');
         
-        const { SplitWalletService } = await import('../../services/split');
-        const walletResult = await SplitWalletService.createSplitWallet(
-          splitData!.billId, // Use billId, not split ID
-          currentUser!.id.toString(),
-          totalAmount,
-          'USDC',
-          participantsWithAmounts.map(p => ({
+        // Use unified creation service with participant mapper
+        const { UnifiedSplitCreationService } = await import('../../services/split/UnifiedSplitCreationService');
+        const { mapParticipantsToSplitWallet } = await import('../../services/split/utils/participantMapper');
+        
+        const mappedParticipants = mapParticipantsToSplitWallet(participantsWithAmounts.map(p => ({
             userId: p.id,
+          id: p.id,
             name: p.name,
             walletAddress: p.walletAddress,
             amountOwed: p.amountOwed,
-          }))
-        );
+        })));
+        
+        const walletResult = await UnifiedSplitCreationService.createSplitWallet({
+          billId: splitData!.billId,
+          creatorId: currentUser!.id.toString(),
+          totalAmount,
+          currency: 'USDC',
+          splitType: 'fair',
+          participants: mappedParticipants,
+        });
         
         if (!walletResult.success || !walletResult.wallet) {
           throw new Error(walletResult.error || 'Failed to create split wallet');
@@ -1509,26 +1690,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           totalParticipants: newWallet.participants.length,
         });
         
-        // Update the split with wallet information
-        if (splitData) {
-          const { SplitStorageService } = await import('../../services/splits/splitStorageService');
-          const updateResult = await SplitStorageService.updateSplit(splitData.id, {
-            walletId: newWallet.id,
-            walletAddress: newWallet.walletAddress,
-            status: 'active' as const
-          });
-          
-          if (updateResult.success) {
-            logger.info('Split updated with wallet information', { 
-              splitId: splitData.id, 
-              walletId: newWallet.id 
-            }, 'FairSplitScreen');
-          } else {
-            logger.warn('Failed to update split with wallet information', { 
-              error: updateResult.error 
-            }, 'FairSplitScreen');
-          }
-        }
+        // Note: Split document sync is handled by UnifiedSplitCreationService
         
         // Set the authoritative price in the price management service
         const walletBillId = newWallet.billId;
@@ -3318,11 +3480,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
         {/* Progress Indicator - Only show when split is confirmed */}
         {isSplitConfirmed && (
-          <FairSplitProgress
-            completionData={completionData}
-            totalAmount={totalAmount}
-            isLoading={isLoadingCompletionData}
-          />
+            <FairSplitProgress
+              completionData={completionData}
+              totalAmount={totalAmount}
+              isLoading={isLoadingCompletionData}
+              splitWallet={splitWallet}
+            />
         )}
 
         {/* Split Wallet Section - Show when wallet exists */}

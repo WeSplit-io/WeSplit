@@ -33,7 +33,17 @@ import {
 import { db } from '../../config/firebase/firebase';
 import { notificationService } from '../notifications/notificationService';
 import { logger } from '../analytics/loggingService';
+import { RequestDeduplicator } from '../split/utils/debounceUtils';
 // import { createPaymentRequestNotificationData, validateNotificationData } from '../notifications/notificationDataUtils';
+
+// User data cache to prevent redundant Firebase calls
+interface UserCacheEntry {
+  user: User;
+  timestamp: number;
+}
+
+const userCache = new Map<string, UserCacheEntry>();
+const USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Data transformation utilities
 export const firebaseDataTransformers = {
@@ -302,21 +312,47 @@ export const firebaseDataTransformers = {
   })
 };
 
+// Request deduplication for user data fetching
+const userDeduplicator = new RequestDeduplicator<(id: string) => Promise<User>>();
+
 // Main Firebase Data Service
 export const firebaseDataService = {
   // User operations
   user: {
   getCurrentUser: async (userId: string): Promise<User> => {
-      try {
-        const userDoc = await getDoc(doc(db, 'users', userId));
-        if (!userDoc.exists()) {
-          throw new Error('User not found');
-        }
-          return firebaseDataTransformers.firestoreToUser(userDoc);
-      } catch (error) {
-        logger.error('Failed to get current user', { userId, error }, 'FirebaseDataService');
-        throw error;
-      }
+      // Use deduplication to prevent multiple simultaneous calls
+      return userDeduplicator.execute(
+        userId,
+        async (id: string): Promise<User> => {
+          // Check cache first
+          const cached = userCache.get(id);
+          const now = Date.now();
+          if (cached && (now - cached.timestamp) < USER_CACHE_TTL) {
+            logger.debug('User data retrieved from cache', { userId: id }, 'FirebaseDataService');
+            return cached.user;
+          }
+
+          try {
+            const userDoc = await getDoc(doc(db, 'users', id));
+            if (!userDoc.exists()) {
+              throw new Error('User not found');
+            }
+            const user = firebaseDataTransformers.firestoreToUser(userDoc);
+            
+            // Cache the user data
+            userCache.set(id, {
+              user,
+              timestamp: now
+            });
+            
+            return user;
+          } catch (error) {
+            logger.error('Failed to get current user', { userId: id, error }, 'FirebaseDataService');
+            throw error;
+          }
+        },
+        userId
+      );
   },
 
   createUser: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
@@ -333,6 +369,8 @@ export const firebaseDataService = {
           created_at: serverTimestamp()
         });
         
+        // CRITICAL: Invalidate cache for new user (though it won't exist yet)
+        // Then fetch fresh data
         const createdUser = await firebaseDataService.user.getCurrentUser(userRef.id);
         logger.info('User created successfully', { userId: userRef.id }, 'FirebaseDataService');
         return createdUser;
@@ -347,6 +385,9 @@ export const firebaseDataService = {
         const userRef = doc(db, 'users', userId);
         await updateDoc(userRef, firebaseDataTransformers.userToFirestore(updates as any));
         
+        // CRITICAL: Invalidate cache after update to ensure fresh data
+        userCache.delete(userId);
+        
         const updatedUser = await firebaseDataService.user.getCurrentUser(userId);
         logger.info('User updated successfully', { userId }, 'FirebaseDataService');
         return updatedUser;
@@ -359,6 +400,10 @@ export const firebaseDataService = {
     deleteUser: async (userId: string): Promise<void> => {
       try {
         await deleteDoc(doc(db, 'users', userId));
+        
+        // CRITICAL: Invalidate cache after deletion
+        userCache.delete(userId);
+        
         logger.info('User deleted successfully', { userId }, 'FirebaseDataService');
         } catch (error) {
         logger.error('Failed to delete user', { userId, error }, 'FirebaseDataService');
@@ -1165,6 +1210,41 @@ export const firebaseDataService = {
       throw new Error('Split operations not yet implemented');
     }
   }
+};
+
+// Cache cleanup function to prevent memory leaks
+const cleanupUserCache = () => {
+  const now = Date.now();
+  const expiredKeys: string[] = [];
+  
+  for (const [key, entry] of userCache.entries()) {
+    if (now - entry.timestamp > USER_CACHE_TTL) {
+      expiredKeys.push(key);
+    }
+  }
+  
+  expiredKeys.forEach(key => userCache.delete(key));
+  
+  if (expiredKeys.length > 0) {
+    logger.debug('Cleaned up expired user cache entries', { 
+      expiredCount: expiredKeys.length,
+      remainingCount: userCache.size
+    }, 'FirebaseDataService');
+  }
+};
+
+// Run cleanup every 2 minutes
+setInterval(cleanupUserCache, 2 * 60 * 1000);
+
+// Export cache management functions
+export const userCacheManager = {
+  clearCache: () => {
+    const clearedCount = userCache.size;
+    userCache.clear();
+    logger.info('User cache cleared', { clearedCount }, 'FirebaseDataService');
+  },
+  getCacheSize: () => userCache.size,
+  cleanup: cleanupUserCache
 };
 
 export default firebaseDataService;

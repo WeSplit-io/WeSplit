@@ -917,15 +917,25 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     isLoadingSplitDataRef.current = true;
 
     try {
-      // Clear any potential caches first
-      clearSplitCaches();
-      
-      // Reduced logging - only log in dev mode
+      // ✅ OPTIMIZATION: Try cached data first for faster initial load
+      // Only force refresh if we need fresh data (e.g., after returning from another screen)
       if (__DEV__) {
         logger.debug('Loading split data for details screen', { splitId: effectiveSplitId }, 'SplitDetailsScreen');
       }
       
-      const result = await SplitStorageService.forceRefreshSplit(effectiveSplitId);
+      // Try cached data first for faster load
+      let result = await SplitStorageService.getSplit(effectiveSplitId);
+      
+      // If cache miss or data seems stale, do a force refresh
+      // For now, always use cached data on initial load for speed
+      // Force refresh can be triggered manually if needed
+      if (!result.success || !result.split) {
+        if (__DEV__) {
+          logger.debug('Cache miss, forcing refresh', { splitId: effectiveSplitId }, 'SplitDetailsScreen');
+        }
+        clearSplitCaches();
+        result = await SplitStorageService.forceRefreshSplit(effectiveSplitId);
+      }
       if (result.success && result.split) {
         const splitData = result.split;
         
@@ -2173,8 +2183,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         <View style={styles.participantsSection}>
           <Text style={styles.participantsTitle}>In the pool:</Text>
 
-          {participants.map((participant: any) => (
-            <View key={participant.userId || participant.id} style={styles.participantCard}>
+          {participants.map((participant: any, index: number) => (
+            <View key={`${participant.userId || participant.id}-${index}`} style={styles.participantCard}>
               <Avatar
                 userId={participant.userId || participant.id}
                 userName={participant.name}

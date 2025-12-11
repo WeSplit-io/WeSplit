@@ -194,51 +194,29 @@ export class SplitStorageServiceClass {
         participantsCount: createdSplit.participants.length
       }, 'SplitStorageService');
 
-      // Sync first split quest completion
-      try {
-        const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
-        await userActionSyncService.syncFirstSplit(createdSplit.creatorId);
-      } catch (syncError) {
-        logger.error('Failed to sync first split quest', { 
-          userId: createdSplit.creatorId, 
-          splitId: createdSplit.id,
-          syncError 
-        }, 'SplitStorageService');
-        // Don't fail split creation if sync fails
-      }
-
-      // Award split creation rewards (owner bonus + first split with friends)
-      try {
-        const { splitRewardsService } = await import('../../services/rewards/splitRewardsService');
-        const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
-        
-        // Award owner bonus for creating split
-        if (createdSplit.splitType === 'fair') {
-          await splitRewardsService.awardFairSplitParticipation({
-            userId: createdSplit.creatorId,
-            splitId: createdSplit.id,
-            splitType: 'fair',
-            splitAmount: createdSplit.totalAmount,
-            isOwner: true
-          });
-        }
-        
-        // Check for first split with friends (multiple participants)
-        if (createdSplit.participants.length > 1) {
-          await userActionSyncService.syncFirstSplitWithFriends(
-            createdSplit.creatorId,
+      // Award split creation rewards (non-blocking, fire and forget)
+      // Use a separate handler that's only loaded when needed to prevent bundling issues
+      // The handler uses dynamic imports internally, so rewards services won't be bundled during split creation
+      Promise.resolve().then(async () => {
+        try {
+          const { awardSplitCreationRewards } = await import('./handlers/SplitRewardsHandler');
+          await awardSplitCreationRewards(
             createdSplit.id,
+            createdSplit.creatorId,
+            createdSplit.splitType,
+            createdSplit.totalAmount,
             createdSplit.participants.length
           );
+        } catch (rewardError) {
+          logger.error('Failed to award split creation rewards', { 
+            userId: createdSplit.creatorId, 
+            splitId: createdSplit.id,
+            rewardError 
+          }, 'SplitStorageService');
         }
-      } catch (rewardError) {
-        logger.error('Failed to award split creation rewards', { 
-          userId: createdSplit.creatorId, 
-          splitId: createdSplit.id,
-          rewardError 
-        }, 'SplitStorageService');
-        // Don't fail split creation if rewards fail
-      }
+      }).catch(() => {
+        // Silently fail - rewards are non-critical
+      });
 
       return {
         success: true,
@@ -829,6 +807,7 @@ export class SplitStorageServiceClass {
 
   /**
    * Update participant status
+   * Accepts either splitId or billId - will try to find split by ID first, then by billId if not found
    */
   static async updateParticipantStatus(
     splitId: string, 
@@ -845,7 +824,18 @@ export class SplitStorageServiceClass {
         amountPaid
       });
 
-      const splitResult = await this.getSplit(splitId);
+      // Try to get split by ID first
+      let splitResult = await this.getSplit(splitId);
+      
+      // If not found and the ID looks like a billId, try to find by billId
+      if (!splitResult.success && splitId.startsWith('bill_')) {
+        logger.debug('Split not found by ID, trying to find by billId', {
+          splitId,
+          userId
+        }, 'SplitStorageService');
+        splitResult = await this.getSplitByBillId(splitId);
+      }
+      
       if (!splitResult.success || !splitResult.split) {
         return splitResult;
       }

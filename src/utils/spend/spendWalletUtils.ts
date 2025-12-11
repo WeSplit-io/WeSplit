@@ -3,36 +3,38 @@
  * Centralized functions for wallet creation and management
  */
 
-import { SplitWalletService } from '../../services/split';
-import { SplitStorageService } from '../../services/splits';
 import { logger } from '../../services/analytics/loggingService';
+import { UnifiedSplitCreationService } from '../../services/split/UnifiedSplitCreationService';
+import { mapParticipantsToSplitWallet } from '../../services/split/utils/participantMapper';
 
 /**
  * Create split wallet for SPEND split
- * Handles participant mapping and split update
+ * Uses unified creation service for consistency
  */
 export async function createSpendSplitWallet(
   splitData: any,
   creatorId: string
 ): Promise<{ success: boolean; wallet?: any; error?: string }> {
   try {
-    // Map participants for wallet creation
+    // Map participants using participant mapper
     const participants = splitData.participants || [];
-    const participantsForWallet = participants.map((p: any) => ({
+    const mappedParticipants = mapParticipantsToSplitWallet(participants.map((p: any) => ({
       userId: p.userId || p.id || '',
+      id: p.userId || p.id || '',
       name: p.name || 'Unknown',
       walletAddress: p.walletAddress || p.wallet_address || '',
       amountOwed: p.amountOwed || 0,
-    }));
+    })));
 
-    // Create wallet
-    const walletResult = await SplitWalletService.createSplitWallet(
-      splitData.billId,
+    // Use unified creation service
+    const walletResult = await UnifiedSplitCreationService.createSplitWallet({
+      billId: splitData.billId,
       creatorId,
-      splitData.totalAmount || 0,
-      'USDC',
-      participantsForWallet
-    );
+      totalAmount: splitData.totalAmount || 0,
+      currency: 'USDC',
+      splitType: 'spend',
+      participants: mappedParticipants,
+    });
 
     if (!walletResult.success || !walletResult.wallet) {
       return {
@@ -41,30 +43,10 @@ export async function createSpendSplitWallet(
       };
     }
 
-    const wallet = walletResult.wallet;
-
-    // Update split document with wallet information
-    try {
-      await SplitStorageService.updateSplit(splitData.id, {
-        walletId: wallet.id,
-        walletAddress: wallet.walletAddress,
-        status: 'active',
-      });
-      logger.info('Split updated with wallet information', {
-        splitId: splitData.id,
-        walletId: wallet.id,
-      }, 'createSpendSplitWallet');
-    } catch (updateError) {
-      logger.warn('Failed to update split with wallet information', {
-        splitId: splitData.id,
-        error: updateError instanceof Error ? updateError.message : String(updateError),
-      }, 'createSpendSplitWallet');
-      // Don't fail if update fails - wallet is created
-    }
-
+    // Note: Split document sync is handled by UnifiedSplitCreationService
     return {
       success: true,
-      wallet,
+      wallet: walletResult.wallet,
     };
   } catch (error) {
     logger.error('Error creating SPEND split wallet', {

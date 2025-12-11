@@ -75,7 +75,20 @@ export class SplitWalletService {
     participants: { userId: string; name: string; walletAddress: string; amountOwed: number }[]
   ) {
     await loadModules();
-    return SplitWalletCreation.createDegenSplitWallet(billId, creatorId, creatorName, totalAmount, currency, participants);
+    const { UnifiedSplitCreationService } = await import('./UnifiedSplitCreationService');
+    return UnifiedSplitCreationService.createSplitWallet({
+      billId,
+      creatorId,
+      creatorName,
+      totalAmount,
+      currency,
+      participants: participants.map(p => ({
+        userId: p.userId,
+        walletAddress: p.walletAddress,
+        amountOwed: p.amountOwed
+      })),
+      splitType: 'degen'
+    });
   }
 
   static isValidWalletAddress(address: string) {
@@ -105,7 +118,15 @@ export class SplitWalletService {
 
   static async createSplitWallet(billId: string, creatorId: string, totalAmount: number, currency?: string, participants?: any[]) {
     await loadModules();
-    return SplitWalletCreation.createSplitWallet(billId, creatorId, totalAmount, currency, participants || []);
+    const { UnifiedSplitCreationService } = await import('./UnifiedSplitCreationService');
+    return UnifiedSplitCreationService.createSplitWallet({
+      billId,
+      creatorId,
+      totalAmount,
+      currency: currency || 'USDC',
+      participants: participants || [],
+      splitType: 'fair' // Default to fair split for backward compatibility
+    });
   }
 
   static async forceResetSplitWallet(splitWalletId: string) {

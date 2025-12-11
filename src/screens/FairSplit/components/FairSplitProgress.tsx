@@ -23,27 +23,55 @@ interface FairSplitProgressProps {
   completionData: CompletionData | null;
   totalAmount: number;
   isLoading?: boolean;
+  splitWallet?: any; // CRITICAL: Fallback to calculate from split wallet if completionData is null
 }
 
 const FairSplitProgress: React.FC<FairSplitProgressProps> = ({
   completionData,
   totalAmount,
-  isLoading = false
+  isLoading = false,
+  splitWallet
 }) => {
-  const displayData = completionData || {
-    completionPercentage: 0,
-    totalAmount,
-    collectedAmount: 0,
-    remainingAmount: totalAmount,
-    participantsPaid: 0,
-    totalParticipants: 0
-  };
+  // CRITICAL: If completionData is null, calculate from split wallet (source of truth)
+  let displayData: CompletionData;
+  if (completionData) {
+    displayData = completionData;
+  } else if (splitWallet?.participants) {
+    // Calculate from split wallet participants
+    const collectedAmount = splitWallet.participants.reduce((sum: number, p: any) => sum + (p.amountPaid || 0), 0);
+    const participantsPaid = splitWallet.participants.filter((p: any) => p.status === 'paid' || (p.amountPaid || 0) >= (p.amountOwed || 0)).length;
+    const totalParticipants = splitWallet.participants.length;
+    const rawCompletionPercentage = totalAmount > 0 ? (collectedAmount / totalAmount) * 100 : 0;
+    const completionPercentage = Math.min(100, Math.max(0, rawCompletionPercentage));
+    
+    displayData = {
+      completionPercentage,
+      totalAmount: totalAmount || splitWallet.totalAmount || 0,
+      collectedAmount,
+      remainingAmount: Math.max(0, (totalAmount || splitWallet.totalAmount || 0) - collectedAmount),
+      participantsPaid,
+      totalParticipants
+    };
+  } else {
+    // Fallback to defaults
+    displayData = {
+      completionPercentage: 0,
+      totalAmount,
+      collectedAmount: 0,
+      remainingAmount: totalAmount,
+      participantsPaid: 0,
+      totalParticipants: 0
+    };
+  }
 
+  // CRITICAL: Cap completion percentage at 100% to prevent display issues
+  const cappedPercentage = Math.min(100, Math.max(0, displayData.completionPercentage));
+  
   // Calculate rotation for progress fill (0% = -90deg, 100% = 270deg)
-  const rotationAngle = (displayData.completionPercentage / 100) * 360 - 90;
+  const rotationAngle = (cappedPercentage / 100) * 360 - 90;
   
   // For 100% completion, show full green circle
-  const isComplete = displayData.completionPercentage >= 100;
+  const isComplete = cappedPercentage >= 100;
 
   return (
     <View style={styles.progressContainer}>
@@ -60,7 +88,7 @@ const FairSplitProgress: React.FC<FairSplitProgressProps> = ({
         )}
         <View style={styles.progressInner}>
           <Text style={styles.progressPercentage}>
-            {displayData.completionPercentage}%
+            {Math.round(cappedPercentage)}%
           </Text>
           <Text style={styles.progressAmount}>
             {displayData.collectedAmount.toFixed(2)} USDC

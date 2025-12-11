@@ -6,52 +6,29 @@
 
 import { logger } from '../core';
 import { roundUsdcAmount as currencyRoundUsdcAmount } from '../../utils/ui/format';
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
+import { validateCreationParams, validateWalletAddress } from './SplitValidationService';
 
 export class SplitWalletCreation {
-  /**
-   * Round USDC amount to proper precision (6 decimal places)
-   * Uses floor instead of round to avoid rounding up beyond available balance
-   */
-  static roundUsdcAmount(amount: number): number {
-    return currencyRoundUsdcAmount(amount);
-  }
 
-  /**
-   * Validate wallet address format
-   */
-  static isValidWalletAddress(address: string): boolean {
-    if (!address || typeof address !== 'string') {return false;}
-    
-    // Remove common invalid values
-    const invalidValues = ['No wallet address', 'Unknown wallet', '', 'null', 'undefined'];
-    if (invalidValues.includes(address.toLowerCase())) {return false;}
-    
-    // Check if it's a valid Solana public key format
-    try {
-      const { PublicKey } = require('@solana/web3.js');
-      new PublicKey(address);
-      return true;
-    } catch {
-      return false;
-    }
-  }
 
   /**
    * Ensure user wallet is properly initialized
    */
   static async ensureUserWalletInitialized(userId: string): Promise<{success: boolean, error?: string}> {
     try {
-      const { walletService } = await import('../blockchain/wallet');
-      const userWallet = await walletService.getWalletInfo(userId);
+      // ✅ MEMORY OPTIMIZATION: Use simplifiedWalletService instead of full walletService (720 modules)
+      const { simplifiedWalletService } = await import('../blockchain/wallet/simplifiedWalletService');
+      const userWallet = await simplifiedWalletService.getWalletInfo(userId);
       if (!userWallet) {
         return { success: false, error: 'User wallet not found' };
       }
       
-      if (!this.isValidWalletAddress(userWallet.address)) {
-        return { success: false, error: 'Invalid user wallet address' };
+      const addressValidation = validateWalletAddress(userWallet.address);
+      if (!addressValidation.isValid) {
+        return { success: false, error: addressValidation.errors.join(', ') };
       }
       
       return { success: true };
@@ -69,14 +46,15 @@ export class SplitWalletCreation {
    */
   static async checkUsdcBalance(userId: string): Promise<{success: boolean, balance: number, error?: string}> {
     try {
-      const { walletService } = await import('../blockchain/wallet');
-      const userWallet = await walletService.getWalletInfo(userId);
+      // ✅ MEMORY OPTIMIZATION: Use simplifiedWalletService instead of full walletService (720 modules)
+      const { simplifiedWalletService } = await import('../blockchain/wallet/simplifiedWalletService');
+      const userWallet = await simplifiedWalletService.getWalletInfo(userId);
       if (!userWallet) {
         return { success: false, balance: 0, error: 'User wallet not found' };
       }
 
-      const balance = await walletService.getUserWalletBalance(userId);
-      if (balance === null) {
+      const balance = await simplifiedWalletService.getUserWalletBalance(userId);
+      if (!balance) {
         return { success: false, balance: 0, error: 'Failed to get wallet balance' };
       }
 
@@ -161,12 +139,52 @@ export class SplitWalletCreation {
     participants: Omit<SplitWalletParticipant, 'amountPaid' | 'status' | 'transactionSignature' | 'paidAt'>[]
   ): Promise<SplitWalletResult> {
     try {
+      // Validate creation parameters using centralized validation service
+      const validation = await validateCreationParams({
+          billId,
+          creatorId,
+        totalAmount,
+        currency,
+        participants
+      });
+
+      if (!validation.isValid) {
+        return {
+          success: false,
+          error: validation.errors.join('; ')
+          };
+      }
+
+      // Check if wallet already exists for this billId
+      try {
+        const { SplitWalletQueries } = await import('./SplitWalletQueries');
+        const existingWallet = await SplitWalletQueries.getSplitWalletByBillId(billId);
+        if (existingWallet.success && existingWallet.wallet) {
+          logger.warn('Split wallet already exists for this bill', {
+            billId,
+            existingWalletId: existingWallet.wallet.id,
+            existingFirebaseDocId: existingWallet.wallet.firebaseDocId
+          }, 'SplitWalletCreation');
+          return {
+            success: false,
+            error: 'A split wallet already exists for this bill',
+            wallet: existingWallet.wallet
+          };
+        }
+      } catch (checkError) {
+        logger.warn('Could not check for existing wallet, proceeding with creation', {
+          billId,
+          error: checkError instanceof Error ? checkError.message : String(checkError)
+        }, 'SplitWalletCreation');
+        // Continue with creation - this is not critical
+      }
       
       logger.info('Creating split wallet', { 
         billId, 
         creatorId, 
         totalAmount, 
         currency,
+        participantsCount: participants.length,
         participants: participants.map(p => ({
           userId: p.userId,
           name: p.name,
@@ -203,12 +221,12 @@ export class SplitWalletCreation {
         creatorId,
         walletAddress: wallet.address,
         publicKey: wallet.publicKey,
-        totalAmount: SplitWalletCreation.roundUsdcAmount(totalAmount),
+        totalAmount: currencyRoundUsdcAmount(totalAmount),
         currency,
         status: 'active',
         participants: participants.map(p => ({
           ...p,
-          amountOwed: SplitWalletCreation.roundUsdcAmount(p.amountOwed), // Round amountOwed to fix precision issues
+          amountOwed: currencyRoundUsdcAmount(p.amountOwed), // Round amountOwed to fix precision issues
           amountPaid: 0,
           status: 'pending' as const,
         })),
@@ -246,21 +264,196 @@ export class SplitWalletCreation {
       }
 
       const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
-      const storeResult = await SplitWalletSecurity.storeFairSplitPrivateKey(
+      
+      // CRITICAL FIX: Add retry mechanism for private key storage (3 attempts)
+      const { RETRY_CONFIG } = await import('./constants/splitConstants');
+      let storeResult = null;
+      let lastError: string | undefined;
+      const maxRetries = RETRY_CONFIG.MAX_ATTEMPTS;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        storeResult = await SplitWalletSecurity.storeFairSplitPrivateKey(
         splitWalletId,
         creatorId,
         privateKey
       );
 
-      if (!storeResult.success) {
-        logger.error('Failed to store private key for creator', { error: storeResult.error }, 'SplitWalletCreation');
-        // Don't fail the entire operation, but log the error
-      } else {
-        logger.info('Private key stored securely for creator', {
-          splitWalletId,
-          creatorId
-        }, 'SplitWalletCreation');
+        if (storeResult.success) {
+          logger.info('Private key stored securely for creator', {
+            splitWalletId,
+            creatorId,
+            attempt
+          }, 'SplitWalletCreation');
+          break;
+        } else {
+          lastError = storeResult.error;
+          logger.warn(`Private key storage attempt ${attempt}/${maxRetries} failed`, {
+            splitWalletId,
+            creatorId,
+            error: lastError,
+            attempt
+          }, 'SplitWalletCreation');
+          
+          // Wait before retry (exponential backoff)
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, RETRY_CONFIG.BACKOFF_BASE * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt - 1)));
+          }
+        }
       }
+
+      if (!storeResult || !storeResult.success) {
+        logger.error('Failed to store private key for creator after all retries', { 
+          error: lastError,
+          attempts: maxRetries
+        }, 'SplitWalletCreation');
+        
+        // CRITICAL: Private key storage failure means withdrawals won't work
+        // We should fail the operation to prevent creating unusable wallets
+        // Clean up the wallet that was created
+        let cleanupSuccess = false;
+        try {
+          const { deleteDoc } = await import('firebase/firestore');
+          await deleteDoc(doc(db, 'splitWallets', createdSplitWallet.firebaseDocId));
+          cleanupSuccess = true;
+          logger.info('Cleaned up split wallet after private key storage failure', {
+            splitWalletId: createdSplitWallet.id,
+            firebaseDocId: createdSplitWallet.firebaseDocId
+          }, 'SplitWalletCreation');
+        } catch (cleanupError) {
+          logger.error('Failed to cleanup split wallet after private key storage failure', {
+            splitWalletId: createdSplitWallet.id,
+            firebaseDocId: createdSplitWallet.firebaseDocId,
+            cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          }, 'SplitWalletCreation');
+          
+          // Mark wallet for manual cleanup by setting a flag
+          try {
+            const { updateDoc } = await import('firebase/firestore');
+            await updateDoc(doc(db, 'splitWallets', createdSplitWallet.firebaseDocId), {
+              status: 'cancelled',
+              error: 'Private key storage failed - requires manual cleanup',
+              lastUpdated: new Date().toISOString()
+            });
+            logger.warn('Marked wallet for manual cleanup', {
+              splitWalletId: createdSplitWallet.id,
+              firebaseDocId: createdSplitWallet.firebaseDocId
+            }, 'SplitWalletCreation');
+          } catch (markError) {
+            logger.error('Failed to mark wallet for manual cleanup', {
+              splitWalletId: createdSplitWallet.id,
+              error: markError instanceof Error ? markError.message : String(markError)
+          }, 'SplitWalletCreation');
+          }
+        }
+        
+        return {
+          success: false,
+          error: `Failed to store private key after ${maxRetries} attempts: ${lastError || 'Unknown error'}. Split wallet creation aborted${cleanupSuccess ? '' : ' (wallet marked for manual cleanup)'}.`
+        };
+      }
+
+      // CRITICAL FIX: Update the split document with wallet information to keep them synchronized
+      // Add retry mechanism and fail wallet creation if split update fails (strict consistency)
+        const { SplitStorageService } = await import('../splits/splitStorageService');
+      let splitUpdateResult = null;
+      let lastSyncError: string | undefined;
+      const maxRetriesSync = RETRY_CONFIG.MAX_ATTEMPTS;
+      
+      for (let attempt = 1; attempt <= maxRetriesSync; attempt++) {
+        try {
+          splitUpdateResult = await SplitStorageService.updateSplitByBillId(billId, {
+          walletId: createdSplitWallet.id,
+          walletAddress: createdSplitWallet.walletAddress,
+          updatedAt: new Date().toISOString()
+        });
+        
+        if (splitUpdateResult.success) {
+          logger.info('Split document updated with wallet information', {
+            splitWalletId: createdSplitWallet.id,
+            billId,
+              walletAddress: createdSplitWallet.walletAddress,
+              attempt
+          }, 'SplitWalletCreation');
+            break;
+        } else {
+            lastSyncError = splitUpdateResult.error;
+            logger.warn(`Split document update attempt ${attempt}/${maxRetriesSync} failed`, {
+            splitWalletId: createdSplitWallet.id,
+            billId,
+              error: lastSyncError,
+              attempt
+          }, 'SplitWalletCreation');
+        }
+      } catch (syncError) {
+          lastSyncError = syncError instanceof Error ? syncError.message : String(syncError);
+            logger.warn(`Split document update attempt ${attempt}/${maxRetriesSync} threw error`, {
+          splitWalletId: createdSplitWallet.id,
+          billId,
+            error: lastSyncError,
+            attempt
+        }, 'SplitWalletCreation');
+        }
+        
+        // Wait before retry (exponential backoff: 100ms, 200ms, 400ms)
+        if (attempt < maxRetriesSync && (!splitUpdateResult || !splitUpdateResult.success)) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_CONFIG.BACKOFF_BASE * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt - 1)));
+        }
+      }
+      
+      // CRITICAL: Fail wallet creation if split update fails after all retries
+      // This ensures strict consistency between wallet and split documents
+      if (!splitUpdateResult || !splitUpdateResult.success) {
+        logger.error('Failed to update split document after all retries - rolling back wallet creation', {
+          splitWalletId: createdSplitWallet.id,
+          billId,
+          error: lastSyncError,
+          attempts: maxRetries
+        }, 'SplitWalletCreation');
+        
+        // Rollback: Delete wallet and private key
+        let rollbackSuccess = false;
+        try {
+          // Delete private key first
+          const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+          await SplitWalletSecurity.deleteSplitWalletPrivateKey(splitWalletId, creatorId);
+          
+          // Delete wallet
+          const { deleteDoc } = await import('firebase/firestore');
+          await deleteDoc(doc(db, 'splitWallets', createdSplitWallet.firebaseDocId));
+          rollbackSuccess = true;
+          logger.info('Rolled back wallet creation after split document update failure', {
+            splitWalletId: createdSplitWallet.id,
+            firebaseDocId: createdSplitWallet.firebaseDocId
+          }, 'SplitWalletCreation');
+        } catch (rollbackError) {
+          logger.error('Failed to rollback wallet creation', {
+            splitWalletId: createdSplitWallet.id,
+            firebaseDocId: createdSplitWallet.firebaseDocId,
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+          }, 'SplitWalletCreation');
+          
+          // Mark wallet for manual cleanup
+          try {
+            const { updateDoc } = await import('firebase/firestore');
+            await updateDoc(doc(db, 'splitWallets', createdSplitWallet.firebaseDocId), {
+              status: 'cancelled',
+              error: 'Split document sync failed - requires manual cleanup',
+              lastUpdated: new Date().toISOString()
+            });
+          } catch (markError) {
+            // Ignore - already in error state
+          }
+        }
+        
+        return {
+          success: false,
+          error: `Failed to update split document after ${maxRetriesSync} attempts: ${lastSyncError || 'Unknown error'}. Wallet creation rolled back${rollbackSuccess ? '' : ' (wallet marked for manual cleanup)'}.`
+        };
+      }
+
+      // Cache the newly created wallet
+      const { SplitWalletCache } = await import('./SplitWalletCache');
+      SplitWalletCache.setWallet(createdSplitWallet);
 
       logger.info('Split wallet created and stored successfully', {
         splitWalletId: createdSplitWallet.id,
@@ -277,8 +470,11 @@ export class SplitWalletCreation {
       };
 
     } catch (error) {
-      logger.error('Error creating split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCreation');
-      logger.error('Failed to create split wallet', error, 'SplitWalletCreation');
+      logger.error('Failed to create split wallet', {
+        error: error instanceof Error ? error.message : String(error),
+        billId,
+        creatorId
+      }, 'SplitWalletCreation');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -299,15 +495,48 @@ export class SplitWalletCreation {
     participants: { userId: string; name: string; walletAddress: string; amountOwed: number }[]
   ): Promise<SplitWalletResult> {
     try {
-      // Validate participants parameter
-      if (!participants || !Array.isArray(participants)) {
-        logger.error('Invalid participants parameter', {
+      // Validate creation parameters using centralized validation service
+      const validation = await validateCreationParams({
           billId,
           creatorId,
-          participants: participants,
-          participantsType: typeof participants
+        totalAmount,
+        currency,
+        participants: participants.map(p => ({
+          userId: p.userId,
+          walletAddress: p.walletAddress,
+          amountOwed: p.amountOwed
+        }))
+      });
+
+      if (!validation.isValid) {
+        return {
+          success: false,
+          error: validation.errors.join('; ')
+          };
+      }
+
+      // Check if wallet already exists for this billId
+      try {
+        const { SplitWalletQueries } = await import('./SplitWalletQueries');
+        const existingWallet = await SplitWalletQueries.getSplitWalletByBillId(billId);
+        if (existingWallet.success && existingWallet.wallet) {
+          logger.warn('Degen split wallet already exists for this bill', {
+            billId,
+            existingWalletId: existingWallet.wallet.id,
+            existingFirebaseDocId: existingWallet.wallet.firebaseDocId
+          }, 'SplitWalletCreation');
+          return {
+            success: false,
+            error: 'A split wallet already exists for this bill',
+            wallet: existingWallet.wallet
+          };
+        }
+      } catch (checkError) {
+        logger.warn('Could not check for existing wallet, proceeding with creation', {
+          billId,
+          error: checkError instanceof Error ? checkError.message : String(checkError)
         }, 'SplitWalletCreation');
-        throw new Error('Participants parameter is required and must be an array');
+        // Continue with creation - this is not critical
       }
 
       logger.info('Creating Degen Split wallet with shared private key access', {
@@ -345,12 +574,12 @@ export class SplitWalletCreation {
         creatorId,
         walletAddress: wallet.address,
         publicKey: wallet.publicKey,
-        totalAmount: SplitWalletCreation.roundUsdcAmount(totalAmount),
+        totalAmount: currencyRoundUsdcAmount(totalAmount),
         currency,
         status: 'active',
         participants: participants.map(p => ({
           ...p,
-          amountOwed: SplitWalletCreation.roundUsdcAmount(p.amountOwed), // Round amountOwed to fix precision issues
+          amountOwed: currencyRoundUsdcAmount(p.amountOwed), // Round amountOwed to fix precision issues
           amountPaid: 0,
           status: 'pending' as const,
         })),
@@ -377,34 +606,58 @@ export class SplitWalletCreation {
         isDedicatedWallet: true
       }, 'SplitWalletCreation');
 
-      // CRITICAL: Update existing split document instead of creating a new one
-      // This prevents duplicate split creation
-      try {
+      // CRITICAL FIX: Update existing split document instead of creating a new one
+      // Add retry mechanism and fail wallet creation if split update fails (strict consistency)
         const { SplitStorageService } = await import('../splits/splitStorageService');
         
         // First, try to find the existing split by billId
         const existingSplitResult = await SplitStorageService.getSplitByBillId(createdSplitWallet.billId);
+      const { RETRY_CONFIG: RETRY_CONFIG_DEGEN } = await import('./constants/splitConstants');
+      let splitUpdateResult = null;
+      let lastSyncError: string | undefined;
+      const maxRetriesDegen = RETRY_CONFIG_DEGEN.MAX_ATTEMPTS;
         
         if (existingSplitResult.success && existingSplitResult.split) {
-          // Update the existing split with wallet information
-          const updateResult = await SplitStorageService.updateSplit(existingSplitResult.split.id, {
+        // Update the existing split with wallet information (with retry)
+        for (let attempt = 1; attempt <= maxRetriesDegen; attempt++) {
+          try {
+            splitUpdateResult = await SplitStorageService.updateSplit(existingSplitResult.split.id, {
             walletId: createdSplitWallet.id,
             walletAddress: createdSplitWallet.walletAddress,
             status: 'active' as const
           });
           
-          if (updateResult.success) {
+            if (splitUpdateResult.success) {
             logger.info('Existing degen split updated with wallet information', {
               splitWalletId: createdSplitWallet.id,
               splitId: existingSplitResult.split.id,
-              billId: createdSplitWallet.billId
+                billId: createdSplitWallet.billId,
+                attempt
             }, 'SplitWalletCreation');
+              break;
           } else {
-            logger.error('Failed to update existing degen split with wallet information', {
+              lastSyncError = splitUpdateResult.error;
+              logger.warn(`Degen split update attempt ${attempt}/${maxRetriesDegen} failed`, {
               splitWalletId: createdSplitWallet.id,
               billId: createdSplitWallet.billId,
-              error: updateResult.error
+                error: lastSyncError,
+                attempt
             }, 'SplitWalletCreation');
+            }
+          } catch (syncError) {
+            lastSyncError = syncError instanceof Error ? syncError.message : String(syncError);
+            logger.warn(`Degen split update attempt ${attempt}/${maxRetriesDegen} threw error`, {
+              splitWalletId: createdSplitWallet.id,
+              billId: createdSplitWallet.billId,
+              error: lastSyncError,
+              attempt
+            }, 'SplitWalletCreation');
+          }
+          
+          // Wait before retry (exponential backoff: 100ms, 200ms, 400ms)
+          if (attempt < maxRetriesDegen && (!splitUpdateResult || !splitUpdateResult.success)) {
+            await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt - 1)));
+          }
           }
         } else {
           // Only create a new split if none exists (fallback case)
@@ -436,29 +689,97 @@ export class SplitWalletCreation {
             walletAddress: createdSplitWallet.walletAddress
           };
 
-          const splitResult = await SplitStorageService.createSplit(splitData);
+        // Retry split creation
+        for (let attempt = 1; attempt <= maxRetriesDegen; attempt++) {
+          try {
+            splitUpdateResult = await SplitStorageService.createSplit(splitData);
           
-          if (splitResult.success) {
+            if (splitUpdateResult.success) {
             logger.info('Fallback degen split document created in splits collection', {
               splitWalletId: createdSplitWallet.id,
-              splitId: splitResult.split?.id,
+                splitId: splitUpdateResult.split?.id,
               billId: createdSplitWallet.billId,
-              firebaseDocId: splitResult.split?.firebaseDocId
+                firebaseDocId: splitUpdateResult.split?.firebaseDocId,
+                attempt
             }, 'SplitWalletCreation');
+              break;
           } else {
-            logger.error('Failed to create fallback degen split document in splits collection', {
+              lastSyncError = splitUpdateResult.error;
+              logger.warn(`Fallback degen split creation attempt ${attempt}/${maxRetriesDegen} failed`, {
               splitWalletId: createdSplitWallet.id,
               billId: createdSplitWallet.billId,
-              error: splitResult.error
+                error: lastSyncError,
+                attempt
             }, 'SplitWalletCreation');
           }
+          } catch (syncError) {
+            lastSyncError = syncError instanceof Error ? syncError.message : String(syncError);
+            logger.warn(`Fallback degen split creation attempt ${attempt}/${maxRetriesDegen} threw error`, {
+              splitWalletId: createdSplitWallet.id,
+              billId: createdSplitWallet.billId,
+              error: lastSyncError,
+              attempt
+            }, 'SplitWalletCreation');
+          }
+          
+          // Wait before retry (exponential backoff: 100ms, 200ms, 400ms)
+          if (attempt < maxRetriesDegen && (!splitUpdateResult || !splitUpdateResult.success)) {
+            await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt - 1)));
+          }
         }
-      } catch (splitError) {
-        logger.error('Error updating/creating degen split document in splits collection', {
+      }
+      
+      // CRITICAL: Fail wallet creation if split update/create fails after all retries
+      if (!splitUpdateResult || !splitUpdateResult.success) {
+        logger.error('Failed to update/create split document after all retries - rolling back wallet creation', {
           splitWalletId: createdSplitWallet.id,
           billId: createdSplitWallet.billId,
-          error: splitError instanceof Error ? splitError.message : String(splitError)
+          error: lastSyncError,
+          attempts: maxRetries
         }, 'SplitWalletCreation');
+        
+        // Rollback: Delete private keys and wallet
+        let rollbackSuccess = false;
+        try {
+          // Delete private keys first
+          const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+          await SplitWalletSecurity.deleteSplitWalletPrivateKeyForAllParticipants(
+            splitWalletId,
+            participants.map(p => ({ userId: p.userId, name: p.name }))
+          );
+          
+          // Delete wallet
+          const { deleteDoc } = await import('firebase/firestore');
+          await deleteDoc(doc(db, 'splitWallets', createdSplitWallet.firebaseDocId));
+          rollbackSuccess = true;
+          logger.info('Rolled back degen wallet creation after split document update failure', {
+            splitWalletId: createdSplitWallet.id,
+            firebaseDocId: createdSplitWallet.firebaseDocId
+          }, 'SplitWalletCreation');
+        } catch (rollbackError) {
+          logger.error('Failed to rollback degen wallet creation', {
+            splitWalletId: createdSplitWallet.id,
+            firebaseDocId: createdSplitWallet.firebaseDocId,
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+          }, 'SplitWalletCreation');
+          
+          // Mark wallet for manual cleanup
+          try {
+            const { updateDoc } = await import('firebase/firestore');
+            await updateDoc(doc(db, 'splitWallets', createdSplitWallet.firebaseDocId), {
+              status: 'cancelled',
+              error: 'Split document sync failed - requires manual cleanup',
+              lastUpdated: new Date().toISOString()
+            });
+          } catch (markError) {
+            // Ignore - already in error state
+          }
+        }
+        
+        return {
+          success: false,
+          error: `Failed to update/create split document after ${maxRetriesDegen} attempts: ${lastSyncError || 'Unknown error'}. Wallet creation rolled back${rollbackSuccess ? '' : ' (wallet marked for manual cleanup)'}.`
+        };
       }
 
       // Store private key for ALL participants (Degen Split feature)
@@ -474,20 +795,131 @@ export class SplitWalletCreation {
       }
 
       const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
-      const storeResult = await SplitWalletSecurity.storeSplitWalletPrivateKeyForAllParticipants(
+      
+      // CRITICAL FIX: Add retry mechanism for private key storage (3 attempts)
+      // For degen splits, ensure all-or-nothing: all participants get keys or none do
+      const { RETRY_CONFIG: RETRY_CONFIG_DEGEN_KEYS } = await import('./constants/splitConstants');
+      let storeResult = null;
+      let lastError: string | undefined;
+      const maxRetriesDegenKeys = RETRY_CONFIG_DEGEN_KEYS.MAX_ATTEMPTS;
+      
+      for (let attempt = 1; attempt <= maxRetriesDegenKeys; attempt++) {
+        storeResult = await SplitWalletSecurity.storeSplitWalletPrivateKeyForAllParticipants(
         splitWalletId,
         participants.map(p => ({ userId: p.userId, name: p.name })),
         privateKey
       );
 
-      if (!storeResult.success) {
-        logger.error('Failed to store private keys for all participants', { error: storeResult.error }, 'SplitWalletCreation');
-        // Don't fail the entire operation, but log the error
-      } else {
-        logger.info('Private keys stored for all Degen Split participants', {
-          splitWalletId,
+        if (storeResult.success) {
+          // Verify all keys were stored by checking each participant
+          let allKeysStored = true;
+          for (const participant of participants) {
+            const hasKey = await SplitWalletSecurity.hasLocalPrivateKey(splitWalletId, participant.userId);
+            if (!hasKey) {
+              allKeysStored = false;
+              logger.warn('Private key verification failed for participant', {
+                splitWalletId,
+                userId: participant.userId,
+                attempt
+              }, 'SplitWalletCreation');
+              break;
+            }
+          }
+          
+          if (allKeysStored) {
+            logger.info('Private keys stored and verified for all Degen Split participants', {
+              splitWalletId,
+              participantsCount: participants.length,
+              attempt
+            }, 'SplitWalletCreation');
+            break;
+          } else {
+            // If verification failed, treat as storage failure and retry
+            storeResult = { success: false, error: 'Key verification failed - not all participants have keys' };
+            lastError = storeResult.error;
+          }
+        } else {
+          lastError = storeResult.error;
+          logger.warn(`Private key storage attempt ${attempt}/${maxRetriesDegenKeys} failed for degen split`, {
+            splitWalletId,
+            participantsCount: participants.length,
+            error: lastError,
+            attempt
+          }, 'SplitWalletCreation');
+        }
+        
+        // Wait before retry (exponential backoff: 100ms, 200ms, 400ms)
+        if (attempt < maxRetriesDegenKeys && !storeResult.success) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_CONFIG_DEGEN_KEYS.BACKOFF_BASE * Math.pow(RETRY_CONFIG_DEGEN_KEYS.BACKOFF_MULTIPLIER, attempt - 1)));
+        }
+      }
+
+      if (!storeResult || !storeResult.success) {
+        logger.error('Failed to store private keys for all participants after all retries', { 
+          error: lastError,
+          attempts: maxRetriesDegenKeys,
           participantsCount: participants.length
         }, 'SplitWalletCreation');
+        
+        // CRITICAL: Private key storage failure means participants can't withdraw
+        // Clean up any keys that were stored (attempt cleanup)
+        try {
+          await SplitWalletSecurity.deleteSplitWalletPrivateKeyForAllParticipants(
+            splitWalletId,
+            participants.map(p => ({ userId: p.userId, name: p.name }))
+          );
+          logger.info('Cleaned up partially stored private keys', {
+            splitWalletId,
+            participantsCount: participants.length
+          }, 'SplitWalletCreation');
+        } catch (cleanupKeysError) {
+          logger.warn('Failed to cleanup partially stored private keys', {
+            splitWalletId,
+            error: cleanupKeysError instanceof Error ? cleanupKeysError.message : String(cleanupKeysError)
+          }, 'SplitWalletCreation');
+        }
+        
+        // Clean up the wallet that was created
+        let cleanupSuccess = false;
+        try {
+          const { deleteDoc } = await import('firebase/firestore');
+          await deleteDoc(doc(db, 'splitWallets', createdSplitWallet.firebaseDocId));
+          cleanupSuccess = true;
+          logger.info('Cleaned up degen split wallet after private key storage failure', {
+            splitWalletId: createdSplitWallet.id,
+            firebaseDocId: createdSplitWallet.firebaseDocId
+          }, 'SplitWalletCreation');
+        } catch (cleanupError) {
+          logger.error('Failed to cleanup degen split wallet after private key storage failure', {
+            splitWalletId: createdSplitWallet.id,
+            firebaseDocId: createdSplitWallet.firebaseDocId,
+            cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          }, 'SplitWalletCreation');
+          
+          // Mark wallet for manual cleanup
+          try {
+            const { updateDoc } = await import('firebase/firestore');
+            await updateDoc(doc(db, 'splitWallets', createdSplitWallet.firebaseDocId), {
+              status: 'cancelled',
+              error: 'Private key storage failed - requires manual cleanup',
+              lastUpdated: new Date().toISOString()
+            });
+            logger.warn('Marked degen wallet for manual cleanup', {
+              splitWalletId: createdSplitWallet.id,
+              firebaseDocId: createdSplitWallet.firebaseDocId
+            }, 'SplitWalletCreation');
+          } catch (markError) {
+            logger.error('Failed to mark degen wallet for manual cleanup', {
+              splitWalletId: createdSplitWallet.id,
+              error: markError instanceof Error ? markError.message : String(markError)
+          }, 'SplitWalletCreation');
+          }
+        }
+        
+        return {
+          success: false,
+          error: `Failed to store private keys for all participants after ${maxRetriesDegenKeys} attempts: ${lastError || 'Unknown error'}. Split wallet creation aborted${cleanupSuccess ? '' : ' (wallet marked for manual cleanup)'}.`
+        };
       }
 
       logger.info('Degen Split wallet created and stored successfully', {
@@ -505,8 +937,11 @@ export class SplitWalletCreation {
       };
 
     } catch (error) {
-      logger.error('Error creating Degen Split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCreation');
-      logger.error('Failed to create Degen Split wallet', error, 'SplitWalletCreation');
+      logger.error('Failed to create Degen Split wallet', {
+        error: error instanceof Error ? error.message : String(error),
+        billId,
+        creatorId
+      }, 'SplitWalletCreation');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -581,8 +1016,10 @@ export class SplitWalletCreation {
       };
 
     } catch (error) {
-      logger.error('Error force resetting split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletCreation');
-      logger.error('Failed to force reset split wallet', error, 'SplitWalletCreation');
+      logger.error('Failed to force reset split wallet', {
+        error: error instanceof Error ? error.message : String(error),
+        splitWalletId
+      }, 'SplitWalletCreation');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',

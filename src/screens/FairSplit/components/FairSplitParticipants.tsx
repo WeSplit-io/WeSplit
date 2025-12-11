@@ -34,6 +34,8 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
 
   // Fetch badges for all participants
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchBadges = async () => {
       const badgesMap: Record<string, { badges: string[]; active_badge?: string }> = {};
       
@@ -41,7 +43,7 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
         participants.map(async (participant) => {
           try {
             const userData = await firebaseDataService.user.getCurrentUser(participant.id);
-            if (userData.badges && userData.badges.length > 0) {
+            if (isMounted && userData.badges && userData.badges.length > 0) {
               badgesMap[participant.id] = {
                 badges: userData.badges,
                 active_badge: userData.active_badge
@@ -53,21 +55,29 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
         })
       );
       
-      setParticipantBadges(badgesMap);
+      if (isMounted) {
+        setParticipantBadges(badgesMap);
+      }
     };
 
     if (participants.length > 0) {
       fetchBadges();
     }
+    
+    return () => {
+      isMounted = false;
+    };
   }, [participants]);
 
   return (
     <View style={styles.participantsContainer}>
-      {participants.map((participant) => {
+      {participants.map((participant, index) => {
         const badges = participantBadges[participant.id];
+        // ✅ FIX: Use unique key combining ID and index to prevent duplicate key errors
+        const uniqueKey = `${participant.id}-${index}`;
         
         return (
-          <View key={participant.id} style={styles.participantCard}>
+          <View key={uniqueKey} style={styles.participantCard}>
             <Avatar
               userId={participant.id}
               userName={participant.name}
@@ -111,8 +121,8 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
                 )}
               </View>
             )}
-          </View>
-          <View style={styles.participantAmountContainer}>
+            </View>
+            <View style={styles.participantAmountContainer}>
             {!isSplitConfirmed && isCurrentUserCreator && splitMethod === 'manual' ? (
               // Creator can edit amounts in manual mode
               <TouchableOpacity 
@@ -134,8 +144,8 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
                 )}
               </View>
             )}
+            </View>
           </View>
-        </View>
         );
       })}
     </View>

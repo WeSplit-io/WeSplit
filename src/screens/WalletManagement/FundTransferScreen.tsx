@@ -10,7 +10,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useApp } from '../../context/AppContext';
-import { walletService } from '../../services/blockchain/wallet';
+// ✅ OPTIMIZATION: Removed unused walletService import (commented out usage) to reduce bundle size
 import { colors, spacing, typography } from '../../theme';
 import { logger } from '../../services/analytics/loggingService';
 import { Container, LoadingScreen } from '../../components/shared';

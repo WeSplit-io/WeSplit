@@ -4,7 +4,8 @@ import Icon from '../../../components/Icon';
 import { useApp } from '../../../context/AppContext';
 import { useWallet } from '../../../context/WalletContext';
 import { subscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod, SubscriptionService } from '../../../services/core';
-import { consolidatedTransactionService } from '../../../services/blockchain/transaction';
+// ✅ OPTIMIZATION: Dynamic import to reduce bundle size (already using dynamic import in code)
+// import { consolidatedTransactionService } from '../../../services/blockchain/transaction';
 import { logger } from '../../../services/analytics/loggingService';
 import styles from './styles';
 import { Container, LoadingScreen, ModernLoader } from '../../../components/shared';

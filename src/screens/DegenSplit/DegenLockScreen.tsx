@@ -410,9 +410,31 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         address: degenState.splitWallet.walletAddress,
         type: 'split'
       },
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         logger.info('Degen split lock successful', { result });
         setTransactionModalConfig(null);
+        
+        // ✅ CRITICAL: Explicitly refresh wallet data to ensure UI shows updated status
+        // Real-time updates may have a delay, so we refresh immediately after transaction success
+        if (degenState.splitWallet?.id) {
+          try {
+            const { SplitWalletService } = await import('../../services/split');
+            const walletResult = await SplitWalletService.getSplitWallet(degenState.splitWallet.id);
+            if (walletResult.success && walletResult.wallet) {
+              degenState.setSplitWallet(walletResult.wallet);
+              logger.info('Wallet data refreshed after degen lock', {
+                splitWalletId: walletResult.wallet.id,
+                participantsLocked: walletResult.wallet.participants.filter((p: any) => p.status === 'locked').length
+              }, 'DegenLockScreen');
+            }
+          } catch (refreshError) {
+            logger.warn('Failed to refresh wallet after degen lock (non-critical)', {
+              error: refreshError instanceof Error ? refreshError.message : String(refreshError)
+            }, 'DegenLockScreen');
+            // Non-critical - real-time updates will eventually sync
+          }
+        }
+        
         // Update progress immediately
         updateCircleProgress();
         // Show success message and stay on current screen

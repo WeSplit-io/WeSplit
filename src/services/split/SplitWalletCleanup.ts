@@ -536,8 +536,9 @@ export class SplitWalletCleanup {
   }
 
   private static async getUserWallet(userId: string): Promise<{ success: boolean; wallet?: { address: string }; error?: string }> {
-    const { walletService } = await import('../blockchain/wallet');
-    const wallet = await walletService.getWalletInfo(userId);
+    // ✅ MEMORY OPTIMIZATION: Use simplifiedWalletService instead of full walletService (720 modules)
+    const { simplifiedWalletService } = await import('../blockchain/wallet/simplifiedWalletService');
+    const wallet = await simplifiedWalletService.getWalletInfo(userId);
     return {
       success: !!wallet,
       wallet: wallet ? { address: wallet.address } : undefined,

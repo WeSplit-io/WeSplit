@@ -937,8 +937,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         try {
           logger.debug('Checking degen split wallet status', { walletId: split.walletId }, 'SplitsListScreen');
 
+          // ✅ OPTIMIZATION: Use cached wallet data first for faster navigation
           // Import SplitWalletService dynamically to avoid circular dependencies
           const { SplitWalletService } = await import('../../../services/split');
+          // getSplitWallet uses cache internally, so this should be fast
           const walletResult = await SplitWalletService.getSplitWallet(split.walletId);
 
           if (walletResult.success && walletResult.wallet) {

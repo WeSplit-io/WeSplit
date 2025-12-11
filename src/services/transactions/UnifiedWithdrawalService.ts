@@ -201,30 +201,51 @@ export class UnifiedWithdrawalService {
       let availableBalance: number;
 
       if (params.sourceType === 'split_wallet') {
-        // Get split wallet balance
+        // Get split wallet
         const { SplitWalletService } = await import('../split');
-        const wallet = await SplitWalletService.getSplitWallet(params.sourceId);
+        const walletResult = await SplitWalletService.getSplitWallet(params.sourceId);
         
-        if (!wallet) {
+        if (!walletResult.success || !walletResult.wallet) {
           return {
             canWithdraw: false,
-            error: 'Split wallet not found'
+            error: walletResult.error || 'Split wallet not found'
           };
         }
 
-        // For split wallets, check if user is creator (only creator can withdraw)
-        if (wallet.creatorId !== params.userId) {
+        const wallet = walletResult.wallet;
+
+        // For split wallets, check if user is creator (only creator can withdraw for fair splits)
+        // For degen splits, winner/loser can withdraw (handled in handleFairSplitWithdrawal)
+        const isDegenSplit = !!wallet.degenLoser || !!wallet.degenWinner;
+        if (!isDegenSplit && wallet.creatorId !== params.userId) {
           return {
             canWithdraw: false,
-            error: 'Only the split creator can withdraw funds'
+            error: 'Only the split creator can withdraw funds from a fair split'
           };
         }
 
-        // Get blockchain balance
-        const { consolidatedTransactionService } = await import('../blockchain/transaction');
-        const balance = await consolidatedTransactionService.getUserWalletBalance(params.userId);
-        availableBalance = wallet.totalBalance || 0;
+        // CRITICAL: Use on-chain balance, not database balance
+        // Database balance (wallet.totalBalance) may be stale or incorrect
+        const { SplitWalletPayments } = await import('../split/SplitWalletPayments');
+        const balanceResult = await SplitWalletPayments.verifySplitWalletBalance(params.sourceId);
+        
+        if (!balanceResult.success) {
+          return {
+            canWithdraw: false,
+            error: balanceResult.error || 'Failed to verify split wallet balance'
+          };
+        }
+
+        availableBalance = balanceResult.balance || 0;
       } else {
+        // DEV FLAG: Shared wallet operations are only available in development
+        if (!__DEV__) {
+          return {
+            canWithdraw: false,
+            error: 'Shared wallet operations are only available in development mode'
+          };
+        }
+
         // Get shared wallet balance and user's available balance
         const { SharedWalletService } = await import('../sharedWallet');
         const result = await SharedWalletService.getSharedWallet(params.sourceId);

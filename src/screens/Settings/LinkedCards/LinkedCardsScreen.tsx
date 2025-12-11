@@ -351,7 +351,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation, route }) => {
     );
   };
 
-  // Handle card selection when coming from SharedWalletDetails
+  // Handle card selection when coming from SharedWalletDetails or DegenResult
   const handleSelectCard = (card: LinkedWallet) => {
     logger.info('Card selected for linking', { 
       cardId: card.id, 
@@ -360,10 +360,10 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation, route }) => {
       hasReturnParams: !!returnParams
     }, 'LinkedCardsScreen');
     
-    if (returnRoute === 'SharedWalletDetails' && returnParams) {
-      // Navigate back with the selected card for linking
-      logger.info('Navigating back to SharedWalletDetails with selected card', {
-        walletId: returnParams.walletId,
+    if (returnRoute && returnParams) {
+      // Navigate back with the selected card
+      logger.info('Navigating back with selected card', {
+        returnRoute,
         cardId: card.id
       }, 'LinkedCardsScreen');
       
@@ -380,7 +380,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const renderKastCards = () => {
-    const isSelectionMode = returnRoute === 'SharedWalletDetails';
+    const isSelectionMode = returnRoute === 'SharedWalletDetails' || returnRoute === 'DegenResult';
     
     return (
       <View style={styles.section}>

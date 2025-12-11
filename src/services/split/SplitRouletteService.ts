@@ -5,8 +5,9 @@
 
 import { logger } from '../analytics/loggingService';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult, DegenRouletteAuditEntry } from './types';
-import { SplitWalletQueries } from './SplitWalletQueries';
-import { SplitWalletManagement } from './SplitWalletManagement';
+// CRITICAL: Dynamic imports to prevent early bundling and memory exhaustion during degen split creation
+// import { SplitWalletQueries } from './SplitWalletQueries';
+// import { SplitWalletManagement } from './SplitWalletManagement';
 import { getSecureRandomInt } from '../../utils/crypto/secureRandom';
 
 const AUDIT_HISTORY_LIMIT = 10;
@@ -77,6 +78,8 @@ export class SplitRouletteService {
     requestedByUserId?: string
   ): Promise<DegenRouletteExecutionResult> {
     try {
+      // Dynamic import to prevent early bundling and memory exhaustion
+      const { SplitWalletQueries } = await import('./SplitWalletQueries');
       const walletResult = await SplitWalletQueries.getSplitWallet(splitWalletId);
       if (!walletResult.success || !walletResult.wallet) {
         return {
@@ -146,6 +149,8 @@ export class SplitRouletteService {
         : [];
       const updatedAudit = [...previousAudit.slice(-(AUDIT_HISTORY_LIMIT - 1)), auditEntry];
 
+      // Dynamic import to prevent early bundling and memory exhaustion
+      const { SplitWalletManagement } = await import('./SplitWalletManagement');
       const updateResult = await SplitWalletManagement.updateSplitWallet(splitWalletId, {
         degenLoser: losersSnapshot,
         degenWinner: losersSnapshot, // Backward compatibility with legacy clients
@@ -158,6 +163,50 @@ export class SplitRouletteService {
           success: false,
           error: updateResult.error || 'Failed to persist roulette result',
         };
+      }
+
+      // CRITICAL FIX: Explicitly sync roulette result to splits collection
+      // This ensures split document has degenLoser, degenWinner, rouletteAudit, and status
+      try {
+        const { SplitStorageService } = await import('../splits/splitStorageService');
+        const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
+        
+        // Sync status
+        await SplitDataSynchronizer.syncSplitStatusFromSplitWalletToSplitStorage(
+          wallet.billId,
+          'spinning_completed',
+          new Date().toISOString()
+        );
+        
+        // Sync degenLoser, degenWinner, and rouletteAudit
+        const syncResult = await SplitStorageService.updateSplitByBillId(wallet.billId, {
+          degenLoser: losersSnapshot,
+          degenWinner: losersSnapshot,
+          rouletteAudit: updatedAudit,
+          status: 'completed', // Map spinning_completed to completed in splits collection
+        });
+        
+        if (!syncResult.success) {
+          logger.error('Failed to sync roulette result to splits collection', {
+            splitWalletId,
+            billId: wallet.billId,
+            error: syncResult.error,
+          }, 'SplitRouletteService');
+          // Don't fail the roulette execution if sync fails, but log the error
+        } else {
+          logger.info('Roulette result synced to splits collection', {
+            splitWalletId,
+            billId: wallet.billId,
+            loserUserId: loserParticipant.userId,
+          }, 'SplitRouletteService');
+        }
+      } catch (syncError) {
+        logger.error('Error syncing roulette result to splits collection', {
+          splitWalletId,
+          billId: wallet.billId,
+          error: syncError instanceof Error ? syncError.message : String(syncError),
+        }, 'SplitRouletteService');
+        // Don't fail the roulette execution if sync fails, but log the error
       }
 
       const winners = wallet.participants

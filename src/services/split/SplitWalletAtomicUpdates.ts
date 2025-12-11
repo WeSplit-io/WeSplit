@@ -27,7 +27,7 @@ export class SplitWalletAtomicUpdates {
   ): Promise<AtomicUpdateResult> {
     try {
       // Step 1: Update splitWallets collection
-      const updateData: any = {
+      const updateData: import('./types').SplitWalletStatusUpdate = {
         status,
         lastUpdated: new Date().toISOString()
       };
@@ -85,37 +85,117 @@ export class SplitWalletAtomicUpdates {
     isDegenSplit: boolean = false
   ): Promise<AtomicUpdateResult> {
     try {
-      // Step 1: Update splitWallets collection
-      await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
-        participants: updatedParticipants,
-        lastUpdated: new Date().toISOString()
-      });
-
-      // Step 2: Update splits collection with appropriate method
+      // VALIDATION: Verify participant data before updating
+      // 1. Ensure amountPaid <= amountOwed for all participants
+      for (const p of updatedParticipants) {
+        if (p.amountPaid > p.amountOwed) {
+          logger.error('Validation failed: amountPaid exceeds amountOwed', {
+            firebaseDocId,
+            billId,
+            participantId: p.userId,
+            amountPaid: p.amountPaid,
+            amountOwed: p.amountOwed
+          }, 'SplitWalletAtomicUpdates');
+          return {
+            success: false,
+            error: `Validation failed: Participant ${p.userId} has amountPaid (${p.amountPaid}) exceeding amountOwed (${p.amountOwed})`
+          };
+        }
+      }
+      
+      // 2. Validate status transitions are valid
+      const validStatuses = ['pending', 'locked', 'paid'];
+      for (const p of updatedParticipants) {
+        if (!validStatuses.includes(p.status)) {
+          logger.error('Validation failed: invalid participant status', {
+            firebaseDocId,
+            billId,
+            participantId: p.userId,
+            invalidStatus: p.status
+          }, 'SplitWalletAtomicUpdates');
+          return {
+            success: false,
+            error: `Validation failed: Participant ${p.userId} has invalid status: ${p.status}`
+          };
+        }
+      }
+      
+      // PERFORMANCE: Parallelize wallet update and split sync
       const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
       
-      let syncResult;
-      if (isDegenSplit) {
-        syncResult = await SplitDataSynchronizer.syncDegenSplitParticipant(
+      const [walletUpdateResult, syncResult] = await Promise.allSettled([
+        // Step 1: Update splitWallets collection
+        updateDoc(doc(db, 'splitWallets', firebaseDocId), {
+          participants: updatedParticipants,
+          lastUpdated: new Date().toISOString()
+        }),
+        // Step 2: Update splits collection with appropriate method
+        isDegenSplit
+          ? SplitDataSynchronizer.syncDegenSplitParticipant(
           billId,
           participantId,
           updatedParticipant,
           updatedParticipant.amountOwed
-        );
-      } else {
-        syncResult = await SplitDataSynchronizer.syncParticipantFromSplitWalletToSplitStorage(
+            )
+          : SplitDataSynchronizer.syncParticipantFromSplitWalletToSplitStorage(
           billId,
           participantId,
           updatedParticipant
-        );
+            )
+      ]);
+
+      // Check wallet update result
+      if (walletUpdateResult.status === 'rejected') {
+        logger.error('Failed to update split wallet', {
+          firebaseDocId,
+          billId,
+          error: walletUpdateResult.reason instanceof Error ? walletUpdateResult.reason.message : String(walletUpdateResult.reason)
+        }, 'SplitWalletAtomicUpdates');
+        return {
+          success: false,
+          error: `Failed to update split wallet: ${walletUpdateResult.reason instanceof Error ? walletUpdateResult.reason.message : String(walletUpdateResult.reason)}`
+        };
       }
 
-      if (!syncResult.success) {
-        logger.error('Failed to sync splits collection', {
+      // Check sync result
+      const finalSyncResult = syncResult.status === 'fulfilled' ? syncResult.value : { success: false, error: 'Sync failed' };
+
+      if (!finalSyncResult.success) {
+        logger.error('Failed to sync splits collection - CRITICAL: Split storage may have stale data', {
           billId,
           participantId,
-          error: syncResult.error
+          error: finalSyncResult.error,
+          walletUpdateSucceeded: walletUpdateResult.status === 'fulfilled'
         }, 'SplitWalletAtomicUpdates');
+        
+        // CRITICAL: Retry sync once with delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const retrySyncResult = isDegenSplit
+          ? await SplitDataSynchronizer.syncDegenSplitParticipant(
+              billId,
+              participantId,
+              updatedParticipant,
+              updatedParticipant.amountOwed
+            )
+          : await SplitDataSynchronizer.syncParticipantFromSplitWalletToSplitStorage(
+              billId,
+              participantId,
+              updatedParticipant
+            );
+        
+        if (!retrySyncResult.success) {
+          logger.error('Retry sync also failed - split storage will have stale data', {
+            billId,
+            participantId,
+            error: retrySyncResult.error
+          }, 'SplitWalletAtomicUpdates');
+          // Still return success for wallet update, but log critical error
+        } else {
+          logger.info('Retry sync succeeded', {
+            billId,
+            participantId
+          }, 'SplitWalletAtomicUpdates');
+        }
       }
       
       return { success: true };
@@ -189,7 +269,7 @@ export class SplitWalletAtomicUpdates {
   static async updateWalletData(
     firebaseDocId: string,
     billId: string,
-    updateData: any
+    updateData: Partial<import('./types').SplitWallet>
   ): Promise<AtomicUpdateResult> {
     try {
       // Step 1: Update splitWallets collection

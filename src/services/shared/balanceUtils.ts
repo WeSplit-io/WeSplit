@@ -101,6 +101,11 @@ export class BalanceUtils {
    * Returns 0 if token account doesn't exist (normal for new wallets)
    */
   static async getUsdcBalance(publicKey: any, usdcMint: any): Promise<UsdcBalanceResult> {
+    // Declare outside try so we can log safely in catch blocks
+    let pubKey: any = null;
+    let mintKey: any = null;
+    let usdcTokenAccount: any = null;
+
     try {
       const { memoryManager } = await import('./memoryManager');
       const { PublicKey } = await memoryManager.loadModule('solana-web3');
@@ -122,9 +127,6 @@ export class BalanceUtils {
         throw new Error('usdcMint parameter is required');
       }
 
-      let pubKey: PublicKey;
-      let mintKey: PublicKey;
-
       try {
         pubKey = publicKey instanceof PublicKey ? publicKey : new PublicKey(publicKey);
       } catch (keyError) {
@@ -137,7 +139,6 @@ export class BalanceUtils {
         throw new Error(`Invalid usdcMint parameter: ${usdcMint} (${typeof usdcMint}). Error: ${mintError instanceof Error ? mintError.message : String(mintError)}`);
       }
       
-      let usdcTokenAccount: any;
       try {
         usdcTokenAccount = await getAssociatedTokenAddress(mintKey, pubKey);
       } catch (tokenAccountError) {
@@ -183,8 +184,8 @@ export class BalanceUtils {
           errorMessage.includes('403') ||
           errorMessage.includes('json-rpc code: -32052')) {
         logger.error('BalanceUtils: RPC API key permission error for USDC balance - switching to fallback endpoint', {
-          publicKey: pubKey.toBase58(),
-          usdcMint: mintKey.toBase58(),
+          publicKey: pubKey?.toBase58?.() || String(pubKey),
+          usdcMint: mintKey?.toBase58?.() || String(mintKey),
           error: errorMessage
         }, 'BalanceUtils');
         
@@ -192,6 +193,11 @@ export class BalanceUtils {
         try {
           await transactionUtils.switchToNextEndpoint();
           const connection = await transactionUtils.getConnection();
+          // usdcTokenAccount may be null if derivation failed; guard to avoid cascading errors
+          if (!usdcTokenAccount) {
+            throw new Error('Token account not derived; cannot fetch balance');
+          }
+
           const accountInfo = await getAccount(connection, usdcTokenAccount);
           
           logger.info('BalanceUtils: Successfully retrieved USDC balance using fallback endpoint', {
@@ -213,8 +219,8 @@ export class BalanceUtils {
       
       // Token account doesn't exist, balance is 0 - this is normal for new wallets
       logger.info('BalanceUtils: USDC token account does not exist (normal for new wallets)', {
-        publicKey: pubKey.toBase58(),
-        usdcMint: mintKey.toBase58(),
+        publicKey: pubKey?.toBase58?.() || String(pubKey),
+        usdcMint: mintKey?.toBase58?.() || String(mintKey),
         error: errorMessage
       }, 'BalanceUtils');
       

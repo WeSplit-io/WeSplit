@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
-import { walletService } from '../../services/blockchain/wallet';
+// ✅ OPTIMIZATION: Removed unused walletService import to reduce bundle size
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors, spacing } from '../../theme';
 import { AvatarUploadFallbackService } from '../../services/core/avatarUploadFallbackService';

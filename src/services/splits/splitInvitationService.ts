@@ -414,7 +414,9 @@ export class SplitInvitationService {
         };
       }
 
-      // CRITICAL: Also update the splitWallets collection to keep both databases synchronized
+      // CRITICAL FIX: Also update the splitWallets collection to keep both databases synchronized
+      // Add rollback mechanism: if wallet update fails, remove participant from split
+      let walletUpdateSuccess = false;
       try {
         const { SplitWalletQueries } = await import('../split/SplitWalletQueries');
         const { SplitWalletManagement } = await import('../split/SplitWalletManagement');
@@ -442,27 +444,83 @@ export class SplitInvitationService {
           
           const allParticipants = [...existingParticipants, newWalletParticipant];
           
-          // Update the split wallet participants
-          const walletUpdateResult = await SplitWalletManagement.updateSplitWalletParticipants(
+          // CRITICAL FIX: Add retry mechanism for wallet update (3 attempts)
+          let walletUpdateResult = null;
+          let lastWalletError: string | undefined;
+          const maxRetries = 3;
+          
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            walletUpdateResult = await SplitWalletManagement.updateSplitWalletParticipants(
             wallet.id,
             allParticipants
           );
           
           if (walletUpdateResult.success) {
+              walletUpdateSuccess = true;
             logger.info('Split wallet database synchronized successfully (new participant)', {
               splitId: invitationData.splitId,
               userId,
               splitWalletId: wallet.id,
               participantName: newParticipant.name,
-              amountOwed: newParticipant.amountOwed
+                amountOwed: newParticipant.amountOwed,
+                attempt
             }, 'SplitInvitationService');
+              break;
           } else {
-            logger.error('Failed to synchronize split wallet database (new participant)', {
+              lastWalletError = walletUpdateResult.error;
+              logger.warn(`Split wallet update attempt ${attempt}/${maxRetries} failed`, {
+                splitId: invitationData.splitId,
+                userId,
+                splitWalletId: wallet.id,
+                error: lastWalletError,
+                attempt
+              }, 'SplitInvitationService');
+            }
+            
+            // Wait before retry (exponential backoff: 100ms, 200ms, 400ms)
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt - 1)));
+            }
+          }
+          
+          // CRITICAL FIX: Rollback participant from split if wallet update fails
+          if (!walletUpdateSuccess) {
+            logger.error('Failed to synchronize split wallet database after all retries - rolling back participant addition', {
               splitId: invitationData.splitId,
               userId,
               splitWalletId: wallet.id,
-              error: walletUpdateResult.error
+              error: lastWalletError,
+              attempts: maxRetries
             }, 'SplitInvitationService');
+            
+            // Remove participant from split document
+            try {
+              const updatedParticipants = split.participants.filter(
+                (p: any) => p.userId !== newParticipant.userId
+              );
+              
+              await SplitStorageService.updateSplit(split.id, {
+                participants: updatedParticipants,
+                updatedAt: new Date().toISOString()
+              });
+              
+              logger.info('Rolled back participant addition from split document', {
+                splitId: invitationData.splitId,
+                userId,
+                participantName: newParticipant.name
+              }, 'SplitInvitationService');
+            } catch (rollbackError) {
+              logger.error('Failed to rollback participant addition from split document', {
+                splitId: invitationData.splitId,
+                userId,
+                error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
+              }, 'SplitInvitationService');
+            }
+            
+            return {
+              success: false,
+              error: `Failed to add participant to split wallet after ${maxRetries} attempts: ${lastWalletError || 'Unknown error'}. Participant has been removed from split.`
+            };
           }
         } else {
           logger.warn('Split wallet not found for new participant sync', {
@@ -470,6 +528,8 @@ export class SplitInvitationService {
             userId,
             error: walletResult.error
           }, 'SplitInvitationService');
+          // If wallet doesn't exist, participant can still be in split (wallet may be created later)
+          // Don't rollback in this case
         }
       } catch (syncError) {
         logger.error('Error synchronizing split wallet database during new participant invitation', {

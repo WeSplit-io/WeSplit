@@ -38,7 +38,9 @@ import { TransactionModal, TransactionItem } from '../../components/transactions
 import { useApp } from '../../context/AppContext';
 import { Transaction } from '../../types';
 import { getReceivedPaymentRequests } from '../../services/payments/firebasePaymentRequestService';
-import { walletService, UserWalletBalance } from '../../services/blockchain/wallet';
+// ✅ OPTIMIZATION: Dynamic import to reduce bundle size and prevent OOM
+// import { walletService, UserWalletBalance } from '../../services/blockchain/wallet';
+type UserWalletBalance = any; // Type only, actual import is dynamic
 import { firebaseDataService } from '../../services/data';
 import { getUserDisplayName, preloadUserData } from '../../services/shared/dataUtils';
 import { logger } from '../../services/analytics/loggingService';
@@ -1090,8 +1092,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
               // Trigger appropriate refreshes
               if (shouldRefreshBalance) {
-                walletService.clearUserCache(currentUserId);
-                refreshWallet();
+                // ✅ OPTIMIZATION: Dynamic import to reduce bundle size
+                (async () => {
+                  const { walletService } = await import('../../services/blockchain/wallet');
+                  walletService.clearUserCache(currentUserId);
+                  refreshWallet();
+                })();
               }
 
               if (shouldRefreshRequests) {
@@ -1119,6 +1125,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       logger.info('Manual refresh triggered', null, 'DashboardScreen');
 
       // Clear cache before refresh to ensure fresh data
+      // ✅ OPTIMIZATION: Dynamic import to reduce bundle size
+      const { walletService } = await import('../../services/blockchain/wallet');
       walletService.clearUserCache(currentUser.id);
 
       // Use Promise.allSettled to prevent one failure from stopping others

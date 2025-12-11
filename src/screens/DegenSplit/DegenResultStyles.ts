@@ -298,6 +298,42 @@ export const styles = StyleSheet.create({
   manageCardsButton: {
     marginTop: spacing.sm,
   },
+  cardSelectionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: 8,
+    backgroundColor: colors.white5,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    marginBottom: spacing.sm,
+  },
+  cardSelectionItemSelected: {
+    backgroundColor: colors.green + '20',
+    borderColor: colors.green,
+  },
+  cardSelectionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  cardSelectionInfo: {
+    marginLeft: spacing.md,
+    flex: 1,
+  },
+  cardSelectionName: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+  },
+  cardSelectionNameSelected: {
+    color: colors.green,
+  },
+  cardSelectionAddress: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.xs,
+  },
   claimButtonNew: {
     flex: 1,
     borderRadius: 12,

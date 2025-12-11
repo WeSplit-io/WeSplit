@@ -15,6 +15,9 @@ import { removeUndefinedValues } from '../shared/dataUtils';
 // Import types
 import { SplitWallet, SplitWalletResult, SplitWalletParticipant } from './types';
 import { Split } from '../splits/types';
+// CRITICAL: Dynamic import to prevent early bundling and memory exhaustion
+// import { SplitWalletCache } from './SplitWalletCache';
+import { PARTICIPANT_STATUS, VALIDATION_TOLERANCE } from './constants/splitConstants';
 
 /**
  * Fix data consistency issues in split wallets
@@ -49,7 +52,7 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
     }, 'SplitWalletManagement');
 
     // If there's a significant difference, fix the participant data
-    const tolerance = 0.001; // 0.001 USDC tolerance
+    const tolerance = VALIDATION_TOLERANCE.BALANCE;
     if (Math.abs(onChainBalance - expectedBalance) > tolerance) {
       logger.warn('⚠️ Data inconsistency detected, fixing participant data', {
         splitWalletId,
@@ -65,7 +68,7 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
           return {
             ...p,
             amountPaid: 0,
-            status: 'pending' as const,
+            status: PARTICIPANT_STATUS.PENDING as const,
             transactionSignature: null, // Use null instead of undefined for Firebase compatibility
             paidAt: null // Use null instead of undefined for Firebase compatibility
           };
@@ -80,7 +83,7 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
             return {
               ...participant,
               amountPaid: roundUsdcAmount(onChainBalance),
-              status: 'paid' as const, // For fair splits, fully paid means 'paid'
+              status: PARTICIPANT_STATUS.PAID as const, // For fair splits, fully paid means 'paid'
               transactionSignature: participant.transactionSignature || null,
               paidAt: participant.paidAt || new Date().toISOString()
             };
@@ -96,7 +99,7 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
           return {
             ...p,
             amountPaid: roundUsdcAmount(adjustedAmountPaid),
-            status: isFullyPaid ? 'paid' as const : 'pending' as const,
+            status: isFullyPaid ? PARTICIPANT_STATUS.PAID as const : PARTICIPANT_STATUS.PENDING as const,
             transactionSignature: p.transactionSignature || null,
             paidAt: isFullyPaid ? (p.paidAt || new Date().toISOString()) : null
           };
@@ -142,6 +145,13 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
       const cleanedUpdateData = removeUndefinedValues(updateData);
       
       await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
+
+      // Invalidate cache after update (dynamic import to prevent early bundling)
+      const { SplitWalletCache } = await import('./SplitWalletCache');
+      SplitWalletCache.invalidate(splitWalletId);
+      if (wallet.billId) {
+        SplitWalletCache.invalidate(wallet.billId);
+      }
 
       return { success: true, fixed: true };
     }
@@ -195,6 +205,10 @@ export async function fixSplitWalletPrecision(splitWalletId: string): Promise<{ 
     const cleanedUpdateData = this.removeUndefinedValues(updateData);
     
     await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
+
+    // Invalidate cache after update (dynamic import to prevent early bundling)
+    const { SplitWalletCache } = await import('./SplitWalletCache');
+    SplitWalletCache.invalidate(splitWalletId);
 
     return { success: true };
   } catch (error) {
@@ -269,8 +283,10 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      logger.error('Error updating split wallet amount', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
-      logger.error('Failed to update split wallet amount', error, 'SplitWalletManagement');
+      logger.error('Failed to update split wallet amount', { 
+        error: error instanceof Error ? error.message : String(error),
+        splitWalletId
+      }, 'SplitWalletManagement');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -317,6 +333,13 @@ export class SplitWalletManagement {
       
       await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 
+      // Invalidate cache after update (dynamic import to prevent early bundling)
+      const { SplitWalletCache } = await import('./SplitWalletCache');
+      SplitWalletCache.invalidate(splitWalletId);
+      if (currentWallet.billId) {
+        SplitWalletCache.invalidate(currentWallet.billId);
+      }
+
       // CRITICAL: Also update the splits collection to keep both databases synchronized
       try {
         const { SplitStorageService } = await import('../splits/splitStorageService');
@@ -327,9 +350,9 @@ export class SplitWalletManagement {
         if (updates.totalAmount) {splitUpdates.totalAmount = updates.totalAmount;}
         if (updates.currency) {splitUpdates.currency = updates.currency;}
         if (updates.updatedAt) {splitUpdates.updatedAt = updates.updatedAt;}
-        if (updates.degenLoser) {splitUpdates.degenLoser = updates.degenLoser as any;}
-        if (updates.degenWinner) {splitUpdates.degenWinner = updates.degenWinner as any;}
-        if (updates.rouletteAudit) {splitUpdates.rouletteAudit = updates.rouletteAudit as any;}
+        if (updates.degenLoser) {splitUpdates.degenLoser = updates.degenLoser;}
+        if (updates.degenWinner) {splitUpdates.degenWinner = updates.degenWinner;}
+        if (updates.rouletteAudit) {splitUpdates.rouletteAudit = updates.rouletteAudit;}
         
         if (Object.keys(splitUpdates).length > 0) {
           const splitUpdateResult = await SplitStorageService.updateSplitByBillId(currentWallet.billId, splitUpdates);
@@ -374,8 +397,10 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      logger.error('Error updating split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
-      logger.error('Failed to update split wallet', error, 'SplitWalletManagement');
+      logger.error('Failed to update split wallet', { 
+        error: error instanceof Error ? error.message : String(error),
+        splitWalletId
+      }, 'SplitWalletManagement');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -403,12 +428,73 @@ export class SplitWalletManagement {
 
       const currentWallet = currentWalletResult.wallet;
 
-      // Map participants with default values
-      const updatedParticipants: SplitWalletParticipant[] = participants.map(p => ({
-        ...p,
+      // PERFORMANCE: Create Map for O(1) lookups instead of O(n) find() in loop
+      const existingParticipantsMap = new Map(
+        currentWallet.participants.map(p => [p.userId, p])
+      );
+
+      // CRITICAL FIX: Preserve existing payment data when updating participants
+      // This prevents losing payment history when repartitioning
+      const updatedParticipants: SplitWalletParticipant[] = participants.map(newP => {
+        const existing = existingParticipantsMap.get(newP.userId);
+        if (existing) {
+          // Preserve existing payment data for existing participants
+          let preservedAmountPaid = existing.amountPaid || 0;
+          let preservedStatus = existing.status || PARTICIPANT_STATUS.PENDING;
+          
+          // VALIDATION: Ensure amountPaid doesn't exceed new amountOwed after repartition
+          if (preservedAmountPaid > newP.amountOwed) {
+            logger.warn('Preserved amountPaid exceeds new amountOwed after repartition, capping it', {
+              userId: newP.userId,
+              preservedAmountPaid,
+              newAmountOwed: newP.amountOwed
+            }, 'SplitWalletManagement');
+            preservedAmountPaid = newP.amountOwed;
+            // If amount was capped, reset status if it was 'paid'/'locked'
+            if (preservedStatus === PARTICIPANT_STATUS.PAID || preservedStatus === PARTICIPANT_STATUS.LOCKED) {
+              preservedStatus = preservedAmountPaid >= newP.amountOwed ? preservedStatus : PARTICIPANT_STATUS.PENDING;
+            }
+          }
+          
+          // VALIDATION: Ensure status is valid
+          const validStatuses = [PARTICIPANT_STATUS.PENDING, PARTICIPANT_STATUS.LOCKED, PARTICIPANT_STATUS.PAID];
+          if (!validStatuses.includes(preservedStatus)) {
+            logger.warn('Invalid status preserved, resetting to pending', {
+              userId: newP.userId,
+              invalidStatus: preservedStatus
+            }, 'SplitWalletManagement');
+            preservedStatus = PARTICIPANT_STATUS.PENDING;
+          }
+          
+          return {
+            ...newP,
+            amountPaid: preservedAmountPaid,
+            status: preservedStatus as typeof PARTICIPANT_STATUS.PENDING | typeof PARTICIPANT_STATUS.LOCKED | typeof PARTICIPANT_STATUS.PAID,
+            transactionSignature: existing.transactionSignature,
+            paidAt: existing.paidAt,
+          };
+        } else {
+          // New participants start with default values
+          return {
+            ...newP,
         amountPaid: 0,
-        status: 'pending' as const,
-      }));
+            status: PARTICIPANT_STATUS.PENDING as const,
+          };
+        }
+      });
+      
+      // VALIDATION: Verify total amounts match wallet total (within tolerance)
+      const totalAmountOwed = updatedParticipants.reduce((sum, p) => sum + (p.amountOwed || 0), 0);
+      const tolerance = VALIDATION_TOLERANCE.AMOUNT;
+      if (Math.abs(totalAmountOwed - currentWallet.totalAmount) > tolerance) {
+        logger.warn('Total amountOwed does not match wallet totalAmount after participant update', {
+          splitWalletId,
+          totalAmountOwed,
+          walletTotalAmount: currentWallet.totalAmount,
+          difference: Math.abs(totalAmountOwed - currentWallet.totalAmount)
+        }, 'SplitWalletManagement');
+        // Don't fail, but log the warning - amounts may be intentionally different
+      }
 
       // Update wallet data
       const updatedWalletData = {
@@ -423,6 +509,13 @@ export class SplitWalletManagement {
       const cleanedUpdateData = this.removeUndefinedValues(updatedWalletData);
       
       await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
+
+      // Invalidate cache after update (dynamic import to prevent early bundling)
+      const { SplitWalletCache } = await import('./SplitWalletCache');
+      SplitWalletCache.invalidate(splitWalletId);
+      if (currentWallet.billId) {
+        SplitWalletCache.invalidate(currentWallet.billId);
+      }
 
       // CRITICAL: Also update the splits collection to keep both databases synchronized
       try {
@@ -500,8 +593,10 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      logger.error('Error updating split wallet participants', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
-      logger.error('Failed to update split wallet participants', error, 'SplitWalletManagement');
+      logger.error('Failed to update split wallet participants', { 
+        error: error instanceof Error ? error.message : String(error),
+        splitWalletId
+      }, 'SplitWalletManagement');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -548,6 +643,13 @@ export class SplitWalletManagement {
       
       await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 
+      // Invalidate cache after update (dynamic import to prevent early bundling)
+      const { SplitWalletCache } = await import('./SplitWalletCache');
+      SplitWalletCache.invalidate(splitWalletId);
+      if (currentWallet.billId) {
+        SplitWalletCache.invalidate(currentWallet.billId);
+      }
+
       const updatedWallet: SplitWallet = {
         ...currentWallet,
         ...updatedWalletData,
@@ -566,8 +668,10 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      logger.error('Error locking split wallet', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
-      logger.error('Failed to lock split wallet', error, 'SplitWalletManagement');
+      logger.error('Failed to lock split wallet', { 
+        error: error instanceof Error ? error.message : String(error),
+        splitWalletId
+      }, 'SplitWalletManagement');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -580,7 +684,7 @@ export class SplitWalletManagement {
    */
   static async debugUsdcBalance(walletAddress: string): Promise<{
     success: boolean;
-    results: any;
+    results: { success: boolean; error?: string };
     error?: string;
   }> {
     try {
@@ -600,8 +704,10 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      logger.error('Error debugging USDC balance', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
-      logger.error('Failed to debug USDC balance', error, 'SplitWalletManagement');
+      logger.error('Failed to debug USDC balance', { 
+        error: error instanceof Error ? error.message : String(error),
+        walletAddress
+      }, 'SplitWalletManagement');
       return {
         success: false,
         results: null,
@@ -665,8 +771,10 @@ export class SplitWalletManagement {
       };
 
     } catch (error) {
-      logger.error('Error repairing split wallet data', { error: error instanceof Error ? error.message : String(error) }, 'SplitWalletManagement');
-      logger.error('Failed to repair split wallet data', error, 'SplitWalletManagement');
+      logger.error('Failed to repair split wallet data', { 
+        error: error instanceof Error ? error.message : String(error),
+        splitWalletId
+      }, 'SplitWalletManagement');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -765,10 +873,10 @@ export class SplitWalletManagement {
     }
     
     if (typeof obj === 'object') {
-      const cleaned: any = {};
+      const cleaned: Partial<T> = {};
       for (const [key, value] of Object.entries(obj)) {
         if (value !== undefined) {
-          cleaned[key] = this.removeUndefinedValues(value);
+          (cleaned as Record<string, unknown>)[key] = this.removeUndefinedValues(value as T);
         }
       }
       return cleaned;

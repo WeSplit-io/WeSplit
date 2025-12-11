@@ -3,11 +3,11 @@
   "version": "1.1.2",
   "main": "index.ts",
   "scripts": {
-    "start": "expo start --host lan --clear",
+    "start": "NODE_OPTIONS='--max-old-space-size=8192' expo start --host lan --clear",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "clear": "npx expo start --clear --host lan",
+    "clear": "NODE_OPTIONS='--max-old-space-size=8192' npx expo start --clear --host lan",
     "prebuild": "npx expo prebuild --clean",
     "clean-cache": "npx expo start --clear && rm -rf node_modules/.cache .expo",
     "increment-build": "node scripts/increment-build.js",
