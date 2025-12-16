@@ -6,6 +6,21 @@
 import { logger } from '../analytics/loggingService';
 import { sendVerificationCode, verifyCode, checkEmailUserExists } from '../data/firebaseFunctionsService';
 
+/**
+ * Test/Placeholder credentials for iOS team testing
+ * 
+ * Usage:
+ * - Email: test@wesplit.app
+ * - Code: 1234
+ * 
+ * These credentials bypass the actual email verification flow and allow
+ * testing the authentication process without needing to receive real emails.
+ * 
+ * NOTE: Enabled in both development and production for iOS team testing
+ */
+const TEST_EMAIL = 'test@wesplit.app';
+const TEST_CODE = '1234';
+
 export interface EmailAuthResult {
   success: boolean;
   verificationId?: string;
@@ -19,6 +34,17 @@ export class EmailAuthService {
    * Check if email user exists
    */
   static async checkUserExists(email: string): Promise<{ success: boolean; userExists: boolean; userId?: string; error?: string }> {
+    // TEST MODE: Always return that test user exists (enabled for iOS team testing)
+    if (email.trim().toLowerCase() === TEST_EMAIL.toLowerCase()) {
+      logger.info('🧪 TEST MODE: Placeholder email detected - returning test user exists', { email: TEST_EMAIL }, 'EmailAuthService');
+      return {
+        success: true,
+        userExists: true,
+        userId: 'test_user_placeholder',
+        error: undefined
+      };
+    }
+    
     try {
       logger.info('Checking if email user exists', { email: email.substring(0, 5) + '...' }, 'EmailAuthService');
 
