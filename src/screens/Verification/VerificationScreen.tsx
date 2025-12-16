@@ -539,31 +539,49 @@ const VerificationScreen: React.FC = () => {
         hasCompletedOnboarding: authResponse.user.hasCompletedOnboarding || false
       };
       
-      // CRITICAL FIX: If Firebase Functions didn't return user data, fetch it from Firestore
-      if (!transformedUser.name || !transformedUser.wallet_address) {
-        if (__DEV__) { logger.info('Firebase Functions returned empty data, fetching from Firestore', null, 'VerificationScreen'); }
+      // CRITICAL: Always fetch fresh user data from Firestore after verification
+      // This ensures we have the latest lastVerifiedAt timestamp and all user fields
+      try {
+        const { firestoreService } = await import('../../config/firebase/firebase');
+        const freshUserData = await firestoreService.getUserDocument(transformedUser.id);
         
-        try {
-          const { firestoreService } = await import('../../config/firebase/firebase');
-          const existingUserData = await firestoreService.getUserDocument(transformedUser.id);
-          
-          if (existingUserData && existingUserData.name && existingUserData.wallet_address) {
-            if (__DEV__) { logger.info('Found existing user data in Firestore', { existingUserData }, 'VerificationScreen'); }
-            
-            // Update transformed user with existing data
-            transformedUser = {
-              ...transformedUser,
-              name: existingUserData.name,
-              wallet_address: existingUserData.wallet_address,
-              wallet_public_key: existingUserData.wallet_public_key || existingUserData.wallet_address,
-              hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false
-            };
-            
-            if (__DEV__) { logger.info('Updated user data from Firestore', { transformedUser }, 'VerificationScreen'); }
+        if (freshUserData) {
+          if (__DEV__) { 
+            logger.info('Fetched fresh user data from Firestore after verification', { 
+              userId: transformedUser.id,
+              hasLastVerifiedAt: !!freshUserData.lastVerifiedAt,
+              lastVerifiedAt: freshUserData.lastVerifiedAt
+            }, 'VerificationScreen'); 
           }
-        } catch (firestoreError) {
-          if (__DEV__) { console.warn('⚠️ Could not fetch user data from Firestore:', firestoreError); }
+          
+          // Update transformed user with fresh Firestore data (includes lastVerifiedAt)
+          transformedUser = {
+            ...transformedUser,
+            name: freshUserData.name || transformedUser.name,
+            email: freshUserData.email || transformedUser.email,
+            wallet_address: freshUserData.wallet_address || transformedUser.wallet_address,
+            wallet_public_key: freshUserData.wallet_public_key || freshUserData.wallet_address || transformedUser.wallet_public_key,
+            created_at: freshUserData.created_at || transformedUser.created_at,
+            avatar: freshUserData.avatar || transformedUser.avatar,
+            hasCompletedOnboarding: freshUserData.hasCompletedOnboarding !== undefined ? freshUserData.hasCompletedOnboarding : transformedUser.hasCompletedOnboarding,
+            // Include lastVerifiedAt for reference (though it's not part of User type)
+            lastVerifiedAt: freshUserData.lastVerifiedAt
+          };
+          
+          if (__DEV__) { 
+            logger.info('Updated user data with fresh Firestore data', { 
+              userId: transformedUser.id,
+              hasLastVerifiedAt: !!transformedUser.lastVerifiedAt
+            }, 'VerificationScreen'); 
+          }
+        } else {
+          if (__DEV__) { 
+            logger.warn('User document not found in Firestore after verification', { userId: transformedUser.id }, 'VerificationScreen'); 
+          }
         }
+      } catch (firestoreError) {
+        logger.warn('Could not fetch fresh user data from Firestore after verification (non-critical)', firestoreError, 'VerificationScreen');
+        // Continue with transformed user from API response
       }
       
       if (__DEV__) {

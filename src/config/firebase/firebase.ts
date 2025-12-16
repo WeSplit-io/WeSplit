@@ -583,24 +583,48 @@ export const firestoreService = {
       const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) {
+        if (__DEV__) {
+          logger.debug('User not found for 30-day verification check', { email }, 'firebase');
+        }
         return false; // User doesn't exist, needs verification
       }
       
       const userDoc = querySnapshot.docs[0];
       if (!userDoc) {
+        if (__DEV__) {
+          logger.debug('No user document found for 30-day verification check', { email }, 'firebase');
+        }
         return false; // No user document found
       }
       const userData = userDoc.data();
       const lastVerifiedAt = userData.lastVerifiedAt;
       
       if (!lastVerifiedAt) {
+        if (__DEV__) {
+          logger.debug('No lastVerifiedAt field found for user', { email, userId: userData.id }, 'firebase');
+        }
         return false; // No verification record, needs verification
       }
       
+      // Handle Firestore Timestamp objects (from serverTimestamp())
+      let lastVerified: Date;
+      if (lastVerifiedAt && typeof lastVerifiedAt.toDate === 'function') {
+        // It's a Firestore Timestamp object
+        lastVerified = lastVerifiedAt.toDate();
+      } else if (typeof lastVerifiedAt === 'string') {
+        // It's an ISO string
+        lastVerified = new Date(lastVerifiedAt);
+      } else if (lastVerifiedAt instanceof Date) {
+        // It's already a Date object
+        lastVerified = lastVerifiedAt;
+      } else {
+        // Try to parse it as a date
+        lastVerified = new Date(lastVerifiedAt);
+      }
+      
       // Check if lastVerifiedAt is a valid date (not NaN)
-      const lastVerified = new Date(lastVerifiedAt);
       if (isNaN(lastVerified.getTime())) {
-        console.warn('⚠️ Invalid lastVerifiedAt date found for user:', email, 'Value:', lastVerifiedAt);
+        console.warn('⚠️ Invalid lastVerifiedAt date found for user:', email, 'Value:', lastVerifiedAt, 'Type:', typeof lastVerifiedAt);
         // Fix the invalid date by updating it to current time
         await this.updateLastVerifiedAt(email);
         return true; // Allow user to proceed since we're fixing the issue
@@ -612,12 +636,20 @@ export const firestoreService = {
       const hasVerifiedWithin30Days = lastVerified > thirtyDaysAgo;
       
       if (__DEV__) {
-        logger.debug('30-day verification check', { email, lastVerified, now, thirtyDaysAgo, hasVerifiedWithin30Days }, 'firebase');
+        logger.debug('30-day verification check', { 
+          email, 
+          lastVerified: lastVerified.toISOString(), 
+          now: now.toISOString(), 
+          thirtyDaysAgo: thirtyDaysAgo.toISOString(), 
+          hasVerifiedWithin30Days,
+          daysSinceVerification: Math.floor((now.getTime() - lastVerified.getTime()) / (1000 * 60 * 60 * 24))
+        }, 'firebase');
       }
       
       return hasVerifiedWithin30Days;
     } catch (error) {
       console.error('Error checking 30-day verification:', error);
+      logger.error('Error checking 30-day verification', { error, email }, 'firebase');
       return false; // On error, require verification
     }
   },

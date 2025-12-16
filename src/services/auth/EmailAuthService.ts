@@ -22,18 +22,54 @@ export class EmailAuthService {
     try {
       logger.info('Checking if email user exists', { email: email.substring(0, 5) + '...' }, 'EmailAuthService');
 
+      // checkEmailUserExists returns the response directly (not wrapped in data)
       const result = await checkEmailUserExists(email);
-      const data = result.data;
+
+      // Add detailed logging to debug the issue
+      if (__DEV__) {
+        logger.debug('checkEmailUserExists result', { 
+          result, 
+          hasResult: !!result,
+          resultType: typeof result,
+          resultKeys: result ? Object.keys(result) : []
+        }, 'EmailAuthService');
+      }
+
+      if (!result) {
+        logger.error('Email user existence check returned no result', null, 'EmailAuthService');
+        return { success: false, userExists: false, error: 'No response received' };
+      }
+
+      // Safely access properties with null checks
+      const success = result?.success ?? false;
+      const userExists = result?.userExists ?? false;
+      const userId = result?.userId;
+      const message = result?.message;
+
+      if (__DEV__) {
+        logger.debug('Parsed checkEmailUserExists result', { 
+          success, 
+          userExists, 
+          userId, 
+          message 
+        }, 'EmailAuthService');
+      }
 
       return {
-        success: data.success,
-        userExists: data.userExists || false,
-        userId: data.userId,
-        error: data.message
+        success,
+        userExists,
+        userId,
+        error: message
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error('Email user existence check failed', { error: errorMessage }, 'EmailAuthService');
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error('Email user existence check failed', { 
+        error: errorMessage,
+        stack: errorStack,
+        errorType: typeof error,
+        errorKeys: error ? Object.keys(error) : []
+      }, 'EmailAuthService');
       return { success: false, userExists: false, error: errorMessage };
     }
   }

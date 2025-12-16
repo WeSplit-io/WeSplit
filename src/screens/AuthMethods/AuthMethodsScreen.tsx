@@ -185,93 +185,169 @@ const AuthMethodsScreen: React.FC = () => {
       // Save email for persistence
       await AuthPersistenceService.saveEmail(email.trim());
 
-      // Check if user already exists for instant login
-      const userExistsResult = await authService.checkEmailUserExists(email.trim());
+      // Check if user already exists
+      let userExistsResult;
+      try {
+        userExistsResult = await authService.checkEmailUserExists(email.trim());
+      } catch (checkError) {
+        logger.error('Exception thrown during checkEmailUserExists', { 
+          error: checkError instanceof Error ? checkError.message : String(checkError)
+        }, 'AuthMethodsScreen');
+        userExistsResult = { success: false, userExists: false, error: 'Failed to check user existence' };
+      }
+
+      // Ensure userExistsResult is valid
+      if (!userExistsResult || typeof userExistsResult !== 'object') {
+        logger.error('Invalid userExistsResult received', { userExistsResult }, 'AuthMethodsScreen');
+        userExistsResult = { success: false, userExists: false, error: 'Invalid response from user check' };
+      }
+
       if (!userExistsResult.success) {
         logger.warn('Failed to check if email user exists, proceeding with verification code', {
           error: userExistsResult.error
         }, 'AuthMethodsScreen');
       }
 
-      // If user exists, perform instant login (similar to phone flow)
+      // If user exists, check if they verified within the last 30 days
       if (userExistsResult.success && userExistsResult.userExists && userExistsResult.userId) {
-        logger.info('Email user exists - performing instant login', {
+        logger.info('Email user exists - checking last verification timestamp', {
           userId: userExistsResult.userId,
           email: email.trim()
         }, 'AuthMethodsScreen');
 
-        // Get user data from Firestore to create proper user object
+        // Check if user verified within 30 days
         try {
-          const { firebaseDataService } = await import('../../services/data/firebaseDataService');
-          const existingUserData = await firebaseDataService.user.getCurrentUser(userExistsResult.userId);
+          const { firestoreService } = await import('../../config/firebase/firebase');
+          const hasVerifiedRecently = await firestoreService.hasVerifiedWithin30Days(email.trim());
 
-          if (existingUserData) {
-            // Create properly formatted user object (consistent with phone flow)
-            const authenticatedUser = {
-              id: userExistsResult.userId,
-              name: existingUserData.name || '',
-              email: existingUserData.email || email.trim(),
-              phone: existingUserData.phone || '',
-              wallet_address: existingUserData.wallet_address || '',
-              wallet_public_key: existingUserData.wallet_public_key || '',
-              created_at: existingUserData.created_at || new Date().toISOString(),
-              avatar: existingUserData.avatar || '',
-              emailVerified: existingUserData.email_verified || true, // Existing users are verified
-              lastLoginAt: new Date().toISOString(), // Use current time for login
-              hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false,
-            };
-
-            // Update authentication context BEFORE navigating
-            authenticateUser(authenticatedUser, 'email');
-
-            logger.info('Authentication context updated for email instant login', {
-              userId: userExistsResult.userId
+          if (hasVerifiedRecently) {
+            logger.info('User verified within 30 days - skipping verification code', {
+              userId: userExistsResult.userId,
+              email: email.trim()
             }, 'AuthMethodsScreen');
 
-            // Check if user needs to create a profile (same logic as phone)
-            const needsProfile = !authenticatedUser.name || authenticatedUser.name.trim() === '';
+            // Get user data from Firestore to create proper user object
+            try {
+              const { firebaseDataService } = await import('../../services/data/firebaseDataService');
+              const existingUserData = await firebaseDataService.user.getCurrentUser(userExistsResult.userId);
 
-            if (needsProfile) {
-              logger.info('Email user needs to create profile (no name), navigating to CreateProfile', {
-                userId: userExistsResult.userId,
-                email: email.trim()
+              if (existingUserData) {
+                // Update lastLoginAt timestamp
+                await firebaseDataService.user.updateUser(userExistsResult.userId, {
+                  lastLoginAt: new Date().toISOString()
+                });
+
+                // Create properly formatted user object (consistent with phone flow)
+                const authenticatedUser = {
+                  id: userExistsResult.userId,
+                  name: existingUserData.name || '',
+                  email: existingUserData.email || email.trim(),
+                  phone: existingUserData.phone || '',
+                  wallet_address: existingUserData.wallet_address || '',
+                  wallet_public_key: existingUserData.wallet_public_key || '',
+                  created_at: existingUserData.created_at || new Date().toISOString(),
+                  avatar: existingUserData.avatar || '',
+                  emailVerified: existingUserData.email_verified !== false, // Default to true if not explicitly false
+                  lastLoginAt: new Date().toISOString(),
+                  hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false,
+                };
+
+                // Sign in to Firebase Auth if custom token is available
+                // This ensures auth.currentUser is set for proper session management
+                try {
+                  const { auth } = await import('../../config/firebase/firebase');
+                  const { signInWithCustomToken } = await import('firebase/auth');
+                  
+                  // Get custom token from Firebase Functions
+                  const { getFunctions, httpsCallable } = await import('firebase/functions');
+                  const functions = getFunctions();
+                  const getUserToken = httpsCallable<{ userId: string }, {
+                    success: boolean;
+                    customToken: string;
+                    message?: string;
+                  }>(functions, 'getUserCustomToken');
+
+                  const tokenResult = await getUserToken({ userId: userExistsResult.userId });
+                  const tokenData = tokenResult.data as {
+                    success: boolean;
+                    customToken: string;
+                    message?: string;
+                  };
+
+                  if (tokenData.success && tokenData.customToken) {
+                    await signInWithCustomToken(auth, tokenData.customToken);
+                    logger.info('✅ Signed in to Firebase Auth with custom token', null, 'AuthMethodsScreen');
+                  }
+                } catch (tokenError) {
+                  logger.warn('Failed to sign in with custom token (non-critical)', tokenError, 'AuthMethodsScreen');
+                  // Continue anyway - user is still authenticated in app context
+                }
+
+                // Update authentication context BEFORE navigating
+                authenticateUser(authenticatedUser, 'email');
+
+                logger.info('Authentication context updated for email login (verified within 30 days)', {
+                  userId: userExistsResult.userId
+                }, 'AuthMethodsScreen');
+
+                // Check if user needs to create a profile (same logic as phone)
+                const needsProfile = !authenticatedUser.name || authenticatedUser.name.trim() === '';
+
+                if (needsProfile) {
+                  logger.info('Email user needs to create profile (no name), navigating to CreateProfile', {
+                    userId: userExistsResult.userId,
+                    email: email.trim()
+                  }, 'AuthMethodsScreen');
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'CreateProfile', params: {
+                      email: email.trim(),
+                      phoneNumber: authenticatedUser.phone
+                    } }],
+                  });
+                } else {
+                  logger.info('Email user already has name, navigating to Dashboard', {
+                    userId: userExistsResult.userId,
+                    name: authenticatedUser.name,
+                    email: email.trim()
+                  }, 'AuthMethodsScreen');
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Dashboard' }],
+                  });
+                }
+                return;
+              } else {
+                logger.error('User data not found in Firestore for email login', {
+                  userId: userExistsResult.userId
+                }, 'AuthMethodsScreen');
+                // Fall through to verification code flow
+              }
+            } catch (firestoreError) {
+              logger.error('Failed to fetch user data for email login', {
+                error: firestoreError instanceof Error ? firestoreError.message : String(firestoreError),
+                userId: userExistsResult.userId
               }, 'AuthMethodsScreen');
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'CreateProfile', params: {
-                  email: email.trim(),
-                  phoneNumber: authenticatedUser.phone
-                } }],
-              });
-            } else {
-              logger.info('Email user already has name, navigating to Dashboard', {
-                userId: userExistsResult.userId,
-                name: authenticatedUser.name,
-                email: email.trim()
-              }, 'AuthMethodsScreen');
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Dashboard' }],
-              });
+              // Fall through to verification code flow
             }
-            return;
           } else {
-            logger.error('User data not found in Firestore for email instant login', {
-              userId: userExistsResult.userId
+            logger.info('User has not verified within 30 days - sending verification code', {
+              userId: userExistsResult.userId,
+              email: email.trim()
             }, 'AuthMethodsScreen');
             // Fall through to verification code flow
           }
-        } catch (firestoreError) {
-          logger.error('Failed to fetch user data for email instant login', {
-            error: firestoreError instanceof Error ? firestoreError.message : String(firestoreError),
-            userId: userExistsResult.userId
+        } catch (verificationCheckError) {
+          logger.error('Failed to check 30-day verification status', {
+            error: verificationCheckError instanceof Error ? verificationCheckError.message : String(verificationCheckError),
+            email: email.trim()
           }, 'AuthMethodsScreen');
-          // Fall through to verification code flow
+          // Fall through to verification code flow on error
         }
       }
 
-      // New user or failed instant login - send verification code
-      logger.info('New email user or instant login failed - sending verification code', {
+      // New user, failed login, or needs re-verification - send verification code
+      logger.info('Sending verification code', {
         email: email.trim(),
         userExists: userExistsResult.userExists
       }, 'AuthMethodsScreen');

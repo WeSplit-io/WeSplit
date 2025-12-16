@@ -251,13 +251,29 @@ export async function checkEmailUserExists(email: string): Promise<{ success: bo
       email: email.trim()
     });
 
+    if (!result || !result.data) {
+      logger.error('Invalid response from checkEmailUserExistsFunction', { result }, 'firebaseFunctionsService');
+      throw new Error('Invalid response from server');
+    }
+
     const response = result.data as { success: boolean; userExists: boolean; userId?: string; message?: string };
 
     if (__DEV__) { logger.debug('Firebase Functions checkEmailUserExists response', { response }, 'firebaseFunctionsService'); }
 
+    // Validate response structure
+    if (typeof response !== 'object' || response === null) {
+      logger.error('Invalid response structure from Firebase Function', { response }, 'firebaseFunctionsService');
+      throw new Error('Invalid response structure from server');
+    }
+
     if (response.success) {
       if (__DEV__) { logger.info('Email user existence check completed', null, 'firebaseFunctionsService'); }
-      return response;
+      return {
+        success: true,
+        userExists: response.userExists || false,
+        userId: response.userId,
+        message: response.message
+      };
     } else {
       throw new Error(response.message || 'Failed to check user existence');
     }
