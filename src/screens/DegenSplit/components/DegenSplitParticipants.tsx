@@ -106,7 +106,6 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
                 userName={participant.name || `Participant ${index + 1}`}
                 size={40}
                 avatarUrl={participant.avatar}
-                showProfileBorder={false}
                 style={{
                   width: 40,
                   height: 40,

@@ -614,8 +614,6 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             size={120}
             avatarUrl={currentUser?.avatar}
             style={combinedAvatarStyle}
-            showBorder={true}
-            borderColor={isWinner ? colors.green : colors.red}
           />
           {currentUser?.badges && currentUser.badges.length > 0 && currentUser.active_badge && (
             <View style={{ marginTop: spacing.sm, alignItems: 'center' }}>

@@ -28,7 +28,6 @@ import { getSeasonReward, calculateRewardPoints, SeasonReward } from '../../serv
 import { seasonService, Season } from '../../services/rewards/seasonService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 import { badgeService, BadgeProgress } from '../../services/rewards/badgeService';
-import { BADGE_DEFINITIONS } from '../../services/rewards/badgeConfig';
 import { pointsService } from '../../services/rewards/pointsService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 
@@ -334,19 +333,21 @@ const HowToEarnPointsScreen: React.FC = () => {
     }
   }, [currentUser?.id, redeemCode, redeemingBadge, loadBadges, updateUser]);
 
-  // Filter badges based on active tab - exclude community badges (only show point badges)
+  // Filter badges based on active tab - uses badge info from database
   const filteredBadges = useMemo(() => {
     // Filter out community badges - only show badges with points
     const pointBadges = badgeProgress.filter(p => {
-      const badgeInfo = BADGE_DEFINITIONS[p.badgeId];
-      return badgeInfo && !badgeInfo.isCommunityBadge && badgeInfo.points !== undefined && badgeInfo.points > 0;
+      const badgeInfo = p.badgeInfo;
+      if (!badgeInfo) return false;
+      // Show badges that have points and are not community badges
+      return !badgeInfo.isCommunityBadge && badgeInfo.points !== undefined && badgeInfo.points > 0;
     });
 
     if (badgeTab === 'claimed') {
-      // Show claimed point badges AND claimed community badges
+      // Show claimed badges (both achievement and community)
       return badgeProgress.filter(p => {
         if (!p.claimed) return false;
-        const badgeInfo = BADGE_DEFINITIONS[p.badgeId];
+        const badgeInfo = p.badgeInfo;
         if (!badgeInfo) return false;
         // Include point badges
         if (!badgeInfo.isCommunityBadge && badgeInfo.points !== undefined && badgeInfo.points > 0) {
@@ -368,7 +369,8 @@ const HowToEarnPointsScreen: React.FC = () => {
   }, [badgeProgress, badgeTab]);
 
   const renderBadgeCard = (progress: BadgeProgress) => {
-    const badgeInfo = BADGE_DEFINITIONS[progress.badgeId];
+    // Badge info is now included in progress from database
+    const badgeInfo = progress.badgeInfo;
     if (!badgeInfo) return null;
 
     const isClaiming = claimingBadge === progress.badgeId;

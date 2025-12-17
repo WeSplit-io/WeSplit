@@ -160,9 +160,6 @@ const DevAssetPreviewScreen: React.FC = () => {
           displayName={currentUser?.name || currentUser?.display_name || 'User'}
           avatarUrl={currentUser?.avatar}
           size={80}
-          borderImageUrl={currentUser?.active_profile_border 
-            ? resolvedUrls[currentUser.active_profile_border]
-            : undefined}
         />
         <Text style={styles.previewLabel}>Current Avatar</Text>
         {currentUser?.name && (

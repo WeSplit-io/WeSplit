@@ -1304,7 +1304,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 avatarUrl={currentUser?.avatar}
                 style={styles.profileImage}
                 size={50}
-                showProfileBorder={true}
+                // Render dashboard avatar without decorative profile border
               />
             </View>
 

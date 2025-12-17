@@ -22,6 +22,7 @@ export interface BadgeProgress {
   imageUrl?: string; // NFT/image URL from database
   isEventBadge?: boolean; // True if this is an event badge
   redeemCode?: string; // Redeem code for event badges
+  badgeInfo?: BadgeInfo; // Badge information from Firestore or config
 }
 
 export interface BadgeClaimResult {
@@ -46,17 +47,20 @@ type UserClaimedBadge = {
   badgeId: string;
   title: string;
   description: string;
-  icon: string;
+  icon?: string; // Optional - not required if iconUrl is provided
   imageUrl?: string;
   claimedAt?: string;
   isCommunityBadge?: boolean;
   showNextToName?: boolean;
+  category?: string;
+  isEventBadge?: boolean;
+  points?: number;
 };
 
 type CommunityBadge = {
   badgeId: string;
   title: string;
-  icon: string;
+  icon?: string; // Optional - not required if iconUrl is provided
   imageUrl?: string;
 };
 
@@ -72,18 +76,39 @@ class BadgeService {
   private claimedBadgeIdsCache = new Map<string, { value: string[]; expires: number }>();
   private userClaimedBadgesCache = new Map<string, { value: UserClaimedBadge[]; expires: number }>();
   private communityBadgesCache = new Map<string, { value: CommunityBadge[]; expires: number }>();
+  private firestoreBadgesCache: { value: Map<string, BadgeInfo>; expires: number } | null = null;
   /**
    * Get user's badge progress for all badges
+   * Includes badges from both Firestore and config
    */
   async getUserBadgeProgress(userId: string): Promise<BadgeProgress[]> {
     try {
+      // Load badges from Firestore and config
+      const firestoreBadges = await this.loadFirestoreBadges();
+      const configBadges = Object.values(BADGE_DEFINITIONS);
+      
+      // Merge badges: Firestore badges override config badges with same ID
+      const allBadgesMap = new Map<string, BadgeInfo>();
+      
+      // Add config badges first
+      configBadges.forEach(badge => {
+        allBadgesMap.set(badge.badgeId, badge);
+      });
+      
+      // Override with Firestore badges (they take priority)
+      firestoreBadges.forEach((badge, badgeId) => {
+        allBadgesMap.set(badgeId, badge);
+      });
+      
+      const allBadges = Array.from(allBadgesMap.values());
+      
       // Get all achievement badges (splits withdrawn badges)
-      const achievementBadges = Object.values(BADGE_DEFINITIONS).filter(
+      const achievementBadges = allBadges.filter(
         badge => badge.category === 'achievement'
       );
 
       // Get all event badges (including community badges)
-      const eventBadges = Object.values(BADGE_DEFINITIONS).filter(
+      const eventBadges = allBadges.filter(
         badge => badge.category === 'event' || badge.category === 'community' || badge.isEventBadge === true
       );
 
@@ -120,7 +145,8 @@ class BadgeService {
             claimed,
             claimedAt: claimedBadgeData?.claimedAt,
             imageUrl,
-            isEventBadge: false
+            isEventBadge: false,
+            badgeInfo: badge // Include badge info in progress
           };
         })
       );
@@ -145,7 +171,8 @@ class BadgeService {
             claimedAt: claimedBadgeData?.claimedAt,
             imageUrl,
             isEventBadge: true,
-            redeemCode: badge.redeemCode
+            redeemCode: badge.redeemCode,
+            badgeInfo: badge // Include badge info in progress
           };
         })
       );
@@ -269,6 +296,7 @@ class BadgeService {
       // Log sample transactions for debugging
       if (transactionDocs.size > 0) {
         const sampleTransaction = Array.from(transactionDocs.values())[0];
+        if (sampleTransaction) {
         const sampleData = sampleTransaction.data();
         logger.debug('Sample transaction data', {
           userId,
@@ -280,6 +308,7 @@ class BadgeService {
           transactionType: sampleData.transactionType,
           note: sampleData.note
         }, 'BadgeService');
+        }
       }
 
       for (const docSnap of transactionDocs.values()) {
@@ -473,6 +502,135 @@ class BadgeService {
   }
 
   /**
+   * Load badges from Firestore badges collection
+   * This allows adding badges dynamically without app updates
+   */
+  private async loadFirestoreBadges(): Promise<Map<string, BadgeInfo>> {
+    const now = Date.now();
+    
+    // Check cache first
+    if (this.firestoreBadgesCache && now < this.firestoreBadgesCache.expires) {
+      logger.debug('Using cached Firestore badges', { count: this.firestoreBadgesCache.value.size }, 'BadgeService');
+      return this.firestoreBadgesCache.value;
+    }
+
+    try {
+      const badgesRef = collection(db, 'badges');
+      const badgesSnapshot = await getDocs(badgesRef);
+      
+      const badgesMap = new Map<string, BadgeInfo>();
+      
+      badgesSnapshot.forEach((doc) => {
+        const data = doc.data();
+        const badgeId = doc.id;
+        
+        // Convert Firestore badge to BadgeInfo format
+        const badgeInfo: BadgeInfo = {
+          badgeId: badgeId,
+          title: data.title || badgeId,
+          description: data.description || '',
+          icon: data.icon || undefined, // Optional - not required if iconUrl is provided
+          iconUrl: data.iconUrl || data.imageUrl,
+          category: data.category,
+          rarity: data.rarity,
+          points: data.points,
+          target: data.target,
+          isEventBadge: data.isEventBadge !== false, // Default to true for Firestore badges
+          redeemCode: data.redeemCode,
+          isCommunityBadge: data.isCommunityBadge || false,
+          showNextToName: data.showNextToName || false,
+          progressMetric: data.progressMetric,
+          progressLabel: data.progressLabel
+        };
+        
+        badgesMap.set(badgeId, badgeInfo);
+      });
+      
+      // Cache the result
+      this.firestoreBadgesCache = {
+        value: badgesMap,
+        expires: now + BadgeService.CACHE_TTL_MS
+      };
+      
+      logger.info('Loaded badges from Firestore', { count: badgesMap.size }, 'BadgeService');
+      return badgesMap;
+    } catch (error) {
+      logger.warn('Failed to load badges from Firestore, using config only', { error }, 'BadgeService');
+      // Return empty map on error - will fall back to config badges
+      return new Map();
+    }
+  }
+
+  /**
+   * Get badge info from either Firestore or config
+   * Priority: Firestore badges > Config badges
+   * 
+   * For event/community badges: Firestore is primary source
+   * For achievement badges: Config is primary source (can be migrated later)
+   */
+  private async getBadgeInfo(badgeId: string): Promise<BadgeInfo | null> {
+    // First check Firestore badges (primary source for event/community badges)
+    const firestoreBadges = await this.loadFirestoreBadges();
+    const firestoreBadge = firestoreBadges.get(badgeId);
+    if (firestoreBadge) {
+      return firestoreBadge;
+    }
+    
+    // Fall back to config badges (for achievement badges or if Firestore fails)
+    return BADGE_DEFINITIONS[badgeId] || null;
+  }
+
+  /**
+   * Public method to get badge info (for use in components)
+   * Uses database first, then falls back to config
+   */
+  async getBadgeInfoPublic(badgeId: string): Promise<BadgeInfo | null> {
+    return this.getBadgeInfo(badgeId);
+  }
+
+  /**
+   * Get all badges from both Firestore and config
+   * Firestore badges override config badges with same ID
+   */
+  async getAllBadges(): Promise<BadgeInfo[]> {
+    const firestoreBadges = await this.loadFirestoreBadges();
+    const configBadges = Object.values(BADGE_DEFINITIONS);
+    
+    // Merge: Firestore badges override config badges
+    const allBadgesMap = new Map<string, BadgeInfo>();
+    
+    // Add config badges first
+    configBadges.forEach(badge => {
+      allBadgesMap.set(badge.badgeId, badge);
+    });
+    
+    // Override with Firestore badges (they take priority)
+    firestoreBadges.forEach((badge, badgeId) => {
+      allBadgesMap.set(badgeId, badge);
+    });
+    
+    return Array.from(allBadgesMap.values());
+  }
+
+  /**
+   * Get badge info by redeem code from Firestore
+   * Event/community badges are now managed entirely in Firestore
+   */
+  private async getBadgeInfoByRedeemCode(redeemCode: string): Promise<BadgeInfo | null> {
+    const normalizedCode = redeemCode.toUpperCase();
+    
+    // Check Firestore badges (all event/community badges are in database)
+    const firestoreBadges = await this.loadFirestoreBadges();
+    for (const badge of firestoreBadges.values()) {
+      if (badge.redeemCode && badge.redeemCode.toUpperCase() === normalizedCode) {
+        return badge;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Get badge image URL from Firebase Storage or badge configuration
    * Priority: 1. Provided URL (converted if gs://), 2. Firebase Storage badge images collection, 3. Badge config iconUrl
    */
@@ -539,8 +697,8 @@ class BadgeService {
    */
   async claimBadge(userId: string, badgeId: string, imageUrl?: string): Promise<BadgeClaimResult> {
     try {
-      // Check if badge exists
-      const badgeInfo = BADGE_DEFINITIONS[badgeId];
+      // Check if badge exists (check both Firestore and config)
+      const badgeInfo = await this.getBadgeInfo(badgeId);
       if (!badgeInfo) {
         return {
           success: false,
@@ -696,7 +854,7 @@ class BadgeService {
       
       const claimedBadges = await Promise.all(
         claimedBadgeIds.map(async (badgeId) => {
-          const badgeInfo = BADGE_DEFINITIONS[badgeId];
+          const badgeInfo = await this.getBadgeInfo(badgeId);
           if (!badgeInfo) return null;
 
           const claimedBadgeData = await this.getClaimedBadgeData(userId, badgeId);
@@ -706,11 +864,14 @@ class BadgeService {
             badgeId,
             title: badgeInfo.title,
             description: badgeInfo.description,
-            icon: badgeInfo.icon,
+            icon: badgeInfo.icon || undefined, // Optional - icon not required
             imageUrl,
             claimedAt: claimedBadgeData?.claimedAt,
             isCommunityBadge: badgeInfo.isCommunityBadge || false,
-            showNextToName: badgeInfo.showNextToName || false
+            showNextToName: badgeInfo.showNextToName || false,
+            category: badgeInfo.category,
+            isEventBadge: badgeInfo.isEventBadge || false,
+            points: badgeInfo.points
           };
         })
       );
@@ -740,7 +901,6 @@ class BadgeService {
         .map(badge => ({
           badgeId: badge.badgeId,
           title: badge.title,
-          icon: badge.icon,
           imageUrl: badge.imageUrl
         }));
 
@@ -773,28 +933,8 @@ class BadgeService {
       // Convert to uppercase for comparison (all redeem codes are stored in uppercase)
       const normalizedCode = trimmedCode.toUpperCase();
       
-      // Find badge by redeem code (supports both event and community badges)
-      // Also supports backward compatibility with old codes
-      let badgeInfo = Object.values(BADGE_DEFINITIONS).find(
-        badge => badge.redeemCode && 
-                 badge.redeemCode.toUpperCase() === normalizedCode && 
-                 (badge.isEventBadge || badge.category === 'event' || badge.category === 'community')
-      );
-
-      // Backward compatibility: check old codes if new code doesn't match
-      if (!badgeInfo) {
-        const oldCodeMappings: Record<string, string> = {
-          'WESPLIT': 'community_wesplit',
-          'SUPERTEAMFRANCE': 'community_superteamfrance',
-          'MONKEDAO': 'community_monkedao',
-          'DIGGERS': 'community_diggers'
-        };
-        
-        const badgeId = oldCodeMappings[normalizedCode];
-        if (badgeId) {
-          badgeInfo = BADGE_DEFINITIONS[badgeId];
-        }
-      }
+      // Find badge in Firestore (all event/community badges are now in database)
+      const badgeInfo = await this.getBadgeInfoByRedeemCode(normalizedCode);
 
       if (!badgeInfo) {
         return {
@@ -1029,6 +1169,137 @@ class BadgeService {
   }
 
   /**
+   * Invalidate Firestore badges cache
+   * Call this when badges are added/updated in Firestore
+   */
+  invalidateFirestoreBadgesCache(): void {
+    this.firestoreBadgesCache = null;
+    logger.debug('Firestore badges cache invalidated', null, 'BadgeService');
+  }
+
+  /**
+   * Test connection to Firestore badges collection
+   * Useful for debugging and verification
+   */
+  async testBadgeConnection(): Promise<{ success: boolean; badgeCount: number; error?: string }> {
+    try {
+      const badgesRef = collection(db, 'badges');
+      const snapshot = await getDocs(badgesRef);
+      
+      logger.info('Badge connection test successful', { 
+        badgeCount: snapshot.size,
+        collection: 'badges'
+      }, 'BadgeService');
+      
+      return {
+        success: true,
+        badgeCount: snapshot.size
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Badge connection test failed', { error: errorMessage }, 'BadgeService');
+      
+      return {
+        success: false,
+        badgeCount: 0,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * Migrate badges from config to Firestore
+   * This can be called from the app to populate Firestore with existing badges
+   */
+  async migrateBadgesToFirestore(overwrite: boolean = false): Promise<{
+    success: number;
+    skipped: number;
+    errors: Array<{ badgeId: string; error: string }>;
+  }> {
+    const result = {
+      success: 0,
+      skipped: 0,
+      errors: [] as Array<{ badgeId: string; error: string }>
+    };
+
+    try {
+      // Get all event/community badges from config
+      const badgesToMigrate = Object.values(BADGE_DEFINITIONS).filter(
+        badge => badge.isEventBadge || 
+                 badge.category === 'event' || 
+                 badge.category === 'community' ||
+                 badge.redeemCode
+      );
+
+      logger.info('Starting badge migration to Firestore', { 
+        badgeCount: badgesToMigrate.length,
+        overwrite 
+      }, 'BadgeService');
+
+      for (const badge of badgesToMigrate) {
+        try {
+          // Check if badge already exists
+          const badgeRef = doc(db, 'badges', badge.badgeId);
+          const existingDoc = await getDoc(badgeRef);
+
+          if (existingDoc.exists() && !overwrite) {
+            logger.debug('Badge already exists, skipping', { badgeId: badge.badgeId }, 'BadgeService');
+            result.skipped++;
+            continue;
+          }
+
+          // Prepare badge data for Firestore
+          const badgeData: any = {
+            badgeId: badge.badgeId,
+            title: badge.title,
+            description: badge.description,
+          };
+
+          // Add optional fields
+          if (badge.iconUrl) badgeData.iconUrl = badge.iconUrl;
+          if (badge.category) badgeData.category = badge.category;
+          if (badge.rarity) badgeData.rarity = badge.rarity;
+          if (badge.points !== undefined) badgeData.points = badge.points;
+          if (badge.target !== undefined) badgeData.target = badge.target;
+          if (badge.isEventBadge !== undefined) badgeData.isEventBadge = badge.isEventBadge;
+          if (badge.redeemCode) badgeData.redeemCode = badge.redeemCode.toUpperCase();
+          if (badge.isCommunityBadge !== undefined) badgeData.isCommunityBadge = badge.isCommunityBadge;
+          if (badge.showNextToName !== undefined) badgeData.showNextToName = badge.showNextToName;
+          if (badge.progressMetric) badgeData.progressMetric = badge.progressMetric;
+          if (badge.progressLabel) badgeData.progressLabel = badge.progressLabel;
+
+          // Write to Firestore
+          await setDoc(badgeRef, badgeData, { merge: true });
+
+          logger.info('Badge migrated to Firestore', { badgeId: badge.badgeId }, 'BadgeService');
+          result.success++;
+
+          // Invalidate cache to ensure fresh data
+          this.invalidateFirestoreBadgesCache();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          logger.error('Failed to migrate badge', { badgeId: badge.badgeId, error: errorMessage }, 'BadgeService');
+          result.errors.push({
+            badgeId: badge.badgeId,
+            error: errorMessage
+          });
+        }
+      }
+
+      logger.info('Badge migration completed', {
+        success: result.success,
+        skipped: result.skipped,
+        errors: result.errors.length
+      }, 'BadgeService');
+
+      return result;
+    } catch (error) {
+      logger.error('Badge migration failed', { error }, 'BadgeService');
+      throw error;
+    }
+  }
+
+  /**
    * Backfill points for badges that were claimed before points awarding was implemented
    * Checks all claimed badges and awards points if they haven't been awarded yet
    */
@@ -1086,7 +1357,7 @@ class BadgeService {
           }
 
           // Get badge info
-          const badgeInfo = BADGE_DEFINITIONS[badgeId];
+          const badgeInfo = await this.getBadgeInfo(badgeId);
           if (!badgeInfo) {
             logger.warn('Badge definition not found', { userId, badgeId }, 'BadgeService');
             result.errors.push(`Badge definition not found: ${badgeId}`);

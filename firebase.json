@@ -1,43 +1,54 @@
 {
-  "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "/join-split",
-        "destination": "/join-split/index.html"
-      },
-      {
-        "source": "/view-split",
-        "destination": "/join-split/index.html"
-      }
-    ],
-    "headers": [
-      {
-        "source": "/.well-known/apple-app-site-association",
-        "headers": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ]
-      },
-      {
-        "source": "/.well-known/assetlinks.json",
-        "headers": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ]
-      }
-    ]
-    },
-    "functions": {
+  "hosting": [
+    {
+      "target": "deeplinks",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "/join-split",
+          "destination": "/join-split/index.html"
+        },
+        {
+          "source": "/view-split",
+          "destination": "/join-split/index.html"
+        },
+        {
+          "source": "/referral",
+          "destination": "/referral/index.html"
+        }
+      ],
+      "headers": [
+        {
+          "source": "/.well-known/apple-app-site-association",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        {
+          "source": "/.well-known/assetlinks.json",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "firestore": {
+    "rules": "config/deployment/firestore.rules",
+    "indexes": "tools/audits/firestore.indexes.json"
+  },
+  "functions": {
     "source": "services/firebase-functions",
     "codebase": "default",
     "predeploy": [
@@ -49,10 +60,12 @@
     "auth": {
       "port": 9099
     },
+    "firestore": {
+      "port": 8080
+    },
     "ui": {
       "enabled": true,
       "port": 4000
     }
   }
 }
- 

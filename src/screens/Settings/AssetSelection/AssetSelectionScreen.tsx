@@ -377,8 +377,6 @@ const AssetSelectionScreen: React.FC<AssetSelectionScreenProps> = ({ route }) =>
           userName={currentUser?.name || currentUserDisplayName}
           avatarUrl={currentUser?.avatar}
           size={avatarPreviewSize}
-          showProfileBorder
-          borderScaleOverride={activeBorderScaleOverride}
         />
         <Text style={styles.previewLabel}>Current Preview</Text>
         {canonicalActiveProfileBorder && (

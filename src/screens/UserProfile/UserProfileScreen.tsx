@@ -27,7 +27,7 @@ import { logger } from '../../services/analytics/loggingService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { badgeService } from '../../services/rewards/badgeService';
 import { userInteractionService, UserInteraction } from '../../services/user/userInteractionService';
-import { getBadgeInfo } from '../../services/rewards/badgeConfig';
+// Badge info is already included in claimedBadges from badgeService
 import { getAssetInfo } from '../../services/rewards/assetConfig';
 import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
@@ -419,7 +419,6 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
               size={110}
               avatarUrl={profileUser.avatar}
               style={styles.avatar}
-              borderImageUrl={profileBorderUrl || undefined}
             />
           </View>
           <View style={styles.nameContainer}>
@@ -467,8 +466,9 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
             {claimedBadges.length > 0 ? (
               <View style={styles.badgesGrid}>
                 {claimedBadges.map((badge) => {
-                  const badgeInfo = getBadgeInfo(badge.badgeId);
-                  if (!badgeInfo) return null;
+                  // Badge data is already included from badgeService.getUserClaimedBadges
+                  // It includes title, icon, imageUrl from database
+                  if (!badge) return null;
 
                   return (
                     <View key={badge.badgeId} style={styles.badgeCardWrapper}>
@@ -479,11 +479,11 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
                             style={styles.badgeImage}
                             resizeMode="contain"
                           />
-                        ) : (
+                        ) : badge.icon ? (
                           <Text style={styles.badgeIcon}>{badge.icon}</Text>
-                        )}
+                        ) : null}
                         <Text style={styles.badgeTitle} numberOfLines={1}>
-                          {badge.title}
+                          {badge.title || badge.badgeId}
                         </Text>
                       </View>
                     </View>

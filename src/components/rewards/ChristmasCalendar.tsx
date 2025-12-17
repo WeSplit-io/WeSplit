@@ -627,8 +627,6 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
                         displayName="Preview User"
                         avatarUrl={currentUser?.avatar}
                         size={80}
-                        borderImageUrl={resolvedAssetUrl}
-                        borderScaleOverride={1.5}
                       />
                     </View>
                     <Text style={styles.previewTopTitle}>{assetGift.name}</Text>

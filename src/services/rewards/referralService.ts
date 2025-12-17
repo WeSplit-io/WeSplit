@@ -4,13 +4,14 @@
  */
 
 import { db } from '../../config/firebase/firebase';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { logger } from '../analytics/loggingService';
 import { pointsService } from './pointsService';
 import { seasonService, Season } from './seasonService';
 import { getSeasonReward, calculateRewardPoints } from './seasonRewardsConfig';
 import { firebaseDataService } from '../data/firebaseDataService';
 import { questService } from './questService';
+import { normalizeReferralCode, referralCodeRateLimiter, REFERRAL_CODE_MIN_LENGTH } from '../shared/referralUtils';
 import { 
   REFERRAL_REWARDS, 
   getReferralRewardConfig, 
@@ -87,12 +88,15 @@ export interface Referral {
 class ReferralService {
   /**
    * Generate a unique referral code for a user
+   * Uses shorter userId prefix + timestamp + random suffix to reduce collision risk
    */
   generateReferralCode(userId: string): string {
-    // Use first 8 chars of userId + timestamp
+    // Use first 6 chars of userId + timestamp + random suffix for better uniqueness
     const timestamp = Date.now().toString(36);
-    const userIdPrefix = userId.substring(0, 8).toUpperCase();
-    return `${userIdPrefix}${timestamp}`.substring(0, 12);
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const userIdPrefix = userId.substring(0, 6).toUpperCase();
+    // Format: 6 chars userId + timestamp (varies) + 4 random chars = up to 12 chars
+    return `${userIdPrefix}${timestamp}${randomSuffix}`.substring(0, 12);
   }
 
   /**
@@ -106,7 +110,7 @@ class ReferralService {
       const user = await firebaseDataService.user.getCurrentUser(userId);
       
       // If user already has a referral code, return it
-      if (user.referral_code && user.referral_code.trim().length >= 8) {
+      if (user.referral_code && user.referral_code.trim().length >= REFERRAL_CODE_MIN_LENGTH) {
         logger.info('User already has referral code', { 
           userId, 
           referralCode: user.referral_code 
@@ -162,32 +166,128 @@ class ReferralService {
     error?: string;
   }> {
     try {
+      // Normalize referral code input for safety (centralized helper)
+      const normalizedCode = normalizeReferralCode(referralCode);
+
       // If referrerId is provided, use it directly
       if (referrerId) {
-        await this.createReferralRecord(referrerId, referredUserId);
+        // Prevent self-referral when referrerId is passed explicitly
+        if (referrerId === referredUserId) {
+          logger.warn('Self-referral attempt blocked (referrerId === referredUserId)', {
+            userId: referredUserId,
+          }, 'ReferralService');
+          return { success: false, referrerId: undefined, error: 'Cannot use your own referral code' };
+        }
+
+        // Validate referrer account is active (security: prevent rewards to inactive accounts)
+        try {
+          const referrerUser = await firebaseDataService.user.getCurrentUser(referrerId);
+          if (referrerUser.status === 'suspended' || referrerUser.status === 'deleted') {
+            logger.warn('Referrer account is inactive', {
+              referrerId,
+              status: referrerUser.status
+            }, 'ReferralService');
+            return { success: false, error: 'This referral code is no longer valid' };
+          }
+        } catch (userError) {
+          logger.error('Failed to validate referrer account status', userError, 'ReferralService');
+          return { success: false, error: 'Unable to validate referral' };
+        }
+
+        // Use transaction for atomic referral creation + referred_by update
+        // Transaction handles idempotency check internally via deterministic ID
+        try {
+          await this.createReferralRecordWithTransaction(referrerId, referredUserId);
+        } catch (transactionError) {
+          // If referral already exists (idempotency), that's okay
+          if (transactionError instanceof Error && transactionError.message.includes('already exists')) {
+            logger.info('Referral already exists between users (referrerId path), skipping duplicate creation', {
+              referrerId,
+              referredUserId
+            }, 'ReferralService');
+
+            // Ensure referred_by is set even if the referral record already existed
+            await firebaseDataService.user.updateUser(referredUserId, {
+              referred_by: referrerId
+            });
+
+            return { success: true, referrerId };
+          }
+          // Re-throw other transaction errors
+          throw transactionError;
+        }
         
-        // Award points to referrer for friend creating account
-        await this.awardInviteFriendReward(referrerId, referredUserId);
+        // Award points to referrer for friend creating account (non-blocking, can fail without breaking referral)
+        try {
+          await this.awardInviteFriendReward(referrerId, referredUserId);
+        } catch (rewardError) {
+          logger.error('Failed to award invite friend reward (non-blocking)', rewardError, 'ReferralService');
+          // Continue - referral record is created, reward can be retried later
+        }
         
         return { success: true, referrerId };
       }
 
       // If referral code is provided, find the referrer
-      if (referralCode) {
-        const referrer = await this.findReferrerByCode(referralCode);
-        if (referrer) {
-          await this.createReferralRecord(referrer.id, referredUserId);
-          
-          // Award points to referrer for friend creating account
-          await this.awardInviteFriendReward(referrer.id, referredUserId);
-          
-          // Update referred user's referred_by field
-          await firebaseDataService.user.updateUser(referredUserId, {
-            referred_by: referrer.id
-          });
-          
-          return { success: true, referrerId: referrer.id };
+      if (normalizedCode) {
+        const referrer = await this.findReferrerByCode(normalizedCode);
+
+        // No matching referrer found
+        if (!referrer) {
+          return { success: false, error: 'Referral code not found' };
         }
+
+        // Validate referrer account is active (security: prevent rewards to inactive accounts)
+        if (referrer.status === 'suspended' || referrer.status === 'deleted') {
+          logger.warn('Referral code belongs to inactive account', {
+            referralCode: normalizedCode,
+            referrerId: referrer.id,
+            status: referrer.status
+          }, 'ReferralService');
+          return { success: false, error: 'This referral code is no longer valid' };
+        }
+
+        // Prevent self-referral when using a referral code
+        if (referrer.id === referredUserId) {
+          logger.warn('Self-referral attempt blocked (referralCode belongs to referred user)', {
+            userId: referredUserId,
+            referralCode: normalizedCode,
+          }, 'ReferralService');
+          return { success: false, referrerId: undefined, error: 'Cannot use your own referral code' };
+        }
+
+        // Use transaction for atomic referral creation + referred_by update
+        // Transaction handles idempotency check internally via deterministic ID
+        try {
+          await this.createReferralRecordWithTransaction(referrer.id, referredUserId);
+        } catch (transactionError) {
+          // If referral already exists (idempotency), that's okay
+          if (transactionError instanceof Error && transactionError.message.includes('already exists')) {
+            logger.info('Referral already exists between users, skipping duplicate creation', {
+              referrerId: referrer.id,
+              referredUserId
+            }, 'ReferralService');
+
+            // Ensure referred_by is set even if the referral record already existed
+            await firebaseDataService.user.updateUser(referredUserId, {
+              referred_by: referrer.id
+            });
+
+            return { success: true, referrerId: referrer.id };
+          }
+          // Re-throw other transaction errors
+          throw transactionError;
+        }
+          
+        // Award points to referrer for friend creating account (non-blocking, can fail without breaking referral)
+        try {
+          await this.awardInviteFriendReward(referrer.id, referredUserId);
+        } catch (rewardError) {
+          logger.error('Failed to award invite friend reward (non-blocking)', rewardError, 'ReferralService');
+          // Continue - referral record is created, reward can be retried later
+        }
+        
+        return { success: true, referrerId: referrer.id };
       }
 
       return { success: false, error: 'No valid referral found' };
@@ -202,6 +302,7 @@ class ReferralService {
 
   /**
    * Create a referral record with enhanced status tracking
+   * @deprecated Use createReferralRecordWithTransaction for atomic operations
    */
   private async createReferralRecord(referrerId: string, referredUserId: string): Promise<void> {
     try {
@@ -251,26 +352,200 @@ class ReferralService {
   }
 
   /**
-   * Find referrer by referral code
-   * Public method for validation purposes
+   * Create a referral record atomically with referred_by field update using Firestore transaction
+   * Ensures both operations succeed or both fail (atomicity)
+   *
+   * NOTE:
+   * - Uses a deterministic composite ID per (referrerId, referredUserId) pair to avoid duplicates
+   * - Avoids unsupported collection queries inside transactions (no getDocs/query)
    */
-  async findReferrerByCode(referralCode: string): Promise<{ id: string; referral_code?: string } | null> {
+  private async createReferralRecordWithTransaction(referrerId: string, referredUserId: string): Promise<void> {
     try {
+      // Deterministic ID per referrer/referred pair to enforce uniqueness at the document level
+      const referralId = `ref_${referrerId}_${referredUserId}`;
+      const referralRef = doc(db, 'referrals', referralId);
+      const referredUserRef = doc(db, 'users', referredUserId);
+
+      // Get referred user data first (outside transaction for efficiency / typing)
+      const referredUser = await firebaseDataService.user.getCurrentUser(referredUserId);
+
+      await runTransaction(db, async (transaction) => {
+        // Check if referral already exists atomically via deterministic ID
+        const existingReferralDoc = await transaction.get(referralRef);
+        if (existingReferralDoc.exists()) {
+          throw new Error('Referral already exists');
+        }
+
+        // Get referred user document within transaction to ensure it still exists
+        const referredUserDoc = await transaction.get(referredUserRef);
+        if (!referredUserDoc.exists()) {
+          throw new Error('Referred user not found');
+        }
+
+        // Create referral record
+        // NOTE: referredUserName removed for privacy - can be fetched when needed by authorized users
+        transaction.set(referralRef, {
+          id: referralId,
+          referrerId,
+          referredUserId,
+          // referredUserName: referredUser.name, // Removed for privacy - fetch when needed
+          createdAt: serverTimestamp(),
+          status: 'active' as ReferralStatus,
+          milestones: {
+            accountCreated: {
+              achieved: true,
+              achievedAt: new Date().toISOString()
+            },
+            firstSplit: {
+              achieved: false
+            }
+          },
+          // Legacy fields (for backward compatibility)
+          hasCreatedAccount: true,
+          hasDoneFirstSplit: false,
+          rewardsAwarded: {
+            accountCreated: false,
+            firstSplitOver10: false
+          },
+          totalPointsEarned: 0,
+          lastActivityAt: serverTimestamp()
+        });
+
+        // Update referred user's referred_by field atomically
+        transaction.update(referredUserRef, {
+          referred_by: referrerId
+        });
+      });
+
+      logger.info('Referral record created atomically with referred_by update', {
+        referralId,
+        referrerId,
+        referredUserId,
+        status: 'active'
+      }, 'ReferralService');
+    } catch (error) {
+      logger.error('Failed to create referral record with transaction', error, 'ReferralService');
+      // If transaction fails due to existing referral, that's okay (idempotency)
+      if (error instanceof Error && error.message.includes('already exists')) {
+        logger.info('Referral already exists (caught in transaction)', {
+          referrerId,
+          referredUserId
+        }, 'ReferralService');
+        return; // Silently succeed - referral already exists
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Validate that a referral code exists (public method for frontend validation)
+   * Does NOT expose user ID to prevent enumeration attacks
+   * Includes rate limiting to prevent abuse
+   */
+  async validateReferralCode(referralCode: string, userId?: string): Promise<{ exists: boolean; error?: string }> {
+    try {
+      // Rate limiting: use userId if provided, otherwise use a generic identifier
+      const rateLimitId = userId || 'anonymous';
+      const rateLimitCheck = referralCodeRateLimiter.checkRateLimit(rateLimitId);
+      
+      if (!rateLimitCheck.allowed) {
+        logger.warn('Rate limit exceeded for referral code validation', {
+          identifier: rateLimitId,
+          referralCode: referralCode.substring(0, 4) + '...'
+        }, 'ReferralService');
+        return {
+          exists: false,
+          error: `Too many referral code lookups. Please wait ${Math.ceil((rateLimitCheck.resetTime! - Date.now()) / 1000 / 60)} minutes.`
+        };
+      }
+
+      // Periodic cleanup of expired rate limit records
+      if (Math.random() < 0.01) { // ~1% chance per call
+        referralCodeRateLimiter.cleanup();
+      }
+
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('referral_code', '==', referralCode));
       const querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
         const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        
+        // Check if referrer account is active (security: don't allow inactive accounts)
+        const userStatus = userData.status;
+        if (userStatus === 'suspended' || userStatus === 'deleted') {
+          logger.warn('Referral code belongs to inactive account', {
+            referralCode: referralCode.substring(0, 4) + '...',
+            status: userStatus
+          }, 'ReferralService');
+          return {
+            exists: false,
+            error: 'This referral code is no longer valid.'
+          };
+        }
+        
+        return { exists: true };
+      }
+      
+      return { exists: false };
+    } catch (error) {
+      logger.error('Failed to validate referral code', error, 'ReferralService');
+      // Re-throw rate limit errors
+      if (error instanceof Error && error.message.includes('Too many')) {
+        return {
+          exists: false,
+          error: error.message
+        };
+      }
+      return { exists: false, error: 'Unable to validate referral code' };
+    }
+  }
+
+  /**
+   * Find referrer by referral code (internal method - returns user ID)
+   * Used internally for tracking referrals - NOT exposed to frontend
+   * Includes rate limiting and account status validation
+   */
+  private async findReferrerByCode(referralCode: string, userId?: string): Promise<{ id: string; referral_code?: string; status?: string } | null> {
+    try {
+      // Rate limiting
+      const rateLimitId = userId || 'anonymous';
+      const rateLimitCheck = referralCodeRateLimiter.checkRateLimit(rateLimitId);
+      
+      if (!rateLimitCheck.allowed) {
+        logger.warn('Rate limit exceeded for referral code lookup', {
+          identifier: rateLimitId,
+          referralCode: referralCode.substring(0, 4) + '...'
+        }, 'ReferralService');
+        throw new Error(`Too many referral code lookups. Please wait ${Math.ceil((rateLimitCheck.resetTime! - Date.now()) / 1000 / 60)} minutes.`);
+      }
+
+      // Periodic cleanup
+      if (Math.random() < 0.01) {
+        referralCodeRateLimiter.cleanup();
+      }
+
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('referral_code', '==', referralCode));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
         return {
           id: userDoc.id,
-          referral_code: userDoc.data().referral_code
+          referral_code: userData.referral_code,
+          status: userData.status
         };
       }
       
       return null;
     } catch (error) {
       logger.error('Failed to find referrer by code', error, 'ReferralService');
+      if (error instanceof Error && error.message.includes('Too many')) {
+        throw error;
+      }
       return null;
     }
   }
@@ -449,11 +724,12 @@ class ReferralService {
         const data = doc.data();
         
         // Build enhanced referral object with backward compatibility
+        // Note: referredUserName removed for privacy - fetch when needed by authorized users
         return {
           id: doc.id,
           referrerId: data.referrerId,
           referredUserId: data.referredUserId,
-          referredUserName: data.referredUserName,
+          referredUserName: data.referredUserName || undefined, // Optional - removed for privacy
           createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
           expiresAt: data.expiresAt?.toDate?.()?.toISOString(),
           status: data.status || (data.hasCreatedAccount ? 'active' : 'pending') as ReferralStatus,
@@ -661,9 +937,19 @@ class ReferralService {
 
   /**
    * Get all referrals for a user with enhanced status tracking
+   * Only allows users to view their own referrals (authorization check)
    */
-  async getUserReferrals(userId: string): Promise<Referral[]> {
+  async getUserReferrals(userId: string, requestingUserId?: string): Promise<Referral[]> {
     try {
+      // Authorization check: only allow users to view their own referrals
+      if (requestingUserId && requestingUserId !== userId) {
+        logger.warn('Unauthorized attempt to view referrals', {
+          requestedUserId: userId,
+          requestingUserId
+        }, 'ReferralService');
+        throw new Error('Unauthorized: Cannot view other users\' referrals');
+      }
+
       const referralsRef = collection(db, 'referrals');
       const q = query(referralsRef, where('referrerId', '==', userId));
       const querySnapshot = await getDocs(q);
@@ -673,11 +959,12 @@ class ReferralService {
         const data = doc.data();
         
         // Build enhanced referral with backward compatibility
+        // Note: referredUserName removed for privacy - fetch when needed by authorized users
         referrals.push({
           id: doc.id,
           referrerId: data.referrerId,
           referredUserId: data.referredUserId,
-          referredUserName: data.referredUserName,
+          referredUserName: data.referredUserName || undefined, // Optional - removed for privacy
           createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
           expiresAt: data.expiresAt?.toDate?.()?.toISOString(),
           status: data.status || (data.hasCreatedAccount ? 'active' : 'pending') as ReferralStatus,

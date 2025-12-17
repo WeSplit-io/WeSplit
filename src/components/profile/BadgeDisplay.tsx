@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import PhosphorIcon from '../shared/PhosphorIcon';
-import { getBadgeInfo } from '../../services/rewards/badgeConfig';
+import { badgeService } from '../../services/rewards/badgeService';
 
 interface BadgeDisplayProps {
   badges?: string[];
@@ -23,6 +23,28 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
   showAll = false,
   onBadgePress
 }) => {
+  const [badgeInfoMap, setBadgeInfoMap] = React.useState<Map<string, any>>(new Map());
+
+  // Load badge info from database for all badges
+  React.useEffect(() => {
+    const loadBadgeInfo = async () => {
+      if (!badges || badges.length === 0) return;
+
+      const infoMap = new Map();
+      await Promise.all(
+        badges.map(async (badgeId) => {
+          const info = await badgeService.getBadgeInfoPublic(badgeId);
+          if (info) {
+            infoMap.set(badgeId, info);
+          }
+        })
+      );
+      setBadgeInfoMap(infoMap);
+    };
+
+    loadBadgeInfo();
+  }, [badges]);
+
   if (!badges || badges.length === 0) {
     return null;
   }
@@ -36,9 +58,9 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
   return (
     <View style={styles.container}>
       {displayBadges.map((badgeId) => {
-        const badgeInfo = getBadgeInfo(badgeId);
+        const badgeInfo = badgeInfoMap.get(badgeId);
         if (!badgeInfo) {
-          // Fallback for unknown badges
+          // Badge info not loaded yet or doesn't exist
           return null;
         }
         const isActive = badgeId === activeBadge;

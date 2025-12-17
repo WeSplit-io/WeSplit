@@ -83,7 +83,6 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
               userName={participant.name}
               size={40}
               avatarUrl={participant.avatar}
-              showProfileBorder={false}
               style={{
                 width: 40,
                 height: 40,

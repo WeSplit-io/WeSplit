@@ -9,7 +9,7 @@ import {
   Platform,
   Linking
 } from 'react-native';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, useRoute, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
 import { Container, Header, Button, Input, LoadingScreen, Tabs } from '../../components/shared';
 import { useApp } from '../../context/AppContext';
@@ -21,13 +21,14 @@ import { authService } from '../../services/auth/AuthService';
 
 type RootStackParamList = {
   Dashboard: undefined;
-  Verification: { email?: string; phoneNumber?: string; verificationId?: string };
-  CreateProfile: { email?: string; phoneNumber?: string };
-  AuthMethods: undefined;
+  Verification: { email?: string; phoneNumber?: string; verificationId?: string; referralCode?: string };
+  CreateProfile: { email?: string; phoneNumber?: string; referralCode?: string };
+  AuthMethods: { referralCode?: string };
 };
 
 const AuthMethodsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const route = useRoute();
   const { authenticateUser, updateUser } = useApp();
 
   // State management
@@ -36,6 +37,9 @@ const AuthMethodsScreen: React.FC = () => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  
+  // Get referral code from route params (from deep link)
+  const referralCode = (route.params as any)?.referralCode;
 
   // Validation functions
   const isValidEmail = (email: string): boolean => {
@@ -296,13 +300,15 @@ const AuthMethodsScreen: React.FC = () => {
                 if (needsProfile) {
                   logger.info('Email user needs to create profile (no name), navigating to CreateProfile', {
                     userId: userExistsResult.userId,
-                    email: email.trim()
+                    email: email.trim(),
+                    hasReferralCode: !!referralCode
                   }, 'AuthMethodsScreen');
                   navigation.reset({
                     index: 0,
                     routes: [{ name: 'CreateProfile', params: {
                       email: email.trim(),
-                      phoneNumber: authenticatedUser.phone
+                      phoneNumber: authenticatedUser.phone,
+                      referralCode: referralCode
                     } }],
                   });
                 } else {
@@ -359,7 +365,10 @@ const AuthMethodsScreen: React.FC = () => {
       }
 
       // Navigate to verification screen
-      navigation.navigate('Verification', { email: email.trim() });
+      navigation.navigate('Verification', { 
+        email: email.trim(),
+        referralCode: referralCode
+      });
     } catch (error) {
       logger.error('Email authentication failed', { error, email: email.trim() }, 'AuthMethodsScreen');
       Alert.alert('Error', 'Failed to process email. Please try again.');
@@ -436,13 +445,15 @@ const AuthMethodsScreen: React.FC = () => {
             if (needsProfile) {
               logger.info('Phone user needs to create profile (no name), navigating to CreateProfile', {
                 userId: result.user.uid,
-                phoneNumber: formattedPhone.substring(0, 5) + '...'
+                phoneNumber: formattedPhone.substring(0, 5) + '...',
+                hasReferralCode: !!referralCode
               }, 'AuthMethodsScreen');
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'CreateProfile', params: {
                   phoneNumber: formattedPhone,
-                  email: authenticatedUser.email
+                  email: authenticatedUser.email,
+                  referralCode: referralCode
                 } }],
               });
             } else {
@@ -476,12 +487,14 @@ const AuthMethodsScreen: React.FC = () => {
       // New user - navigate to verification screen for SMS code
       logger.info('New phone user - navigating to SMS verification', {
         phoneNumber: formattedPhone.substring(0, 5) + '...',
-        verificationId: result.verificationId
+        verificationId: result.verificationId,
+        hasReferralCode: !!referralCode
       }, 'AuthMethodsScreen');
 
       navigation.navigate('Verification', {
         phoneNumber: formattedPhone,
-        verificationId: result.verificationId
+        verificationId: result.verificationId,
+        referralCode: referralCode
       });
     } catch (error) {
       logger.error('Phone authentication failed', { error, phoneNumber: formattedPhone.substring(0, 5) + '...' }, 'AuthMethodsScreen');

@@ -11,13 +11,11 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { SvgUri } from 'react-native-svg';
 import { colors } from '../theme/colors';
 import { logger } from '../services/core';
 import { userImageService } from '../services/core';
 import { UserImageInfo, UserImageService } from '../services/core/userImageService';
 import { DEFAULT_AVATAR_URL } from '../config/constants/constants';
-import { isSvgUrl, isSafeUrl } from '../utils/ui/format/formatUtils';
 
 interface UserAvatarProps {
   userId?: string;
@@ -25,8 +23,6 @@ interface UserAvatarProps {
   size?: number;
   style?: ViewStyle;
   textStyle?: TextStyle;
-  showBorder?: boolean;
-  borderColor?: string;
   // If user data is already available, pass it to avoid extra API calls
   userImageInfo?: UserImageInfo;
   // Direct avatar URL if available
@@ -35,8 +31,6 @@ interface UserAvatarProps {
   displayName?: string;
   // Loading timeout in milliseconds (default: 5000)
   loadingTimeout?: number;
-  borderImageUrl?: string;
-  borderScaleOverride?: number;
 }
 
 
@@ -46,19 +40,14 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   size = 40,
   style,
   textStyle,
-  showBorder = false,
-  borderColor = colors.green,
   userImageInfo,
   avatarUrl,
   displayName,
   loadingTimeout = 5000,
-  borderImageUrl,
-  borderScaleOverride,
 }) => {
   const [imageInfo, setImageInfo] = useState<UserImageInfo | null>(userImageInfo || null);
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [borderError, setBorderError] = useState(false);
 
   useEffect(() => {
     logger.debug('Props received', {
@@ -142,11 +131,6 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     setIsLoading(false);
   };
 
-  const handleBorderError = () => {
-    logger.warn('Border image failed to load', { userId, borderImageUrl }, 'UserAvatar');
-    setBorderError(true);
-  };
-
   const avatarContainerStyle: ViewStyle = {
     width: size,
     height: size,
@@ -163,10 +147,6 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     backgroundColor: colors.white5,
     justifyContent: 'center',
     alignItems: 'center',
-    ...(showBorder && {
-      borderWidth: 2,
-      borderColor: borderColor,
-    }),
     overflow: 'hidden',
   };
 
@@ -199,10 +179,6 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     ? imageInfo.imageUrl 
     : DEFAULT_AVATAR_URL;
 
-  // Responsive border scaling - smaller on mobile devices
-  const baseBorderScale = size < 60 ? 1.12 : size < 100 ? 1.14 : 1.15;
-  const borderScale = borderScaleOverride ?? baseBorderScale;
-
   return (
     <View style={avatarContainerStyle}>
       <View style={avatarCircleStyle}>
@@ -226,44 +202,6 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
           resizeMode="cover"
         />
       </View>
-      {borderImageUrl && !borderError && isSafeUrl(borderImageUrl) && (
-        isSvgUrl(borderImageUrl) ? (
-          <View
-            style={{
-              position: 'absolute',
-              top: (size - size * borderScale) / 2,
-              left: (size - size * borderScale) / 2,
-              width: size * borderScale,
-              height: size * borderScale,
-              zIndex: 2,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            pointerEvents="none"
-          >
-            <SvgUri
-              uri={borderImageUrl}
-              width="100%"
-              height="100%"
-              onError={handleBorderError}
-            />
-          </View>
-        ) : (
-          <Image
-            source={{ uri: borderImageUrl }}
-            style={{
-              position: 'absolute',
-              top: (size - size * borderScale) / 2,
-              left: (size - size * borderScale) / 2,
-              width: size * borderScale,
-              height: size * borderScale,
-              zIndex: 2,
-            }}
-            resizeMode="cover"
-            onError={handleBorderError}
-          />
-        )
-      )}
     </View>
   );
 };

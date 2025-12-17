@@ -202,81 +202,21 @@ export const BADGE_DEFINITIONS: Record<string, BadgeInfo> = {
     progressLabel: 'TOTAL VOLUME ($)'
   },
 
-  // Event Badges - Can be claimed via redeem codes
-  // Add event badges here as needed
-  
-  // Community Badges - Represent communities, displayed next to user name
-  // These badges can only be claimed via redeem codes
-  'community_wesplit': {
-    badgeId: 'community_wesplit',
-    title: 'WeSplit Community',
-    description: 'WeSplit community member',
-    icon: '👥',
-    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/wesplit-badge.png',
-    category: 'community',
-    rarity: 'common',
-    points: 0, // Community badges typically don't award points
-    isEventBadge: true,
-    isCommunityBadge: true,
-    showNextToName: true, // Display next to user name
-    redeemCode: 'WS24X9K'
-  },
-  'community_superteamfrance': {
-    badgeId: 'community_superteamfrance',
-    title: 'Superteam France',
-    description: 'Superteam France community member',
-    icon: '🇫🇷',
-    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/superteamfrance-badge.png',
-    category: 'community',
-    rarity: 'rare',
-    points: 0,
-    isEventBadge: true,
-    isCommunityBadge: true,
-    showNextToName: true,
-    redeemCode: 'STF24M8P'
-  },
-  'community_monkedao': {
-    badgeId: 'community_monkedao',
-    title: 'MonkeDAO',
-    description: 'MonkeDAO community member',
-    icon: '🐵',
-    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/monkedao-badge.png',
-    category: 'community',
-    rarity: 'rare',
-    points: 0,
-    isEventBadge: true,
-    isCommunityBadge: true,
-    showNextToName: true,
-    redeemCode: 'MKD24N2Q'
-  },
-  'community_diggers': {
-    badgeId: 'community_diggers',
-    title: 'Diggers',
-    description: 'Diggers community member',
-    icon: '⛏️',
-    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/diggers-badge.png',
-    category: 'community',
-    rarity: 'rare',
-    points: 0,
-    isEventBadge: true,
-    isCommunityBadge: true,
-    showNextToName: true,
-    redeemCode: 'DGR24K7R'
-  },
-  'event_solana_breakpoint_2025': {
-    badgeId: 'event_solana_breakpoint_2025',
-    title: 'Solana Breakpoint 2025',
-    description: 'Solana Breakpoint 2025 attendee',
-    icon: '🎯',
-    iconUrl: 'gs://wesplit-35186.firebasestorage.app/badges/communauté/BP2025-badge.png',
-    category: 'event',
-    rarity: 'epic',
-    points: 500,
-    isEventBadge: true,
-    isCommunityBadge: false,
-    showNextToName: false,
-    redeemCode: 'BP25X9K'
-  },
+  // Event/Community Badges - Now managed in Firestore
+  // ====================================================
+  // Event and community badges are no longer defined here.
+  // They are loaded dynamically from the 'badges' Firestore collection.
+  // 
+  // To add new event/community badges:
+  //   1. Add badge document to Firestore 'badges' collection
+  //   2. Badge will be automatically available in the app
+  //   3. No app update required
+  //
+  // See:
+  //   - src/services/rewards/badgeService.ts (badge loading logic)
+  //   - docs/guides/DYNAMIC_BADGE_CREATION.md (how to add badges)
+  //
+  // Achievement badges (below) remain in config as they are progress-based.
 };
 
 /**

@@ -530,13 +530,9 @@ export const firestoreService = {
         try {
           const { referralService } = await import('../services/rewards/referralService');
           const { userActionSyncService } = await import('../services/rewards/userActionSyncService');
-          const { updateDoc } = await import('firebase/firestore');
           
-          // Generate referral code
-          const referralCode = referralService.generateReferralCode(user.uid);
-          await updateDoc(userRef, {
-            referral_code: referralCode
-          });
+          // Ensure referral code exists using centralized, uniqueness-checked logic
+          await referralService.ensureUserHasReferralCode(user.uid);
           
           // Track referral if provided (check route params or query params)
           // Note: This would need to be passed from the signup flow

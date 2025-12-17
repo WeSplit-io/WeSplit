@@ -1255,6 +1255,12 @@ export const userCacheManager = {
     userCache.clear();
     logger.info('User cache cleared', { clearedCount }, 'FirebaseDataService');
   },
+  invalidateUser: (userId: string) => {
+    const deleted = userCache.delete(userId);
+    if (deleted) {
+      logger.debug('User cache invalidated', { userId }, 'FirebaseDataService');
+    }
+  },
   getCacheSize: () => userCache.size,
   cleanup: cleanupUserCache
 };

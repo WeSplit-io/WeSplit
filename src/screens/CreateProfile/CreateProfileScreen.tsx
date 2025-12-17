@@ -28,6 +28,7 @@ import { logger } from '../../services/analytics/loggingService';
 import { Container, Input, Button } from '../../components/shared';
 import Header from '../../components/shared/Header';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import { normalizeReferralCode, REFERRAL_CODE_MIN_LENGTH, REFERRAL_CODE_MAX_LENGTH } from '../../services/shared/referralUtils';
 
 const CreateProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -62,11 +63,11 @@ const CreateProfileScreen: React.FC = () => {
     }
 
     // Minimum length check
-    if (code.length < 8) {
+    if (code.length < REFERRAL_CODE_MIN_LENGTH) {
       setReferralValidation({
         isValidating: false,
         isValid: false,
-        error: 'Referral code must be at least 8 characters'
+        error: `Referral code must be at least ${REFERRAL_CODE_MIN_LENGTH} characters`
       });
       return;
     }
@@ -78,10 +79,12 @@ const CreateProfileScreen: React.FC = () => {
     validationTimeoutRef.current = setTimeout(async () => {
       try {
         const { referralService } = await import('../../services/rewards/referralService');
-        // Check if referral code exists by trying to find the referrer
-        const referrer = await referralService.findReferrerByCode(code);
+        // Validate referral code exists (doesn't expose user ID for privacy)
+        // Pass current user ID for rate limiting (if available)
+        const currentUserId = state.currentUser?.id;
+        const validation = await referralService.validateReferralCode(code, currentUserId);
         
-        if (referrer) {
+        if (validation.exists) {
           setReferralValidation({
             isValidating: false,
             isValid: true,
@@ -91,7 +94,7 @@ const CreateProfileScreen: React.FC = () => {
           setReferralValidation({
             isValidating: false,
             isValid: false,
-            error: 'Referral code not found. Please check and try again.'
+            error: validation.error || 'Referral code not found. Please check and try again.'
           });
         }
       } catch (error) {
@@ -263,7 +266,7 @@ const CreateProfileScreen: React.FC = () => {
     if (!referralInput && referralCode) {
       setReferralInput(referralCode);
       // Validate if code exists
-      if (referralCode.length >= 8) {
+      if (referralCode.length >= REFERRAL_CODE_MIN_LENGTH) {
         validateReferralCode(referralCode);
       }
     }
@@ -279,14 +282,14 @@ const CreateProfileScreen: React.FC = () => {
   };
 
   const handleReferralSubmit = () => {
-    const trimmedCode = referralInput.trim().toUpperCase().replace(/\s/g, '');
+    const trimmedCode = normalizeReferralCode(referralInput);
     
     // Validate before submitting
-    if (!trimmedCode || trimmedCode.length < 8) {
+    if (!trimmedCode || trimmedCode.length < REFERRAL_CODE_MIN_LENGTH) {
       setReferralValidation({
         isValidating: false,
         isValid: false,
-        error: 'Please enter a valid referral code'
+        error: `Please enter a valid referral code (at least ${REFERRAL_CODE_MIN_LENGTH} characters)`
       });
       return;
     }
@@ -618,7 +621,7 @@ const CreateProfileScreen: React.FC = () => {
           (async () => {
             try {
               const { referralService } = await import('../../services/rewards/referralService');
-              const trimmedCode = finalReferralCode.trim().toUpperCase();
+              const trimmedCode = normalizeReferralCode(finalReferralCode);
               
               logger.info('Tracking referral', { userId: appUser.id, referralCode: trimmedCode }, 'CreateProfileScreen');
               
@@ -645,7 +648,13 @@ const CreateProfileScreen: React.FC = () => {
               }, 'CreateProfileScreen');
               // Don't fail account creation if referral tracking fails
             }
-          })().catch(() => {}); // Swallow errors - non-blocking
+          })().catch((backgroundError) => {
+            // Ensure background errors are logged for observability
+            logger.error('Background referral tracking task failed', { 
+              userId: appUser.id,
+              error: backgroundError 
+            }, 'CreateProfileScreen');
+          }); // Still non-blocking for the user flow
         }
         
         // Verify data was saved correctly
@@ -881,7 +890,7 @@ const CreateProfileScreen: React.FC = () => {
                     }
                     autoCapitalize="characters"
                     autoCorrect={false}
-                    maxLength={12}
+                    maxLength={REFERRAL_CODE_MAX_LENGTH}
                     error={referralValidation.error}
                     containerStyle={{ width: '100%' }}
                   />

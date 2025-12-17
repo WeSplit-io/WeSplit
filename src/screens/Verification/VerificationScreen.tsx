@@ -255,11 +255,14 @@ const VerificationScreen: React.FC = () => {
           const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
           if (needsProfile) {
+            // Preserve referral code from route params
+            const referralCode = route.params?.referralCode;
             (navigation as any).reset({
               index: 0,
               routes: [{ name: 'CreateProfile', params: {
                 email: transformedUser.email,
-                phoneNumber: transformedUser.phone
+                phoneNumber: transformedUser.phone,
+                referralCode: referralCode
               } }],
             });
           } else {
@@ -330,16 +333,20 @@ const VerificationScreen: React.FC = () => {
               const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
               if (needsProfile) {
+                // Preserve referral code from route params
+                const referralCode = route.params?.referralCode;
                 logger.info('User needs to create profile (no name), navigating to CreateProfile', {
                   method: route.params?.phoneNumber ? 'phone' : 'email',
                   phoneNumber: transformedUser.phone,
-                  email: transformedUser.email
+                  email: transformedUser.email,
+                  hasReferralCode: !!referralCode
                 }, 'VerificationScreen');
                 (navigation as any).reset({
                   index: 0,
                   routes: [{ name: 'CreateProfile', params: {
                     email: transformedUser.email,
-                    phoneNumber: transformedUser.phone
+                    phoneNumber: transformedUser.phone,
+                    referralCode: referralCode
                   } }],
                 });
               } else {
@@ -403,12 +410,18 @@ const VerificationScreen: React.FC = () => {
               const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
               if (needsProfile) {
-                logger.info('Phone user needs to create profile (no name, fallback case), navigating to CreateProfile', { phoneNumber: transformedUser.phone }, 'VerificationScreen');
+                // Preserve referral code from route params
+                const referralCode = route.params?.referralCode;
+                logger.info('Phone user needs to create profile (no name, fallback case), navigating to CreateProfile', { 
+                  phoneNumber: transformedUser.phone,
+                  hasReferralCode: !!referralCode
+                }, 'VerificationScreen');
                 (navigation as any).reset({
                   index: 0,
                   routes: [{ name: 'CreateProfile', params: {
                     phoneNumber: transformedUser.phone,
-                    email: transformedUser.email
+                    email: transformedUser.email,
+                    referralCode: referralCode
                   } }],
                 });
               } else {
@@ -478,12 +491,18 @@ const VerificationScreen: React.FC = () => {
             const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
             if (needsProfile) {
-              logger.info('Phone user needs to create profile (no name, Firestore error fallback), navigating to CreateProfile', { phoneNumber: transformedUser.phone }, 'VerificationScreen');
+              // Preserve referral code from route params
+              const referralCode = route.params?.referralCode;
+              logger.info('Phone user needs to create profile (no name, Firestore error fallback), navigating to CreateProfile', { 
+                phoneNumber: transformedUser.phone,
+                hasReferralCode: !!referralCode
+              }, 'VerificationScreen');
               (navigation as any).reset({
                 index: 0,
                 routes: [{ name: 'CreateProfile', params: {
                   phoneNumber: transformedUser.phone,
-                  email: transformedUser.email
+                  email: transformedUser.email,
+                  referralCode: referralCode
                 } }],
               });
             } else {
@@ -616,10 +635,17 @@ const VerificationScreen: React.FC = () => {
       const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
       
       if (needsProfile) {
-        logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'VerificationScreen');
+        // Preserve referral code from route params
+        const referralCode = route.params?.referralCode;
+        logger.info('User needs to create profile (no name), navigating to CreateProfile', {
+          hasReferralCode: !!referralCode
+        }, 'VerificationScreen');
         (navigation as any).reset({
           index: 0,
-          routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
+          routes: [{ name: 'CreateProfile', params: { 
+            email: transformedUser.email,
+            referralCode: referralCode
+          } }],
         });
       } else {
         // User already has a name, go directly to Dashboard

@@ -17,10 +17,23 @@ import { pendingInvitationService, PendingInvitation } from './pendingInvitation
 import { firebaseDataService } from '../data/firebaseDataService';
 
 // Universal link domains that we recognize
-const UNIVERSAL_LINK_DOMAINS = ['wesplit.io', 'www.wesplit.io'];
+const UNIVERSAL_LINK_DOMAINS = ['wesplit.io', 'www.wesplit.io', 'wesplit-deeplinks.web.app'];
 
 export interface DeepLinkData {
-  action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split' | 'view-split' | 'wallet-linked' | 'wallet-error';
+  action:
+    | 'join'
+    | 'invite'
+    | 'profile'
+    | 'send'
+    | 'transfer'
+    | 'moonpay-success'
+    | 'moonpay-failure'
+    | 'oauth-callback'
+    | 'join-split'
+    | 'view-split'
+    | 'wallet-linked'
+    | 'wallet-error'
+    | 'referral';
   inviteId?: string;
   groupId?: string;
   groupName?: string;
@@ -40,6 +53,8 @@ export interface DeepLinkData {
   walletAddress?: string; // Connected wallet address
   signature?: string; // Wallet signature for verification
   linkingError?: string; // Error message if wallet linking failed
+  // Referral-specific
+  referralCode?: string;
 }
 
 /**
@@ -284,6 +299,30 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
             linkingError: error || 'Unknown wallet error'
           };
         }
+      case 'referral': {
+        // Referral deep link
+        // App-scheme: wesplit://referral/CODE or wesplit://referral?code=CODE
+        // Universal:  https://wesplit-deeplinks.web.app/referral?code=CODE
+        let code = urlObj.searchParams.get('code');
+
+        if (!code && params[0]) {
+          code = params[0];
+        }
+
+        if (!code) {
+          if (__DEV__) {
+            console.warn('🔥 Referral action missing code parameter');
+          }
+          return null;
+        }
+
+        const normalizedCode = code.trim().toUpperCase();
+
+        return {
+          action: 'referral',
+          referralCode: normalizedCode
+        };
+      }
       
       default:
         if (__DEV__) {
@@ -723,6 +762,42 @@ export function setupDeepLinkListeners(
         );
         break;
       
+      case 'referral': {
+        // Referral links are meant for onboarding/new users
+        if (!linkData.referralCode) {
+          if (__DEV__) {
+            console.warn('🔥 Referral deep link missing referralCode');
+          }
+          Alert.alert('Invalid Link', 'This referral link is not valid.');
+          return;
+        }
+
+        // If user is not authenticated, route through auth flow with referralCode
+        if (!currentUser?.id) {
+          logger.info('Received referral deep link for unauthenticated user, navigating to AuthMethods', {
+            referralCode: linkData.referralCode
+          }, 'deepLinkHandler');
+
+          navigation.navigate('AuthMethods', {
+            referralCode: linkData.referralCode
+          } as any);
+          return;
+        }
+
+        // If user is already onboarded, just show info (we don't apply referrals mid-life yet)
+        logger.info('Referral deep link opened by already-authenticated user', {
+          userId: currentUser.id,
+          referralCode: linkData.referralCode
+        }, 'deepLinkHandler');
+
+        Alert.alert(
+          'Referral Link',
+          'Referral codes are applied when creating a new account. You are already signed in, so this link will not change your referral status.',
+          [{ text: 'OK' }]
+        );
+        break;
+      }
+      
       default:
         if (__DEV__) {
           console.warn('🔥 Unknown deep link action:', linkData.action);
@@ -861,6 +936,17 @@ export function generateWalletErrorLink(provider?: string, error?: string): stri
 }
 
 /**
+ * Generate a referral deep link (universal link) that can be used in shares/QRs.
+ * Currently targets the deeplinks hosting site: wesplit-deeplinks.web.app
+ */
+export function generateReferralLink(referralCode: string): string {
+  const normalizedCode = referralCode.trim().toUpperCase();
+  const baseUrl = 'https://wesplit-deeplinks.web.app/referral';
+  const params = new URLSearchParams({ code: normalizedCode });
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
  * Test function to verify deep link flow
  * This can be called to test the invitation system
  */
@@ -923,5 +1009,6 @@ export const deepLinkHandler = {
   generateTransferLink,
   generateWalletLinkedLink,
   generateWalletErrorLink,
+  generateReferralLink,
   testDeepLinkFlow
 }; 

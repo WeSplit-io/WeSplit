@@ -110,8 +110,6 @@ const SendConfirmation: React.FC<SendConfirmationProps> = ({
               userName={recipientUserName || recipientName}
               avatarUrl={recipientImageUrl}
               size={60}
-              showBorder={false}
-              showProfileBorder={false}
             />
           )}
         </View>

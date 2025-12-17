@@ -63,7 +63,6 @@ const AvatarComponent = ({ avatar, displayName, style, userId }: { avatar?: stri
       userName={displayName}
       avatarUrl={avatar}
       size={32}
-      showProfileBorder={false}
       style={{
         width: 32,
         height: 32,

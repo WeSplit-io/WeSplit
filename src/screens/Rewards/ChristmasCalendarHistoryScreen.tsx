@@ -171,9 +171,7 @@ const ChristmasCalendarHistoryScreen: React.FC = () => {
               userId={currentUser?.id}
               displayName="Preview User"
               avatarUrl={currentUser?.avatar}
-              borderImageUrl={assetPreviewUrl}
               size={48}
-              borderScaleOverride={1.5}
             />
           </View>
         );

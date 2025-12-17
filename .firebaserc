@@ -3,6 +3,14 @@
     "wesplit": "wesplit-35186",
     "default": "wesplit-35186"
   },
-  "targets": {},
+  "targets": {
+    "wesplit-35186": {
+      "hosting": {
+        "deeplinks": [
+          "wesplit-deeplinks"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

@@ -302,7 +302,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentWalletBackgrounds: state.currentUser.wallet_backgrounds
       }, 'AppContext');
 
-      const userData = await firebaseDataService.user.getUser(state.currentUser.id.toString());
+      const userData = await firebaseDataService.user.getCurrentUser(state.currentUser.id.toString());
 
       logger.debug('User data refreshed from Firestore', {
         userId: state.currentUser.id,

@@ -87,7 +87,6 @@ const SpendSplitParticipants: React.FC<SpendSplitParticipantsProps> = ({
                   userName={participant.name}
                   avatarUrl={'avatar' in participant ? participant.avatar : undefined}
                   size={48}
-                  showProfileBorder={false}
                   style={styles.avatar}
                 />
                 {isPaid && (

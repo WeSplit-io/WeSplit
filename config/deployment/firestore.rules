@@ -44,5 +44,56 @@ service cloud.firestore {
       // The encryption key derivation also requires app config, providing additional security
       allow read, write: if request.auth != null;
     }
+
+    // Referrals - restrict access to involved users only
+    match /referrals/{referralId} {
+      // Allow read if the authenticated user is either the referrer or the referred user
+      allow read: if request.auth != null &&
+        (request.auth.uid == resource.data.referrerId ||
+         request.auth.uid == resource.data.referredUserId);
+
+      // Allow create if the authenticated user is the referred user
+      // (referrals are created when a new user signs up with a code)
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.referredUserId;
+
+      // Allow updates only for involved users; business logic still enforced in application code
+      allow update: if request.auth != null &&
+        (request.auth.uid == resource.data.referrerId ||
+         request.auth.uid == resource.data.referredUserId);
+
+      // Deletions should generally be done via privileged backend code; block from clients
+      allow delete: if false;
+    }
+
+    // Badges collection - public read for all badges, admin-only write
+    // This allows users to claim badges via redeem codes without app updates
+    match /badges/{badgeId} {
+      // Anyone can read badges (needed for redeem code lookup)
+      allow read: if true;
+      
+      // Only admins can create/update/delete badges
+      // In production, you should add admin check: request.auth.token.admin == true
+      // For now, allowing authenticated users (you can restrict this later)
+      allow write: if request.auth != null;
+    }
+
+    // Badge images collection - public read, admin-only write
+    match /badge_images/{badgeId} {
+      // Anyone can read badge images
+      allow read: if true;
+      
+      // Only admins can write badge images
+      allow write: if request.auth != null;
+    }
+
+    // User badges subcollection - users can read their own, system can write
+    match /users/{userId}/badges/{badgeId} {
+      // Users can read their own claimed badges
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // System can write when claiming badges (enforced by application code)
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 } 

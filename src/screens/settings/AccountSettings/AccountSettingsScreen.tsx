@@ -27,7 +27,8 @@ import Avatar from '../../../components/shared/Avatar';
 import { getAssetInfo } from '../../../services/rewards/assetConfig';
 import { resolveStorageUrl } from '../../../services/shared/storageUrlService';
 import AssetSelectionModal from '../AssetSelection/AssetSelectionModal';
-import { SvgUri } from 'react-native-svg';
+import { badgeService } from '../../../services/rewards/badgeService';
+// Badge info is loaded from database via badgeService
 
 interface AccountSettingsScreenProps {
   navigation: any;
@@ -54,9 +55,11 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<'infos' | 'appearance'>('infos');
   const [showAssetSelectionModal, setShowAssetSelectionModal] = useState(false);
-  const [assetSelectionType, setAssetSelectionType] = useState<'profile_border' | 'wallet_background' | null>(null);
+  const [assetSelectionType, setAssetSelectionType] = useState<'wallet_background' | null>(null);
   const [walletBackgroundUrl, setWalletBackgroundUrl] = useState<string | null>(null);
-  const [borderPreviewUrl, setBorderPreviewUrl] = useState<string | null>(null);
+  const [userBadges, setUserBadges] = useState<any[]>([]);
+  const [loadingBadges, setLoadingBadges] = useState(false);
+  const [selectingBadge, setSelectingBadge] = useState(false);
   
   // Account deletion states
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -96,28 +99,66 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
     loadWalletBackground();
   }, [currentUser?.active_wallet_background]);
 
-  // Load border preview URL
+  // Load user badges (community and event badges)
   useEffect(() => {
-    const loadBorderPreview = async () => {
-      if (!currentUser?.active_profile_border) {
-        setBorderPreviewUrl(null);
+    const loadUserBadges = async () => {
+      if (!currentUser?.id) {
+        setUserBadges([]);
         return;
       }
 
+      setLoadingBadges(true);
       try {
-        const assetInfo = getAssetInfo(currentUser.active_profile_border);
-        if (assetInfo?.url) {
-          const resolvedUrl = await resolveStorageUrl(assetInfo.url, { assetId: currentUser.active_profile_border });
-          setBorderPreviewUrl(resolvedUrl || null);
-        }
+        const allBadges = await badgeService.getUserClaimedBadges(currentUser.id.toString());
+        
+        logger.debug('Loaded all claimed badges', { 
+          totalBadges: allBadges.length,
+          badges: allBadges.map((b: any) => ({
+            badgeId: b.badgeId,
+            title: b.title,
+            isCommunityBadge: b.isCommunityBadge,
+            isEventBadge: b.isEventBadge,
+            category: b.category
+          }))
+        }, 'AccountSettingsScreen');
+        
+        // Filter for community badges and event badges (like Solana Breakpoint)
+        // Include badges that are either community badges OR event badges
+        const selectableBadges = allBadges.filter((badge: any) => 
+          badge.isCommunityBadge || 
+          badge.isEventBadge ||
+          badge.category === 'event'
+        );
+        
+        logger.debug('Filtered selectable badges', { 
+          selectableCount: selectableBadges.length,
+          badges: selectableBadges.map((b: any) => ({
+            badgeId: b.badgeId,
+            title: b.title,
+            type: b.isCommunityBadge ? 'community' : 'event'
+          }))
+        }, 'AccountSettingsScreen');
+        
+        // Sort: community badges first, then event badges
+        const sortedBadges = selectableBadges.sort((a: any, b: any) => {
+          // Community badges first
+          if (a.isCommunityBadge && !b.isCommunityBadge) return -1;
+          if (!a.isCommunityBadge && b.isCommunityBadge) return 1;
+          // Then by title
+          return a.title.localeCompare(b.title);
+        });
+        
+        setUserBadges(sortedBadges);
       } catch (error) {
-        logger.warn('Failed to load border preview', { error }, 'AccountSettingsScreen');
-        setBorderPreviewUrl(null);
+        logger.error('Failed to load user badges', { error }, 'AccountSettingsScreen');
+        setUserBadges([]);
+      } finally {
+        setLoadingBadges(false);
       }
     };
 
-    loadBorderPreview();
-  }, [currentUser?.active_profile_border]);
+    loadUserBadges();
+  }, [currentUser?.id, currentUser?.badges]);
 
   // Refresh user data when screen comes into focus (throttled to avoid excessive calls)
   useFocusEffect(
@@ -132,7 +173,6 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
 
         try {
           logger.debug('Refreshing user data on AccountSettingsScreen focus', {
-            currentProfileBorders: currentUser?.profile_borders,
             currentWalletBackgrounds: currentUser?.wallet_backgrounds,
             currentUserId: currentUser?.id
           }, 'AccountSettingsScreen');
@@ -140,7 +180,6 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           await refreshUser();
 
           logger.debug('User data refreshed on AccountSettingsScreen focus', {
-            newProfileBorders: currentUser?.profile_borders,
             newWalletBackgrounds: currentUser?.wallet_backgrounds,
             currentUserId: currentUser?.id
           }, 'AccountSettingsScreen');
@@ -543,6 +582,61 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
 
   const displayName = currentUser?.name || 'PauluneMoon';
 
+  // Handle badge selection
+  const handleSelectBadge = async (badgeId: string) => {
+    if (!currentUser?.id || selectingBadge) {
+      return;
+    }
+
+    const isCurrentlyActive = currentUser.active_badge === badgeId;
+
+    try {
+      setSelectingBadge(true);
+      
+      if (isCurrentlyActive) {
+        // Deselect the badge by setting it to null in Firestore.
+        // The transformer will store null, and reads will map null to undefined.
+        await updateUser({
+          active_badge: null as any,
+        });
+      } else {
+        // Select the badge - only pass the field to update.
+        // updateUser handles Firestore update + cache invalidation + local state merge.
+        await updateUser({
+          active_badge: badgeId,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to update badge', { error, badgeId, isCurrentlyActive }, 'AccountSettingsScreen');
+      Alert.alert(
+        'Error', 
+        isCurrentlyActive 
+          ? 'Failed to deselect badge. Please try again.' 
+          : 'Failed to select badge. Please try again.'
+      );
+    } finally {
+      setSelectingBadge(false);
+    }
+  };
+
+  // Get badge benefits description
+  // Uses badge data already loaded from database (userBadges includes description)
+  const getBadgeBenefits = (badge: any): string => {
+    // Badge data from getUserClaimedBadges already includes description from database
+    if (badge?.description) {
+      return badge.description;
+    }
+    
+    // Fallback benefits for specific badges
+    const benefits: Record<string, string> = {
+      'community_wesplit': 'Double points, Free fees',
+      'community_superteamfrance': 'Double points, Free fees',
+      'community_monkedao': 'Double points, Free fees',
+      'community_diggers': 'Double points, Free fees',
+    };
+    return benefits[badge?.badgeId] || 'Community benefits';
+  };
+
   return (
     <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
@@ -569,7 +663,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                 avatarUrl={avatar || currentUser?.avatar || undefined}
                 size={140}
                 style={styles.avatarImage}
-                showProfileBorder
+                // Disable decorative profile border for account settings avatar
               />
               {!(avatar || currentUser?.avatar) && (
                 <View
@@ -814,7 +908,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
 
           {activeTab === 'appearance' && (
             <View style={{ marginTop: spacing.md }}>
-              {/* Profile Border Section */}
+              {/* Badges Section (Community & Event) */}
               <View style={{ marginBottom: spacing.lg }}>
                 <Text style={{
                   fontSize: typography.fontSize.lg,
@@ -822,86 +916,207 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                   color: colors.white,
                   marginBottom: spacing.xs,
                 }}>
-                  Profile Border
+                  Badges
                 </Text>
                 <Text style={{
                   fontSize: typography.fontSize.sm,
                   color: colors.white70,
                   marginBottom: spacing.md,
                 }}>
-                  Select a border to display around your avatar
+                  Select a badge to display on your profile. Community badges provide special benefits like double points and free fees.
                 </Text>
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                
+                {loadingBadges ? (
+                  <View style={{
                     backgroundColor: colors.white5,
                     borderRadius: spacing.md,
-                    padding: spacing.md,
-                  }}
-                  onPress={() => {
-                    setAssetSelectionType('profile_border');
-                    setShowAssetSelectionModal(true);
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    <View style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: spacing.xs,
-                      marginRight: spacing.md,
-                      backgroundColor: colors.white5,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
+                    padding: spacing.lg,
+                    alignItems: 'center',
+                  }}>
+                    <ActivityIndicator size="small" color={colors.green} />
+                    <Text style={{
+                      color: colors.white70,
+                      fontSize: typography.fontSize.sm,
+                      marginTop: spacing.sm,
                     }}>
-                      {borderPreviewUrl ? (() => {
-                        const isSvg = borderPreviewUrl.toLowerCase().includes('.svg');
-                        if (isSvg) {
-                          return (
-                            <SvgUri
-                              uri={borderPreviewUrl}
-                              width={48}
-                              height={48}
-                            />
-                          );
-                        } else {
-                          return (
-                            <Image
-                              source={{ uri: borderPreviewUrl }}
-                              style={{ width: 48, height: 48 }}
-                              resizeMode="contain"
-                            />
-                          );
-                        }
-                      })() : (
-                        <PhosphorIcon name="CircleHalf" size={24} color={colors.white70} weight="regular" />
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{
-                        color: colors.white,
-                        fontSize: typography.fontSize.md,
-                        fontWeight: typography.fontWeight.medium,
-                      }}>
-                        {currentUser?.active_profile_border 
-                          ? (getAssetInfo(currentUser.active_profile_border)?.name || 'Custom Border')
-                          : 'No Border'}
-                      </Text>
-                      <Text style={{
-                        color: colors.white50,
-                        fontSize: typography.fontSize.sm,
-                        marginTop: 2,
-                      }}>
-                        {currentUser?.profile_borders && currentUser.profile_borders.length > 0
-                          ? `${currentUser.profile_borders.length} border${currentUser.profile_borders.length > 1 ? 's' : ''} available`
-                          : 'Claim borders from the Advent Calendar'}
-                      </Text>
-                    </View>
+                      Loading badges...
+                    </Text>
                   </View>
-                  <PhosphorIcon name="PencilSimpleLine" size={20} color={colors.white70} weight="regular" />
-                </TouchableOpacity>
+                ) : userBadges.length === 0 ? (
+                  <View style={{
+                    backgroundColor: colors.white5,
+                    borderRadius: spacing.md,
+                    padding: spacing.lg,
+                    alignItems: 'center',
+                  }}>
+                    <PhosphorIcon name="Trophy" size={32} color={colors.white30} weight="regular" />
+                    <Text style={{
+                      color: colors.white70,
+                      fontSize: typography.fontSize.md,
+                      marginTop: spacing.sm,
+                      textAlign: 'center',
+                    }}>
+                      No community badges yet
+                    </Text>
+                    <Text style={{
+                      color: colors.white50,
+                      fontSize: typography.fontSize.sm,
+                      marginTop: spacing.xs,
+                      textAlign: 'center',
+                    }}>
+                      Claim community badges using redeem codes
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{
+                    gap: spacing.md,
+                  }}>
+                    {userBadges.map((badge) => {
+                      const isActive = currentUser?.active_badge === badge.badgeId;
+                      const isCommunityBadge = badge.isCommunityBadge === true;
+                      // Event badges are those that are event category but NOT community badges
+                      const isEventBadge = !isCommunityBadge && (badge.isEventBadge === true || badge.category === 'event');
+                      const isSelectable = isCommunityBadge; // Only community badges are selectable
+                      
+                      // Event badges ONLY: just show the rounded badge icon (no title, no description, no border)
+                      if (isEventBadge && !isCommunityBadge) {
+                        return (
+                          <View
+                            key={badge.badgeId}
+                            style={{
+                              width: '100%',
+                              alignItems: 'center',
+                              paddingVertical: spacing.sm,
+                            }}
+                          >
+                            {badge.imageUrl ? (
+                              <Image
+                                source={{ uri: badge.imageUrl }}
+                                style={{
+                                  width: 60,
+                                  height: 60,
+                                  borderRadius: 30,
+                                }}
+                                resizeMode="cover"
+                              />
+                            ) : badge.icon ? (
+                              <View style={{
+                                width: 60,
+                                height: 60,
+                                borderRadius: 30,
+                                backgroundColor: colors.white10,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}>
+                                <Text style={{ fontSize: 30 }}>{badge.icon}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        );
+                      }
+                      
+                      // Community badges: full card with title, benefits, selection, etc.
+                      // This is the default render for all non-event badges (community badges)
+                      return (
+                        <TouchableOpacity
+                          key={badge.badgeId}
+                          style={{
+                            width: '100%',
+                            backgroundColor: isSelectable && isActive ? colors.green + '20' : colors.white5,
+                            borderRadius: spacing.md,
+                            padding: spacing.md,
+                            borderWidth: 2,
+                            borderColor: isSelectable && isActive ? colors.green : colors.white10,
+                            opacity: (isSelectable && selectingBadge) ? 0.6 : 1,
+                          }}
+                          onPress={() => isSelectable && handleSelectBadge(badge.badgeId)}
+                          disabled={!isSelectable || selectingBadge}
+                          activeOpacity={isSelectable ? 0.7 : 1}
+                        >
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginBottom: spacing.sm,
+                          }}>
+                            {badge.imageUrl ? (
+                              <Image
+                                source={{ uri: badge.imageUrl }}
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 8,
+                                  marginRight: spacing.sm,
+                                }}
+                                resizeMode="cover"
+                              />
+                            ) : badge.icon ? (
+                              <View style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 8,
+                                backgroundColor: colors.white10,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: spacing.sm,
+                              }}>
+                                <Text style={{ fontSize: 20 }}>{badge.icon}</Text>
+                              </View>
+                            ) : null}
+                            <View style={{ flex: 1 }}>
+                              <Text style={{
+                                color: colors.white,
+                                fontSize: typography.fontSize.md,
+                                fontWeight: typography.fontWeight.medium,
+                              }} numberOfLines={1}>
+                                {badge.title}
+                              </Text>
+                              {isSelectable && isActive && (
+                                <View style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  marginTop: 2,
+                                }}>
+                                  <PhosphorIcon name="CheckCircle" size={12} color={colors.green} weight="fill" />
+                                  <Text style={{
+                                    color: colors.green,
+                                    fontSize: typography.fontSize.xs,
+                                    marginLeft: 4,
+                                  }}>
+                                    Active - Tap to deselect
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                          {/* Show benefits/effects ONLY for community badges */}
+                          {isCommunityBadge && (
+                            <View style={{
+                              backgroundColor: colors.white5,
+                              borderRadius: spacing.xs,
+                              padding: spacing.xs,
+                              marginTop: spacing.xs,
+                            }}>
+                              <Text style={{
+                                color: colors.green,
+                                fontSize: typography.fontSize.xs,
+                                fontWeight: typography.fontWeight.medium,
+                              }}>
+                                Benefits:
+                              </Text>
+                              <Text style={{
+                                color: colors.white70,
+                                fontSize: typography.fontSize.xs,
+                                marginTop: 2,
+                              }}>
+                                {getBadgeBenefits(badge)}
+                              </Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
 
               {/* Wallet Background Section */}
@@ -1013,7 +1228,6 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
             try {
               await refreshUser();
               logger.debug('User data refreshed after asset selection modal closed', {
-                profileBorders: currentUser?.profile_borders,
                 walletBackgrounds: currentUser?.wallet_backgrounds
               }, 'AccountSettingsScreen');
             } catch (error) {
