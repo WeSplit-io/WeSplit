@@ -639,7 +639,27 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         <Text style={styles.splitMethodLabel}>Split Participants:</Text>
 
           <DegenSplitParticipants
-            participants={participants}
+            participants={(() => {
+              // CRITICAL FIX: Merge participants with splitWallet data to ensure wallet addresses are available
+              if (degenState.splitWallet?.participants?.length > 0) {
+                return participants.map(p => {
+                  const walletParticipant = degenState.splitWallet.participants.find(
+                    (wp: any) => wp.userId === (p.userId || p.id)
+                  );
+                  if (walletParticipant) {
+                    return {
+                      ...p,
+                      walletAddress: walletParticipant.walletAddress || p.walletAddress || p.wallet_address || '',
+                      wallet_address: walletParticipant.walletAddress || p.walletAddress || p.wallet_address || '',
+                      avatar: walletParticipant.avatar || p.avatar,
+                      name: walletParticipant.name || p.name,
+                    };
+                  }
+                  return p;
+                });
+              }
+              return participants;
+            })()}
             totalAmount={totalAmount}
             currentUserId={currentUser?.id?.toString()}
             splitWallet={degenState.splitWallet}

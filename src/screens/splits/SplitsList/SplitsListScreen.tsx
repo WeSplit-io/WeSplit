@@ -96,11 +96,14 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
   const [activeTab, setActiveTab] = useState<'splits' | 'sharedWallets'>('splits'); // NEW: Top-level tab state
   const [sharedWallets, setSharedWallets] = useState<SharedWallet[]>([]);
   const [isLoadingSharedWallets, setIsLoadingSharedWallets] = useState(false);
+  const [sharedWalletsError, setSharedWalletsError] = useState<string | null>(null); // Track errors to prevent infinite retries
+  const [hasAttemptedLoadSharedWallets, setHasAttemptedLoadSharedWallets] = useState(false); // Track if we've attempted to load
   const [showCreateModal, setShowCreateModal] = useState(false);
   const SPLITS_PER_PAGE = 10;
   
   // Refs to prevent infinite loops
   const hasLoadedOnFocusRef = useRef(false);
+  const hasLoadedSharedWalletsOnFocusRef = useRef(false); // Track if shared wallets loaded on focus
   const lastUserIdRef = useRef<string | null>(null);
   const lastRouteParamsRef = useRef<string>(''); // Track last route params to detect changes
   const userHasManuallyChangedTabRef = useRef(false); // Track if user manually changed tab
@@ -326,11 +329,22 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     // Prevent reloading if already loading
     if (isLoadingSharedWallets) return;
 
+    // Don't retry if we have a permission error - it won't resolve without fixing the rules
+    if (sharedWalletsError && sharedWalletsError.includes('permissions')) {
+      if (__DEV__) {
+        logger.debug('Skipping shared wallets load due to permission error', { error: sharedWalletsError }, 'SplitsListScreen');
+      }
+      return;
+    }
+
     setIsLoadingSharedWallets(true);
+    setSharedWalletsError(null); // Clear previous errors on retry
     try {
       const result = await SharedWalletService.getUserSharedWallets(currentUser.id.toString());
       if (result.success && result.wallets) {
         setSharedWallets(result.wallets);
+        setSharedWalletsError(null); // Clear any previous errors
+        setHasAttemptedLoadSharedWallets(true);
         if (__DEV__) {
           logger.debug('Shared wallets loaded successfully', { 
             count: result.wallets.length,
@@ -338,20 +352,26 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
           }, 'SplitsListScreen');
         }
       } else {
-        logger.error('Failed to load shared wallets', { error: result.error }, 'SplitsListScreen');
+        const errorMessage = result.error || 'Unknown error';
+        logger.error('Failed to load shared wallets', { error: errorMessage }, 'SplitsListScreen');
+        setSharedWalletsError(errorMessage);
+        setHasAttemptedLoadSharedWallets(true);
         // Don't clear wallets on error - keep existing ones to prevent flickering
         // Only clear if we have no wallets yet
         setSharedWallets(prev => prev.length === 0 ? [] : prev);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       logger.error('Error loading shared wallets', error, 'SplitsListScreen');
+      setSharedWalletsError(errorMessage);
+      setHasAttemptedLoadSharedWallets(true);
       // Don't clear wallets on error - keep existing ones to prevent flickering
       // Only clear if we have no wallets yet
       setSharedWallets(prev => prev.length === 0 ? [] : prev);
     } finally {
       setIsLoadingSharedWallets(false);
     }
-  }, [currentUser?.id, isLoadingSharedWallets]);
+  }, [currentUser?.id, isLoadingSharedWallets, sharedWalletsError]);
 
   // Handle route params to set active tab (e.g., when navigating from SharedWalletName or SharedWalletDetails)
   // Only apply if user hasn't manually changed the tab and route params have changed
@@ -397,6 +417,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
       const userChanged = lastUserIdRef.current !== currentUser.id;
       if (userChanged) {
         hasLoadedOnFocusRef.current = false;
+        hasLoadedSharedWalletsOnFocusRef.current = false; // Reset shared wallets focus load flag
         lastUserIdRef.current = currentUser.id;
         // Reset to page 1 when user changes
         setCurrentPage(1);
@@ -407,6 +428,9 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         // Reset manual tab change flag when user changes
         userHasManuallyChangedTabRef.current = false;
         lastRouteParamsRef.current = '';
+        // Reset shared wallets state
+        setHasAttemptedLoadSharedWallets(false);
+        setSharedWalletsError(null);
       }
       
       // Always reload on focus to ensure we have the latest data
@@ -446,19 +470,33 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         }
       } else if (activeTab === 'sharedWallets') {
         // Load shared wallets if on shared wallets tab
+        // Only load once per focus to prevent infinite loops
+        // Similar to splits - only reload if we haven't loaded on this focus yet
+        if (!hasLoadedSharedWalletsOnFocusRef.current) {
+          // Don't load if we have a permission error - it won't resolve without fixing rules
+          if (!sharedWalletsError || !sharedWalletsError.includes('permissions')) {
         loadSharedWallets();
+            hasLoadedSharedWalletsOnFocusRef.current = true;
       }
-    }, [currentUser?.id, activeTab])
+        }
+      }
+    }, [currentUser?.id, activeTab, hasAttemptedLoadSharedWallets, sharedWalletsError, loadSharedWallets])
   );
 
 
   // Load shared wallets when tab changes to sharedWallets
-  // Only load if we don't already have wallets to prevent unnecessary reloads
+  // Only load if we don't already have wallets and haven't encountered a permission error
   useEffect(() => {
-    if (activeTab === 'sharedWallets' && currentUser?.id && sharedWallets.length === 0 && !isLoadingSharedWallets) {
+    if (
+      activeTab === 'sharedWallets' && 
+      currentUser?.id && 
+      sharedWallets.length === 0 && 
+      !isLoadingSharedWallets &&
+      !hasAttemptedLoadSharedWallets // Only attempt once unless manually refreshed
+    ) {
       loadSharedWallets();
     }
-  }, [activeTab, currentUser?.id, loadSharedWallets, sharedWallets.length, isLoadingSharedWallets]);
+  }, [activeTab, currentUser?.id, loadSharedWallets, sharedWallets.length, isLoadingSharedWallets, hasAttemptedLoadSharedWallets]);
 
   // Load participant avatars when splits change
   useEffect(() => {
@@ -800,6 +838,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     const count = await loadTotalCount();
     await loadSplits(1, undefined, count);
     } else if (activeTab === 'sharedWallets') {
+      // Reset error state on manual refresh to allow retry
+      setSharedWalletsError(null);
+      setHasAttemptedLoadSharedWallets(false);
+      hasLoadedSharedWalletsOnFocusRef.current = false; // Reset focus flag to allow reload
       await loadSharedWallets();
     }
     setRefreshing(false);

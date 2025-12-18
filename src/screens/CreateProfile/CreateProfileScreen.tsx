@@ -29,6 +29,8 @@ import { Container, Input, Button } from '../../components/shared';
 import Header from '../../components/shared/Header';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { normalizeReferralCode, REFERRAL_CODE_MIN_LENGTH, REFERRAL_CODE_MAX_LENGTH } from '../../services/shared/referralUtils';
+import { auth } from '../../config/firebase/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const CreateProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -434,13 +436,61 @@ const CreateProfileScreen: React.FC = () => {
         logger.warn('Could not check existing user, proceeding with profile creation', null, 'CreateProfileScreen');
       }
 
+        // CRITICAL: Ensure Firebase Auth is ready before creating user document
+        // This prevents permission errors when auth state hasn't synced yet
+        logger.info('Waiting for Firebase Auth state to be ready', null, 'CreateProfileScreen');
+        const waitForAuth = (): Promise<boolean> => {
+          if (!auth) {
+            logger.error('Firebase Auth not initialized', null, 'CreateProfileScreen');
+            return Promise.resolve(false);
+          }
+          
+          if (auth.currentUser) {
+            return Promise.resolve(true);
+          }
+          
+          return new Promise((resolve) => {
+            const unsubscribe = onAuthStateChanged(auth, (user) => {
+              unsubscribe();
+              resolve(!!user);
+            });
+            
+            setTimeout(() => {
+              unsubscribe();
+              resolve(!!auth.currentUser);
+            }, 5000);
+          });
+        };
+        
+        const authReady = await waitForAuth();
+        if (!authReady && !auth?.currentUser) {
+          logger.error('Firebase Auth not ready after waiting', null, 'CreateProfileScreen');
+          Alert.alert(
+            'Authentication Error',
+            'Please wait a moment and try again. If the problem persists, please sign in again.'
+          );
+          return;
+        }
+        
+        // Verify that the authenticated user ID matches the app state user ID (if available)
+        if (state.currentUser?.id && auth?.currentUser?.uid) {
+          if (state.currentUser.id !== auth.currentUser.uid) {
+            logger.warn('User ID mismatch between app state and Firebase Auth', {
+              appStateId: state.currentUser.id,
+              authUid: auth.currentUser.uid
+            }, 'CreateProfileScreen');
+            // Continue anyway - use auth.currentUser.uid as it's the source of truth for Firestore
+          }
+        }
+
         // Create or update user using unified service
       try {
         logger.info('Creating/updating user with firebase service', {
           isPhoneAuth,
           email: email?.substring(0, 5) + '...',
           phone: phoneNumber?.substring(0, 5) + '...',
-          name: pseudo
+          name: pseudo,
+          authUid: auth?.currentUser?.uid
         }, 'CreateProfileScreen');
         
         // Handle user creation differently for email vs phone auth
@@ -465,31 +515,34 @@ const CreateProfileScreen: React.FC = () => {
           } else {
             // Create new phone user
             logger.info('Creating new phone user', { phone: phoneNumber?.substring(0, 5) + '...', name: pseudo }, 'CreateProfileScreen');
-            const newUserId = state.currentUser?.id || 'unknown';
+            const newUserId = state.currentUser?.id || auth?.currentUser?.uid;
+            
+            if (!newUserId) {
+              throw new Error('User ID is required to create a profile. Please sign in first.');
+            }
 
-            // Create user document with phone as primary identifier
-            await firebaseDataService.user.createUserDocument({
-              uid: newUserId,
+            // Verify auth state matches the user ID we're trying to use
+            if (auth?.currentUser?.uid && auth.currentUser.uid !== newUserId) {
+              logger.warn('User ID mismatch, using Firebase Auth UID', {
+                appStateId: newUserId,
+                authUid: auth.currentUser.uid
+              }, 'CreateProfileScreen');
+              // Use auth.currentUser.uid as it's required by Firestore security rules
+            }
+
+            // Create user document using the createUser method which handles authentication properly
+            user = await firebaseDataService.user.createUser({
               email: email || '',
-              phoneNumber: phoneNumber || '',
-              displayName: pseudo,
-              photoURL: avatar || DEFAULT_AVATAR_URL
-            } as any, null);
-
-            user = {
-              id: newUserId,
               name: pseudo,
-              email: email || '',
               phone: phoneNumber || '',
-              avatar: avatar || DEFAULT_AVATAR_URL,
               wallet_address: '',
               wallet_public_key: '',
-              created_at: new Date().toISOString(),
+              avatar: avatar || DEFAULT_AVATAR_URL,
               hasCompletedOnboarding: true,
               badges: [],
               profile_borders: [],
               wallet_backgrounds: []
-            };
+            });
           }
         } else {
           // For email authentication, use existing logic

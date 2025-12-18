@@ -267,6 +267,39 @@ function validatePaymentData(data) {
           errors.push('metadata.paymentTimeout must be a positive number');
         }
       }
+      
+      // Validate callbackUrl if provided (security: prevent malicious redirects)
+      if (metadata.callbackUrl) {
+        if (typeof metadata.callbackUrl !== 'string' || metadata.callbackUrl.trim() === '') {
+          errors.push('metadata.callbackUrl must be a non-empty string');
+        } else {
+          const callbackUrl = metadata.callbackUrl.trim();
+          
+          // Block dangerous protocols
+          const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:'];
+          const lowerUrl = callbackUrl.toLowerCase();
+          if (dangerousProtocols.some(proto => lowerUrl.startsWith(proto))) {
+            errors.push('metadata.callbackUrl contains invalid or dangerous protocol');
+          }
+          
+          // Block script injection patterns
+          if (/<script|javascript:|on\w+\s*=/i.test(callbackUrl)) {
+            errors.push('metadata.callbackUrl contains potentially dangerous content');
+          }
+          
+          // If it's an HTTP(S) URL, validate it properly
+          if (callbackUrl.startsWith('http://') || callbackUrl.startsWith('https://')) {
+            try {
+              const urlObj = new URL(callbackUrl);
+              if (!['http:', 'https:'].includes(urlObj.protocol)) {
+                errors.push('metadata.callbackUrl must use http:// or https:// protocol');
+              }
+            } catch (urlError) {
+              errors.push('metadata.callbackUrl is not a valid URL');
+            }
+          }
+        }
+      }
     }
   }
   

@@ -37,7 +37,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      buildNumber: "55",
+      buildNumber: "59",
       deploymentTarget: "15.1",
       googleServicesFile: "./GoogleService-Info.plist", // Uncomment when file is added
       infoPlist: {
@@ -58,17 +58,18 @@ module.exports = {
       //   'com.apple.developer.devicecheck': true  // Removed - causing provisioning profile issues
       // },
       // Associated domains for iOS Universal Links
-      // This allows https://wesplit.io links to open directly in the app
+      // This allows https://wesplit.io and https://wesplit-deeplinks.web.app links to open directly in the app
       associatedDomains: [
         "applinks:wesplit.io",
-        "applinks:www.wesplit.io"
+        "applinks:www.wesplit.io",
+        "applinks:wesplit-deeplinks.web.app"
       ]
     },
     scheme: "wesplit",
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      versionCode: 11255,
+      versionCode: 11259,
       googleServicesFile: "./google-services.json", // Uncomment when file is added
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
@@ -106,8 +107,8 @@ module.exports = {
           ],
           category: ["BROWSABLE", "DEFAULT"]
         },
-        // Android App Links for universal links (https://wesplit.io)
-        // This allows https://wesplit.io links to open directly in the app
+        // Android App Links for universal links
+        // This allows https://wesplit.io and https://wesplit-deeplinks.web.app links to open directly in the app
         {
           action: "VIEW",
           autoVerify: true,
@@ -131,6 +132,31 @@ module.exports = {
               scheme: "https",
               host: "www.wesplit.io",
               pathPrefix: "/view-split"
+            },
+            {
+              scheme: "https",
+              host: "wesplit.io",
+              pathPrefix: "/spend-callback"
+            },
+            {
+              scheme: "https",
+              host: "www.wesplit.io",
+              pathPrefix: "/spend-callback"
+            },
+            {
+              scheme: "https",
+              host: "wesplit-deeplinks.web.app",
+              pathPrefix: "/join-split"
+            },
+            {
+              scheme: "https",
+              host: "wesplit-deeplinks.web.app",
+              pathPrefix: "/view-split"
+            },
+            {
+              scheme: "https",
+              host: "wesplit-deeplinks.web.app",
+              pathPrefix: "/spend-callback"
             }
           ],
           category: ["BROWSABLE", "DEFAULT"]

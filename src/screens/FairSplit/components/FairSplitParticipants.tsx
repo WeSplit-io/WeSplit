@@ -11,7 +11,6 @@ import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 import { styles } from '../styles';
 import { Participant } from '../../../services/payments/amountCalculationService';
-import BadgeDisplay from '../../../components/profile/BadgeDisplay';
 import UserNameWithBadges from '../../../components/profile/UserNameWithBadges';
 import { firebaseDataService } from '../../../services/data/firebaseDataService';
 
@@ -95,15 +94,8 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
                 userId={participant.id}
                 userName={participant.name}
                 textStyle={styles.participantName}
-                showBadges={true}
+                showBadges={false}
               />
-              {badges && badges.badges.length > 0 && badges.active_badge && (
-                <BadgeDisplay
-                  badges={badges.badges}
-                  activeBadge={badges.active_badge}
-                  showAll={false}
-                />
-              )}
               <Text style={styles.participantWallet}>
                 {participant.walletAddress && participant.walletAddress.length > 10 
                   ? `${participant.walletAddress.slice(0, 4)}...${participant.walletAddress.slice(-4)}`

@@ -1761,8 +1761,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             )
           ) : (
             <>
-              {getCombinedActivities().slice(0, 5).map((activity) => {
-                const activityKey = `${activity.type}-${activity.id}-${activity.timestamp.getTime()}`;
+              {getCombinedActivities().slice(0, 5).map((activity, index) => {
+                const activityKey = `${activity.type}-${activity.id}-${activity.timestamp.getTime()}-${index}`;
                 if (activity.type === 'request') {
                   const request = activity.data;
                   const index = paymentRequests.findIndex(r => r.id === request.id);

@@ -540,14 +540,36 @@ exports.payParticipantShare = functions.https.onRequest(async (req, res) => {
         });
       }
       
-      return res.status(200).json({
+      // Build response with optional deep link for redirect
+      const response = {
         success: true,
         transactionSignature: transactionSignature || null,
         amountPaid: newAmountPaid,
         remainingAmount: remainingAmount,
         splitStatus: newSplitStatus,
         isFullyFunded: isFullyFunded
-      });
+      };
+
+      // If split has external metadata with callback URL, include deep link
+      if (splitData.externalMetadata?.callbackUrl) {
+        const callbackUrl = splitData.externalMetadata.callbackUrl;
+        const orderId = splitData.externalMetadata.orderId;
+        
+        // Generate deep link to return to Spend app
+        const deepLinkParams = new URLSearchParams({
+          callbackUrl: encodeURIComponent(callbackUrl),
+          status: 'success'
+        });
+        
+        if (orderId) {
+          deepLinkParams.append('orderId', orderId);
+        }
+        
+        response.deepLink = `wesplit://spend-callback?${deepLinkParams.toString()}`;
+        response.redirectUrl = callbackUrl; // Also include direct redirect URL
+      }
+
+      return res.status(200).json(response);
       
     } catch (error) {
       console.error('Error in payParticipantShare:', error);
@@ -867,7 +889,7 @@ exports.searchKnownUsers = functions.https.onRequest(async (req, res) => {
  *       {
  *         "email": "user2@example.com",
  *         "inviteCode": "INV_abc123",
- *         "inviteLink": "https://wesplit.io/join-split?invite=INV_abc123"
+ *         "inviteLink": "https://wesplit-deeplinks.web.app/join-split?invite=INV_abc123"
  *       }
  *     ]
  *   },
@@ -1043,7 +1065,8 @@ function generateInviteLinkSync(email, splitId) {
     timestamp: Date.now()
   };
   const encoded = Buffer.from(JSON.stringify(inviteData)).toString('base64url');
-  return `https://wesplit.io/join-split?invite=${encoded}`;
+  // Use deep link domain for universal links (works for all users)
+  return `https://wesplit-deeplinks.web.app/join-split?invite=${encoded}`;
 }
 
 /**
@@ -1375,7 +1398,8 @@ exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => 
         }
       }
       
-      return res.status(200).json({
+      // Build response with optional deep link for redirect
+      const response = {
         success: true,
         results: results,
         summary: {
@@ -1384,7 +1408,27 @@ exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => 
           alreadyParticipant: results.alreadyParticipant.length,
           failed: results.failed.length
         }
-      });
+      };
+
+      // If split has external metadata with callback URL, include deep link
+      if (splitData.externalMetadata?.callbackUrl) {
+        const callbackUrl = splitData.externalMetadata.callbackUrl;
+        const orderId = splitData.externalMetadata.orderId;
+        
+        // Generate deep link to view split in WeSplit app
+        const viewSplitParams = new URLSearchParams({
+          splitId: splitId
+        });
+        
+        if (splitData.creatorId) {
+          viewSplitParams.append('userId', splitData.creatorId);
+        }
+        
+        response.deepLink = `wesplit://view-split?${viewSplitParams.toString()}`;
+        response.redirectUrl = callbackUrl; // Also include direct redirect URL
+      }
+
+      return res.status(200).json(response);
       
     } catch (error) {
       console.error('Error in batchInviteParticipants:', error);

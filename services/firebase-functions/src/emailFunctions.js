@@ -448,3 +448,82 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
   }
 });
 
+/**
+ * HTTP Callable Function: Check if user has verified within the last 30 days
+ * This replaces the client-side Firestore query to avoid permission issues.
+ */
+exports.hasVerifiedWithin30Days = functions.https.onCall(async (data, context) => {
+  try {
+    const rawEmail = data && data.email;
+    const email = (rawEmail || '').trim().toLowerCase();
+
+    if (!email || !email.includes('@')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Valid email is required');
+    }
+
+    console.log('🔍 Checking 30-day verification for email:', email);
+
+    // Find user by email
+    const usersRef = db.collection('users');
+    const querySnapshot = await usersRef.where('email', '==', email).limit(1).get();
+
+    if (querySnapshot.empty) {
+      console.log('ℹ️ User not found for 30-day verification check', { email });
+      return { success: true, hasVerifiedWithin30Days: false };
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data() || {};
+    const lastVerifiedAt = userData.lastVerifiedAt;
+
+    if (!lastVerifiedAt) {
+      console.log('ℹ️ No lastVerifiedAt field found for user', { email, userId: userDoc.id });
+      return { success: true, hasVerifiedWithin30Days: false };
+    }
+
+    // Normalize lastVerifiedAt to a JS Date
+    let lastVerified;
+    if (lastVerifiedAt && typeof lastVerifiedAt.toDate === 'function') {
+      lastVerified = lastVerifiedAt.toDate();
+    } else if (lastVerifiedAt instanceof Date) {
+      lastVerified = lastVerifiedAt;
+    } else if (typeof lastVerifiedAt === 'string') {
+      lastVerified = new Date(lastVerifiedAt);
+    } else {
+      lastVerified = new Date(lastVerifiedAt);
+    }
+
+    if (isNaN(lastVerified.getTime())) {
+      console.warn('⚠️ Invalid lastVerifiedAt date for user', { email, value: lastVerifiedAt, type: typeof lastVerifiedAt });
+      // Treat as not verified recently
+      return { success: true, hasVerifiedWithin30Days: false };
+    }
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const hasVerifiedWithin30Days = lastVerified > thirtyDaysAgo;
+
+    console.log('✅ 30-day verification check result', {
+      email,
+      userId: userDoc.id,
+      lastVerified: lastVerified.toISOString(),
+      now: now.toISOString(),
+      thirtyDaysAgo: thirtyDaysAgo.toISOString(),
+      hasVerifiedWithin30Days
+    });
+
+    return {
+      success: true,
+      hasVerifiedWithin30Days
+    };
+  } catch (error) {
+    console.error('❌ Error in hasVerifiedWithin30Days function:', error);
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError('internal', 'Failed to check 30-day verification');
+  }
+});
+

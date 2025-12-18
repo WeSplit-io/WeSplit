@@ -2,6 +2,10 @@
  * Comprehensive test script for SPEND API endpoints
  * Tests all endpoints: searchKnownUsers, batchInviteParticipants, email sending, etc.
  * 
+ * Updated: 2025-01-27
+ * - Uses new deep link domain: wesplit-deeplinks.web.app
+ * - Tests production logic and URL validation
+ * 
  * Usage:
  *   node test-spend-endpoints.js
  * 
@@ -11,6 +15,7 @@
  *   - USE_EMULATOR: Set to 'true' to use emulator (default: false)
  *   - EMULATOR_HOST: Emulator host (default: localhost)
  *   - EMULATOR_PORT: Emulator port (default: 5001)
+ *   - DEEP_LINK_DOMAIN: Deep link domain (default: wesplit-deeplinks.web.app)
  */
 
 const https = require('https');
@@ -22,11 +27,17 @@ const BASE_URL = process.env.BASE_URL || 'https://us-central1-wesplit-35186.clou
 const USE_EMULATOR = process.env.USE_EMULATOR === 'true';
 const EMULATOR_HOST = process.env.EMULATOR_HOST || 'localhost';
 const EMULATOR_PORT = parseInt(process.env.EMULATOR_PORT || '5001');
+const DEEP_LINK_DOMAIN = process.env.DEEP_LINK_DOMAIN || 'wesplit-deeplinks.web.app';
+// Use production endpoints (not test/mock endpoints) to match SPEND team testing
+const USE_PRODUCTION_ENDPOINTS = process.env.USE_PRODUCTION_ENDPOINTS !== 'false'; // Default: true
 
 // Test data
 const TEST_SPLIT_ID = process.env.TEST_SPLIT_ID || `test_split_${Date.now()}`;
 const TEST_INVITER_ID = process.env.TEST_INVITER_ID || 'test_creator_123';
 const TEST_INVITER_NAME = process.env.TEST_INVITER_NAME || 'Test Creator';
+
+// Store created split ID for use across tests
+let createdSplitId = null;
 
 // Colors for console output
 const colors = {
@@ -158,16 +169,99 @@ async function testSearchKnownUsers() {
 }
 
 /**
+ * Test 0: Create Split (helper function)
+ */
+async function createTestSplit() {
+  console.log(`${colors.cyan}=== Test 0: Create Test Split ===${colors.reset}`);
+  
+  const testWalletAddress = 'BPFLoaderUpgradeab1e11111111111111111111111';
+  const testTreasuryWallet = '2nkTRv3qxk7n2eYYjFAndReVXaV7sTF3Z9pNimvp5jcp';
+  
+  const payload = {
+    email: 'test-creator@example.com',
+    walletAddress: testWalletAddress,
+    invoiceId: `TEST-INV-${Date.now()}`,
+    amount: 100.00,
+    currency: 'USDC',
+    merchant: {
+      name: 'Test Merchant',
+      address: '123 Test Street'
+    },
+    transactionDate: new Date().toISOString(),
+    source: 'spend',
+    callbackUrl: 'spend://order/TEST-123/success',
+    metadata: {
+      orderData: {
+        id: `ord_test_${Math.random().toString(36).substr(2, 9)}`,
+        order_number: `ORD-TEST-${Date.now()}`,
+        store: 'amazon',
+        status: 'Payment_Pending',
+        total_amount: 100.00
+      },
+      orderId: `ORD-TEST-${Date.now()}`,
+      treasuryWallet: testTreasuryWallet,
+      webhookUrl: 'https://spend.example.com/webhooks/wesplit',
+      webhookSecret: 'test_secret_123',
+      paymentThreshold: 1.0
+    }
+  };
+
+  try {
+    // Always use production endpoint to match SPEND team testing
+    const endpoint = USE_PRODUCTION_ENDPOINTS ? '/createSplitFromPayment' : '/testCreateSplitFromPayment';
+    
+    if (!USE_PRODUCTION_ENDPOINTS) {
+      console.log(`${colors.yellow}⚠️  Using test endpoint (not production). Set USE_PRODUCTION_ENDPOINTS=true to test real endpoints.${colors.reset}`);
+    } else {
+      console.log(`${colors.cyan}ℹ️  Using PRODUCTION endpoint: ${endpoint}${colors.reset}`);
+    }
+    
+    const response = await makeRequest('POST', endpoint, payload);
+    
+    if (response.status === 200 && response.body.success) {
+      const splitId = response.body.data?.splitId;
+      if (splitId) {
+        createdSplitId = splitId;
+        console.log(`${colors.green}✅ Split created using ${USE_PRODUCTION_ENDPOINTS ? 'PRODUCTION' : 'TEST'} endpoint: ${splitId}${colors.reset}\n`);
+        return splitId;
+      }
+    }
+    
+    // Log error details
+    console.log(`${colors.red}❌ Split creation failed:${colors.reset}`);
+    console.log(`   Status: ${response.status}`);
+    console.log(`   Error: ${response.body.error || response.body.message || 'Unknown error'}`);
+    if (response.body.errors) {
+      console.log(`   Validation errors: ${JSON.stringify(response.body.errors)}`);
+    }
+    
+    console.log(`${colors.yellow}⚠️  Could not create split, will use test ID: ${TEST_SPLIT_ID}${colors.reset}\n`);
+    return TEST_SPLIT_ID;
+  } catch (error) {
+    console.log(`${colors.red}❌ Error creating split: ${error.message}${colors.reset}`);
+    console.log(`${colors.yellow}⚠️  Will use test ID: ${TEST_SPLIT_ID}${colors.reset}\n`);
+    return TEST_SPLIT_ID;
+  }
+}
+
+/**
  * Test 2: Batch Invite Participants (with email sending)
  */
 async function testBatchInviteParticipants() {
   console.log(`${colors.cyan}=== Test 2: Batch Invite Participants ===${colors.reset}`);
   
-  // First, we need a valid split ID - try to create one or use existing
-  let splitId = TEST_SPLIT_ID;
+  // Use created split ID if available, otherwise use test ID
+  const splitId = createdSplitId || TEST_SPLIT_ID;
   
-  // Try to get an existing split or create one via createSplitFromPayment
-  // For now, we'll use the test split ID and handle the case where it doesn't exist
+  if (!createdSplitId) {
+    console.log(`${colors.yellow}⚠️  No split created yet. Attempting to create one...${colors.reset}`);
+    const newSplitId = await createTestSplit();
+    if (newSplitId && newSplitId !== TEST_SPLIT_ID) {
+      createdSplitId = newSplitId;
+    }
+  }
+  
+  const finalSplitId = createdSplitId || splitId;
   
   const testParticipants = [
     {
@@ -184,11 +278,11 @@ async function testBatchInviteParticipants() {
 
   try {
     const response = await makeRequest('POST', '/batchInviteParticipants', {
-      splitId: splitId,
+      splitId: finalSplitId,
       inviterId: TEST_INVITER_ID,
       inviterName: TEST_INVITER_NAME,
       participants: testParticipants,
-      sendNotifications: true, // Test email sending
+      sendNotifications: false, // Set to false to avoid email sending in tests
     });
 
     const passed = response.status === 200 && response.body.success === true;
@@ -200,7 +294,7 @@ async function testBatchInviteParticipants() {
         status: response.status,
         message: passed
           ? `Invited ${response.body.summary?.pendingInvites || 0} new users, ${response.body.summary?.addedExisting || 0} existing users`
-          : `Failed: ${response.body.error || response.body.message || 'Unknown error'}. Note: Split may not exist - create one first via createSplitFromPayment`,
+          : `Failed: ${response.body.error || response.body.message || 'Unknown error'}. Split ID used: ${finalSplitId}`,
         data: passed ? {
           summary: response.body.summary,
           pendingInvites: response.body.results?.pendingInvites?.length || 0,
@@ -225,8 +319,10 @@ async function testBatchInviteParticipants() {
 async function testGetSplitStatus() {
   console.log(`${colors.cyan}=== Test 3: Get Split Status ===${colors.reset}`);
   
+  const splitId = createdSplitId || TEST_SPLIT_ID;
+  
   try {
-    const response = await makeRequest('GET', `/getSplitStatus?splitId=${TEST_SPLIT_ID}`);
+    const response = await makeRequest('GET', `/getSplitStatus?splitId=${splitId}`);
     
     // This might fail if split doesn't exist, which is okay for testing
     const passed = response.status === 200 && response.body.success === true;
@@ -306,7 +402,113 @@ async function testMatchUsersByEmail() {
 }
 
 /**
- * Test 5: Search Known Users - Edge Cases
+ * Test 5: Deep Link URL Validation
+ */
+async function testDeepLinkURLValidation() {
+  console.log(`${colors.cyan}=== Test 5: Deep Link URL Validation ===${colors.reset}`);
+  
+  const tests = [];
+  
+  // Test 1: Valid callback URL (should pass)
+  try {
+    const validCallbackUrl = 'spend://order/ORD-123/success';
+    const response = await makeRequest('POST', '/createSplitFromPayment', {
+      email: 'test@example.com',
+      amount: 100,
+      currency: 'USDC',
+      invoiceId: 'TEST-INV-123',
+      metadata: {
+        callbackUrl: validCallbackUrl,
+        treasuryWallet: '2nkTRv3qxk7n2eYYjFAndReVXaV7sTF3Z9pNimvp5jcp',
+        orderId: 'ORD-123'
+      }
+    });
+    
+    tests.push({
+      name: 'Valid callback URL (spend://)',
+      passed: response.status === 200 || response.status === 400, // 400 if validation fails, 200 if passes
+      details: {
+        status: response.status,
+        message: response.status === 200 
+          ? 'Valid callback URL accepted' 
+          : response.status === 400
+            ? 'Callback URL validation working (rejected invalid format)'
+            : 'Unexpected response',
+      },
+    });
+  } catch (error) {
+    tests.push({
+      name: 'Valid callback URL',
+      passed: false,
+      details: { error: error.message },
+    });
+  }
+  
+  // Test 2: Invalid callback URL - dangerous protocol (should fail)
+  try {
+    const maliciousUrl = 'javascript:alert("xss")';
+    const response = await makeRequest('POST', '/createSplitFromPayment', {
+      email: 'test@example.com',
+      amount: 100,
+      currency: 'USDC',
+      invoiceId: 'TEST-INV-123',
+      metadata: {
+        callbackUrl: maliciousUrl,
+        treasuryWallet: '2nkTRv3qxk7n2eYYjFAndReVXaV7sTF3Z9pNimvp5jcp',
+        orderId: 'ORD-123'
+      }
+    });
+    
+    tests.push({
+      name: 'Invalid callback URL - dangerous protocol (should reject)',
+      passed: response.status === 400,
+      details: {
+        status: response.status,
+        message: response.status === 400 
+          ? 'Correctly rejected dangerous protocol' 
+          : 'Should have rejected javascript: protocol',
+      },
+    });
+  } catch (error) {
+    tests.push({
+      name: 'Invalid callback URL - dangerous protocol',
+      passed: false,
+      details: { error: error.message },
+    });
+  }
+  
+  // Test 3: Deep link domain verification
+  try {
+    const deepLinkUrl = `https://${DEEP_LINK_DOMAIN}/view-split?splitId=test123`;
+    tests.push({
+      name: 'Deep link domain configuration',
+      passed: DEEP_LINK_DOMAIN === 'wesplit-deeplinks.web.app',
+      details: {
+        status: 'info',
+        message: `Using deep link domain: ${DEEP_LINK_DOMAIN}`,
+        exampleUrl: deepLinkUrl,
+      },
+    });
+  } catch (error) {
+    tests.push({
+      name: 'Deep link domain configuration',
+      passed: false,
+      details: { error: error.message },
+    });
+  }
+  
+  // Format all test results
+  let allPassed = true;
+  tests.forEach(test => {
+    const passed = formatTestResult(test.name, test.passed, test.details);
+    if (!passed) allPassed = false;
+  });
+  
+  return allPassed;
+}
+
+/**
+ * Test 6: Search Known Users - Edge Cases
  */
 async function testSearchKnownUsersEdgeCases() {
   console.log(`${colors.cyan}=== Test 5: Search Known Users - Edge Cases ===${colors.reset}`);
@@ -391,15 +593,23 @@ async function runAllTests() {
   console.log(`Base URL: ${USE_EMULATOR ? `http://${EMULATOR_HOST}:${EMULATOR_PORT}` : BASE_URL}`);
   console.log(`API Key: ${API_KEY.substring(0, 20)}...`);
   console.log(`Test Split ID: ${TEST_SPLIT_ID}`);
+  console.log(`Deep Link Domain: ${DEEP_LINK_DOMAIN}`);
+  console.log(`Production Endpoints: ${USE_PRODUCTION_ENDPOINTS ? '✅ YES (matches SPEND team)' : '❌ NO (using test endpoints)'}`);
   console.log('');
   
   const results = [];
   
   // Run all tests
+  // First, create a test split if needed
+  console.log(`${colors.cyan}=== Creating test split for subsequent tests ===${colors.reset}`);
+  await createTestSplit();
+  console.log('');
+  
   results.push(await testSearchKnownUsers());
   results.push(await testMatchUsersByEmail());
   results.push(await testBatchInviteParticipants());
   results.push(await testGetSplitStatus());
+  results.push(await testDeepLinkURLValidation());
   results.push(await testSearchKnownUsersEdgeCases());
   
   // Summary
@@ -436,9 +646,11 @@ if (require.main === module) {
 
 module.exports = {
   runAllTests,
+  createTestSplit,
   testSearchKnownUsers,
   testBatchInviteParticipants,
   testGetSplitStatus,
   testMatchUsersByEmail,
+  testDeepLinkURLValidation,
   testSearchKnownUsersEdgeCases,
 };

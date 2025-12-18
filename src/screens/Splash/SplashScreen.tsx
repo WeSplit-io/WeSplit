@@ -151,21 +151,43 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
               // Update app context with fresh data
               authenticateUser(transformedUser, 'email');
 
-              // Check if user needs to create a profile (has no name/pseudo)
-              const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+              // Check if user needs to create a profile
+              // A user has a profile if they have a name AND have completed onboarding
+              const hasName = transformedUser.name && transformedUser.name.trim() !== '';
+              const hasCompletedOnboarding = transformedUser.hasCompletedOnboarding === true;
+              
+              logger.info('Checking user profile status on splash', {
+                userId: transformedUser.id,
+                hasName,
+                hasCompletedOnboarding,
+                name: transformedUser.name?.substring(0, 10) + '...',
+                email: transformedUser.email?.substring(0, 10) + '...'
+              }, 'SplashScreen');
 
-              if (needsProfile) {
-                logger.info('User needs to create profile (no name), navigating to CreateProfile', { email: transformedUser.email }, 'SplashScreen');
+              if (!hasName) {
+                // User doesn't have a name - needs to create profile
+                logger.info('User needs to create profile (no name), navigating to CreateProfile', { 
+                  email: transformedUser.email,
+                  userId: transformedUser.id
+                }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('CreateProfile', { email: transformedUser.email });
-              } else if (transformedUser.hasCompletedOnboarding) {
-                logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+              } else if (hasCompletedOnboarding) {
+                // User has name and completed onboarding - go to dashboard
+                logger.info('User completed onboarding, navigating to Dashboard', { 
+                  userId: transformedUser.id,
+                  name: transformedUser.name
+                }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('Dashboard');
               } else {
-                logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+                // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+                logger.info('User needs onboarding, navigating to Dashboard', { 
+                  userId: transformedUser.id,
+                  name: transformedUser.name
+                }, 'SplashScreen');
                 setHasNavigated(true);
-                navigation.replace('Onboarding');
+                navigation.replace('Dashboard');
               }
             } else {
               // User document doesn't exist in Firestore - this shouldn't happen but handle gracefully
@@ -223,21 +245,43 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
               // Update app context with fresh data
               authenticateUser(transformedUser, state.authMethod || 'email');
 
-              // Check if user needs to create a profile (has no name/pseudo)
-              const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+              // Check if user needs to create a profile
+              // A user has a profile if they have a name AND have completed onboarding
+              const hasName = transformedUser.name && transformedUser.name.trim() !== '';
+              const hasCompletedOnboarding = transformedUser.hasCompletedOnboarding === true;
+              
+              logger.info('Checking user profile status on splash (app context)', {
+                userId: transformedUser.id,
+                hasName,
+                hasCompletedOnboarding,
+                name: transformedUser.name?.substring(0, 10) + '...',
+                email: transformedUser.email?.substring(0, 10) + '...'
+              }, 'SplashScreen');
 
-              if (needsProfile) {
-                logger.info('User needs to create profile (no name), navigating to CreateProfile', { email: transformedUser.email }, 'SplashScreen');
+              if (!hasName) {
+                // User doesn't have a name - needs to create profile
+                logger.info('User needs to create profile (no name), navigating to CreateProfile', { 
+                  email: transformedUser.email,
+                  userId: transformedUser.id
+                }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('CreateProfile', { email: transformedUser.email });
-              } else if (transformedUser.hasCompletedOnboarding) {
-                logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+              } else if (hasCompletedOnboarding) {
+                // User has name and completed onboarding - go to dashboard
+                logger.info('User completed onboarding, navigating to Dashboard', { 
+                  userId: transformedUser.id,
+                  name: transformedUser.name
+                }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('Dashboard');
               } else {
-                logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+                // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+                logger.info('User needs onboarding, navigating to Dashboard', { 
+                  userId: transformedUser.id,
+                  name: transformedUser.name
+                }, 'SplashScreen');
                 setHasNavigated(true);
-                navigation.replace('Onboarding');
+                navigation.replace('Dashboard');
               }
             } else {
               // User document not found - use app context data

@@ -54,6 +54,7 @@ class SplitRewardsService {
       }
 
       if (pointsAwarded > 0) {
+        // Note: Community badge bonus is now applied automatically in awardSeasonPoints()
         const result = await pointsService.awardSeasonPoints(
           userId,
           pointsAwarded,
@@ -70,7 +71,8 @@ class SplitRewardsService {
             splitId,
             splitAmount,
             isOwner,
-            pointsAwarded,
+            basePoints: pointsAwarded,
+            finalPoints: result.pointsAwarded,
             season,
             isPartnership
           }, 'SplitRewardsService');

@@ -29,6 +29,7 @@ import {
   getDocs,
   deleteDoc
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -573,76 +574,32 @@ export const firestoreService = {
   // Check if user has verified within the last 30 days
   async hasVerifiedWithin30Days(email: string): Promise<boolean> {
     try {
-      // Find user by email
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email));
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        if (__DEV__) {
-          logger.debug('User not found for 30-day verification check', { email }, 'firebase');
-        }
-        return false; // User doesn't exist, needs verification
+      // Use Cloud Function to perform 30-day verification check with admin privileges
+      if (!app) {
+        // Firebase not initialized - require verification
+        logger.warn('Firebase app not initialized, skipping 30-day verification check', { email }, 'firebase');
+        return false;
       }
-      
-      const userDoc = querySnapshot.docs[0];
-      if (!userDoc) {
-        if (__DEV__) {
-          logger.debug('No user document found for 30-day verification check', { email }, 'firebase');
-        }
-        return false; // No user document found
-      }
-      const userData = userDoc.data();
-      const lastVerifiedAt = userData.lastVerifiedAt;
-      
-      if (!lastVerifiedAt) {
-        if (__DEV__) {
-          logger.debug('No lastVerifiedAt field found for user', { email, userId: userData.id }, 'firebase');
-        }
-        return false; // No verification record, needs verification
-      }
-      
-      // Handle Firestore Timestamp objects (from serverTimestamp())
-      let lastVerified: Date;
-      if (lastVerifiedAt && typeof lastVerifiedAt.toDate === 'function') {
-        // It's a Firestore Timestamp object
-        lastVerified = lastVerifiedAt.toDate();
-      } else if (typeof lastVerifiedAt === 'string') {
-        // It's an ISO string
-        lastVerified = new Date(lastVerifiedAt);
-      } else if (lastVerifiedAt instanceof Date) {
-        // It's already a Date object
-        lastVerified = lastVerifiedAt;
-      } else {
-        // Try to parse it as a date
-        lastVerified = new Date(lastVerifiedAt);
-      }
-      
-      // Check if lastVerifiedAt is a valid date (not NaN)
-      if (isNaN(lastVerified.getTime())) {
-        console.warn('⚠️ Invalid lastVerifiedAt date found for user:', email, 'Value:', lastVerifiedAt, 'Type:', typeof lastVerifiedAt);
-        // Fix the invalid date by updating it to current time
-        await this.updateLastVerifiedAt(email);
-        return true; // Allow user to proceed since we're fixing the issue
-      }
-      
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-      
-      const hasVerifiedWithin30Days = lastVerified > thirtyDaysAgo;
-      
+
+      const functions = getFunctions(app);
+      const hasVerifiedFn = httpsCallable(functions, 'hasVerifiedWithin30Days');
+
+      const result = await hasVerifiedFn({ email });
+      const data = result.data as { success?: boolean; hasVerifiedWithin30Days?: boolean };
+
+      const success = !!data?.success;
+      const hasVerified = !!data?.hasVerifiedWithin30Days;
+
       if (__DEV__) {
-        logger.debug('30-day verification check', { 
-          email, 
-          lastVerified: lastVerified.toISOString(), 
-          now: now.toISOString(), 
-          thirtyDaysAgo: thirtyDaysAgo.toISOString(), 
-          hasVerifiedWithin30Days,
-          daysSinceVerification: Math.floor((now.getTime() - lastVerified.getTime()) / (1000 * 60 * 60 * 24))
+        logger.debug('30-day verification check (Cloud Function)', {
+          email,
+          success,
+          hasVerifiedWithin30Days: hasVerified
         }, 'firebase');
       }
-      
-      return hasVerifiedWithin30Days;
+
+      // On failure or explicit false, require verification
+      return success && hasVerified;
     } catch (error) {
       console.error('Error checking 30-day verification:', error);
       logger.error('Error checking 30-day verification', { error, email }, 'firebase');

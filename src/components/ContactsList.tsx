@@ -777,21 +777,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
     const [communityBadges, setCommunityBadges] = useState<CommunityBadgeType[]>([]);
 
     useEffect(() => {
-      if (!contact.id || contact.show_badges_on_profile === false) {
-        setCommunityBadges([]);
-        return;
-      }
-
-      const loadBadges = async () => {
-        try {
-          const badges = await badgeService.getUserCommunityBadges(contact.id);
-          setCommunityBadges(badges);
-        } catch (error) {
-          // Silently fail - badges are optional
-        }
-      };
-
-      loadBadges();
+      // Community badges are disabled - do not load or display them
+      setCommunityBadges([]);
     }, [contact.id, contact.show_badges_on_profile]);
 
     return (

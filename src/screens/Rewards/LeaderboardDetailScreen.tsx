@@ -32,6 +32,7 @@ import UserNameWithBadges from '../../components/profile/UserNameWithBadges';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 import { TransactionBasedContactService } from '../../services/contacts/transactionBasedContactService';
+import { badgeService } from '../../services/rewards/badgeService';
 
 type LeaderboardFilter = 'friends' | 'global';
 
@@ -168,6 +169,24 @@ const LeaderboardDetailScreen: React.FC = () => {
     return colors.white10;
   }, []);
 
+  // Helper component to render badges, filtering out community badges
+  const RenderFilteredBadges = useCallback(({ badges, activeBadge }: { badges?: string[], activeBadge?: string }) => {
+    // Don't render if no badges or no active badge
+    if (!badges || badges.length === 0 || !activeBadge) {
+      return null;
+    }
+    
+    // BadgeDisplay already filters out community badges, so we can just use it
+    // The filter happens inside BadgeDisplay after badge info is loaded
+    return (
+      <BadgeDisplay
+        badges={badges}
+        activeBadge={activeBadge}
+        showAll={false}
+      />
+    );
+  }, []);
+
   // Memoize leaderboard slices to prevent recalculation on every render
   const topThree = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
   const restOfLeaderboard = useMemo(() => leaderboard.slice(3), [leaderboard]);
@@ -198,13 +217,7 @@ const LeaderboardDetailScreen: React.FC = () => {
                 showBadges={true}
               />
             </View>
-            {topThree[1].badges && topThree[1].badges.length > 0 && topThree[1].active_badge && (
-              <BadgeDisplay
-                badges={topThree[1].badges}
-                activeBadge={topThree[1].active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={topThree[1].badges} activeBadge={topThree[1].active_badge} />
             <Text style={styles.topThreePoints}>{topThree[1].points} pts</Text>
           </View>
         )}
@@ -246,13 +259,7 @@ const LeaderboardDetailScreen: React.FC = () => {
                 showBadges={true}
               />
             </View>
-            {topThree[0].badges && topThree[0].badges.length > 0 && topThree[0].active_badge && (
-              <BadgeDisplay
-                badges={topThree[0].badges}
-                activeBadge={topThree[0].active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={topThree[0].badges} activeBadge={topThree[0].active_badge} />
             <Text style={styles.topThreePoints}>{topThree[0].points} pts</Text>
           </View>
         )}
@@ -278,13 +285,7 @@ const LeaderboardDetailScreen: React.FC = () => {
                 showBadges={true}
               />
             </View>
-            {topThree[2].badges && topThree[2].badges.length > 0 && topThree[2].active_badge && (
-              <BadgeDisplay
-                badges={topThree[2].badges}
-                activeBadge={topThree[2].active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={topThree[2].badges} activeBadge={topThree[2].active_badge} />
             <Text style={styles.topThreePoints}>{topThree[2].points} pts</Text>
           </View>
         )}
@@ -409,13 +410,7 @@ const LeaderboardDetailScreen: React.FC = () => {
               ]}
               showBadges={true}
             />
-            {entry.badges && entry.badges.length > 0 && entry.active_badge && (
-              <BadgeDisplay
-                badges={entry.badges}
-                activeBadge={entry.active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={entry.badges} activeBadge={entry.active_badge} />
           </View>
         </View>
 
@@ -454,13 +449,7 @@ const LeaderboardDetailScreen: React.FC = () => {
               textStyle={styles.entryName}
               showBadges={true}
             />
-            {entry.badges && entry.badges.length > 0 && entry.active_badge && (
-              <BadgeDisplay
-                badges={entry.badges}
-                activeBadge={entry.active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={entry.badges} activeBadge={entry.active_badge} />
           </View>
         </View>
 
@@ -499,13 +488,7 @@ const LeaderboardDetailScreen: React.FC = () => {
             textStyle={styles.userRankName}
             showBadges={true}
           />
-          {userEntry.badges && userEntry.badges.length > 0 && userEntry.active_badge && (
-            <BadgeDisplay
-              badges={userEntry.badges}
-              activeBadge={userEntry.active_badge}
-              showAll={false}
-            />
-          )}
+          <RenderFilteredBadges badges={userEntry.badges} activeBadge={userEntry.active_badge} />
         </View>
         <Text style={styles.userRankPoints}>{userEntry.points.toLocaleString()} pts</Text>
       </LinearGradient>

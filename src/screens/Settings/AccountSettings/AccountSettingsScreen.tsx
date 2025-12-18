@@ -629,10 +629,10 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
     
     // Fallback benefits for specific badges
     const benefits: Record<string, string> = {
-      'community_wesplit': 'Double points, Free fees',
-      'community_superteamfrance': 'Double points, Free fees',
-      'community_monkedao': 'Double points, Free fees',
-      'community_diggers': 'Double points, Free fees',
+      'community_wesplit': 'Double points',
+      'community_superteamfrance': 'Double points',
+      'community_monkedao': 'Double points',
+      'community_diggers': 'Double points',
     };
     return benefits[badge?.badgeId] || 'Community benefits';
   };
@@ -923,7 +923,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                   color: colors.white70,
                   marginBottom: spacing.md,
                 }}>
-                  Select a badge to display on your profile. Community badges provide special benefits like double points and free fees.
+                  Select a badge to display on your profile. Community badges provide double points on all transactions and activities.
                 </Text>
                 
                 {loadingBadges ? (
@@ -1038,7 +1038,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                             alignItems: 'center',
                             marginBottom: spacing.sm,
                           }}>
-                            {badge.imageUrl ? (
+                            {badge.imageUrl && badge.imageUrl.startsWith('http') ? (
                               <Image
                                 source={{ uri: badge.imageUrl }}
                                 style={{
@@ -1110,6 +1110,34 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                               }}>
                                 {getBadgeBenefits(badge)}
                               </Text>
+                              <View style={{
+                                marginTop: spacing.xs,
+                                paddingTop: spacing.xs,
+                                borderTopWidth: 1,
+                                borderTopColor: colors.white10,
+                              }}>
+                                <View style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: spacing.xs,
+                                }}>
+                                  <PhosphorIcon name="Lightning" size={14} color={colors.green} weight="fill" />
+                                  <Text style={{
+                                    color: colors.green,
+                                    fontSize: typography.fontSize.xs,
+                                    fontWeight: typography.fontWeight.semibold,
+                                  }}>
+                                    Double Points Active
+                                  </Text>
+                                </View>
+                                <Text style={{
+                                  color: colors.white50,
+                                  fontSize: typography.fontSize.xs,
+                                  marginTop: 2,
+                                }}>
+                                  All points from transactions, quests, and splits are doubled
+                                </Text>
+                              </View>
                             </View>
                           )}
                         </TouchableOpacity>

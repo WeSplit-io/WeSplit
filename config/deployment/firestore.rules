@@ -1,9 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and write their own user document
+    // Users collection - allow authenticated users to read any user document
+    // This is necessary for:
+    // 1. Users reading their own document (by user ID)
+    // 2. Contact resolution (querying by email/wallet address)
+    // 3. User lookup for transactions, splits, etc.
+    // Note: Queries are limited to 1 result in application code for privacy
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow authenticated users to read any user document
+      // This enables queries by email/wallet address for contact resolution
+      allow read: if request.auth != null;
+      
+      // Users can create their own document (when document doesn't exist yet)
+      // The document ID must match the authenticated user's UID
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Users can update their own document (when document exists)
+      // The document ID must match the authenticated user's UID
+      allow update: if request.auth != null && request.auth.uid == userId;
+      
+      // Users cannot delete their own document (for data retention)
+      // Deletions should be handled by backend/admin functions
+      allow delete: if false;
     }
     
     // Verification codes can be created by anyone but only read by the email owner
@@ -95,5 +114,154 @@ service cloud.firestore {
       // System can write when claiming badges (enforced by application code)
       allow write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Contacts collection - users can read/write their own contacts
+    match /contacts/{contactId} {
+      // Users can read contacts where they are the owner
+      allow read: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+      
+      // Users can create contacts for themselves
+      allow create: if request.auth != null && 
+        request.resource.data.user_id == request.auth.uid;
+      
+      // Users can update/delete their own contacts
+      allow update, delete: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+    }
+
+    // Transactions collection - users can read transactions they're involved in
+    match /transactions/{transactionId} {
+      // Users can read transactions where they are sender or recipient
+      allow read: if request.auth != null && 
+        (resource.data.from_user == request.auth.uid || 
+         resource.data.to_user == request.auth.uid);
+      
+      // Users can create transactions where they are the sender
+      allow create: if request.auth != null && 
+        request.resource.data.from_user == request.auth.uid;
+      
+      // Users can update transactions they're involved in (for status updates, etc.)
+      allow update: if request.auth != null && 
+        (resource.data.from_user == request.auth.uid || 
+         resource.data.to_user == request.auth.uid);
+      
+      // Deletions should be restricted (or handled by backend)
+      allow delete: if false;
+    }
+
+    // User transactions collection (transaction history)
+    match /user_transactions/{transactionId} {
+      // Users can read their own transaction history
+      allow read: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+      
+      // Users can create their own transaction history entries
+      allow create: if request.auth != null && 
+        request.resource.data.user_id == request.auth.uid;
+      
+      // Users can update their own transaction history
+      allow update: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+      
+      // Deletions should be restricted
+      allow delete: if false;
+    }
+
+    // Splits collection - users can read splits they're involved in
+    // Note: participants is an array of objects with userId fields
+    // Firestore rules can't easily check nested arrays, so we allow authenticated users
+    // Application code enforces participant checks
+    match /splits/{splitId} {
+      // Users can read splits where they are creator
+      // For participants, we rely on application-level checks (participants array contains userId)
+      allow read: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+      
+      // Also allow read for authenticated users (participant check happens in app code)
+      // This is necessary because Firestore rules can't check nested participant.userId values
+      // Application code must verify user is a participant before showing split details
+      allow read: if request.auth != null;
+      
+      // Users can create splits where they are the creator
+      allow create: if request.auth != null && 
+        request.resource.data.creatorId == request.auth.uid;
+      
+      // Users can update splits they created
+      allow update: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+      
+      // Also allow updates for authenticated users (participant checks in app code)
+      allow update: if request.auth != null;
+      
+      // Only creators can delete splits
+      allow delete: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+    }
+
+    // Points transactions collection - users can read their own points history
+    match /points_transactions/{transactionId} {
+      // Users can read their own points transactions
+      allow read: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+      
+      // System can create points transactions (enforced by application code)
+      allow create: if request.auth != null && 
+        request.resource.data.user_id == request.auth.uid;
+      
+      // Updates should be restricted (points are immutable)
+      allow update: if false;
+      
+      // Deletions should be restricted
+      allow delete: if false;
+    }
+
+    // Shared wallets collection - users can read wallets they created or are members of
+    match /sharedWallets/{sharedWalletId} {
+      // Users can read wallets where they are creator
+      allow read: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+      
+      // Users can also read wallets where they are a member
+      // Note: Firestore rules can't easily check nested arrays, so we allow authenticated users
+      // Application code enforces member checks
+      allow read: if request.auth != null;
+      
+      // Users can create wallets where they are the creator
+      allow create: if request.auth != null && 
+        request.resource.data.creatorId == request.auth.uid;
+      
+      // Users can update wallets they created
+      allow update: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+      
+      // Also allow updates for authenticated users (member checks in app code)
+      allow update: if request.auth != null;
+      
+      // Only creators can delete wallets
+      allow delete: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+    }
+
+    // Payment requests - users can read requests where they are sender or recipient
+    match /paymentRequests/{requestId} {
+      // Users can read payment requests where they are sender or recipient
+      allow read: if request.auth != null &&
+        (resource.data.recipientId == request.auth.uid ||
+         resource.data.senderId == request.auth.uid);
+
+      // Users can create payment requests where they are the sender
+      allow create: if request.auth != null &&
+        request.resource.data.senderId == request.auth.uid;
+
+      // Users can update requests they're involved in (e.g., accept/reject)
+      allow update: if request.auth != null &&
+        (resource.data.recipientId == request.auth.uid ||
+         resource.data.senderId == request.auth.uid);
+
+      // Deletions should be restricted (or handled by backend)
+      allow delete: if false;
+    }
   }
 } 
+

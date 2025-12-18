@@ -18,6 +18,10 @@
           "destination": "/join-split/index.html"
         },
         {
+          "source": "/spend-callback",
+          "destination": "/spend-callback/index.html"
+        },
+        {
           "source": "/referral",
           "destination": "/referral/index.html"
         }

@@ -230,17 +230,51 @@ const AuthMethodsScreen: React.FC = () => {
               email: email.trim()
             }, 'AuthMethodsScreen');
 
-            // Get user data from Firestore to create proper user object
+            // STEP 1: Sign in to Firebase Auth using custom token so Firestore rules will allow reads
+            try {
+              const { auth, app } = await import('../../config/firebase/firebase');
+              const { signInWithCustomToken } = await import('firebase/auth');
+              
+              const { getFunctions, httpsCallable } = await import('firebase/functions');
+              const functions = getFunctions(app);
+              const getUserToken = httpsCallable<{ userId: string }, {
+                success: boolean;
+                customToken: string;
+                message?: string;
+              }>(functions, 'getUserCustomToken');
+
+              const tokenResult = await getUserToken({ userId: userExistsResult.userId });
+              const tokenData = tokenResult.data as {
+                success: boolean;
+                customToken: string;
+                message?: string;
+              };
+
+              if (tokenData.success && tokenData.customToken) {
+                await signInWithCustomToken(auth, tokenData.customToken);
+                logger.info('✅ Signed in to Firebase Auth with custom token', null, 'AuthMethodsScreen');
+              } else {
+                logger.warn('getUserCustomToken did not return a valid token, falling back to verification code', {
+                  userId: userExistsResult.userId,
+                  tokenData
+                }, 'AuthMethodsScreen');
+                throw new Error('Failed to obtain custom token');
+              }
+            } catch (tokenError) {
+              logger.warn('Failed to sign in with custom token, falling back to verification code', { 
+                error: tokenError instanceof Error ? tokenError.message : String(tokenError),
+                userId: userExistsResult.userId
+              }, 'AuthMethodsScreen');
+              // If we can't sign in, fall through to verification code flow
+              throw tokenError;
+            }
+
+            // STEP 2: Now that we're authenticated, get user data from Firestore to create proper user object
             try {
               const { firebaseDataService } = await import('../../services/data/firebaseDataService');
               const existingUserData = await firebaseDataService.user.getCurrentUser(userExistsResult.userId);
 
               if (existingUserData) {
-                // Update lastLoginAt timestamp
-                await firebaseDataService.user.updateUser(userExistsResult.userId, {
-                  lastLoginAt: new Date().toISOString()
-                });
-
                 // Create properly formatted user object (consistent with phone flow)
                 const authenticatedUser = {
                   id: userExistsResult.userId,
@@ -256,37 +290,6 @@ const AuthMethodsScreen: React.FC = () => {
                   hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false,
                 };
 
-                // Sign in to Firebase Auth if custom token is available
-                // This ensures auth.currentUser is set for proper session management
-                try {
-                  const { auth } = await import('../../config/firebase/firebase');
-                  const { signInWithCustomToken } = await import('firebase/auth');
-                  
-                  // Get custom token from Firebase Functions
-                  const { getFunctions, httpsCallable } = await import('firebase/functions');
-                  const functions = getFunctions();
-                  const getUserToken = httpsCallable<{ userId: string }, {
-                    success: boolean;
-                    customToken: string;
-                    message?: string;
-                  }>(functions, 'getUserCustomToken');
-
-                  const tokenResult = await getUserToken({ userId: userExistsResult.userId });
-                  const tokenData = tokenResult.data as {
-                    success: boolean;
-                    customToken: string;
-                    message?: string;
-                  };
-
-                  if (tokenData.success && tokenData.customToken) {
-                    await signInWithCustomToken(auth, tokenData.customToken);
-                    logger.info('✅ Signed in to Firebase Auth with custom token', null, 'AuthMethodsScreen');
-                  }
-                } catch (tokenError) {
-                  logger.warn('Failed to sign in with custom token (non-critical)', tokenError, 'AuthMethodsScreen');
-                  // Continue anyway - user is still authenticated in app context
-                }
-
                 // Update authentication context BEFORE navigating
                 authenticateUser(authenticatedUser, 'email');
 
@@ -294,10 +297,23 @@ const AuthMethodsScreen: React.FC = () => {
                   userId: userExistsResult.userId
                 }, 'AuthMethodsScreen');
 
-                // Check if user needs to create a profile (same logic as phone)
-                const needsProfile = !authenticatedUser.name || authenticatedUser.name.trim() === '';
+                // Check if user needs to create a profile
+                // A user has a profile if they have a name AND have completed onboarding
+                // If they have a name but haven't completed onboarding, they should go to onboarding
+                // If they don't have a name, they need to create a profile
+                const hasName = authenticatedUser.name && authenticatedUser.name.trim() !== '';
+                const hasCompletedOnboarding = authenticatedUser.hasCompletedOnboarding === true;
+                
+                logger.info('Checking user profile status', {
+                  userId: userExistsResult.userId,
+                  hasName,
+                  hasCompletedOnboarding,
+                  name: authenticatedUser.name?.substring(0, 10) + '...',
+                  email: email.trim()
+                }, 'AuthMethodsScreen');
 
-                if (needsProfile) {
+                if (!hasName) {
+                  // User doesn't have a name - needs to create profile
                   logger.info('Email user needs to create profile (no name), navigating to CreateProfile', {
                     userId: userExistsResult.userId,
                     email: email.trim(),
@@ -311,8 +327,20 @@ const AuthMethodsScreen: React.FC = () => {
                       referralCode: referralCode
                     } }],
                   });
+                } else if (hasCompletedOnboarding) {
+                  // User has name and completed onboarding - go to dashboard
+                  logger.info('Email user has profile and completed onboarding, navigating to Dashboard', {
+                    userId: userExistsResult.userId,
+                    name: authenticatedUser.name,
+                    email: email.trim()
+                  }, 'AuthMethodsScreen');
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Dashboard' }],
+                  });
                 } else {
-                  logger.info('Email user already has name, navigating to Dashboard', {
+                  // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+                  logger.info('Email user has name but needs onboarding, navigating to Dashboard', {
                     userId: userExistsResult.userId,
                     name: authenticatedUser.name,
                     email: email.trim()

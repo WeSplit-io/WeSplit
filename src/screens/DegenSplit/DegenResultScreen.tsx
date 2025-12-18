@@ -30,7 +30,6 @@ import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from '.
 import { DegenSplitHeader } from './components';
 import { Container, Button, AppleSlider, Modal, PhosphorIcon } from '@/components/shared';
 import Avatar from '@/components/shared/Avatar';
-import BadgeDisplay from '../../components/profile/BadgeDisplay';
 
 interface DegenResultScreenProps {
   navigation: any;
@@ -615,15 +614,6 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             avatarUrl={currentUser?.avatar}
             style={combinedAvatarStyle}
           />
-          {currentUser?.badges && currentUser.badges.length > 0 && currentUser.active_badge && (
-            <View style={{ marginTop: spacing.sm, alignItems: 'center' }}>
-              <BadgeDisplay
-                badges={currentUser.badges}
-                activeBadge={currentUser.active_badge}
-                showAll={false}
-              />
-            </View>
-          )}
         </View>
 
         {/* Result Title */}

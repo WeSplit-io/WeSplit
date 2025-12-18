@@ -631,13 +631,24 @@ const VerificationScreen: React.FC = () => {
         // Non-critical, continue with authentication
       }
 
-      // Check if user needs to create a profile (has no name/pseudo)
-      const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+      // Check if user needs to create a profile
+      // A user has a profile if they have a name AND have completed onboarding
+      const hasName = transformedUser.name && transformedUser.name.trim() !== '';
+      const hasCompletedOnboarding = transformedUser.hasCompletedOnboarding === true;
       
-      if (needsProfile) {
-        // Preserve referral code from route params
+      logger.info('Checking user profile status after verification', {
+        userId: transformedUser.id,
+        hasName,
+        hasCompletedOnboarding,
+        name: transformedUser.name?.substring(0, 10) + '...',
+        email: transformedUser.email?.substring(0, 10) + '...'
+      }, 'VerificationScreen');
+      
+      if (!hasName) {
+        // User doesn't have a name - needs to create profile
         const referralCode = route.params?.referralCode;
         logger.info('User needs to create profile (no name), navigating to CreateProfile', {
+          userId: transformedUser.id,
           hasReferralCode: !!referralCode
         }, 'VerificationScreen');
         (navigation as any).reset({
@@ -647,14 +658,27 @@ const VerificationScreen: React.FC = () => {
             referralCode: referralCode
           } }],
         });
-      } else {
-        // User already has a name, go directly to Dashboard
-        logger.info('User already has name, navigating to Dashboard', { name: transformedUser.name }, 'VerificationScreen');
+      } else if (hasCompletedOnboarding) {
+        // User has name and completed onboarding - go to dashboard
+        logger.info('User has profile and completed onboarding, navigating to Dashboard', { 
+          userId: transformedUser.id,
+          name: transformedUser.name 
+        }, 'VerificationScreen');
         (navigation as any).reset({
           index: 0,
           routes: [{ name: 'Dashboard' }],
         });
-        }
+      } else {
+        // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+        logger.info('User has name but needs onboarding, navigating to Dashboard', { 
+          userId: transformedUser.id,
+          name: transformedUser.name 
+        }, 'VerificationScreen');
+        (navigation as any).reset({
+          index: 0,
+          routes: [{ name: 'Dashboard' }],
+        });
+      }
       } else {
         throw new Error('Email or phone number not found');
       }

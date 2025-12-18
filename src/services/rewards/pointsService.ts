@@ -11,6 +11,7 @@ import { firebaseDataService } from '../data/firebaseDataService';
 import { MIN_TRANSACTION_AMOUNT_FOR_POINTS } from './rewardsConfig';
 import { seasonService, Season } from './seasonService';
 import { getSeasonReward, calculateRewardPoints, RewardTask } from './seasonRewardsConfig';
+import { applyCommunityBadgeBonus } from './communityBadgeBonusService';
 
 class PointsService {
   /**
@@ -61,13 +62,16 @@ class PointsService {
       
       // Get season-based reward for transaction
       const reward = getSeasonReward('transaction_1_1_request', season, isPartnership);
-      const pointsAwarded = calculateRewardPoints(reward, transactionAmount);
+      const basePoints = calculateRewardPoints(reward, transactionAmount);
+      
+      // Note: Community badge bonus is automatically applied in awardSeasonPoints()
+      // This ensures double points for all users with active community badges
 
-      if (pointsAwarded <= 0) {
+      if (basePoints <= 0) {
         logger.warn('Calculated points are zero or negative', {
           userId,
           transactionAmount,
-          pointsAwarded,
+          basePoints,
           transactionId,
           season,
           isPartnership,
@@ -84,7 +88,7 @@ class PointsService {
       logger.info('Awarding transaction points', {
         userId,
         transactionAmount,
-        pointsAwarded,
+        basePoints,
         transactionId,
         season,
         isPartnership,
@@ -93,9 +97,10 @@ class PointsService {
       }, 'PointsService');
 
       // Award points to user with season info
+      // Community badge bonus will be applied automatically in awardSeasonPoints()
       const result = await this.awardSeasonPoints(
         userId,
-        pointsAwarded,
+        basePoints,
         'transaction_reward',
         transactionId,
         `Points for ${transactionAmount} USDC transaction (Season ${season})`,
@@ -149,6 +154,34 @@ class PointsService {
         };
       }
 
+      // Apply community badge bonus (double points) for all sources except admin adjustments
+      // Admin adjustments should not be doubled as they are manual corrections
+      let finalAmount = amount;
+      let bonusApplied = false;
+      let bonusInfo: { hasActiveCommunityBadge: boolean; multiplier: number; activeBadgeId?: string } | null = null;
+      
+      if (source !== 'admin_adjustment') {
+        const bonusResult = await applyCommunityBadgeBonus(amount, userId);
+        finalAmount = bonusResult.finalPoints;
+        bonusApplied = bonusResult.hasActiveCommunityBadge;
+        bonusInfo = {
+          hasActiveCommunityBadge: bonusResult.hasActiveCommunityBadge,
+          multiplier: bonusResult.multiplier,
+          activeBadgeId: bonusResult.activeBadgeId
+        };
+        
+        if (bonusApplied) {
+          logger.info('Community badge bonus applied in awardSeasonPoints', {
+            userId,
+            source,
+            baseAmount: amount,
+            finalAmount,
+            multiplier: bonusResult.multiplier,
+            activeBadgeId: bonusResult.activeBadgeId
+          }, 'PointsService');
+        }
+      }
+
       // Get current user points
       const currentPoints = await this.getUserPoints(userId);
 
@@ -165,8 +198,8 @@ class PointsService {
         };
       }
 
-      const newPoints = (userDoc.data().points || 0) + amount;
-      const totalEarned = (userDoc.data().total_points_earned || 0) + amount;
+      const newPoints = (userDoc.data().points || 0) + finalAmount;
+      const totalEarned = (userDoc.data().total_points_earned || 0) + finalAmount;
 
       // Update user points atomically
       await updateDoc(userRef, {
@@ -178,30 +211,42 @@ class PointsService {
       // Use current season if not provided (for backward compatibility)
       const effectiveSeason = season !== undefined ? season : seasonService.getCurrentSeason();
 
+      // Update description to include bonus info if applied
+      let finalDescription = description || `Awarded ${amount} points`;
+      if (bonusApplied && bonusInfo) {
+        // Only add bonus note if description doesn't already mention it
+        if (!description?.includes('Community Badge Bonus')) {
+          finalDescription = `${description || `Awarded ${amount} points`} - Community Badge Bonus: ${bonusInfo.multiplier}x`;
+        }
+      }
+
       // Record points transaction with season info
       await this.recordPointsTransaction(
         userId,
-        amount,
+        finalAmount,
         source,
         sourceId || '',
-        description || `Awarded ${amount} points`,
+        finalDescription,
         effectiveSeason,
         taskType
       );
 
       logger.info('Points awarded successfully', {
         userId,
-        amount,
+        baseAmount: amount,
+        finalAmount,
         currentPoints,
         newPoints,
         source,
         season: effectiveSeason,
-        taskType
+        taskType,
+        hasActiveCommunityBadge: bonusInfo?.hasActiveCommunityBadge || false,
+        multiplier: bonusInfo?.multiplier || 1
       }, 'PointsService');
 
       return {
         success: true,
-        pointsAwarded: amount,
+        pointsAwarded: finalAmount,
         totalPoints: newPoints
       };
     } catch (error) {

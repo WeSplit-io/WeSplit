@@ -684,8 +684,15 @@ class BadgeService {
         logger.debug('Badge image not found in badge_images collection', { badgeId, error: storageError }, 'BadgeService');
       }
 
-      // Return fallback URL if provided (even if conversion failed, might still be useful)
-      return fallbackUrl;
+      // Never return a gs:// URL - React Native Image component doesn't support it
+      // If fallback is a gs:// URL and conversion failed, return undefined instead
+      if (fallbackUrl && fallbackUrl.startsWith('gs://')) {
+        logger.warn('Cannot use gs:// URL as fallback - conversion failed', { badgeId, gsUrl: fallbackUrl }, 'BadgeService');
+        return undefined;
+      }
+
+      // Return fallback URL only if it's a valid HTTPS URL
+      return fallbackUrl && fallbackUrl.startsWith('http') ? fallbackUrl : undefined;
     } catch (error) {
       logger.error('Failed to get badge image URL', { error, badgeId }, 'BadgeService');
       return fallbackUrl;
