@@ -23,7 +23,7 @@ type RootStackParamList = {
   Dashboard: undefined;
   Verification: { email?: string; phoneNumber?: string; verificationId?: string; referralCode?: string };
   CreateProfile: { email?: string; phoneNumber?: string; referralCode?: string };
-  AuthMethods: { referralCode?: string };
+  AuthMethods: { referralCode?: string; email?: string; prefilledEmail?: string };
 };
 
 const AuthMethodsScreen: React.FC = () => {
@@ -38,8 +38,9 @@ const AuthMethodsScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   
-  // Get referral code from route params (from deep link)
+  // Get referral code and email from route params (from deep link)
   const referralCode = (route.params as any)?.referralCode;
+  const prefilledEmail = (route.params as any)?.email || (route.params as any)?.prefilledEmail;
 
   // Validation functions
   const isValidEmail = (email: string): boolean => {
@@ -63,14 +64,20 @@ const AuthMethodsScreen: React.FC = () => {
     return cleaned;
   };
 
-  // Load persisted email and phone on component mount
+  // Load persisted email and phone on component mount, and prefill email from route params
   useEffect(() => {
     const loadPersistedData = async () => {
       try {
-        // Load persisted email
-        const persistedEmail = await AuthPersistenceService.loadEmail();
-        if (persistedEmail) {
-          setEmail(persistedEmail);
+        // Priority: route params > persisted email
+        if (prefilledEmail) {
+          setEmail(prefilledEmail);
+          logger.info('Email prefilled from route params', { email: prefilledEmail }, 'AuthMethodsScreen');
+        } else {
+          // Load persisted email
+          const persistedEmail = await AuthPersistenceService.loadEmail();
+          if (persistedEmail) {
+            setEmail(persistedEmail);
+          }
         }
 
         // Load persisted phone number
@@ -86,7 +93,7 @@ const AuthMethodsScreen: React.FC = () => {
     };
 
     loadPersistedData();
-  }, []);
+  }, [prefilledEmail]);
 
   // Helper function to process phantom authentication success
   const processPhantomAuthSuccess = async (phantomUser: any) => {

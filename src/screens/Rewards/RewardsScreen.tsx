@@ -28,7 +28,6 @@ import { PointsTransaction } from '../../types/rewards';
 import { logger } from '../../services/analytics/loggingService';
 import { userActionSyncService } from '../../services/rewards/userActionSyncService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
-import { christmasCalendarService } from '../../services/rewards/christmasCalendarService';
 
 const RewardsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
@@ -40,7 +39,6 @@ const RewardsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const isLoadingRef = useRef(false);
-  const isDevEnvironment = __DEV__ || process.env.EXPO_PUBLIC_ENV === 'development';
 
   const loadData = useCallback(async () => {
     if (!currentUser?.id) {
@@ -107,13 +105,6 @@ const RewardsScreen: React.FC = () => {
     await loadData();
     setRefreshing(false);
   }, [loadData]);
-
-  const openDevCalendar = useCallback(() => {
-    if (!christmasCalendarService.isBypassModeEnabled()) {
-      christmasCalendarService.setBypassMode(true);
-    }
-    rewardNav.goToChristmasCalendar();
-  }, [rewardNav]);
 
   // Memoized formatting functions to prevent recreation on every render
   const formatPoints = useCallback((points: number) => {
@@ -215,31 +206,6 @@ const RewardsScreen: React.FC = () => {
           />
         }
       >
-        {isDevEnvironment && currentUser?.id && (
-          <View style={styles.devToolsContainer}>
-            <Text style={styles.devToolsLabel}>Dev Tools</Text>
-            <Text style={styles.devToolsHelper}>
-              Development tools for testing rewards features.
-            </Text>
-            <TouchableOpacity
-              style={styles.devLaunchButton}
-              onPress={openDevCalendar}
-              activeOpacity={0.85}
-            >
-              <PhosphorIcon name="Calendar" size={16} color={colors.black} weight="fill" />
-              <Text style={styles.devLaunchButtonText}>Open Christmas Calendar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.devLaunchButton}
-              onPress={() => rewardNav.goToDevAssetPreview()}
-              activeOpacity={0.85}
-            >
-              <PhosphorIcon name="Image" size={16} color={colors.black} weight="fill" />
-              <Text style={styles.devLaunchButtonText}>Preview Assets & Badges</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Points Display */}
         <View style={styles.pointsContainer}>
           <Text style={styles.pointsValue}>
@@ -412,42 +378,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: spacing.md,
     paddingBottom: 120, // Space for NavBar
-  },
-  devToolsContainer: {
-    marginBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.white10,
-    backgroundColor: colors.black,
-    gap: spacing.sm,
-  },
-  devToolsLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.white70,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  devToolsHelper: {
-    fontSize: typography.fontSize.xs,
-    color: colors.white70,
-    marginBottom: spacing.sm,
-  },
-  devLaunchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.green,
-    borderRadius: 999,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-  },
-  devLaunchButtonText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.black,
   },
   loadingContainer: {
     flex: 1,

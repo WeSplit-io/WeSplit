@@ -40,7 +40,6 @@ import ReferralScreen from './src/screens/Rewards/ReferralScreen';
 import PointsHistoryScreen from './src/screens/Rewards/PointsHistoryScreen';
 import ChristmasCalendarScreen from './src/screens/Rewards/ChristmasCalendarScreen';
 import ChristmasCalendarHistoryScreen from './src/screens/Rewards/ChristmasCalendarHistoryScreen';
-import DevAssetPreviewScreen from './src/screens/Rewards/DevAssetPreviewScreen';
 import SendScreen from './src/screens/Send/SendScreen';
 import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
 import CentralizedTransactionScreen from './src/screens/Transaction/CentralizedTransactionScreen';
@@ -198,7 +197,6 @@ export default function App() {
                     <Stack.Screen name="PointsHistory" component={PointsHistoryScreen} />
                     <Stack.Screen name="ChristmasCalendar" component={ChristmasCalendarScreen} />
                     <Stack.Screen name="ChristmasCalendarHistory" component={ChristmasCalendarHistoryScreen} />
-                    {__DEV__ && <Stack.Screen name="DevAssetPreview" component={DevAssetPreviewScreen} />}
                     <Stack.Screen name="DegenLock" component={DegenLockScreen} />
                     <Stack.Screen name="DegenSpin" component={DegenSpinScreen} />
                     <Stack.Screen name="DegenResult" component={DegenResultScreen} />

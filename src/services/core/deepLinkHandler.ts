@@ -776,14 +776,21 @@ export function setupDeepLinkListeners(
             // Store the invitation for processing after authentication
             await pendingInvitationService.storePendingInvitation(invitationData, url);
             
-            // Inform user and redirect to authentication
+            // Extract email from invitation data or URL for prefilling
+            const prefilledEmail = invitationData.email || 
+              (url ? new URL(url).searchParams.get('email') : null);
+            
+            // Inform user and redirect to authentication with prefilled email
             Alert.alert(
               'Sign In Required',
               `You've been invited to join "${invitationData.billName || 'a split'}"!\n\nPlease sign in or create an account to join this split. Your invitation will be waiting for you.`,
               [
                 {
                   text: 'Sign In',
-                  onPress: () => navigation.navigate('AuthMethods'),
+                  onPress: () => navigation.navigate('AuthMethods', {
+                    prefilledEmail: prefilledEmail || undefined,
+                    email: prefilledEmail || undefined,
+                  }),
                 },
               ]
             );
@@ -797,6 +804,7 @@ export function setupDeepLinkListeners(
             shareableLink: url, // Pass the original URL
             splitInvitationData: linkData.splitInvitationData,
             splitId: invitationData.splitId,
+            prefilledEmail: invitationData.email, // Pass email for prefilling if needed
             isFromDeepLink: true
           });
           

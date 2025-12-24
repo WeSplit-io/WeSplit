@@ -115,6 +115,55 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // User quests subcollection - users can read/write their own quest progress
+    // Used by quest service to track quest completion and award points
+    match /users/{userId}/quests/{questId} {
+      // Users can read their own quest progress
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Users can create/update their own quests (when completing quests)
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false; // Quest history should not be deleted
+    }
+
+    // User metadata subcollection - users can read/write their own metadata
+    // Used for caching badge metrics and other user-specific metadata
+    match /users/{userId}/metadata/{metadataId} {
+      // Users can read their own metadata
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Users can create/update their own metadata (e.g., badge metrics caching)
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false; // Metadata should not be deleted (can be updated instead)
+    }
+
+    // User assets subcollection - users can read/write their own owned assets
+    // Used by advent calendar and other reward systems to store asset metadata
+    match /users/{userId}/assets/{assetId} {
+      // Users can read their own assets
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Users can create/update their own assets; deletions are blocked for safety
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // Christmas calendar subcollections - users can read/write their own calendar data
+    // Advent calendar per-day claim status
+    match /users/{userId}/christmas_calendar/{dayId} {
+      // Users can read and write their own calendar days
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Detailed claim records for analytics/tracking
+    match /users/{userId}/christmas_calendar_claims/{claimId} {
+      // Users can read their own claim history
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Claims are written by the app on behalf of the user
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Contacts collection - users can read/write their own contacts
     match /contacts/{contactId} {
       // Users can read contacts where they are the owner
@@ -261,6 +310,77 @@ service cloud.firestore {
 
       // Deletions should be restricted (or handled by backend)
       allow delete: if false;
+    }
+
+    // =============================================================================
+    // SPEND INTEGRATION COLLECTIONS
+    // These collections are primarily accessed via Firebase Admin SDK (bypasses rules)
+    // Rules are defined here for defense in depth and documentation
+    // =============================================================================
+
+    // API Keys collection - Admin-only access (server-side only)
+    // Used by SPEND endpoints for API key validation
+    match /apiKeys/{apiKeyId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      // In production, you could add: request.auth.token.admin == true
+      allow read, write: if false; // Block all client access - Admin SDK bypasses this
+    }
+
+    // Pending invitations - Users can read their own invites, admin can write
+    // Used by SPEND endpoints to store pending invites for new users
+    match /pending_invitations/{inviteId} {
+      // Users can read invitations sent to their email
+      allow read: if request.auth != null && 
+        request.auth.token.email == resource.data.email;
+      
+      // Only server-side (Admin SDK) can create - block all client access
+      allow create, update, delete: if false; // Admin SDK bypasses this
+    }
+
+    // Invite batches - Admin-only access (analytics/logging)
+    // Used by SPEND endpoints to log email matching analytics
+    match /invite_batches/{batchId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
+    }
+
+    // Webhook logs - Admin-only access (logging)
+    // Used to log outgoing webhooks sent to SPEND
+    match /webhook_logs/{logId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
+    }
+
+    // SPEND webhook received - Admin-only access (logging)
+    // Used to log incoming webhooks from SPEND
+    match /spend_webhook_received/{logId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
+    }
+
+    // SPEND webhook logs - Admin-only access (logging)
+    // Used to log webhook attempts and debugging
+    match /spend_webhook_logs/{logId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
+    }
+
+    // Linked wallets - Users can read their own, admin can write
+    // Used by SPEND endpoints to link external wallets
+    match /linkedWallets/{walletId} {
+      // Users can read their own linked wallets
+      allow read: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      
+      // Only server-side (Admin SDK) can create/update - block all client access
+      allow create, update, delete: if false; // Admin SDK bypasses this
+    }
+
+    // Rate limits - Admin-only access (server-side only)
+    // Used for API rate limiting
+    match /rateLimits/{limitId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
     }
   }
 } 

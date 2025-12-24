@@ -504,6 +504,9 @@ class BadgeService {
   /**
    * Load badges from Firestore badges collection
    * This allows adding badges dynamically without app updates
+   * 
+   * Automatically filters out test badges, placeholders, and empty badges
+   * to prevent them from appearing in the app.
    */
   private async loadFirestoreBadges(): Promise<Map<string, BadgeInfo>> {
     const now = Date.now();
@@ -524,11 +527,30 @@ class BadgeService {
         const data = doc.data();
         const badgeId = doc.id;
         
+        // Filter out test badges and placeholders
+        const title = (data.title || '').trim();
+        const description = (data.description || '').trim();
+        const badgeIdLower = badgeId.toLowerCase();
+        const titleLower = title.toLowerCase();
+        
+        // Skip test badges, placeholders, and empty badges
+        if (
+          badgeIdLower.includes('test') ||
+          titleLower.includes('test') ||
+          titleLower.includes('placeholder') ||
+          title === '' ||
+          description === '' ||
+          badgeId === ''
+        ) {
+          logger.debug('Filtered out test/placeholder badge', { badgeId, title }, 'BadgeService');
+          return; // Skip this badge
+        }
+        
         // Convert Firestore badge to BadgeInfo format
         const badgeInfo: BadgeInfo = {
           badgeId: badgeId,
-          title: data.title || badgeId,
-          description: data.description || '',
+          title: title || badgeId,
+          description: description,
           icon: data.icon || undefined, // Optional - not required if iconUrl is provided
           iconUrl: data.iconUrl || data.imageUrl,
           category: data.category,

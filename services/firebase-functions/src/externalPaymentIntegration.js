@@ -524,17 +524,19 @@ async function createSplitFromPayment(user, paymentData) {
       orderExtractionPath = 'metadata.order';
     }
     
-    // Log order extraction (sanitized - no sensitive data)
-    console.log('[SP3ND] Order extraction:', {
-      path: orderExtractionPath,
-      hasOrder: !!sp3ndOrder,
-      orderId: sp3ndOrder?.id || sp3ndOrder?.order_number || 'N/A',
-      orderNumber: sp3ndOrder?.order_number || 'N/A',
-      store: sp3ndOrder?.store || 'N/A',
-      totalAmount: sp3ndOrder?.total_amount || 'N/A',
-      itemsCount: sp3ndOrder?.items?.length || 0,
-      // Never log: webhookSecret, user_wallet, customer_email, transaction_signature
-    });
+    // Log order extraction (sanitized - no sensitive data) - only in debug mode
+    if (process.env.DEBUG_SPEND === 'true') {
+      console.log('[SP3ND] Order extraction:', {
+        path: orderExtractionPath,
+        hasOrder: !!sp3ndOrder,
+        orderId: sp3ndOrder?.id || sp3ndOrder?.order_number || 'N/A',
+        orderNumber: sp3ndOrder?.order_number || 'N/A',
+        store: sp3ndOrder?.store || 'N/A',
+        totalAmount: sp3ndOrder?.total_amount || 'N/A',
+        itemsCount: sp3ndOrder?.items?.length || 0,
+        // Never log: webhookSecret, user_wallet, customer_email, transaction_signature
+      });
+    }
     
     // Use SP3ND order total_amount if available, otherwise use paymentData.amount
     const sourceAmount = sp3ndOrder?.total_amount || paymentData.amount;
@@ -699,13 +701,15 @@ async function createSplitFromPayment(user, paymentData) {
           
           // Store full SP3ND order data for reference
           if (sp3ndOrder) {
-            // Log order storage (sanitized - no sensitive data)
-            console.log('[SP3ND] Storing complete order data in externalMetadata.orderData:', {
-              orderId: sp3ndOrder.id || sp3ndOrder.order_number,
-              itemsCount: sp3ndOrder.items?.length || 0,
-              hasAllFields: !!(sp3ndOrder.id && sp3ndOrder.order_number && sp3ndOrder.status && sp3ndOrder.store),
-              // Never log: webhookSecret, user_wallet, customer_email, transaction_signature
-            });
+            // Log order storage (sanitized - no sensitive data) - only in debug mode
+            if (process.env.DEBUG_SPEND === 'true') {
+              console.log('[SP3ND] Storing complete order data in externalMetadata.orderData:', {
+                orderId: sp3ndOrder.id || sp3ndOrder.order_number,
+                itemsCount: sp3ndOrder.items?.length || 0,
+                hasAllFields: !!(sp3ndOrder.id && sp3ndOrder.order_number && sp3ndOrder.status && sp3ndOrder.store),
+                // Never log: webhookSecret, user_wallet, customer_email, transaction_signature
+              });
+            }
             
             // Store all relevant SP3ND order fields
             // Parse timestamps to ensure consistent format (ISO 8601 strings)
@@ -776,9 +780,39 @@ async function createSplitFromPayment(user, paymentData) {
     // Firestore doesn't allow undefined values in documents
     const cleanedSplitData = removeUndefinedValues(splitData);
     
+    // Log split data before saving (sanitized)
+    console.log('💾 Saving split to Firestore:', {
+      splitId: splitData.id,
+      billId: splitData.billId,
+      title: splitData.title,
+      totalAmount: splitData.totalAmount,
+      currency: splitData.currency,
+      splitType: splitData.splitType,
+      creatorId: splitData.creatorId,
+      participantsCount: splitData.participants?.length || 0,
+      hasExternalMetadata: !!splitData.externalMetadata
+    });
+    
     // Save split to Firestore
     const splitsRef = db.collection('splits');
-    const splitDocRef = await splitsRef.add(cleanedSplitData);
+    let splitDocRef;
+    
+    try {
+      splitDocRef = await splitsRef.add(cleanedSplitData);
+      console.log('✅ Split saved successfully to Firestore:', {
+        splitId: splitData.id,
+        firebaseDocId: splitDocRef.id,
+        billId: splitData.billId
+      });
+    } catch (firestoreError) {
+      console.error('❌ Firestore error saving split:', {
+        error: firestoreError.message,
+        code: firestoreError.code,
+        splitId: splitData.id,
+        billId: splitData.billId
+      });
+      throw new functions.https.HttpsError('internal', `Failed to save split to Firestore: ${firestoreError.message}`, firestoreError);
+    }
     
     return {
       ...splitData,
@@ -786,7 +820,11 @@ async function createSplitFromPayment(user, paymentData) {
     };
     
   } catch (error) {
-    console.error('Error creating split:', error);
+    console.error('❌ Error creating split:', {
+      error: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     throw new functions.https.HttpsError('internal', 'Failed to create split', error);
   }
 }
@@ -835,8 +873,7 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
         });
       }
       } else {
-        // Emulator: Log that we're skipping auth (for debugging)
-        console.log('🔧 Emulator mode: Skipping API key validation');
+        // Emulator: Skip auth (no logging to reduce noise)
         // Use a dummy key for rate limiting in emulator (or skip rate limiting)
         apiKey = 'emulator_test_key';
       }
@@ -880,25 +917,24 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
       // Create split
       const split = await createSplitFromPayment(user, paymentData);
       
-      // Send webhook notification if webhook URL is provided
+      // Verify split was saved (check firebaseDocId)
+      if (!split.firebaseDocId) {
+        console.error('❌ Split created but firebaseDocId is missing!', {
+          splitId: split.id,
+          billId: split.billId
+        });
+        return res.status(500).json({
+          success: false,
+          error: 'Split was created but failed to save to database'
+        });
+      }
+      
+      // Send webhook notification if webhook URL is provided (non-blocking)
       if (split.externalMetadata?.webhookUrl && split.externalMetadata?.webhookSecret) {
-        try {
-          const { sendWebhookNotification } = require('./spendApiEndpoints');
-          await sendWebhookNotification(split, 'split.created', {
-            total_amount: split.totalAmount,
-            currency: split.currency,
-            creator_id: split.creatorId,
-            participants: (split.participants || []).map(p => ({
-              user_id: p.userId,
-              email: p.email,
-              amount_owed: p.amountOwed
-            }))
-          });
-          console.log('✅ Split creation webhook sent to SPEND');
-        } catch (webhookError) {
+        // Don't await - fire and forget to avoid blocking response
+        sendWebhookNotificationAsync(split).catch(webhookError => {
           console.warn('⚠️ Failed to send split creation webhook (non-blocking):', webhookError.message);
-          // Don't fail split creation if webhook fails
-        }
+        });
       }
       
       // Return success response with redirect URL if callback URL provided
@@ -909,6 +945,7 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
           userEmail: user.email,
           walletAddress: user.wallet_address || '',
           splitId: split.id,
+          billId: split.billId, // Include billId for SPEND team reference
           splitStatus: split.status,
           totalAmount: split.totalAmount,
           currency: split.currency,
@@ -918,14 +955,20 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
       };
       
       // If callback URL provided, include redirect information
-      if (paymentData.callbackUrl) {
-        response.redirectUrl = `${paymentData.callbackUrl}?splitId=${split.id}&userId=${user.id}&status=success`;
+      // Check both paymentData.callbackUrl and metadata.callbackUrl
+      const callbackUrl = paymentData.callbackUrl || (paymentData.metadata && paymentData.metadata.callbackUrl);
+      if (callbackUrl) {
+        response.redirectUrl = `${callbackUrl}?splitId=${split.id}&userId=${user.id}&status=success`;
       }
       
       return res.status(200).json(response);
       
     } catch (error) {
-      console.error('Error in createSplitFromPayment:', error);
+      console.error('❌ Error in createSplitFromPayment endpoint:', {
+        error: error.message,
+        code: error.code,
+        stack: error.stack?.split('\n').slice(0, 5).join('\n') // First 5 lines of stack
+      });
       
       // Handle Firebase errors
       if (error instanceof functions.https.HttpsError) {
@@ -943,6 +986,29 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
       });
     }
   });
+}
+
+/**
+ * Send webhook notification asynchronously (non-blocking)
+ */
+async function sendWebhookNotificationAsync(split) {
+  try {
+    const { sendWebhookNotification } = require('./spendApiEndpoints');
+    await sendWebhookNotification(split, 'split.created', {
+      total_amount: split.totalAmount,
+      currency: split.currency,
+      creator_id: split.creatorId,
+      participants: (split.participants || []).map(p => ({
+        user_id: p.userId,
+        email: p.email,
+        amount_owed: p.amountOwed
+      }))
+    });
+    console.log('✅ Split creation webhook sent to SPEND');
+  } catch (webhookError) {
+    // Error already logged in catch block above
+    throw webhookError;
+  }
 });
 
 /**

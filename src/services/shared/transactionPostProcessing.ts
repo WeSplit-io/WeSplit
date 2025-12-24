@@ -19,6 +19,7 @@ const pendingTransactionSaves = new Map<string, Promise<{
 export interface TransactionPostProcessingParams {
   userId: string;
   toAddress: string;
+  /** Full transaction amount (before fees) - used for point calculation */
   amount: number;
   signature: string;
   transactionType: TransactionType;
@@ -237,11 +238,13 @@ export async function saveTransactionAndAwardPoints(
 
       if (shouldAwardPoints && recipientUser) {
         // This is an internal wallet-to-wallet transfer, award points
+        // ✅ CRITICAL: params.amount should be the FULL transaction amount (before fees)
+        // Points are calculated as a percentage of the full amount, not the net amount
         try {
           const { pointsService } = await import('../rewards/pointsService');
           const pointsResult = await pointsService.awardTransactionPoints(
             params.userId,
-            params.amount,
+            params.amount, // Full transaction amount (before fees)
             params.signature,
             'send'
           );
