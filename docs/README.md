@@ -62,6 +62,11 @@ Feature-specific documentation covering implementation details, architecture, an
   - [Transaction History Unified Component](./features/TRANSACTION_HISTORY_UNIFIED_COMPONENT.md)
   - [Split Transaction History Integration](./features/SPLIT_TRANSACTION_HISTORY_INTEGRATION.md)
 
+- **Rewards & Referrals**
+  - [Referral System Complete](./REFERRAL_SYSTEM_COMPLETE.md) - Complete referral system documentation
+  - [Referral Flow Verification](./REFERRAL_FLOW_VERIFICATION.md) - Flow verification details
+  - [Community Badge Bonus Implementation](./COMMUNITY_BADGE_BONUS_IMPLEMENTATION.md) - Community badge bonus system
+
 ---
 
 ### 📖 Guides (`guides/`)
@@ -139,6 +144,10 @@ See [guides/README.md](./guides/README.md) for complete list.
 ### Working with Shared Wallets
 - [Shared Wallet Complete Guide](./features/SHARED_WALLET_COMPLETE_GUIDE.md)
 - [Shared Wallet Navigation Flow](./features/SHARED_WALLET_NAVIGATION_FLOW.md)
+
+### Understanding Referral System
+- [Referral System Complete](./REFERRAL_SYSTEM_COMPLETE.md) - Complete documentation
+- [Referral Flow Verification](./REFERRAL_FLOW_VERIFICATION.md) - Flow verification
 
 ### Deploying to Production
 - [Production Build Quick Start](./guides/LOCAL_PRODUCTION_BUILD_SETUP.md)

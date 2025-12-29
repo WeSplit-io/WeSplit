@@ -6,10 +6,14 @@ service cloud.firestore {
     // 1. Users reading their own document (by user ID)
     // 2. Contact resolution (querying by email/wallet address)
     // 3. User lookup for transactions, splits, etc.
+    // 4. Referral code validation (querying by referral_code field)
     // Note: Queries are limited to 1 result in application code for privacy
     match /users/{userId} {
-      // Allow authenticated users to read any user document
-      // This enables queries by email/wallet address for contact resolution
+      // Allow authenticated users to read any user document (including queries)
+      // This enables:
+      // - Queries by email/wallet address for contact resolution
+      // - Queries by referral_code for referral validation
+      // - Direct document reads by user ID
       allow read: if request.auth != null;
       
       // Users can create their own document (when document doesn't exist yet)
@@ -67,16 +71,25 @@ service cloud.firestore {
     // Referrals - restrict access to involved users only
     match /referrals/{referralId} {
       // Allow read if the authenticated user is either the referrer or the referred user
+      // This enables:
+      // - Referrers to view their referral records (for count, points tracking)
+      // - Referred users to view their referral record (for status, milestones)
       allow read: if request.auth != null &&
         (request.auth.uid == resource.data.referrerId ||
          request.auth.uid == resource.data.referredUserId);
 
       // Allow create if the authenticated user is the referred user
       // (referrals are created when a new user signs up with a code)
+      // The transaction sets: referrerId, referredUserId, status, milestones, rewardsAwarded
+      // Rule verifies: request.auth.uid == request.resource.data.referredUserId
       allow create: if request.auth != null &&
         request.auth.uid == request.resource.data.referredUserId;
 
       // Allow updates only for involved users; business logic still enforced in application code
+      // This enables:
+      // - Referrers to update referral records (for points tracking, reward status)
+      // - Referred users to update referral records (for milestone tracking)
+      // Updates use setDoc with merge, so partial updates are allowed
       allow update: if request.auth != null &&
         (request.auth.uid == resource.data.referrerId ||
          request.auth.uid == resource.data.referredUserId);

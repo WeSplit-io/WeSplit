@@ -26,6 +26,7 @@ export interface EmailAuthResult {
   verificationId?: string;
   expiresIn?: number;
   user?: any;
+  customToken?: string | null;
   error?: string;
 }
 
@@ -138,12 +139,14 @@ export class EmailAuthService {
       if (result.success && result.user) {
         logger.info('Email code verified successfully', {
           userId: result.user.id,
-          email: email.substring(0, 5) + '...'
+          email: email.substring(0, 5) + '...',
+          hasCustomToken: !!result.customToken
         }, 'EmailAuthService');
 
         return {
           success: true,
-          user: result.user
+          user: result.user,
+          customToken: result.customToken || undefined
         };
       } else {
         logger.error('Email code verification failed', { error: result.message }, 'EmailAuthService');

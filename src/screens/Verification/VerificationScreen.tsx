@@ -530,19 +530,57 @@ const VerificationScreen: React.FC = () => {
       if (__DEV__) { logger.info('Authentication successful', { user: authResponse.user }, 'VerificationScreen'); }
       
       // CRITICAL: Sign user into Firebase Auth using custom token if available
-      // This ensures auth.currentUser is set, which is required for phone linking
+      // This ensures auth.currentUser is set, which is required for Firestore operations
       if (authResponse.customToken) {
         try {
-          const { signInWithCustomToken } = await import('firebase/auth');
+          const { signInWithCustomToken, onAuthStateChanged } = await import('firebase/auth');
           const { auth } = await import('../../config/firebase/firebase');
+          
+          // Sign in with custom token
           await signInWithCustomToken(auth, authResponse.customToken);
-          if (__DEV__) { logger.info('✅ Signed in to Firebase Auth with custom token', null, 'VerificationScreen'); }
+          logger.info('✅ Signed in to Firebase Auth with custom token', null, 'VerificationScreen');
+          
+          // CRITICAL: Wait for auth state to propagate before accessing Firestore
+          // This ensures Firestore security rules recognize the authenticated user
+          const authReady = await new Promise<boolean>((resolve) => {
+            if (auth.currentUser && auth.currentUser.uid === authResponse.user.id) {
+              resolve(true);
+              return;
+            }
+            
+            const unsubscribe = onAuthStateChanged(auth, (user) => {
+              if (user && user.uid === authResponse.user.id) {
+                unsubscribe();
+                resolve(true);
+              }
+            });
+            
+            // Timeout after 3 seconds
+            setTimeout(() => {
+              unsubscribe();
+              resolve(!!auth.currentUser && auth.currentUser.uid === authResponse.user.id);
+            }, 3000);
+          });
+          
+          if (!authReady) {
+            logger.warn('Auth state not ready after sign-in, Firestore operations may fail', {
+              userId: authResponse.user.id,
+              hasCurrentUser: !!auth.currentUser
+            }, 'VerificationScreen');
+          } else {
+            logger.info('✅ Auth state ready, Firestore operations can proceed', {
+              userId: authResponse.user.id
+            }, 'VerificationScreen');
+          }
         } catch (tokenError) {
-          logger.warn('Failed to sign in with custom token (non-critical)', tokenError, 'VerificationScreen');
-          // Continue anyway - user is still authenticated in app context
+          logger.error('Failed to sign in with custom token', tokenError, 'VerificationScreen');
+          // This is critical - without auth, Firestore operations will fail
+          throw new Error('Failed to authenticate. Please try again.');
         }
       } else {
         logger.warn('No custom token returned from verification - user may not be signed into Firebase Auth', null, 'VerificationScreen');
+        // For new users, we still need to sign them in - this should not happen
+        // But if it does, we'll try to continue and let Firestore rules handle it
       }
       
       // Transform API response to match User type (snake_case)
@@ -560,6 +598,7 @@ const VerificationScreen: React.FC = () => {
       
       // CRITICAL: Always fetch fresh user data from Firestore after verification
       // This ensures we have the latest lastVerifiedAt timestamp and all user fields
+      // NOTE: This will only work if user is authenticated (auth.currentUser is set)
       try {
         const { firestoreService } = await import('../../config/firebase/firebase');
         const freshUserData = await firestoreService.getUserDocument(transformedUser.id);

@@ -21,6 +21,7 @@ import { EmailAuthService } from './EmailAuthService';
 export interface AuthResult {
   success: boolean;
   user?: User;
+  customToken?: string | null;
   error?: string;
   isNewUser?: boolean;
 }
@@ -115,12 +116,17 @@ class AuthService {
     const result = await EmailAuthService.verifyCode(email, code);
 
     if (result.success && result.user) {
-      // Ensure wallet exists for email users too
-      await this.ensureUserWallet(result.user.id);
-      await this.updateLastLoginTime(result.user.id);
+      // NOTE: Wallet and login time updates require authentication
+      // These will be handled after sign-in with custom token in VerificationScreen
+      // We skip them here to avoid permission errors before auth is ready
     }
 
-    return result;
+    return {
+      success: result.success,
+      user: result.user,
+      customToken: result.customToken,
+      error: result.error
+    };
   }
 
   /**

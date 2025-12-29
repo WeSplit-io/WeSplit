@@ -80,10 +80,52 @@ const CreateProfileScreen: React.FC = () => {
     // Debounce validation (wait 500ms after user stops typing)
     validationTimeoutRef.current = setTimeout(async () => {
       try {
+        // Wait for Firebase Auth to be ready (may take time after custom token sign-in)
+        // Check both app state and Firebase Auth state
+        let currentUserId = state.currentUser?.id;
+        let authReady = !!auth?.currentUser;
+
+        // If Firebase Auth isn't ready but we have app state user, wait a bit for auth to sync
+        if (!authReady && currentUserId) {
+          logger.debug('Waiting for Firebase Auth to sync after custom token sign-in', {
+            userId: currentUserId
+          }, 'CreateProfileScreen');
+          
+          // Wait up to 2 seconds for auth state to sync
+          const maxWait = 2000;
+          const startTime = Date.now();
+          while (!authReady && (Date.now() - startTime) < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            authReady = !!auth?.currentUser;
+            if (authReady) {
+              currentUserId = auth.currentUser.uid;
+              break;
+            }
+          }
+        }
+
+        // Use Firebase Auth UID if available, otherwise fall back to app state
+        if (auth?.currentUser?.uid) {
+          currentUserId = auth.currentUser.uid;
+        }
+
+        // If still no user ID, we can't validate (but this should be rare)
+        if (!currentUserId) {
+          logger.warn('Cannot validate referral code: no user ID available', {
+            hasAppStateUser: !!state.currentUser?.id,
+            hasAuthUser: !!auth?.currentUser
+          }, 'CreateProfileScreen');
+          setReferralValidation({
+            isValidating: false,
+            isValid: null,
+            error: 'Please wait for authentication to complete'
+          });
+          return;
+        }
+
         const { referralService } = await import('../../services/rewards/referralService');
-        // Validate referral code exists (doesn't expose user ID for privacy)
-        // Pass current user ID for rate limiting (if available)
-        const currentUserId = state.currentUser?.id;
+        // Pass original code to service - it will handle normalization and case variations
+        // This allows the service to try multiple case variations if normalized query fails
         const validation = await referralService.validateReferralCode(code, currentUserId);
         
         if (validation.exists) {
@@ -117,8 +159,51 @@ const CreateProfileScreen: React.FC = () => {
       const code = String(params.referralCode).toUpperCase().replace(/\s/g, '');
       setReferralCode(code);
       setReferralInput(code); // Pre-fill the input if code comes from route
-      // Validate the pre-filled code
-      validateReferralCode(code);
+      
+      // Wait for auth to be ready before validating (critical for Firestore access)
+      const validateWhenReady = async () => {
+        // Wait for auth state to be ready
+        if (!auth?.currentUser) {
+          logger.debug('Waiting for auth state before validating referral code from route params', null, 'CreateProfileScreen');
+          
+          const authReady = await new Promise<boolean>((resolve) => {
+            if (!auth) {
+              resolve(false);
+              return;
+            }
+            
+            if (auth.currentUser) {
+              resolve(true);
+              return;
+            }
+            
+            const unsubscribe = onAuthStateChanged(auth, (user) => {
+              unsubscribe();
+              resolve(!!user);
+            });
+            
+            setTimeout(() => {
+              unsubscribe();
+              resolve(!!auth.currentUser);
+            }, 3000);
+          });
+          
+          if (!authReady) {
+            logger.warn('Auth not ready, skipping referral code validation on mount', null, 'CreateProfileScreen');
+            // Don't validate yet - user can validate manually when they're ready
+            return;
+          }
+        }
+        
+        // Auth is ready, validate the code
+        logger.info('Auth ready, validating referral code from route params', { referralCode: code }, 'CreateProfileScreen');
+        validateReferralCode(code);
+      };
+      
+      validateWhenReady().catch((error) => {
+        logger.error('Error validating referral code on mount', error, 'CreateProfileScreen');
+      });
+      
       logger.info('Referral code loaded from route params', { referralCode: code }, 'CreateProfileScreen');
     }
   }, [route.params, validateReferralCode]);
@@ -132,13 +217,60 @@ const CreateProfileScreen: React.FC = () => {
     };
   }, []);
 
-  // Debug logging (only in dev mode)
+  // Debug logging and auth state check (only in dev mode)
   useEffect(() => {
     if (__DEV__) {
       logger.debug('CreateProfileScreen mounted', { 
         hasReferralCode: !!referralCode,
-        routeParams: route.params 
+        routeParams: route.params,
+        isAuthenticated: !!auth?.currentUser,
+        currentUserId: auth?.currentUser?.uid,
+        appStateUserId: state.currentUser?.id
       }, 'CreateProfileScreen');
+    }
+    
+    // Verify auth state is ready on mount
+    if (!auth?.currentUser && state.currentUser?.id) {
+      logger.warn('CreateProfileScreen: User in app state but not in Firebase Auth', {
+        appStateUserId: state.currentUser.id
+      }, 'CreateProfileScreen');
+      
+      // Try to wait for auth state
+      const checkAuth = async () => {
+        const authReady = await new Promise<boolean>((resolve) => {
+          if (!auth) {
+            resolve(false);
+            return;
+          }
+          
+          if (auth.currentUser) {
+            resolve(true);
+            return;
+          }
+          
+          const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            resolve(!!user);
+          });
+          
+          setTimeout(() => {
+            unsubscribe();
+            resolve(!!auth.currentUser);
+          }, 2000);
+        });
+        
+        if (authReady) {
+          logger.info('Auth state synced after mount', {
+            userId: auth.currentUser?.uid
+          }, 'CreateProfileScreen');
+        } else {
+          logger.warn('Auth state not ready after mount - Firestore operations may fail', null, 'CreateProfileScreen');
+        }
+      };
+      
+      checkAuth().catch((error) => {
+        logger.error('Error checking auth state on mount', error, 'CreateProfileScreen');
+      });
     }
   }, []);
 
@@ -674,11 +806,16 @@ const CreateProfileScreen: React.FC = () => {
           (async () => {
             try {
               const { referralService } = await import('../../services/rewards/referralService');
-              const trimmedCode = normalizeReferralCode(finalReferralCode);
+              // Pass original code (not pre-normalized) to allow case variation matching
+              // The service will normalize internally and try case variations if needed
+              logger.info('Tracking referral', { 
+                userId: appUser.id, 
+                referralCode: finalReferralCode,
+                normalizedCode: normalizeReferralCode(finalReferralCode)
+              }, 'CreateProfileScreen');
               
-              logger.info('Tracking referral', { userId: appUser.id, referralCode: trimmedCode }, 'CreateProfileScreen');
-              
-              const result = await referralService.trackReferral(appUser.id, trimmedCode);
+              // Pass original code to trackReferral - it handles normalization and case variations
+              const result = await referralService.trackReferral(appUser.id, finalReferralCode);
               
               if (result.success) {
                 logger.info('Referral tracked successfully', { 
@@ -688,7 +825,7 @@ const CreateProfileScreen: React.FC = () => {
               } else {
                 logger.warn('Referral tracking failed', { 
                   userId: appUser.id, 
-                  referralCode: trimmedCode,
+                  referralCode: finalReferralCode,
                   error: result.error 
                 }, 'CreateProfileScreen');
                 // Don't show error to user - referral is optional
