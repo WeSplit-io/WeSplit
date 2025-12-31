@@ -26,7 +26,9 @@ export class PhoneAuthService {
    */
   static async checkUserExists(phoneNumber: string): Promise<{ success: boolean; userExists: boolean; userId?: string; error?: string }> {
     try {
-      const functions = getFunctions();
+      const { getApp } = await import('firebase/app');
+      const app = getApp();
+      const functions = getFunctions(app, 'us-central1');
       const checkUserExists = httpsCallable<{ phoneNumber: string }, {
         success: boolean;
         userExists: boolean;
@@ -55,7 +57,9 @@ export class PhoneAuthService {
    */
   static async getCustomToken(userId: string): Promise<{ success: boolean; customToken?: string; error?: string }> {
     try {
-      const functions = getFunctions();
+      const { getApp } = await import('firebase/app');
+      const app = getApp();
+      const functions = getFunctions(app, 'us-central1');
       const getUserToken = httpsCallable<{ userId: string }, {
         success: boolean;
         customToken: string;
@@ -85,7 +89,9 @@ export class PhoneAuthService {
       logger.info('Sending SMS verification code', { phone: phoneNumber.substring(0, 5) + '...' }, 'PhoneAuthService');
 
       // Use server-side SMS sending with Twilio (bypasses reCAPTCHA issues)
-      const functions = getFunctions();
+      const { getApp } = await import('firebase/app');
+      const app = getApp();
+      const functions = getFunctions(app, 'us-central1');
       const startPhoneAuth = httpsCallable<{ phoneNumber: string }, {
         success: boolean;
         sessionId: string;
@@ -127,7 +133,9 @@ export class PhoneAuthService {
       logger.info('Verifying SMS code', { codeLength: code.length }, 'PhoneAuthService');
 
       // Use server-side verification
-      const functions = getFunctions();
+      const { getApp } = await import('firebase/app');
+      const app = getApp();
+      const functions = getFunctions(app, 'us-central1');
       const verifyPhoneCodeFunction = httpsCallable<{
         sessionId: string;
         code: string;

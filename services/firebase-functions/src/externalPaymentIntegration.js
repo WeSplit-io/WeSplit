@@ -986,7 +986,7 @@ exports.createSplitFromPayment = functions.https.onRequest(async (req, res) => {
       });
     }
   });
-}
+});
 
 /**
  * Send webhook notification asynchronously (non-blocking)
@@ -1009,7 +1009,7 @@ async function sendWebhookNotificationAsync(split) {
     // Error already logged in catch block above
     throw webhookError;
   }
-});
+}
 
 /**
  * HTTP Callable Function: Test endpoint (doesn't create actual data)

@@ -384,6 +384,7 @@ class ReferralService {
       const referralId = `ref_${referrerId}_${referredUserId}`;
       const referralRef = doc(db, 'referrals', referralId);
       const referredUserRef = doc(db, 'users', referredUserId);
+      const referrerUserRef = doc(db, 'users', referrerId);
 
       // Get referred user data first (outside transaction for efficiency / typing)
       const referredUser = await firebaseDataService.user.getCurrentUser(referredUserId);
@@ -399,6 +400,12 @@ class ReferralService {
         const referredUserDoc = await transaction.get(referredUserRef);
         if (!referredUserDoc.exists()) {
           throw new Error('Referred user not found');
+        }
+
+        // Get referrer user document to update counter
+        const referrerUserDoc = await transaction.get(referrerUserRef);
+        if (!referrerUserDoc.exists()) {
+          throw new Error('Referrer user not found');
         }
 
         // Create referral record
@@ -434,9 +441,16 @@ class ReferralService {
         transaction.update(referredUserRef, {
           referred_by: referrerId
         });
+
+        // Update referrer's referral counter atomically
+        const currentCount = referrerUserDoc.data().referral_count || 0;
+        transaction.update(referrerUserRef, {
+          referral_count: currentCount + 1,
+          referral_code_last_used_at: serverTimestamp()
+        });
       });
 
-      logger.info('Referral record created atomically with referred_by update', {
+      logger.info('Referral record created atomically with referred_by update and counter increment', {
         referralId,
         referrerId,
         referredUserId,

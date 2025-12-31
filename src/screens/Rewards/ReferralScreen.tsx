@@ -72,9 +72,24 @@ const ReferralScreen: React.FC = () => {
           referralCode: code 
         }, 'ReferralScreen');
         
-        // Load referral count (pass current user ID for authorization)
-        const referrals = await referralService.getUserReferrals(currentUser.id, currentUser.id);
-        setReferralCount(referrals.length);
+        // Use counter field from user document (faster than querying all referrals)
+        // Fallback to querying if counter is not available (for backward compatibility)
+        if (currentUser.referral_count !== undefined) {
+          setReferralCount(currentUser.referral_count);
+        } else {
+          // Fallback: query referrals if counter not available
+          const referrals = await referralService.getUserReferrals(currentUser.id, currentUser.id);
+          setReferralCount(referrals.length);
+          
+          // Update user document with count for future use
+          try {
+            await firebaseDataService.user.updateUser(currentUser.id, {
+              referral_count: referrals.length
+            });
+          } catch (updateError) {
+            logger.warn('Failed to update referral count (non-critical)', { error: updateError }, 'ReferralScreen');
+          }
+        }
       } catch (error) {
         logger.error('Failed to load referral code', error, 'ReferralScreen');
         // Show error but don't block the screen
@@ -89,7 +104,7 @@ const ReferralScreen: React.FC = () => {
     };
 
     loadReferralData();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.referral_count]);
 
   const handleCopyCode = useCallback(async () => {
     if (!referralCode) return;

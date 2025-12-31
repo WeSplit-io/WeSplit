@@ -150,7 +150,10 @@ export const firebaseDataTransformers = {
     active_profile_border: doc.data().active_profile_border || undefined,
     wallet_backgrounds: doc.data().wallet_backgrounds || [],
     active_wallet_background: doc.data().active_wallet_background || undefined,
-    referral_code: doc.data().referral_code || undefined
+    referral_code: doc.data().referral_code || undefined,
+    referred_by: doc.data().referred_by || undefined,
+    referral_count: doc.data().referral_count || 0,
+    referral_code_last_used_at: doc.data().referral_code_last_used_at ? firebaseDataTransformers.timestampToISO(doc.data().referral_code_last_used_at) : undefined
   }),
 
   // Transform User to Firestore data
@@ -195,6 +198,9 @@ export const firebaseDataTransformers = {
     if (user.wallet_backgrounds !== undefined) {data.wallet_backgrounds = user.wallet_backgrounds;}
     if (user.active_wallet_background !== undefined) {data.active_wallet_background = user.active_wallet_background;}
     if (user.referral_code !== undefined) {data.referral_code = user.referral_code;}
+    if (user.referred_by !== undefined) {data.referred_by = user.referred_by;}
+    if (user.referral_count !== undefined) {data.referral_count = user.referral_count;}
+    if (user.referral_code_last_used_at !== undefined) {data.referral_code_last_used_at = user.referral_code_last_used_at ? firebaseDataTransformers.isoToTimestamp(user.referral_code_last_used_at) : null;}
     
     return data;
   },

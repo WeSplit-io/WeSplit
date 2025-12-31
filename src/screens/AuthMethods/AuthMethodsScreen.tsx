@@ -18,6 +18,7 @@ import { AuthPersistenceService } from '../../services/core/authPersistenceServi
 import { isPhantomSocialLoginEnabled, isPhantomEnabled } from '../../config/features';
 import { PhantomAuthButton } from '../../components/auth/PhantomAuthButton';
 import { authService } from '../../services/auth/AuthService';
+import { isValidPhoneNumber as validatePhoneE164, normalizePhoneNumber } from '../../utils/validation/phone';
 
 type RootStackParamList = {
   Dashboard: undefined;
@@ -49,19 +50,18 @@ const AuthMethodsScreen: React.FC = () => {
   };
 
   const isValidPhoneNumber = (phone: string): boolean => {
-    // E.164 format validation (e.g., +1234567890)
-    const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    return phoneRegex.test(phone.trim());
+    // Use centralized phone validation utility
+    return validatePhoneE164(phone);
   };
 
   const formatPhoneNumber = (phone: string): string => {
-    // Remove all non-digit characters except +
-    const cleaned = phone.replace(/[^\d+]/g, '');
-    // Ensure it starts with +
-    if (!cleaned.startsWith('+')) {
-      return '+' + cleaned;
+    // Use centralized phone normalization utility
+    const normalized = normalizePhoneNumber(phone);
+    // Validate after normalization
+    if (!normalized || !validatePhoneE164(normalized)) {
+      return phone; // Return original if normalization fails
     }
-    return cleaned;
+    return normalized;
   };
 
   // Load persisted email and phone on component mount, and prefill email from route params
