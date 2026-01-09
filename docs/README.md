@@ -96,7 +96,8 @@ Setup guides, tutorials, deployment instructions, and how-to documents:
   - [Company Wallet Change Guide](./guides/COMPANY_WALLET_CHANGE_GUIDE.md)
 
 - **Integration**
-  - [SPEND Integration](./guides/SPEND_INTEGRATION/) - External payment integration
+  - **[SPEND Integration Guide](./SPEND_INTEGRATION_GUIDE.md)** ⭐ - Complete API reference for SPEND partners
+  - [SPEND Integration (detailed folder)](./guides/SPEND_INTEGRATION/) - Internal implementation docs
 
 See [guides/README.md](./guides/README.md) for complete list.
 

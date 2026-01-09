@@ -27,7 +27,9 @@ module.exports = {
     name: "WeSplit Beta",
     slug: "WeSplit",
     version: "1.1.2",
-    orientation: "portrait",
+    // Changed from "portrait" to "default" to allow all orientations
+    // This fixes Android 16 warnings about orientation restrictions on large screens
+    orientation: "default",
     icon: "./assets/android-app-icon-no-alpha.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
@@ -80,6 +82,9 @@ module.exports = {
       compileSdkVersion: 36,
       targetSdkVersion: 36,
       minSdkVersion: 24,
+      // Enable edge-to-edge display for Android 15+ compatibility
+      // This helps address deprecated API warnings
+      softwareKeyboardLayoutMode: "pan",
       // Permissions matching last successful build to ensure required features match
       permissions: [
         "android.permission.CAMERA",
@@ -179,6 +184,7 @@ module.exports = {
     },
     plugins: [
       "./queries.js",
+      "./plugins/android-fix-orientation.js", // Plugin to remove screenOrientation restrictions
       "expo-secure-store",
       "expo-router",
       "expo-camera",

@@ -1,35 +1,44 @@
 # SPEND Integration Documentation
 
-This folder contains production-ready documentation for the SPEND payment gateway integration with WeSplit.
+> ⚠️ **DOCUMENTATION CONSOLIDATED**  
+> **Single Source of Truth:** [`docs/SPEND_INTEGRATION_GUIDE.md`](../../SPEND_INTEGRATION_GUIDE.md)
+
+---
+
+## 📖 For SPEND Developers
+
+**Use this single file for all integration needs:**
+
+### **[SPEND Integration Guide](../../SPEND_INTEGRATION_GUIDE.md)** ⭐
+
+Contains everything needed:
+- ✅ All API endpoints with examples
+- ✅ Webhook documentation
+- ✅ Authentication
+- ✅ Error handling
+- ✅ Testing commands
+
+---
 
 ## 📁 Folder Structure
 
-### 📤 FOR_SPEND/ - Files for SPEND Development Team
-
-**Share this entire folder with SPEND developers.**
-
-Contains complete integration guides, API references, and technical specifications for implementing the WeSplit payment gateway.
+### 📤 FOR_SPEND/ - Archived Files
+Files in this folder have been **consolidated** into the main guide.
+See `FOR_SPEND/README.md` for details.
 
 ### 🔒 INTERNAL/ - WeSplit Team Only
-
-**Do NOT share these files externally. Internal use only.**
-
-Contains implementation details, verification status, and internal documentation.
+Internal implementation details. Do NOT share externally.
 
 ---
 
 ## 🚀 Quick Start
 
 ### For SPEND Developers
-1. **Quick Integration Guide**: `FOR_SPEND/SPEND_INTEGRATION_QUICK_REFERENCE.md` ⭐
-2. **Start Here**: `FOR_SPEND/README.md`
-3. **Complete Guide**: `FOR_SPEND/EXTERNAL_WEB_APP_TECHNICAL_INTEGRATION.md`
-4. **API Reference**: `SPEND_API_REFERENCE.md`
+→ **[SPEND Integration Guide](../../SPEND_INTEGRATION_GUIDE.md)**
 
 ### For WeSplit Developers
 - **Implementation Status**: `PRODUCTION_READINESS_CHECKLIST.md`
-- **API Reference**: `SPEND_API_REFERENCE.md`
-- **Data Flow**: `SPEND_DATA_FLOW.md`
+- **Fix Summaries**: `../../SPEND_ENDPOINTS_FIXES_SUMMARY.md`
 
 ---
 
