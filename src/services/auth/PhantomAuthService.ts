@@ -8,7 +8,7 @@
 
 import { logger } from '../analytics/loggingService';
 import { firebaseDataService } from '../data/firebaseDataService';
-// import { PhantomConnectService } from './PhantomConnectService'; // PhantomConnectService does not exist yet
+import { PhantomConnectService } from '../blockchain/wallet/phantomConnectService';
 
 export interface PhantomAuthResult {
   success: boolean;
@@ -56,22 +56,23 @@ class PhantomAuthService {
       return;
     }
 
-    // const phantomConnect = PhantomConnectService.getInstance();
+    const phantomConnect = PhantomConnectService.getInstance();
 
     // Configure for app authentication (not just splits)
-    // phantomConnect.configure({
-    //   enableSocialLogin: true,
-    //   enableEmbeddedWallets: true,
-    //   spendingLimits: {
-    //     maxAmount: 1000, // Higher limits for app-wide auth
-    //     maxDaily: 5000,
-    //     allowedTokens: ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v']
-    //   }
-    // });
+    phantomConnect.configure({
+      enableSocialLogin: true,
+      enableEmbeddedWallets: true,
+      spendingLimits: {
+        maxAmount: 1000, // Higher limits for app-wide auth
+        maxDaily: 5000,
+        allowedTokens: ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v']
+      }
+    });
 
-    logger.info('Phantom Auth Service initialized (mock)', null, 'PhantomAuthService');
+    logger.info('Phantom Auth Service initialized', null, 'PhantomAuthService');
 
     // Try to restore existing session
+    // TODO: Implement persistent session restoration using AsyncStorage
     await this.restoreSession();
   }
 
@@ -409,15 +410,12 @@ class PhantomAuthService {
       const stateData = JSON.parse(atob(state));
       const { provider } = stateData;
 
-      // const phantomConnect = PhantomConnectService.getInstance();
-      // const connectResult = await phantomConnect.connect({
-      //   authCode,
-      //   preferredMethod: 'social',
-      //   socialProvider: provider
-      // });
-
-      // Mock result for now since PhantomConnectService is missing
-      const connectResult: any = { success: false, error: 'Phantom Connect Service not available' };
+      const phantomConnect = PhantomConnectService.getInstance();
+      const connectResult = await phantomConnect.connect({
+        authCode,
+        preferredMethod: 'social',
+        socialProvider: provider
+      });
 
       if (!connectResult.success) {
         return {
@@ -521,32 +519,6 @@ class PhantomAuthService {
     } catch (error) {
       logger.error('Failed to enrich user data', error, 'PhantomAuthService');
       return user;
-    }
-  }
-
-  /**
-   * Check if Phantom wallet is linked to existing Firebase user
-   */
-  private async linkToExistingFirebaseUser(phantomUser: PhantomUser): Promise<void> {
-    try {
-      // Look for existing Firebase users with this wallet address
-      const existingUsers = await firebaseDataService.user.searchUsersByWallet(phantomUser.phantomWalletAddress);
-
-      if (existingUsers.length > 0) {
-        const firebaseUser = existingUsers[0];
-        phantomUser.firebaseUserId = firebaseUser.id;
-
-        // Update the Phantom user record
-        await this.updatePhantomUser(phantomUser);
-
-        logger.info('Linked Phantom user to existing Firebase user', {
-          phantomUserId: phantomUser.id,
-          firebaseUserId: firebaseUser.id
-        }, 'PhantomAuthService');
-      }
-
-    } catch (error) {
-      logger.error('Failed to link to existing Firebase user', error, 'PhantomAuthService');
     }
   }
 
@@ -728,9 +700,10 @@ class PhantomAuthService {
    */
   public async signOut(): Promise<void> {
     try {
-      // const phantomConnect = PhantomConnectService.getInstance();
-      // Note: Phantom Connect doesn't have explicit sign out
-      // We'll clear local session
+      const phantomConnect = PhantomConnectService.getInstance();
+      await phantomConnect.disconnect();
+      
+      // Clear local session
       this.currentUser = null;
 
       logger.info('Phantom user signed out', null, 'PhantomAuthService');
@@ -756,12 +729,16 @@ class PhantomAuthService {
 
   /**
    * Restore session on app start
+   * TODO: Implement persistent session restoration using AsyncStorage
+   * - Store session tokens/user data when authenticating
+   * - Load and validate on app start
+   * - Auto-refresh if needed
    */
   private async restoreSession(): Promise<void> {
     try {
-      // In a full implementation, you'd check for stored session tokens
+      // TODO: Implement session restoration with AsyncStorage
       // For now, users will need to re-authenticate
-      logger.debug('Session restoration not implemented yet', null, 'PhantomAuthService');
+      logger.debug('Session restoration not yet implemented - user will need to re-authenticate', null, 'PhantomAuthService');
 
     } catch (error) {
       logger.error('Failed to restore session', error, 'PhantomAuthService');

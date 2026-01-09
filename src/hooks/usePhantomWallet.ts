@@ -6,7 +6,7 @@
  */
 
 import { useCallback } from 'react';
-import { usePhantom, useSolana } from '@phantom/react-sdk';
+import { usePhantom, useSolana } from '@phantom/react-native-sdk';
 import { logger } from '../services/analytics/loggingService';
 import { UnifiedWalletService } from '../services/blockchain/wallet/UnifiedWalletService';
 import { UnifiedTransactionService } from '../services/blockchain/transaction/UnifiedTransactionService';

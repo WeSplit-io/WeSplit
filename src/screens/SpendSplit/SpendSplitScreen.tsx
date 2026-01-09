@@ -479,17 +479,13 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             [{ text: 'OK' }]
           );
 
-          // Trigger automatic payment using centralized transaction handler
-          const { centralizedTransactionHandler } = await import('../../services/transactions/CentralizedTransactionHandler');
-          const paymentResult = await centralizedTransactionHandler.executeTransaction({
-            context: 'spend_split_payment',
-            userId: currentUser?.id || '',
-            amount: wallet.totalAmount,
-            currency: 'USDC',
-            destinationType: 'external',
-            splitId: splitData.id,
-            splitWalletId: wallet.id
-          });
+          // Trigger automatic payment using SpendMerchantPaymentService
+          // This service handles: status updates, idempotency, webhooks, and notifications
+          const { SpendMerchantPaymentService } = await import('../../services/integrations/spend/SpendMerchantPaymentService');
+          const paymentResult = await SpendMerchantPaymentService.processMerchantPayment(
+            splitData.id,
+            wallet.id
+          );
 
           if (paymentResult.success) {
             logger.info('SPEND merchant payment processed successfully', {

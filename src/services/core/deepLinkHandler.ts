@@ -100,7 +100,8 @@ export interface DeepLinkData {
     | 'wallet-linked'
     | 'wallet-error'
     | 'referral'
-    | 'spend-callback'; // Return to Spend app after payment/action
+    | 'spend-callback'
+    | 'phantom-callback'; // Phantom auth callback
   inviteId?: string;
   groupId?: string;
   groupName?: string;
@@ -127,6 +128,12 @@ export interface DeepLinkData {
   orderId?: string; // Spend order ID
   status?: 'success' | 'error' | 'cancelled'; // Callback status
   message?: string; // Optional message for callback
+  // Phantom callback-specific
+  response_type?: 'success' | 'error'; // Phantom callback response type
+  wallet_id?: string; // Phantom wallet identifier
+  authUserId?: string; // Phantom auth user ID
+  provider?: string; // Social provider (google, apple)
+  error?: string; // Error message from Phantom callback
 }
 
 /**
@@ -440,6 +447,34 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
           orderId: orderId || undefined,
           status: validStatus,
           message: message ? decodeURIComponent(message) : undefined
+        };
+      }
+
+      case 'phantom-callback': {
+        // Phantom auth callback deep link
+        // Format (app-scheme): wesplit://phantom-callback?response_type=success&wallet_id=xxx&authUserId=xxx&provider=google
+        // Format (universal): https://wesplit-deeplinks.web.app/phantom-callback?response_type=success&wallet_id=xxx
+        const response_type = urlObj.searchParams.get('response_type') as 'success' | 'error' | null;
+        const wallet_id = urlObj.searchParams.get('wallet_id');
+        const authUserId = urlObj.searchParams.get('authUserId');
+        const provider = urlObj.searchParams.get('provider');
+        const error = urlObj.searchParams.get('error');
+
+        logger.debug('Parsed phantom-callback deep link', {
+          response_type,
+          hasWalletId: !!wallet_id,
+          hasAuthUserId: !!authUserId,
+          provider,
+          hasError: !!error
+        }, 'deepLinkHandler');
+
+        return {
+          action: 'phantom-callback',
+          response_type: response_type || undefined,
+          wallet_id: wallet_id || undefined,
+          authUserId: authUserId || undefined,
+          provider: provider || undefined,
+          error: error ? decodeURIComponent(error) : undefined
         };
       }
       
