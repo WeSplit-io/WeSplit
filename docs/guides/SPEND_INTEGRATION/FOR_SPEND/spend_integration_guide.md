@@ -835,12 +835,6 @@ Testing Checklist:
 
 ## Configuration
 
-### SPEND Treasury Wallet
-
-```
-Production: 2nkTRv3qxk7n2eYYjFAndReVXaV7sTF3Z9pNimvp5jcp
-```
-
 ### Deep Link Domain
 
 ```
