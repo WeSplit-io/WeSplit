@@ -172,7 +172,7 @@ const DegenRoulette: React.FC<DegenRouletteProps> = ({
                   userId={participant.userId}
                   userName={participant.name}
                   textStyle={styles.rouletteCardName}
-                  showBadges={true}
+                  showBadges={false}
                 />
               </View>
 

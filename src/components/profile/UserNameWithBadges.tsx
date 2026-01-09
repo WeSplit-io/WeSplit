@@ -28,35 +28,14 @@ const UserNameWithBadges: React.FC<UserNameWithBadgesProps> = ({
   const [communityBadges, setCommunityBadges] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!userId || showBadges === false) {
-      setCommunityBadges([]);
-      return;
-    }
-
-    const loadBadges = async () => {
-      try {
-        const badges = await badgeService.getUserCommunityBadges(userId);
-        setCommunityBadges(badges);
-      } catch (error) {
-        // Silently fail - badges are optional
-      }
-    };
-
-    loadBadges();
+    // Community badges are disabled - do not load or display them
+    setCommunityBadges([]);
   }, [userId, showBadges]);
 
   return (
     <View style={[styles.container, style]}>
       <Text style={[styles.name, textStyle]}>{userName}</Text>
-      {communityBadges.map((badge) => (
-        <CommunityBadge
-          key={badge.badgeId}
-          icon={badge.icon}
-          iconUrl={badge.imageUrl}
-          title={badge.title}
-          size={16}
-        />
-      ))}
+      {/* Community badges are disabled - not displaying them */}
     </View>
   );
 };

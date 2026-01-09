@@ -17,7 +17,13 @@ export async function createSpendSplitWallet(
 ): Promise<{ success: boolean; wallet?: any; error?: string }> {
   try {
     // Map participants using participant mapper
-    const participants = splitData.participants || [];
+    // Filter out invited participants without userId (they'll be added when they join)
+    const participants = (splitData.participants || []).filter((p: any) => {
+      // Include participants with userId (existing users) or status 'accepted' (creator)
+      // Exclude invited participants without userId (they'll join later)
+      return p.userId || p.status === 'accepted';
+    });
+    
     const mappedParticipants = mapParticipantsToSplitWallet(participants.map((p: any) => ({
       userId: p.userId || p.id || '',
       id: p.userId || p.id || '',

@@ -21,7 +21,8 @@ import {
   Timestamp,
   writeBatch
 } from 'firebase/firestore';
-import { db } from '../../config/firebase/firebase';
+import { db, auth } from '../../config/firebase/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { logger } from '../analytics/loggingService';
@@ -892,6 +893,53 @@ class NotificationServiceClass {
    */
   async getUserNotifications(userId: string, limitCount: number = 50): Promise<NotificationData[]> {
     try {
+      // CRITICAL: Ensure user is authenticated before querying Firestore
+      if (!auth?.currentUser) {
+        logger.debug('User not authenticated, waiting for auth state before getting notifications', {
+          userId
+        }, 'NotificationService');
+        
+        // Wait up to 3 seconds for auth state to be ready
+        const authReady = await new Promise<boolean>((resolve) => {
+          if (!auth) {
+            resolve(false);
+            return;
+          }
+          
+          if (auth.currentUser) {
+            resolve(true);
+            return;
+          }
+          
+          const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            resolve(!!user);
+          });
+          
+          setTimeout(() => {
+            unsubscribe();
+            resolve(!!auth.currentUser);
+          }, 3000);
+        });
+        
+        if (!authReady) {
+          logger.warn('User not authenticated after waiting, skipping notification fetch', {
+            userId
+          }, 'NotificationService');
+          return [];
+        }
+      }
+      
+      // Verify auth token is valid
+      if (auth.currentUser) {
+        try {
+          await auth.currentUser.getIdToken(true); // Force refresh
+        } catch (tokenError) {
+          logger.warn('Failed to refresh auth token for notifications (non-critical)', tokenError, 'NotificationService');
+          // Continue anyway - token might still be valid
+        }
+      }
+      
       const notificationsRef = collection(db, 'notifications');
       const notificationsQuery = query(
         notificationsRef,
@@ -914,7 +962,18 @@ class NotificationServiceClass {
         user_id: doc.data().userId // Add user_id for backward compatibility
       }));
     } catch (error) {
-      logger.error('Failed to get user notifications:', error, 'NotificationService');
+      const errorCode = (error as any)?.code;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Don't log permission errors as errors - they're expected when user isn't authenticated
+      if (errorCode === 'permission-denied' || errorMessage.includes('permission')) {
+        logger.debug('Permission denied for notifications (user may not be authenticated yet)', {
+          userId,
+          errorCode
+        }, 'NotificationService');
+      } else {
+        logger.error('Failed to get user notifications:', error, 'NotificationService');
+      }
       return [];
     }
   }

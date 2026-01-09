@@ -6,8 +6,7 @@
 
 import {
   User,
-  signOut as firebaseSignOut,
-  signInWithCustomToken
+  signOut as firebaseSignOut
 } from 'firebase/auth';
 import { auth } from '../../config/firebase/firebase';
 import { Platform } from 'react-native';
@@ -15,12 +14,14 @@ import { logger } from '../analytics/loggingService';
 import { firebaseDataService } from '../data/firebaseDataService';
 import { walletService } from '../blockchain/wallet';
 import { EmailAuthService } from './EmailAuthService';
+import { PhoneAuthService } from './PhoneAuthService';
 
 
 // Types
 export interface AuthResult {
   success: boolean;
   user?: User;
+  customToken?: string | null;
   error?: string;
   isNewUser?: boolean;
 }
@@ -58,14 +59,47 @@ class AuthService {
 
   /**
    * Validate phone number format (E.164)
+   * E.164 format: +[country code][number] where country code is 1-9 followed by 1-14 digits
+   * Total length: 1-15 digits after +
    */
   private validatePhoneNumber(phoneNumber: string): { isValid: boolean; error?: string } {
-    if (!phoneNumber || !phoneNumber.startsWith('+')) {
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
       return {
         isValid: false,
-        error: 'Phone number must be in E.164 format (e.g., +1234567890)'
+        error: 'Phone number is required'
       };
     }
+
+    // Remove whitespace for validation
+    const cleaned = phoneNumber.trim().replace(/\s/g, '');
+    
+    // E.164 format: ^\+[1-9]\d{1,14}$
+    // Must start with +, country code starts with 1-9, followed by 1-14 digits
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    
+    if (!e164Regex.test(cleaned)) {
+      return {
+        isValid: false,
+        error: 'Phone number must be in E.164 format (e.g., +1234567890). Country code must start with 1-9, followed by 1-14 digits.'
+      };
+    }
+
+    // Additional validation: minimum length check (at least country code + 1 digit)
+    if (cleaned.length < 8) {
+      return {
+        isValid: false,
+        error: 'Phone number is too short. Please include country code and full number.'
+      };
+    }
+
+    // Maximum length check (E.164 max is 15 digits after +)
+    if (cleaned.length > 16) {
+      return {
+        isValid: false,
+        error: 'Phone number is too long. Maximum 15 digits after country code.'
+      };
+    }
+
     return { isValid: true };
   }
   private static instance: AuthService;
@@ -115,12 +149,17 @@ class AuthService {
     const result = await EmailAuthService.verifyCode(email, code);
 
     if (result.success && result.user) {
-      // Ensure wallet exists for email users too
-      await this.ensureUserWallet(result.user.id);
-      await this.updateLastLoginTime(result.user.id);
+      // NOTE: Wallet and login time updates require authentication
+      // These will be handled after sign-in with custom token in VerificationScreen
+      // We skip them here to avoid permission errors before auth is ready
     }
 
-    return result;
+    return {
+      success: result.success,
+      user: result.user,
+      customToken: result.customToken,
+      error: result.error
+    };
   }
 
   /**
@@ -129,6 +168,14 @@ class AuthService {
    */
   async signInWithPhoneNumber(phoneNumber: string): Promise<{ success: boolean; verificationId?: string; expiresIn?: number; user?: any; isNewUser?: boolean; error?: string }> {
     try {
+      // Log environment for debugging
+      logger.info('Phone Auth Environment Check', {
+        isDev: __DEV__,
+        platform: Platform.OS,
+        hasFirebase: !!auth?.app,
+        projectId: auth?.app?.options?.projectId
+      }, 'AuthService');
+
       // Prevent duplicate calls for the same phone number within a short time window
       const now = Date.now();
       const lastCallKey = `phone_auth_${phoneNumber}`;
@@ -194,78 +241,47 @@ class AuthService {
       }, 'AuthService');
 
       try {
-        // Import Firebase Functions dynamically
-        const { getFunctions, httpsCallable } = await import('firebase/functions');
-        const functions = getFunctions();
+        // Use PhoneAuthService to check if user exists
+        const checkResult = await PhoneAuthService.checkUserExists(phoneNumber);
 
-        // Call server-side function to check if user exists
-        const checkUserExists = httpsCallable<{ phoneNumber: string }, {
-          success: boolean;
-          userExists: boolean;
-          userId?: string;
-          message?: string;
-        }>(functions, 'checkPhoneUserExists');
-
-        const checkResult = await checkUserExists({ phoneNumber });
-        const checkData = checkResult.data as {
-          success: boolean;
-          userExists: boolean;
-          userId?: string;
-          message?: string;
-        };
-
-        if (checkData.success && checkData.userExists && checkData.userId) {
+        if (checkResult.success && checkResult.userExists && checkResult.userId) {
           // User exists - instant login without SMS verification
           logger.info('User exists with phone number - instant login', {
-            userId: checkData.userId,
+            userId: checkResult.userId,
             phonePrefix: phoneNumber.substring(0, 5)
           }, 'AuthService');
 
-          // Get user custom token for instant login
-          const getUserToken = httpsCallable<{ userId: string }, {
-            success: boolean;
-            customToken: string;
-            message?: string;
-          }>(functions, 'getUserCustomToken');
+          // Use PhoneAuthService for instant login
+          const instantLoginResult = await PhoneAuthService.instantLogin(phoneNumber, checkResult.userId);
 
-          const tokenResult = await getUserToken({ userId: checkData.userId });
-          const tokenData = tokenResult.data as {
-            success: boolean;
-            customToken: string;
-            message?: string;
-          };
-
-          if (!tokenData.success) {
-            throw new Error(tokenData.message || 'Failed to get user token');
+          if (!instantLoginResult.success || !instantLoginResult.user) {
+            throw new Error(instantLoginResult.error || 'Failed to perform instant login');
           }
-
-          // Sign in with custom token
-          const userCredential = await signInWithCustomToken(auth, tokenData.customToken);
 
           // Get user data from Firestore
           const { firebaseDataService } = await import('../data/firebaseDataService');
-          const existingUserData = await firebaseDataService.user.getCurrentUser(userCredential.user.uid);
+          const existingUserData = await firebaseDataService.user.getCurrentUser(instantLoginResult.user.uid);
 
           if (!existingUserData) {
             throw new Error('User data not found in database');
-            }
+          }
 
           // Ensure wallet exists for the user
-          await this.ensureUserWallet(userCredential.user.uid);
+          await this.ensureUserWallet(instantLoginResult.user.uid);
 
           // Update last login time
-          await this.updateLastLoginTime(userCredential.user.uid);
+          await this.updateLastLoginTime(instantLoginResult.user.uid);
 
           logger.info('✅ Phone instant login successful', {
-            userId: userCredential.user.uid,
+            userId: instantLoginResult.user.uid,
             phone: phoneNumber.substring(0, 5) + '...',
             isNewUser: false
           }, 'AuthService');
 
-            return {
+          return {
             success: true,
             verificationId: 'instant-login', // Special marker for instant login
-            user: userCredential.user,
+            user: instantLoginResult.user,
             isNewUser: false
           };
         }
@@ -281,46 +297,30 @@ class AuthService {
         phonePrefix: phoneNumber.substring(0, 5)
       }, 'AuthService');
 
-      // Use Firebase's actual SMS sending for real SMS delivery
+      // Use PhoneAuthService to send verification code
       logger.info('Using server-side SMS verification with Twilio', {
         phonePrefix: phoneNumber.substring(0, 5),
         platform: Platform.OS
       }, 'AuthService');
 
       try {
-        // Use server-side SMS sending with Twilio (bypasses reCAPTCHA issues)
-        const { getFunctions, httpsCallable } = await import('firebase/functions');
-        const functions = getFunctions();
+        // Use PhoneAuthService to send verification code
+        const sendResult = await PhoneAuthService.sendVerificationCode(phoneNumber);
 
-        const startPhoneAuth = httpsCallable<{ phoneNumber: string }, {
-          success: boolean;
-          sessionId: string;
-          expiresIn: number;
-          message?: string;
-        }>(functions, 'startPhoneAuthentication');
-
-        const result = await startPhoneAuth({ phoneNumber });
-        const data = result.data as {
-          success: boolean;
-          sessionId: string;
-          expiresIn: number;
-          message?: string;
-        };
-
-        if (!data.success) {
-          throw new Error(data.message || 'Failed to start phone authentication');
+        if (!sendResult.success) {
+          throw new Error(sendResult.error || 'Failed to send verification code');
         }
 
         logger.info('✅ SMS verification session started with Twilio', {
-          sessionId: data.sessionId,
+          sessionId: sendResult.verificationId,
           phonePrefix: phoneNumber.substring(0, 5),
-          expiresIn: data.expiresIn
+          expiresIn: sendResult.expiresIn
         }, 'AuthService');
 
         return {
           success: true,
-          verificationId: data.sessionId,
-          expiresIn: data.expiresIn
+          verificationId: sendResult.verificationId,
+          expiresIn: sendResult.expiresIn
         };
 
       } catch (error: unknown) {
@@ -332,6 +332,34 @@ class AuthService {
           code: errorCode,
           phonePrefix: phoneNumber.substring(0, 5)
         }, 'AuthService');
+
+        // Handle specific Firebase Functions errors
+        if (errorCode === 'functions/not-found') {
+          return {
+            success: false,
+            error: 'Phone authentication service is not available. Please try again later or use email authentication.'
+          };
+        } else if (errorCode === 'functions/permission-denied') {
+          return {
+            success: false,
+            error: 'Permission denied. Please ensure you have the latest app version.'
+          };
+        } else if (errorCode === 'functions/resource-exhausted') {
+          return {
+            success: false,
+            error: 'Too many requests. Please wait a few minutes before trying again.'
+          };
+        } else if (errorCode === 'functions/invalid-argument') {
+          return {
+            success: false,
+            error: 'Invalid phone number format. Please use international format (e.g., +1234567890).'
+          };
+        } else if (errorCode === 'functions/internal') {
+          return {
+            success: false,
+            error: errorMessage || 'Failed to send SMS verification code. Please try again.'
+          };
+        }
 
         return {
           success: false,
@@ -395,10 +423,6 @@ class AuthService {
         platform: Platform.OS
       }, 'AuthService');
 
-      // Use server-side phone linking to avoid reCAPTCHA issues
-      const { getFunctions, httpsCallable } = await import('firebase/functions');
-      const functions = getFunctions();
-
       // Validate phone number format (E.164)
       const phoneValidation = this.validatePhoneNumber(phoneNumber);
       if (!phoneValidation.isValid) {
@@ -408,11 +432,11 @@ class AuthService {
         };
       }
 
-      logger.info('🔄 Starting server-side phone linking process', {
-        userId,
-        phone: phoneNumber.substring(0, 5) + '...',
-        platform: Platform.OS
-      }, 'AuthService');
+      // Use server-side phone linking to avoid reCAPTCHA issues
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const { getApp } = await import('firebase/app');
+      const app = getApp();
+      const functions = getFunctions(app, 'us-central1');
 
       // Call the server-side function to start phone linking
       const startPhoneLinking = httpsCallable<{
@@ -511,7 +535,9 @@ class AuthService {
 
       // Use server-side verification for phone linking
       const { getFunctions, httpsCallable } = await import('firebase/functions');
-      const functions = getFunctions();
+      const { getApp } = await import('firebase/app');
+      const app = getApp();
+      const functions = getFunctions(app, 'us-central1');
       
       // Call the server-side function to verify phone code and link to user
       const verifyPhoneForLinking = httpsCallable<{
@@ -610,46 +636,18 @@ class AuthService {
         codeLength: code.length
       }, 'AuthService');
 
-      // Use server-side verification to bypass reCAPTCHA issues
-      const { getFunctions, httpsCallable } = await import('firebase/functions');
-      const functions = getFunctions();
+      // Use PhoneAuthService to verify the code
+      const verifyResult = await PhoneAuthService.verifyCode(verificationId, code);
 
-      // Call the server-side function to verify phone code
-      const verifyPhoneCodeFunction = httpsCallable<{
-        sessionId: string;
-        code: string;
-      }, {
-        success: boolean;
-        customToken: string;
-        userId: string;
-        isNewUser: boolean;
-        phoneNumber: string;
-        message?: string;
-      }>(functions, 'verifyPhoneCode');
-
-      const result = await verifyPhoneCodeFunction({ sessionId: verificationId, code });
-
-      const data = result.data as {
-        success: boolean;
-        customToken: string;
-        userId: string;
-        isNewUser: boolean;
-        phoneNumber: string;
-        message?: string;
-      };
-
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to verify phone code');
+      if (!verifyResult.success || !verifyResult.user) {
+        throw new Error(verifyResult.error || 'Failed to verify phone code');
       }
 
-      // Sign in with the custom token returned from the server
-      const userCredential = await signInWithCustomToken(auth, data.customToken);
-
-      // The server-side function already handled user creation and phone verification
-      // For phone auth, the Firebase Function should have created the Firestore document
+      // PhoneAuthService already handled sign-in with custom token
       // We just need to ensure wallet setup and update login time
-      const phoneNumber = data.phoneNumber;
-      const isNewUser = data.isNewUser;
+      const userCredential = { user: verifyResult.user };
+      const isNewUser = verifyResult.isNewUser || false;
+      const phoneNumber = verifyResult.user.phoneNumber || '';
 
       logger.info('Phone verification result', {
         userId: userCredential.user.uid,
@@ -752,8 +750,7 @@ class AuthService {
       logger.info('✅ Server-side Phone Sign-In successful', {
         userId: userCredential.user.uid,
         phone: phoneNumber.substring(0, 5) + '...',
-        isNewUser: isNewUser,
-        firebaseFunctionUserId: data.userId
+        isNewUser: isNewUser
       }, 'AuthService');
 
       return {

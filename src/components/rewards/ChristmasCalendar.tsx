@@ -26,6 +26,7 @@ import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 import { getAssetInfo } from '../../services/rewards/assetConfig';
 import UserAvatar from '../UserAvatar';
 import { useApp } from '../../context/AppContext';
+import { AssetPreview } from './AssetPreview';
 import {
   getTileBackgroundStyle,
   getDefaultTileBackgroundStyle,
@@ -588,54 +589,20 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
           <View style={styles.modalClaimingContent}>
             {/* Asset Preview - shown at top for wallet backgrounds and profile borders */}
             {gift.type === 'asset' && (() => {
-              const assetGift = gift as any; // gift config has assetType property
+              const assetGift = gift as AssetGift;
               const resolvedAssetUrl = resolvedAssetUrls[assetGift.assetId];
 
-              if (assetGift.assetType === 'wallet_background') {
-                const previewTitle = `${assetGift.name} Wallet Background`;
-
-                return (
-                  <View style={styles.walletPreviewTopContainer}>
-                    <View style={styles.walletPreviewWrapper}>
-                      {resolvedAssetUrl ? (
-                        <View style={styles.walletPreviewImageFrame}>
-                          <Image
-                            source={{ uri: resolvedAssetUrl }}
-                            style={styles.walletPreviewTopImage}
-                            resizeMode="cover"
-                            onError={() => {
-                              console.warn('Wallet background image failed to load');
-                            }}
-                          />
-                        </View>
-                      ) : (
-                        <View style={[styles.walletPreviewTopImage, { backgroundColor: colors.white10, justifyContent: 'center', alignItems: 'center' }]}>
-                          <PhosphorIcon name="Image" size={32} color={colors.white70} />
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.previewTopTitle}>{previewTitle}</Text>
-                  </View>
-                );
-              } else if (assetGift.assetType === 'profile_border') {
-                return (
-                  <View style={styles.profilePreviewTopContainer}>
-                    <View style={styles.profilePreviewWrapper}>
-                      <UserAvatar
-                        userId={userId}
-                        userName="Preview User"
-                        displayName="Preview User"
-                        avatarUrl={currentUser?.avatar}
-                        size={80}
-                        borderImageUrl={resolvedAssetUrl}
-                        borderScaleOverride={1.5}
-                      />
-                    </View>
-                    <Text style={styles.previewTopTitle}>{assetGift.name}</Text>
-                  </View>
-                );
-              }
-              return null;
+              return (
+                <AssetPreview
+                  asset={assetGift}
+                  resolvedImageUrl={resolvedAssetUrl}
+                  userId={userId}
+                  userAvatarUrl={currentUser?.avatar}
+                  userName={currentUser?.name || 'Preview User'}
+                  title={assetGift.assetType === 'wallet_background' ? `${assetGift.name} Wallet Background` : assetGift.name}
+                  containerStyle={styles.assetPreviewContainer}
+                />
+              );
             })()}
 
             {/* For points rewards, show the reward details */}
@@ -1406,63 +1373,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: spacing.sm,
   },
-  profilePreviewTopContainer: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.white50,
-    borderRadius: 20,
-    padding: spacing.xl,
+  assetPreviewContainer: {
+    width: '100%',
     marginBottom: spacing.xl,
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.white5,
-    width: '100%',
-  },
-  previewTopTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-    marginTop: spacing.sm,
-    textAlign: 'center',
-  },
-  profilePreviewWrapper: {
-    alignItems: 'center',
-  },
-  previewTopDescription: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.green,
-    marginTop: spacing.sm,
-    textAlign: 'center',
-  },
-  walletPreviewWrapper: {
-    width: '100%',
-  },
-  walletPreviewTopContainer: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.white50,
-    borderRadius: 20,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.white5,
-    width: '100%',
-  },
-  walletPreviewTopImage: {
-    width: '100%',
-    height: 150,
-    borderRadius: 18,
-  },
-  walletPreviewImageFrame: {
-    width: '100%',
-    borderRadius: 18,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.white10,
-    backgroundColor: colors.black,
-    position: 'relative',
   },
   cannotClaimContainer: {
     flexDirection: 'row',

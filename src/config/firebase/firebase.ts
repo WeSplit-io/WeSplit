@@ -29,6 +29,7 @@ import {
   getDocs,
   deleteDoc
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -530,13 +531,9 @@ export const firestoreService = {
         try {
           const { referralService } = await import('../services/rewards/referralService');
           const { userActionSyncService } = await import('../services/rewards/userActionSyncService');
-          const { updateDoc } = await import('firebase/firestore');
           
-          // Generate referral code
-          const referralCode = referralService.generateReferralCode(user.uid);
-          await updateDoc(userRef, {
-            referral_code: referralCode
-          });
+          // Ensure referral code exists using centralized, uniqueness-checked logic
+          await referralService.ensureUserHasReferralCode(user.uid);
           
           // Track referral if provided (check route params or query params)
           // Note: This would need to be passed from the signup flow
@@ -577,47 +574,35 @@ export const firestoreService = {
   // Check if user has verified within the last 30 days
   async hasVerifiedWithin30Days(email: string): Promise<boolean> {
     try {
-      // Find user by email
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email));
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        return false; // User doesn't exist, needs verification
+      // Use Cloud Function to perform 30-day verification check with admin privileges
+      if (!app) {
+        // Firebase not initialized - require verification
+        logger.warn('Firebase app not initialized, skipping 30-day verification check', { email }, 'firebase');
+        return false;
       }
-      
-      const userDoc = querySnapshot.docs[0];
-      if (!userDoc) {
-        return false; // No user document found
-      }
-      const userData = userDoc.data();
-      const lastVerifiedAt = userData.lastVerifiedAt;
-      
-      if (!lastVerifiedAt) {
-        return false; // No verification record, needs verification
-      }
-      
-      // Check if lastVerifiedAt is a valid date (not NaN)
-      const lastVerified = new Date(lastVerifiedAt);
-      if (isNaN(lastVerified.getTime())) {
-        console.warn('⚠️ Invalid lastVerifiedAt date found for user:', email, 'Value:', lastVerifiedAt);
-        // Fix the invalid date by updating it to current time
-        await this.updateLastVerifiedAt(email);
-        return true; // Allow user to proceed since we're fixing the issue
-      }
-      
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-      
-      const hasVerifiedWithin30Days = lastVerified > thirtyDaysAgo;
-      
+
+      const functions = getFunctions(app);
+      const hasVerifiedFn = httpsCallable(functions, 'hasVerifiedWithin30Days');
+
+      const result = await hasVerifiedFn({ email });
+      const data = result.data as { success?: boolean; hasVerifiedWithin30Days?: boolean };
+
+      const success = !!data?.success;
+      const hasVerified = !!data?.hasVerifiedWithin30Days;
+
       if (__DEV__) {
-        logger.debug('30-day verification check', { email, lastVerified, now, thirtyDaysAgo, hasVerifiedWithin30Days }, 'firebase');
+        logger.debug('30-day verification check (Cloud Function)', {
+          email,
+          success,
+          hasVerifiedWithin30Days: hasVerified
+        }, 'firebase');
       }
-      
-      return hasVerifiedWithin30Days;
+
+      // On failure or explicit false, require verification
+      return success && hasVerified;
     } catch (error) {
       console.error('Error checking 30-day verification:', error);
+      logger.error('Error checking 30-day verification', { error, email }, 'firebase');
       return false; // On error, require verification
     }
   },

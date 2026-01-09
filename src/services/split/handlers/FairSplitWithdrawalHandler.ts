@@ -54,7 +54,9 @@ export async function extractFairSplitFunds(
     }
 
     const availableBalance = balanceValidation.balance;
-    const withdrawalAmount = Math.floor(availableBalance * Math.pow(10, 6)) / Math.pow(10, 6);
+    // Use wallet.totalAmount for merchant payments (SPEND), availableBalance for personal splits
+    // For SPEND merchant payments, we want to send the exact totalAmount, not just what's available
+    const withdrawalAmount = wallet.totalAmount || Math.floor(availableBalance * Math.pow(10, 6)) / Math.pow(10, 6);
     
     if (withdrawalAmount <= 0) {
       return {

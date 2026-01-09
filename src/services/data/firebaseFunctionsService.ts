@@ -7,6 +7,21 @@ import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/
 import { getApp } from 'firebase/app';
 import { logger } from '../analytics/loggingService';
 
+/**
+ * Test/Placeholder credentials for iOS team testing
+ * 
+ * Usage:
+ * - Email: test@wesplit.app
+ * - Code: 1234
+ * 
+ * These credentials bypass the actual email verification flow and allow
+ * testing the authentication process without needing to receive real emails.
+ * 
+ * NOTE: Enabled in both development and production for iOS team testing
+ */
+const TEST_EMAIL = 'test@wesplit.app';
+const TEST_CODE = '1234';
+
 // Use the existing Firebase app instance instead of creating a new one
 // This ensures we're using the same Firebase configuration and authentication state
 // The app is initialized in src/config/firebase/firebase.ts
@@ -104,6 +119,13 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
   if (__DEV__) { logger.info('sendVerificationCode called (Firebase Functions)', null, 'firebaseFunctionsService'); }
   if (__DEV__) { logger.debug('Email', { email }, 'firebaseFunctionsService'); }
   
+  // TEST MODE: Bypass sending code for placeholder email (enabled for iOS team testing)
+  if (email.trim().toLowerCase() === TEST_EMAIL.toLowerCase()) {
+    logger.info('🧪 TEST MODE: Placeholder email detected - skipping actual code send', { email: TEST_EMAIL }, 'firebaseFunctionsService');
+    logger.info('🧪 TEST MODE: Use code "1234" to verify', null, 'firebaseFunctionsService');
+    return { success: true };
+  }
+  
   try {
     // Generate a 4-digit verification code
     const code = Math.floor(1000 + Math.random() * 9000).toString();
@@ -179,6 +201,79 @@ export async function verifyCode(email: string, code: string): Promise<FirebaseV
   if (__DEV__) { logger.info('verifyCode called (Firebase Functions)', null, 'firebaseFunctionsService'); }
   if (__DEV__) { logger.debug('Email and Code', { email, code }, 'firebaseFunctionsService'); }
   
+  // TEST MODE: Bypass verification for placeholder credentials (enabled for iOS team testing)
+  if (email.trim().toLowerCase() === TEST_EMAIL.toLowerCase() && code.trim() === TEST_CODE) {
+    logger.info('🧪 TEST MODE: Using placeholder credentials for testing', { email: TEST_EMAIL, code: TEST_CODE }, 'firebaseFunctionsService');
+    
+    try {
+      // Get or create test user in Firestore
+      const { collection, query, where, getDocs, doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('../../config/firebase/firebase');
+      
+      // Check if test user exists
+      let testUser;
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', TEST_EMAIL));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        testUser = querySnapshot.docs[0].data();
+        logger.info('🧪 Test user found in Firestore', { userId: testUser.id }, 'firebaseFunctionsService');
+      }
+      
+      // Create test user if doesn't exist
+      if (!testUser) {
+        const testUserId = 'test_user_' + Date.now();
+        testUser = {
+          id: testUserId,
+          email: TEST_EMAIL,
+          name: 'Test User',
+          wallet_address: '',
+          wallet_public_key: '',
+          created_at: new Date().toISOString(),
+          avatar: '',
+          emailVerified: true,
+          lastLoginAt: new Date().toISOString(),
+          lastVerifiedAt: new Date().toISOString(),
+          hasCompletedOnboarding: true,
+          points: 0,
+          total_points_earned: 0
+        };
+        
+        // Try to create user document (non-blocking)
+        try {
+          const userRef = doc(db, 'users', testUserId);
+          await setDoc(userRef, testUser, { merge: true });
+          logger.info('🧪 Test user created in Firestore', { userId: testUserId }, 'firebaseFunctionsService');
+        } catch (createError) {
+          logger.warn('Could not create test user document (non-critical)', { error: createError }, 'firebaseFunctionsService');
+        }
+      }
+      
+      // Return mock successful response
+      return {
+        success: true,
+        message: 'Test verification successful',
+        email: TEST_EMAIL,
+        skipVerification: false,
+        user: {
+          id: testUser.id,
+          email: testUser.email,
+          name: testUser.name || 'Test User',
+          walletAddress: testUser.wallet_address || '',
+          walletPublicKey: testUser.wallet_public_key || '',
+          avatar: testUser.avatar || '',
+          createdAt: testUser.created_at || new Date().toISOString(),
+          hasCompletedOnboarding: testUser.hasCompletedOnboarding !== false
+        },
+        customToken: null // Will be created by Firebase Function if needed
+      };
+    } catch (testError) {
+      logger.error('Error in test mode verification', { error: testError }, 'firebaseFunctionsService');
+      // Fall through to normal verification flow
+    }
+  }
+  
   try {
     // Call Firebase Function to verify code
     const result = await verifyCodeFunction({
@@ -251,13 +346,29 @@ export async function checkEmailUserExists(email: string): Promise<{ success: bo
       email: email.trim()
     });
 
+    if (!result || !result.data) {
+      logger.error('Invalid response from checkEmailUserExistsFunction', { result }, 'firebaseFunctionsService');
+      throw new Error('Invalid response from server');
+    }
+
     const response = result.data as { success: boolean; userExists: boolean; userId?: string; message?: string };
 
     if (__DEV__) { logger.debug('Firebase Functions checkEmailUserExists response', { response }, 'firebaseFunctionsService'); }
 
+    // Validate response structure
+    if (typeof response !== 'object' || response === null) {
+      logger.error('Invalid response structure from Firebase Function', { response }, 'firebaseFunctionsService');
+      throw new Error('Invalid response structure from server');
+    }
+
     if (response.success) {
       if (__DEV__) { logger.info('Email user existence check completed', null, 'firebaseFunctionsService'); }
-      return response;
+      return {
+        success: true,
+        userExists: response.userExists || false,
+        userId: response.userId,
+        message: response.message
+      };
     } else {
       throw new Error(response.message || 'Failed to check user existence');
     }

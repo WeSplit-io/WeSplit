@@ -239,6 +239,7 @@ class QuestService {
           points: actualPointsAwarded
         }, { merge: true });
         
+        // Note: Community badge bonus is now applied automatically in awardSeasonPoints()
         pointsResult = await pointsService.awardSeasonPoints(
           userId,
           actualPointsAwarded,
@@ -254,6 +255,7 @@ class QuestService {
         actualPointsAwarded = questDef.points;
         // Use awardSeasonPoints (awardPoints now redirects to it, but using awardSeasonPoints directly is clearer)
         const currentSeason = seasonService.getCurrentSeason();
+        // Note: Community badge bonus is now applied automatically in awardSeasonPoints()
         pointsResult = await pointsService.awardSeasonPoints(
           userId,
           questDef.points,

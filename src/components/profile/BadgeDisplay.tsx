@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import PhosphorIcon from '../shared/PhosphorIcon';
-import { getBadgeInfo } from '../../services/rewards/badgeConfig';
+import { badgeService } from '../../services/rewards/badgeService';
 
 interface BadgeDisplayProps {
   badges?: string[];
@@ -23,6 +23,28 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
   showAll = false,
   onBadgePress
 }) => {
+  const [badgeInfoMap, setBadgeInfoMap] = React.useState<Map<string, any>>(new Map());
+
+  // Load badge info from database for all badges
+  React.useEffect(() => {
+    const loadBadgeInfo = async () => {
+      if (!badges || badges.length === 0) return;
+
+      const infoMap = new Map();
+      await Promise.all(
+        badges.map(async (badgeId) => {
+          const info = await badgeService.getBadgeInfoPublic(badgeId);
+          if (info) {
+            infoMap.set(badgeId, info);
+          }
+        })
+      );
+      setBadgeInfoMap(infoMap);
+    };
+
+    loadBadgeInfo();
+  }, [badges]);
+
   if (!badges || badges.length === 0) {
     return null;
   }
@@ -33,12 +55,32 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
     return null;
   }
 
+  // Filter out badges that are community badges or haven't loaded yet
+  const validBadges = displayBadges.filter((badgeId) => {
+    const badgeInfo = badgeInfoMap.get(badgeId);
+    // Don't show badge if info hasn't loaded yet (prevents showing badgeId as title)
+    if (!badgeInfo) {
+      return false;
+    }
+    // Filter out community badges - they should not be displayed in BadgeDisplay
+    // Community badges are shown via CommunityBadge component next to names
+    if (badgeInfo.isCommunityBadge) {
+      return false;
+    }
+    return true;
+  });
+
+  // Don't render anything if no valid badges
+  if (validBadges.length === 0) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
-      {displayBadges.map((badgeId) => {
-        const badgeInfo = getBadgeInfo(badgeId);
+      {validBadges.map((badgeId) => {
+        const badgeInfo = badgeInfoMap.get(badgeId);
+        // This should never be null due to filtering above, but add safety check
         if (!badgeInfo) {
-          // Fallback for unknown badges
           return null;
         }
         const isActive = badgeId === activeBadge;
@@ -52,7 +94,7 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
             activeOpacity={0.7}
           >
             <View style={styles.badgeContent}>
-              {badgeInfo.iconUrl ? (
+              {badgeInfo.iconUrl && badgeInfo.iconUrl.startsWith('http') ? (
                 <Image
                   source={{ uri: badgeInfo.iconUrl }}
                   style={styles.badgeIconImage}
@@ -116,7 +158,7 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   badgeTitleActive: {
-    color: colors.green,
+    color: colors.white,
   },
   activeIndicator: {
     marginLeft: spacing.xs / 2,

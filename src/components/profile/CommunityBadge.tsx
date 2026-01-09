@@ -28,7 +28,7 @@ const CommunityBadge: React.FC<CommunityBadgeProps> = ({
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
-      {iconUrl ? (
+      {iconUrl && iconUrl.startsWith('http') ? (
         <Image
           source={{ uri: iconUrl }}
           style={[styles.image, { width: size, height: size }]}

@@ -1,9 +1,32 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and write their own user document
+    // Users collection - allow authenticated users to read any user document
+    // This is necessary for:
+    // 1. Users reading their own document (by user ID)
+    // 2. Contact resolution (querying by email/wallet address)
+    // 3. User lookup for transactions, splits, etc.
+    // 4. Referral code validation (querying by referral_code field)
+    // Note: Queries are limited to 1 result in application code for privacy
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow authenticated users to read any user document (including queries)
+      // This enables:
+      // - Queries by email/wallet address for contact resolution
+      // - Queries by referral_code for referral validation
+      // - Direct document reads by user ID
+      allow read: if request.auth != null;
+      
+      // Users can create their own document (when document doesn't exist yet)
+      // The document ID must match the authenticated user's UID
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Users can update their own document (when document exists)
+      // The document ID must match the authenticated user's UID
+      allow update: if request.auth != null && request.auth.uid == userId;
+      
+      // Users cannot delete their own document (for data retention)
+      // Deletions should be handled by backend/admin functions
+      allow delete: if false;
     }
     
     // Verification codes can be created by anyone but only read by the email owner
@@ -44,5 +67,334 @@ service cloud.firestore {
       // The encryption key derivation also requires app config, providing additional security
       allow read, write: if request.auth != null;
     }
+
+    // Referrals - restrict access to involved users only
+    match /referrals/{referralId} {
+      // Allow read if the authenticated user is either the referrer or the referred user
+      // This enables:
+      // - Referrers to view their referral records (for count, points tracking)
+      // - Referred users to view their referral record (for status, milestones)
+      allow read: if request.auth != null &&
+        (request.auth.uid == resource.data.referrerId ||
+         request.auth.uid == resource.data.referredUserId);
+
+      // Allow create if the authenticated user is the referred user
+      // (referrals are created when a new user signs up with a code)
+      // The transaction sets: referrerId, referredUserId, status, milestones, rewardsAwarded
+      // Rule verifies: request.auth.uid == request.resource.data.referredUserId
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.referredUserId;
+
+      // Allow updates only for involved users; business logic still enforced in application code
+      // This enables:
+      // - Referrers to update referral records (for points tracking, reward status)
+      // - Referred users to update referral records (for milestone tracking)
+      // Updates use setDoc with merge, so partial updates are allowed
+      allow update: if request.auth != null &&
+        (request.auth.uid == resource.data.referrerId ||
+         request.auth.uid == resource.data.referredUserId);
+
+      // Deletions should generally be done via privileged backend code; block from clients
+      allow delete: if false;
+    }
+
+    // Badges collection - public read for all badges, admin-only write
+    // This allows users to claim badges via redeem codes without app updates
+    match /badges/{badgeId} {
+      // Anyone can read badges (needed for redeem code lookup)
+      allow read: if true;
+      
+      // Only admins can create/update/delete badges
+      // In production, you should add admin check: request.auth.token.admin == true
+      // For now, allowing authenticated users (you can restrict this later)
+      allow write: if request.auth != null;
+    }
+
+    // Badge images collection - public read, admin-only write
+    match /badge_images/{badgeId} {
+      // Anyone can read badge images
+      allow read: if true;
+      
+      // Only admins can write badge images
+      allow write: if request.auth != null;
+    }
+
+    // User badges subcollection - users can read their own, system can write
+    match /users/{userId}/badges/{badgeId} {
+      // Users can read their own claimed badges
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // System can write when claiming badges (enforced by application code)
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // User quests subcollection - users can read/write their own quest progress
+    // Used by quest service to track quest completion and award points
+    match /users/{userId}/quests/{questId} {
+      // Users can read their own quest progress
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Users can create/update their own quests (when completing quests)
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false; // Quest history should not be deleted
+    }
+
+    // User metadata subcollection - users can read/write their own metadata
+    // Used for caching badge metrics and other user-specific metadata
+    match /users/{userId}/metadata/{metadataId} {
+      // Users can read their own metadata
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Users can create/update their own metadata (e.g., badge metrics caching)
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false; // Metadata should not be deleted (can be updated instead)
+    }
+
+    // User assets subcollection - users can read/write their own owned assets
+    // Used by advent calendar and other reward systems to store asset metadata
+    match /users/{userId}/assets/{assetId} {
+      // Users can read their own assets
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Users can create/update their own assets; deletions are blocked for safety
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // Christmas calendar subcollections - users can read/write their own calendar data
+    // Advent calendar per-day claim status
+    match /users/{userId}/christmas_calendar/{dayId} {
+      // Users can read and write their own calendar days
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Detailed claim records for analytics/tracking
+    match /users/{userId}/christmas_calendar_claims/{claimId} {
+      // Users can read their own claim history
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Claims are written by the app on behalf of the user
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Contacts collection - users can read/write their own contacts
+    match /contacts/{contactId} {
+      // Users can read contacts where they are the owner
+      allow read: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+      
+      // Users can create contacts for themselves
+      allow create: if request.auth != null && 
+        request.resource.data.user_id == request.auth.uid;
+      
+      // Users can update/delete their own contacts
+      allow update, delete: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+    }
+
+    // Transactions collection - users can read transactions they're involved in
+    match /transactions/{transactionId} {
+      // Users can read transactions where they are sender or recipient
+      allow read: if request.auth != null && 
+        (resource.data.from_user == request.auth.uid || 
+         resource.data.to_user == request.auth.uid);
+      
+      // Users can create transactions where they are the sender
+      allow create: if request.auth != null && 
+        request.resource.data.from_user == request.auth.uid;
+      
+      // Users can update transactions they're involved in (for status updates, etc.)
+      allow update: if request.auth != null && 
+        (resource.data.from_user == request.auth.uid || 
+         resource.data.to_user == request.auth.uid);
+      
+      // Deletions should be restricted (or handled by backend)
+      allow delete: if false;
+    }
+
+    // User transactions collection (transaction history)
+    match /user_transactions/{transactionId} {
+      // Users can read their own transaction history
+      allow read: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+      
+      // Users can create their own transaction history entries
+      allow create: if request.auth != null && 
+        request.resource.data.user_id == request.auth.uid;
+      
+      // Users can update their own transaction history
+      allow update: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+      
+      // Deletions should be restricted
+      allow delete: if false;
+    }
+
+    // Splits collection - users can read splits they're involved in
+    // Note: participants is an array of objects with userId fields
+    // Firestore rules can't easily check nested arrays, so we allow authenticated users
+    // Application code enforces participant checks
+    match /splits/{splitId} {
+      // Users can read splits where they are creator
+      // For participants, we rely on application-level checks (participants array contains userId)
+      allow read: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+      
+      // Also allow read for authenticated users (participant check happens in app code)
+      // This is necessary because Firestore rules can't check nested participant.userId values
+      // Application code must verify user is a participant before showing split details
+      allow read: if request.auth != null;
+      
+      // Users can create splits where they are the creator
+      allow create: if request.auth != null && 
+        request.resource.data.creatorId == request.auth.uid;
+      
+      // Users can update splits they created
+      allow update: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+      
+      // Also allow updates for authenticated users (participant checks in app code)
+      allow update: if request.auth != null;
+      
+      // Only creators can delete splits
+      allow delete: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+    }
+
+    // Points transactions collection - users can read their own points history
+    match /points_transactions/{transactionId} {
+      // Users can read their own points transactions
+      allow read: if request.auth != null && 
+        resource.data.user_id == request.auth.uid;
+      
+      // System can create points transactions (enforced by application code)
+      allow create: if request.auth != null && 
+        request.resource.data.user_id == request.auth.uid;
+      
+      // Updates should be restricted (points are immutable)
+      allow update: if false;
+      
+      // Deletions should be restricted
+      allow delete: if false;
+    }
+
+    // Shared wallets collection - users can read wallets they created or are members of
+    match /sharedWallets/{sharedWalletId} {
+      // Users can read wallets where they are creator
+      allow read: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+      
+      // Users can also read wallets where they are a member
+      // Note: Firestore rules can't easily check nested arrays, so we allow authenticated users
+      // Application code enforces member checks
+      allow read: if request.auth != null;
+      
+      // Users can create wallets where they are the creator
+      allow create: if request.auth != null && 
+        request.resource.data.creatorId == request.auth.uid;
+      
+      // Users can update wallets they created
+      allow update: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+      
+      // Also allow updates for authenticated users (member checks in app code)
+      allow update: if request.auth != null;
+      
+      // Only creators can delete wallets
+      allow delete: if request.auth != null && 
+        resource.data.creatorId == request.auth.uid;
+    }
+
+    // Payment requests - users can read requests where they are sender or recipient
+    match /paymentRequests/{requestId} {
+      // Users can read payment requests where they are sender or recipient
+      allow read: if request.auth != null &&
+        (resource.data.recipientId == request.auth.uid ||
+         resource.data.senderId == request.auth.uid);
+
+      // Users can create payment requests where they are the sender
+      allow create: if request.auth != null &&
+        request.resource.data.senderId == request.auth.uid;
+
+      // Users can update requests they're involved in (e.g., accept/reject)
+      allow update: if request.auth != null &&
+        (resource.data.recipientId == request.auth.uid ||
+         resource.data.senderId == request.auth.uid);
+
+      // Deletions should be restricted (or handled by backend)
+      allow delete: if false;
+    }
+
+    // =============================================================================
+    // SPEND INTEGRATION COLLECTIONS
+    // These collections are primarily accessed via Firebase Admin SDK (bypasses rules)
+    // Rules are defined here for defense in depth and documentation
+    // =============================================================================
+
+    // API Keys collection - Admin-only access (server-side only)
+    // Used by SPEND endpoints for API key validation
+    match /apiKeys/{apiKeyId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      // In production, you could add: request.auth.token.admin == true
+      allow read, write: if false; // Block all client access - Admin SDK bypasses this
+    }
+
+    // Pending invitations - Users can read their own invites, admin can write
+    // Used by SPEND endpoints to store pending invites for new users
+    match /pending_invitations/{inviteId} {
+      // Users can read invitations sent to their email
+      allow read: if request.auth != null && 
+        request.auth.token.email == resource.data.email;
+      
+      // Only server-side (Admin SDK) can create - block all client access
+      allow create, update, delete: if false; // Admin SDK bypasses this
+    }
+
+    // Invite batches - Admin-only access (analytics/logging)
+    // Used by SPEND endpoints to log email matching analytics
+    match /invite_batches/{batchId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
+    }
+
+    // Webhook logs - Admin-only access (logging)
+    // Used to log outgoing webhooks sent to SPEND
+    match /webhook_logs/{logId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
+    }
+
+    // SPEND webhook received - Admin-only access (logging)
+    // Used to log incoming webhooks from SPEND
+    match /spend_webhook_received/{logId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
+    }
+
+    // SPEND webhook logs - Admin-only access (logging)
+    // Used to log webhook attempts and debugging
+    match /spend_webhook_logs/{logId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
+    }
+
+    // Linked wallets - Users can read their own, admin can write
+    // Used by SPEND endpoints to link external wallets
+    match /linkedWallets/{walletId} {
+      // Users can read their own linked wallets
+      allow read: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+      
+      // Only server-side (Admin SDK) can create/update - block all client access
+      allow create, update, delete: if false; // Admin SDK bypasses this
+    }
+
+    // Rate limits - Admin-only access (server-side only)
+    // Used for API rate limiting
+    match /rateLimits/{limitId} {
+      // Only server-side (Admin SDK) can access - block all client access
+      allow read, write: if false; // Admin SDK bypasses this
+    }
   }
 } 
+

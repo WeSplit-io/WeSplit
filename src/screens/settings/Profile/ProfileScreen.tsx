@@ -18,9 +18,9 @@ const AvatarComponent = ({ avatar, displayName, style, userId }: { avatar?: stri
       avatarUrl={avatar}
       userName={displayName}
       userId={userId}
-      size={60} // Explicit size to ensure proper border scaling
+      size={60}
       style={style}
-      showProfileBorder={true}
+      // Explicitly render avatar without decorative profile border
     />
   );
 };

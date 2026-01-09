@@ -2105,14 +2105,31 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       return;
     }
 
-    // Validate that all participants have amounts assigned
-    if (hasInvalidAmounts()) {
-      Alert.alert('Error', 'All participants must have valid amounts assigned');
+    // Ensure all participants have valid amounts (handle case where amounts might be 0 or undefined)
+    const participantsWithAmounts = participants.map(p => {
+      // If amountOwed is 0 or undefined, calculate it based on split method
+      if (!p.amountOwed || p.amountOwed === 0) {
+        if (splitMethod === 'equal' && participants.length > 0) {
+          return { ...p, amountOwed: totalAmount / participants.length };
+        }
+      }
+      return p;
+    });
+
+    // Update participants if amounts were recalculated
+    if (participantsWithAmounts.some((p, i) => p.amountOwed !== participants[i].amountOwed)) {
+      setParticipants(participantsWithAmounts);
+    }
+
+    // Validate that all participants have positive amounts assigned
+    const invalidParticipants = participantsWithAmounts.filter(p => !p.amountOwed || p.amountOwed <= 0);
+    if (invalidParticipants.length > 0) {
+      Alert.alert('Error', `Some participants don't have valid amounts assigned. Please ensure all participants have amounts greater than 0.`);
       return;
     }
 
     // Validate that total amounts match the bill total
-    const totalAssigned = calculateTotalAssigned();
+    const totalAssigned = participantsWithAmounts.reduce((sum, p) => sum + (p.amountOwed || 0), 0);
     if (Math.abs(totalAssigned - totalAmount) > 0.01) { // Allow small rounding differences
       Alert.alert('Error', `Total assigned amounts (${totalAssigned.toFixed(2)}) must equal bill total (${totalAmount.toFixed(2)})`);
       return;
@@ -2132,7 +2149,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           currentUser!.id.toString(),
           totalAmount,
           'USDC',
-          participants.map(p => ({
+          participantsWithAmounts.map(p => ({
             userId: p.id,
             name: p.name,
             walletAddress: p.walletAddress,
@@ -2174,7 +2191,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       const updateResult = await SplitStorageService.updateSplit(splitData!.id, {
         status: 'active',
         splitMethod: splitMethod, // Store the locked split method
-        participants: participants.map(p => ({
+        participants: participantsWithAmounts.map(p => ({
           userId: p.id,
           name: p.name,
           email: '', // Email not available in Participant type

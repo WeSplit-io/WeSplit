@@ -48,6 +48,7 @@ if (!admin.apps.length) {
 const emailFunctions = require('./emailFunctions');
 exports.sendVerificationEmail = emailFunctions.sendVerificationEmail;
 exports.verifyCode = emailFunctions.verifyCode;
+exports.hasVerifiedWithin30Days = emailFunctions.hasVerifiedWithin30Days;
 
 // Import and export phone functions
 const phoneFunctions = require('./phoneFunctions');

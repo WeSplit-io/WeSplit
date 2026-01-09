@@ -9,7 +9,7 @@ import {
   Platform,
   Linking
 } from 'react-native';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, useRoute, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
 import { Container, Header, Button, Input, LoadingScreen, Tabs } from '../../components/shared';
 import { useApp } from '../../context/AppContext';
@@ -18,16 +18,18 @@ import { AuthPersistenceService } from '../../services/core/authPersistenceServi
 import { isPhantomSocialLoginEnabled, isPhantomEnabled } from '../../config/features';
 import { PhantomAuthButton } from '../../components/auth/PhantomAuthButton';
 import { authService } from '../../services/auth/AuthService';
+import { isValidPhoneNumber as validatePhoneE164, normalizePhoneNumber } from '../../utils/validation/phone';
 
 type RootStackParamList = {
   Dashboard: undefined;
-  Verification: { email?: string; phoneNumber?: string; verificationId?: string };
-  CreateProfile: { email?: string; phoneNumber?: string };
-  AuthMethods: undefined;
+  Verification: { email?: string; phoneNumber?: string; verificationId?: string; referralCode?: string };
+  CreateProfile: { email?: string; phoneNumber?: string; referralCode?: string };
+  AuthMethods: { referralCode?: string; email?: string; prefilledEmail?: string };
 };
 
 const AuthMethodsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const route = useRoute();
   const { authenticateUser, updateUser } = useApp();
 
   // State management
@@ -36,6 +38,10 @@ const AuthMethodsScreen: React.FC = () => {
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  
+  // Get referral code and email from route params (from deep link)
+  const referralCode = (route.params as any)?.referralCode;
+  const prefilledEmail = (route.params as any)?.email || (route.params as any)?.prefilledEmail;
 
   // Validation functions
   const isValidEmail = (email: string): boolean => {
@@ -44,29 +50,34 @@ const AuthMethodsScreen: React.FC = () => {
   };
 
   const isValidPhoneNumber = (phone: string): boolean => {
-    // E.164 format validation (e.g., +1234567890)
-    const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    return phoneRegex.test(phone.trim());
+    // Use centralized phone validation utility
+    return validatePhoneE164(phone);
   };
 
   const formatPhoneNumber = (phone: string): string => {
-    // Remove all non-digit characters except +
-    const cleaned = phone.replace(/[^\d+]/g, '');
-    // Ensure it starts with +
-    if (!cleaned.startsWith('+')) {
-      return '+' + cleaned;
+    // Use centralized phone normalization utility
+    const normalized = normalizePhoneNumber(phone);
+    // Validate after normalization
+    if (!normalized || !validatePhoneE164(normalized)) {
+      return phone; // Return original if normalization fails
     }
-    return cleaned;
+    return normalized;
   };
 
-  // Load persisted email and phone on component mount
+  // Load persisted email and phone on component mount, and prefill email from route params
   useEffect(() => {
     const loadPersistedData = async () => {
       try {
-        // Load persisted email
-        const persistedEmail = await AuthPersistenceService.loadEmail();
-        if (persistedEmail) {
-          setEmail(persistedEmail);
+        // Priority: route params > persisted email
+        if (prefilledEmail) {
+          setEmail(prefilledEmail);
+          logger.info('Email prefilled from route params', { email: prefilledEmail }, 'AuthMethodsScreen');
+        } else {
+          // Load persisted email
+          const persistedEmail = await AuthPersistenceService.loadEmail();
+          if (persistedEmail) {
+            setEmail(persistedEmail);
+          }
         }
 
         // Load persisted phone number
@@ -82,7 +93,7 @@ const AuthMethodsScreen: React.FC = () => {
     };
 
     loadPersistedData();
-  }, []);
+  }, [prefilledEmail]);
 
   // Helper function to process phantom authentication success
   const processPhantomAuthSuccess = async (phantomUser: any) => {
@@ -185,93 +196,199 @@ const AuthMethodsScreen: React.FC = () => {
       // Save email for persistence
       await AuthPersistenceService.saveEmail(email.trim());
 
-      // Check if user already exists for instant login
-      const userExistsResult = await authService.checkEmailUserExists(email.trim());
+      // Check if user already exists
+      let userExistsResult;
+      try {
+        userExistsResult = await authService.checkEmailUserExists(email.trim());
+      } catch (checkError) {
+        logger.error('Exception thrown during checkEmailUserExists', { 
+          error: checkError instanceof Error ? checkError.message : String(checkError)
+        }, 'AuthMethodsScreen');
+        userExistsResult = { success: false, userExists: false, error: 'Failed to check user existence' };
+      }
+
+      // Ensure userExistsResult is valid
+      if (!userExistsResult || typeof userExistsResult !== 'object') {
+        logger.error('Invalid userExistsResult received', { userExistsResult }, 'AuthMethodsScreen');
+        userExistsResult = { success: false, userExists: false, error: 'Invalid response from user check' };
+      }
+
       if (!userExistsResult.success) {
         logger.warn('Failed to check if email user exists, proceeding with verification code', {
           error: userExistsResult.error
         }, 'AuthMethodsScreen');
       }
 
-      // If user exists, perform instant login (similar to phone flow)
+      // If user exists, check if they verified within the last 30 days
       if (userExistsResult.success && userExistsResult.userExists && userExistsResult.userId) {
-        logger.info('Email user exists - performing instant login', {
+        logger.info('Email user exists - checking last verification timestamp', {
           userId: userExistsResult.userId,
           email: email.trim()
         }, 'AuthMethodsScreen');
 
-        // Get user data from Firestore to create proper user object
+        // Check if user verified within 30 days
         try {
-          const { firebaseDataService } = await import('../../services/data/firebaseDataService');
-          const existingUserData = await firebaseDataService.user.getCurrentUser(userExistsResult.userId);
+          const { firestoreService } = await import('../../config/firebase/firebase');
+          const hasVerifiedRecently = await firestoreService.hasVerifiedWithin30Days(email.trim());
 
-          if (existingUserData) {
-            // Create properly formatted user object (consistent with phone flow)
-            const authenticatedUser = {
-              id: userExistsResult.userId,
-              name: existingUserData.name || '',
-              email: existingUserData.email || email.trim(),
-              phone: existingUserData.phone || '',
-              wallet_address: existingUserData.wallet_address || '',
-              wallet_public_key: existingUserData.wallet_public_key || '',
-              created_at: existingUserData.created_at || new Date().toISOString(),
-              avatar: existingUserData.avatar || '',
-              emailVerified: existingUserData.email_verified || true, // Existing users are verified
-              lastLoginAt: new Date().toISOString(), // Use current time for login
-              hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false,
-            };
-
-            // Update authentication context BEFORE navigating
-            authenticateUser(authenticatedUser, 'email');
-
-            logger.info('Authentication context updated for email instant login', {
-              userId: userExistsResult.userId
+          if (hasVerifiedRecently) {
+            logger.info('User verified within 30 days - skipping verification code', {
+              userId: userExistsResult.userId,
+              email: email.trim()
             }, 'AuthMethodsScreen');
 
-            // Check if user needs to create a profile (same logic as phone)
-            const needsProfile = !authenticatedUser.name || authenticatedUser.name.trim() === '';
+            // STEP 1: Sign in to Firebase Auth using custom token so Firestore rules will allow reads
+            try {
+              const { auth, app } = await import('../../config/firebase/firebase');
+              const { signInWithCustomToken } = await import('firebase/auth');
+              
+              const { getFunctions, httpsCallable } = await import('firebase/functions');
+              const functions = getFunctions(app);
+              const getUserToken = httpsCallable<{ userId: string }, {
+                success: boolean;
+                customToken: string;
+                message?: string;
+              }>(functions, 'getUserCustomToken');
 
-            if (needsProfile) {
-              logger.info('Email user needs to create profile (no name), navigating to CreateProfile', {
-                userId: userExistsResult.userId,
-                email: email.trim()
+              const tokenResult = await getUserToken({ userId: userExistsResult.userId });
+              const tokenData = tokenResult.data as {
+                success: boolean;
+                customToken: string;
+                message?: string;
+              };
+
+              if (tokenData.success && tokenData.customToken) {
+                await signInWithCustomToken(auth, tokenData.customToken);
+                logger.info('✅ Signed in to Firebase Auth with custom token', null, 'AuthMethodsScreen');
+              } else {
+                logger.warn('getUserCustomToken did not return a valid token, falling back to verification code', {
+                  userId: userExistsResult.userId,
+                  tokenData
+                }, 'AuthMethodsScreen');
+                throw new Error('Failed to obtain custom token');
+              }
+            } catch (tokenError) {
+              logger.warn('Failed to sign in with custom token, falling back to verification code', { 
+                error: tokenError instanceof Error ? tokenError.message : String(tokenError),
+                userId: userExistsResult.userId
               }, 'AuthMethodsScreen');
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'CreateProfile', params: {
-                  email: email.trim(),
-                  phoneNumber: authenticatedUser.phone
-                } }],
-              });
-            } else {
-              logger.info('Email user already has name, navigating to Dashboard', {
-                userId: userExistsResult.userId,
-                name: authenticatedUser.name,
-                email: email.trim()
-              }, 'AuthMethodsScreen');
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Dashboard' }],
-              });
+              // If we can't sign in, fall through to verification code flow
+              throw tokenError;
             }
-            return;
+
+            // STEP 2: Now that we're authenticated, get user data from Firestore to create proper user object
+            try {
+              const { firebaseDataService } = await import('../../services/data/firebaseDataService');
+              const existingUserData = await firebaseDataService.user.getCurrentUser(userExistsResult.userId);
+
+              if (existingUserData) {
+                // Create properly formatted user object (consistent with phone flow)
+                const authenticatedUser = {
+                  id: userExistsResult.userId,
+                  name: existingUserData.name || '',
+                  email: existingUserData.email || email.trim(),
+                  phone: existingUserData.phone || '',
+                  wallet_address: existingUserData.wallet_address || '',
+                  wallet_public_key: existingUserData.wallet_public_key || '',
+                  created_at: existingUserData.created_at || new Date().toISOString(),
+                  avatar: existingUserData.avatar || '',
+                  emailVerified: existingUserData.email_verified !== false, // Default to true if not explicitly false
+                  lastLoginAt: new Date().toISOString(),
+                  hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false,
+                };
+
+                // Update authentication context BEFORE navigating
+                authenticateUser(authenticatedUser, 'email');
+
+                logger.info('Authentication context updated for email login (verified within 30 days)', {
+                  userId: userExistsResult.userId
+                }, 'AuthMethodsScreen');
+
+                // Check if user needs to create a profile
+                // A user has a profile if they have a name AND have completed onboarding
+                // If they have a name but haven't completed onboarding, they should go to onboarding
+                // If they don't have a name, they need to create a profile
+                const hasName = authenticatedUser.name && authenticatedUser.name.trim() !== '';
+                const hasCompletedOnboarding = authenticatedUser.hasCompletedOnboarding === true;
+                
+                logger.info('Checking user profile status', {
+                  userId: userExistsResult.userId,
+                  hasName,
+                  hasCompletedOnboarding,
+                  name: authenticatedUser.name?.substring(0, 10) + '...',
+                  email: email.trim()
+                }, 'AuthMethodsScreen');
+
+                if (!hasName) {
+                  // User doesn't have a name - needs to create profile
+                  logger.info('Email user needs to create profile (no name), navigating to CreateProfile', {
+                    userId: userExistsResult.userId,
+                    email: email.trim(),
+                    hasReferralCode: !!referralCode
+                  }, 'AuthMethodsScreen');
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'CreateProfile', params: {
+                      email: email.trim(),
+                      phoneNumber: authenticatedUser.phone,
+                      referralCode: referralCode
+                    } }],
+                  });
+                } else if (hasCompletedOnboarding) {
+                  // User has name and completed onboarding - go to dashboard
+                  logger.info('Email user has profile and completed onboarding, navigating to Dashboard', {
+                    userId: userExistsResult.userId,
+                    name: authenticatedUser.name,
+                    email: email.trim()
+                  }, 'AuthMethodsScreen');
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Dashboard' }],
+                  });
+                } else {
+                  // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+                  logger.info('Email user has name but needs onboarding, navigating to Dashboard', {
+                    userId: userExistsResult.userId,
+                    name: authenticatedUser.name,
+                    email: email.trim()
+                  }, 'AuthMethodsScreen');
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Dashboard' }],
+                  });
+                }
+                return;
+              } else {
+                logger.error('User data not found in Firestore for email login', {
+                  userId: userExistsResult.userId
+                }, 'AuthMethodsScreen');
+                // Fall through to verification code flow
+              }
+            } catch (firestoreError) {
+              logger.error('Failed to fetch user data for email login', {
+                error: firestoreError instanceof Error ? firestoreError.message : String(firestoreError),
+                userId: userExistsResult.userId
+              }, 'AuthMethodsScreen');
+              // Fall through to verification code flow
+            }
           } else {
-            logger.error('User data not found in Firestore for email instant login', {
-              userId: userExistsResult.userId
+            logger.info('User has not verified within 30 days - sending verification code', {
+              userId: userExistsResult.userId,
+              email: email.trim()
             }, 'AuthMethodsScreen');
             // Fall through to verification code flow
           }
-        } catch (firestoreError) {
-          logger.error('Failed to fetch user data for email instant login', {
-            error: firestoreError instanceof Error ? firestoreError.message : String(firestoreError),
-            userId: userExistsResult.userId
+        } catch (verificationCheckError) {
+          logger.error('Failed to check 30-day verification status', {
+            error: verificationCheckError instanceof Error ? verificationCheckError.message : String(verificationCheckError),
+            email: email.trim()
           }, 'AuthMethodsScreen');
-          // Fall through to verification code flow
+          // Fall through to verification code flow on error
         }
       }
 
-      // New user or failed instant login - send verification code
-      logger.info('New email user or instant login failed - sending verification code', {
+      // New user, failed login, or needs re-verification - send verification code
+      logger.info('Sending verification code', {
         email: email.trim(),
         userExists: userExistsResult.userExists
       }, 'AuthMethodsScreen');
@@ -283,7 +400,10 @@ const AuthMethodsScreen: React.FC = () => {
       }
 
       // Navigate to verification screen
-      navigation.navigate('Verification', { email: email.trim() });
+      navigation.navigate('Verification', { 
+        email: email.trim(),
+        referralCode: referralCode
+      });
     } catch (error) {
       logger.error('Email authentication failed', { error, email: email.trim() }, 'AuthMethodsScreen');
       Alert.alert('Error', 'Failed to process email. Please try again.');
@@ -360,13 +480,15 @@ const AuthMethodsScreen: React.FC = () => {
             if (needsProfile) {
               logger.info('Phone user needs to create profile (no name), navigating to CreateProfile', {
                 userId: result.user.uid,
-                phoneNumber: formattedPhone.substring(0, 5) + '...'
+                phoneNumber: formattedPhone.substring(0, 5) + '...',
+                hasReferralCode: !!referralCode
               }, 'AuthMethodsScreen');
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'CreateProfile', params: {
                   phoneNumber: formattedPhone,
-                  email: authenticatedUser.email
+                  email: authenticatedUser.email,
+                  referralCode: referralCode
                 } }],
               });
             } else {
@@ -400,12 +522,14 @@ const AuthMethodsScreen: React.FC = () => {
       // New user - navigate to verification screen for SMS code
       logger.info('New phone user - navigating to SMS verification', {
         phoneNumber: formattedPhone.substring(0, 5) + '...',
-        verificationId: result.verificationId
+        verificationId: result.verificationId,
+        hasReferralCode: !!referralCode
       }, 'AuthMethodsScreen');
 
       navigation.navigate('Verification', {
         phoneNumber: formattedPhone,
-        verificationId: result.verificationId
+        verificationId: result.verificationId,
+        referralCode: referralCode
       });
     } catch (error) {
       logger.error('Phone authentication failed', { error, phoneNumber: formattedPhone.substring(0, 5) + '...' }, 'AuthMethodsScreen');

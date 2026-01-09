@@ -16,7 +16,6 @@ import {
   centralizedTransactionHandler
 } from '../../services/transactions/CentralizedTransactionHandler';
 import type { TransactionContext, TransactionParams } from '../../services/transactions/types';
-import type { UserContact } from '../../types';
 import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 import { formatWalletAddress } from '../../utils/spend/spendDataUtils';
 
@@ -218,6 +217,9 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
   // Load wallet address on mount
+  const [fallbackBalance, setFallbackBalance] = useState<number | null>(null);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+
   useEffect(() => {
     const loadWalletAddress = async () => {
       if (!currentUser?.id) return;
@@ -227,6 +229,10 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
         const walletInfo = await simplifiedWalletService.getWalletInfo(currentUser.id.toString());
         if (walletInfo) {
           setWalletAddress(walletInfo.address);
+          logger.debug('Wallet address loaded for balance', {
+            userId: currentUser.id,
+            address: walletInfo.address
+          }, 'CentralizedTransactionScreen');
         }
       } catch (error) {
         logger.error('Failed to load wallet address for balance', { userId: currentUser.id, error }, 'CentralizedTransactionScreen');
@@ -244,10 +250,66 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
     }
   );
 
-  // Determine effective balance
-  const effectiveBalance = liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined
-    ? liveBalance.usdcBalance
-    : appWalletBalance;
+  // CRITICAL FIX: Fetch balance as fallback if liveBalance and appWalletBalance are both missing
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setFallbackBalance(null);
+      return;
+    }
+
+    // Only fetch if both liveBalance and appWalletBalance are missing
+    const needsFallback = (liveBalance?.usdcBalance === null || liveBalance?.usdcBalance === undefined) && 
+                          (appWalletBalance === null || appWalletBalance === undefined || appWalletBalance === 0);
+    
+    if (needsFallback && !isLoadingBalance && !fallbackBalance) {
+      setIsLoadingBalance(true);
+      const fetchBalance = async () => {
+        try {
+          const { getUserBalanceWithFallback } = await import('../../services/shared/balanceCheckUtils');
+          const balanceResult = await getUserBalanceWithFallback(currentUser.id.toString(), {
+            useLiveBalance: true,
+            walletAddress: walletAddress || undefined
+          });
+          
+          if (balanceResult.usdcBalance !== null && balanceResult.usdcBalance !== undefined) {
+            setFallbackBalance(balanceResult.usdcBalance);
+            logger.info('Balance fetched as fallback', {
+              userId: currentUser.id,
+              balance: balanceResult.usdcBalance,
+              source: balanceResult.source
+            }, 'CentralizedTransactionScreen');
+          }
+        } catch (error) {
+          logger.error('Failed to fetch fallback balance', {
+            userId: currentUser.id,
+            error: error instanceof Error ? error.message : String(error)
+          }, 'CentralizedTransactionScreen');
+        } finally {
+          setIsLoadingBalance(false);
+        }
+      };
+      
+      fetchBalance();
+    }
+  }, [currentUser?.id, liveBalance?.usdcBalance, appWalletBalance, walletAddress, isLoadingBalance, fallbackBalance]);
+
+  // Determine effective balance with proper fallback chain
+  const effectiveBalance = (() => {
+    // Priority: liveBalance > appWalletBalance > fallbackBalance > 0
+    if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined) {
+      return liveBalance.usdcBalance;
+    }
+    
+    if (appWalletBalance !== null && appWalletBalance !== undefined) {
+      return appWalletBalance;
+    }
+    
+    if (fallbackBalance !== null && fallbackBalance !== undefined) {
+      return fallbackBalance;
+    }
+    
+    return 0;
+  })();
 
   // Determine recipient information
   const getRecipientInfo = () => {

@@ -16,6 +16,7 @@ import {
   getDocs, 
   getDoc, 
   addDoc, 
+  setDoc,
   updateDoc, 
   deleteDoc, 
   query, 
@@ -30,10 +31,11 @@ import {
   runTransaction,
   QueryDocumentSnapshot
 } from 'firebase/firestore';
-import { db } from '../../config/firebase/firebase';
+import { db, auth } from '../../config/firebase/firebase';
 import { notificationService } from '../notifications/notificationService';
 import { logger } from '../analytics/loggingService';
 import { RequestDeduplicator } from '../split/utils/debounceUtils';
+import { onAuthStateChanged } from 'firebase/auth';
 // import { createPaymentRequestNotificationData, validateNotificationData } from '../notifications/notificationDataUtils';
 
 // User data cache to prevent redundant Firebase calls
@@ -44,6 +46,56 @@ interface UserCacheEntry {
 
 const userCache = new Map<string, UserCacheEntry>();
 const USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Wait for Firebase Auth state to be ready
+ * This ensures auth.currentUser is available before creating user documents
+ */
+async function waitForAuthState(timeoutMs: number = 5000): Promise<boolean> {
+  if (!auth) {
+    logger.error('Firebase Auth not initialized', null, 'FirebaseDataService');
+    return false;
+  }
+
+  // If auth state is already available, return immediately
+  if (auth.currentUser) {
+    return true;
+  }
+
+  // Wait for auth state to be restored from AsyncStorage
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(!!user);
+    });
+
+    // Timeout after specified duration
+    setTimeout(() => {
+      unsubscribe();
+      resolve(!!auth.currentUser);
+    }, timeoutMs);
+  });
+}
+
+/**
+ * Verify that the current user's auth token is valid
+ * This ensures the token hasn't expired and is still valid for Firestore operations
+ */
+async function verifyAuthToken(): Promise<boolean> {
+  if (!auth?.currentUser) {
+    return false;
+  }
+
+  try {
+    // Force token refresh to ensure it's valid
+    // This will throw an error if the token is invalid or expired
+    await auth.currentUser.getIdToken(true);
+    return true;
+  } catch (error) {
+    logger.error('Auth token verification failed', { error }, 'FirebaseDataService');
+    return false;
+  }
+}
 
 // Data transformation utilities
 export const firebaseDataTransformers = {
@@ -98,7 +150,10 @@ export const firebaseDataTransformers = {
     active_profile_border: doc.data().active_profile_border || undefined,
     wallet_backgrounds: doc.data().wallet_backgrounds || [],
     active_wallet_background: doc.data().active_wallet_background || undefined,
-    referral_code: doc.data().referral_code || undefined
+    referral_code: doc.data().referral_code || undefined,
+    referred_by: doc.data().referred_by || undefined,
+    referral_count: doc.data().referral_count || 0,
+    referral_code_last_used_at: doc.data().referral_code_last_used_at ? firebaseDataTransformers.timestampToISO(doc.data().referral_code_last_used_at) : undefined
   }),
 
   // Transform User to Firestore data
@@ -143,6 +198,9 @@ export const firebaseDataTransformers = {
     if (user.wallet_backgrounds !== undefined) {data.wallet_backgrounds = user.wallet_backgrounds;}
     if (user.active_wallet_background !== undefined) {data.active_wallet_background = user.active_wallet_background;}
     if (user.referral_code !== undefined) {data.referral_code = user.referral_code;}
+    if (user.referred_by !== undefined) {data.referred_by = user.referred_by;}
+    if (user.referral_count !== undefined) {data.referral_count = user.referral_count;}
+    if (user.referral_code_last_used_at !== undefined) {data.referral_code_last_used_at = user.referral_code_last_used_at ? firebaseDataTransformers.isoToTimestamp(user.referral_code_last_used_at) : null;}
     
     return data;
   },
@@ -361,6 +419,46 @@ export const firebaseDataService = {
 
   createUser: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
       try {
+        // CRITICAL: Wait for Firebase Auth state to be ready
+        // This ensures auth.currentUser is available (may take time to restore from AsyncStorage)
+        const authReady = await waitForAuthState(5000);
+        if (!authReady) {
+          logger.warn('Auth state not ready after waiting, checking currentUser again', null, 'FirebaseDataService');
+        }
+
+        // Get the authenticated user's UID - required for Firestore security rules
+        const currentUser = auth?.currentUser;
+        if (!currentUser || !currentUser.uid) {
+          // If we have a user ID from the app state, try to use it (but verify it matches auth)
+          // This is a fallback for cases where auth state hasn't synced yet
+          const errorMsg = 'User must be authenticated to create a profile. Please sign in first.';
+          logger.error('No authenticated user found', { 
+            hasAuth: !!auth,
+            authReady,
+            currentUser: currentUser ? 'exists' : 'null'
+          }, 'FirebaseDataService');
+          throw new Error(errorMsg);
+        }
+        
+        // CRITICAL: Verify the auth token is valid before making Firestore requests
+        // This ensures the token hasn't expired and will pass Firestore security rules
+        const tokenValid = await verifyAuthToken();
+        if (!tokenValid) {
+          const errorMsg = 'Authentication token is invalid or expired. Please sign in again.';
+          logger.error('Auth token verification failed', { 
+            userId: currentUser.uid,
+            hasAuth: !!auth
+          }, 'FirebaseDataService');
+          throw new Error(errorMsg);
+        }
+        
+        const userId = currentUser.uid;
+        
+        logger.info('Auth verified, creating user document', { 
+          userId,
+          hasToken: true
+        }, 'FirebaseDataService');
+        
         // Ensure points are initialized to 0 if not provided
         const userDataWithPoints = {
           ...userData,
@@ -368,15 +466,19 @@ export const firebaseDataService = {
           total_points_earned: userData.total_points_earned ?? 0
         };
         
-        const userRef = await addDoc(collection(db, 'users'), {
+        // CRITICAL: Use setDoc with the authenticated user's UID as the document ID
+        // This ensures the Firestore security rule (request.auth.uid == userId) is satisfied
+        const userRef = doc(db, 'users', userId);
+        await setDoc(userRef, {
           ...firebaseDataTransformers.userToFirestore(userDataWithPoints),
+          id: userId, // Ensure the id field matches the document ID
           created_at: serverTimestamp()
         });
         
         // CRITICAL: Invalidate cache for new user (though it won't exist yet)
         // Then fetch fresh data
-        const createdUser = await firebaseDataService.user.getCurrentUser(userRef.id);
-        logger.info('User created successfully', { userId: userRef.id }, 'FirebaseDataService');
+        const createdUser = await firebaseDataService.user.getCurrentUser(userId);
+        logger.info('User created successfully', { userId }, 'FirebaseDataService');
         return createdUser;
     } catch (error) {
         logger.error('Failed to create user', { userData, error }, 'FirebaseDataService');
@@ -1254,6 +1356,12 @@ export const userCacheManager = {
     const clearedCount = userCache.size;
     userCache.clear();
     logger.info('User cache cleared', { clearedCount }, 'FirebaseDataService');
+  },
+  invalidateUser: (userId: string) => {
+    const deleted = userCache.delete(userId);
+    if (deleted) {
+      logger.debug('User cache invalidated', { userId }, 'FirebaseDataService');
+    }
   },
   getCacheSize: () => userCache.size,
   cleanup: cleanupUserCache

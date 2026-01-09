@@ -109,7 +109,6 @@ coverage/
 .nyc_output
 
 # Dependency directories
-node_modules/
 jspm_packages/
 
 # Optional npm cache directory
@@ -213,3 +212,5 @@ deadcode-report.json
 # Pipeline testing
 pipeline-test-report.json
 .secrets`
+
+docs/

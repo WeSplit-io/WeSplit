@@ -42,6 +42,8 @@ import { createSpendSplitWallet } from '../../utils/spend/spendWalletUtils';
 import { createMockSpendOrderData } from '../../services/integrations/spend/SpendMockData';
 import { SplitInvitationShare } from '../../components/split';
 import { SplitInvitationService, SplitInvitationData } from '../../services/splits/splitInvitationService';
+import { Linking } from 'react-native';
+import { generateSpendCallbackLink } from '../../services/core/deepLinkHandler';
 
 
 interface SpendSplitScreenProps {
@@ -66,6 +68,7 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
   // Core split state
   const [splitWallet, setSplitWallet] = useState<SplitWallet | null>((existingSplitWallet as SplitWallet) || null);
   const [isSplitConfirmed, setIsSplitConfirmed] = useState(false);
+  const [isCreatingWallet, setIsCreatingWallet] = useState(false);
 
   // UI state
   const [isInitializing, setIsInitializing] = useState(true);
@@ -276,33 +279,12 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
           }
         }
 
-        // Auto-create wallet for SPEND splits if it doesn't exist
-        logger.info('No wallet found for SPEND split, auto-creating wallet', {
+        // Don't auto-create wallet - user must confirm split first (aligned with fair splits)
+        // Wallet will be created when user confirms or when they try to make a payment
+        logger.debug('No wallet found for SPEND split - will be created on user confirmation', {
           splitId: splitData.id,
           billId: splitData.billId,
         }, 'SpendSplitScreen');
-
-        const walletResult = await createSpendSplitWallet(
-          splitData,
-          currentUser.id.toString()
-        );
-
-        if (walletResult.success && walletResult.wallet) {
-          setSplitWallet(walletResult.wallet);
-          setIsSplitConfirmed(true);
-          
-          logger.info('SPEND split wallet auto-created successfully', {
-            splitId: splitData.id,
-            walletId: walletResult.wallet.id,
-            walletAddress: walletResult.wallet.walletAddress,
-          }, 'SpendSplitScreen');
-        } else {
-          logger.error('Failed to auto-create wallet for SPEND split', {
-            splitId: splitData.id,
-            error: walletResult.error,
-          }, 'SpendSplitScreen');
-          setError(walletResult.error || 'Failed to create split wallet');
-        }
       } catch (err) {
         logger.error('Error initializing SPEND split', {
           error: err instanceof Error ? err.message : String(err),
@@ -497,17 +479,13 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
             [{ text: 'OK' }]
           );
 
-          // Trigger automatic payment using centralized transaction handler
-          const { centralizedTransactionHandler } = await import('../../services/transactions/CentralizedTransactionHandler');
-          const paymentResult = await centralizedTransactionHandler.executeTransaction({
-            context: 'spend_split_payment',
-            userId: currentUser?.id || '',
-            amount: wallet.totalAmount,
-            currency: 'USDC',
-            destinationType: 'external',
-            splitId: splitData.id,
-            splitWalletId: wallet.id
-          });
+          // Trigger automatic payment using SpendMerchantPaymentService
+          // This service handles: status updates, idempotency, webhooks, and notifications
+          const { SpendMerchantPaymentService } = await import('../../services/integrations/spend/SpendMerchantPaymentService');
+          const paymentResult = await SpendMerchantPaymentService.processMerchantPayment(
+            splitData.id,
+            wallet.id
+          );
 
           if (paymentResult.success) {
             logger.info('SPEND merchant payment processed successfully', {
@@ -515,11 +493,50 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
               transactionSignature: paymentResult.transactionSignature,
             }, 'SpendSplitScreen');
 
-            Alert.alert(
-              'Payment Sent to SPEND ✅',
-              `Payment of ${wallet.totalAmount} USDC has been sent to SPEND. Your order will be fulfilled shortly.`,
-              [{ text: 'Done' }]
-            );
+            // Check if we should redirect back to Spend app
+            const callbackUrl = splitData.externalMetadata?.callbackUrl;
+            const orderId = splitData.externalMetadata?.orderId;
+
+            if (callbackUrl) {
+              // Generate deep link to return to Spend app
+              const callbackDeepLink = generateSpendCallbackLink(
+                callbackUrl,
+                orderId,
+                'success',
+                `Payment of ${wallet.totalAmount} USDC has been sent to SPEND. Your order will be fulfilled shortly.`
+              );
+
+              Alert.alert(
+                'Payment Sent to SPEND ✅',
+                `Payment of ${wallet.totalAmount} USDC has been sent to SPEND. Your order will be fulfilled shortly.`,
+                [
+                  {
+                    text: 'Return to SPEND',
+                    onPress: () => {
+                      Linking.openURL(callbackDeepLink).catch((error) => {
+                        logger.error('Failed to open Spend callback URL', {
+                          callbackUrl,
+                          error: error instanceof Error ? error.message : String(error)
+                        }, 'SpendSplitScreen');
+                        
+                        // Fallback: try direct URL
+                        Linking.openURL(callbackUrl).catch(() => {
+                          Alert.alert('Redirect Failed', 'Unable to return to SPEND app. Please return manually.');
+                        });
+                      });
+                    }
+                  },
+                  { text: 'Stay in WeSplit', style: 'cancel' }
+                ]
+              );
+            } else {
+              // No callback URL - show standard success message
+              Alert.alert(
+                'Payment Sent to SPEND ✅',
+                `Payment of ${wallet.totalAmount} USDC has been sent to SPEND. Your order will be fulfilled shortly.`,
+                [{ text: 'Done' }]
+              );
+            }
 
             // Reload split data to get updated payment status
             const { SplitStorageService } = await import('../../services/splits');
@@ -633,6 +650,75 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
       setBalanceCheckError('Could not verify balance. You can still attempt to pay.');
     }
   }, [currentUser, liveBalance]);
+
+  // Handle create split wallet (aligned with fair splits)
+  const handleCreateSplitWallet = async () => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    // Check if we already have a split wallet
+    if (splitWallet) {
+      Alert.alert(
+        'Split Wallet Ready!',
+        'Your split wallet is already created. Participants can now send their payments.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (!splitData) {
+      Alert.alert('Error', 'Split data not available');
+      return;
+    }
+
+    setIsCreatingWallet(true);
+
+    try {
+      logger.info('Creating split wallet for SPEND split', {
+        splitId: splitData.id,
+        billId: splitData.billId,
+        creatorId: currentUser.id.toString(),
+      }, 'SpendSplitScreen');
+
+      const walletResult = await createSpendSplitWallet(
+        splitData,
+        currentUser.id.toString()
+      );
+
+      if (walletResult.success && walletResult.wallet) {
+        const newWallet = walletResult.wallet;
+        setSplitWallet(newWallet);
+        setIsSplitConfirmed(true);
+        
+        logger.info('SPEND split wallet created successfully', {
+          splitId: splitData.id,
+          walletId: newWallet.id,
+          walletAddress: newWallet.walletAddress,
+        }, 'SpendSplitScreen');
+
+        Alert.alert(
+          'Split Wallet Created!',
+          'Your split wallet has been created. Participants can now send their payments.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        throw new Error(walletResult.error || 'Failed to create split wallet');
+      }
+    } catch (error) {
+      logger.error('Error creating SPEND split wallet', {
+        error: error instanceof Error ? error.message : String(error),
+        splitId: splitData?.id,
+      }, 'SpendSplitScreen');
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to create split wallet. Please try again.'
+      );
+    } finally {
+      setIsCreatingWallet(false);
+    }
+  };
 
   // Handle send payment button
   const handleSendMyShares = async () => {
@@ -880,6 +966,34 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         </View>
       </ScrollView>
 
+      {/* Create Wallet Button - Show if wallet doesn't exist (aligned with fair splits) */}
+      {!splitWallet && splitData?.creatorId === currentUser?.id?.toString() && (
+        <View style={{
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.md,
+          backgroundColor: colors.black,
+        }}>
+          <Button
+            title={isCreatingWallet ? 'Creating Wallet...' : 'Create Split Wallet'}
+            onPress={handleCreateSplitWallet}
+            disabled={isCreatingWallet}
+            variant="primary"
+            style={{
+              backgroundColor: colors.spendGradientStart,
+            }}
+          />
+          <Text style={{
+            color: colors.white70,
+            fontSize: typography.fontSize.sm,
+            textAlign: 'center',
+            marginTop: spacing.sm,
+            paddingHorizontal: spacing.md,
+          }}>
+            Create a wallet to start collecting payments from participants
+          </Text>
+        </View>
+      )}
+
       {/* Payment Button - Show if user needs to pay */}
       {(() => {
         if (!currentUser || !splitData) return null;
@@ -900,7 +1014,9 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
         // Don't show button if already paid or payment is being processed
         if (isPaid || isSendingPayment) return null;
         
-        // Show button even if wallet doesn't exist yet - it will be created when needed
+        // Only show payment button if wallet exists (aligned with fair splits)
+        if (!splitWallet) return null;
+        
         return (
           <View style={{
             paddingVertical: spacing.md,

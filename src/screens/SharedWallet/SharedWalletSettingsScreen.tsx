@@ -15,6 +15,8 @@ import {
   Switch,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../config/firebase/firebase';
 import * as Clipboard from 'expo-clipboard';
 import { 
   Container, 
@@ -112,7 +114,46 @@ const SharedWalletSettingsScreen: React.FC = () => {
     loadWallet();
   }, [walletId, routeWallet, navigation]);
 
-  // Reload wallet when screen comes into focus
+  // Set up real-time listener for wallet updates
+  useEffect(() => {
+    if (!wallet?.firebaseDocId) return;
+
+    logger.info('Setting up real-time listener for shared wallet settings', {
+      walletId: wallet.id,
+      firebaseDocId: wallet.firebaseDocId
+    }, 'SharedWalletSettingsScreen');
+
+    const walletRef = doc(db, 'sharedWallets', wallet.firebaseDocId);
+    const unsubscribe = onSnapshot(walletRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const updatedWallet = {
+          ...docSnapshot.data(),
+          firebaseDocId: docSnapshot.id,
+        } as SharedWallet;
+
+        logger.info('Real-time wallet settings update received', {
+          walletId: wallet.id,
+          updatedAt: updatedWallet.updatedAt
+        }, 'SharedWalletSettingsScreen');
+
+        setWallet(updatedWallet);
+      }
+    }, (error) => {
+      logger.error('Real-time listener error for shared wallet settings', {
+        walletId: wallet.id,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SharedWalletSettingsScreen');
+    });
+
+    return () => {
+      logger.info('Cleaning up real-time listener for shared wallet settings', {
+        walletId: wallet.id
+      }, 'SharedWalletSettingsScreen');
+      unsubscribe();
+    };
+  }, [wallet?.firebaseDocId, wallet?.id]);
+
+  // Reload wallet when screen comes into focus (fallback if real-time listener fails)
   useFocusEffect(
     useCallback(() => {
       if (wallet?.id) {
@@ -126,9 +167,12 @@ const SharedWalletSettingsScreen: React.FC = () => {
             logger.error('Error reloading wallet on focus', error as LogData, 'SharedWalletSettingsScreen');
           }
         };
+        // Only reload if we don't have a real-time listener set up
+        if (!wallet?.firebaseDocId) {
         reloadWallet();
       }
-    }, [wallet?.id])
+      }
+    }, [wallet?.id, wallet?.firebaseDocId])
   );
 
   // Pre-fetch private key payload for faster retrieval
@@ -389,6 +433,7 @@ const SharedWalletSettingsScreen: React.FC = () => {
           </View>
         </View>
 
+        {isCreator && (
         <View style={styles.sectionGroup}>
           <Text style={styles.sectionHeading}>Goal</Text>
           {!goalAmount ? (
@@ -414,6 +459,25 @@ const SharedWalletSettingsScreen: React.FC = () => {
             </View>
           )}
         </View>
+        )}
+        
+        {/* Show goal as read-only for non-creators */}
+        {!isCreator && goalAmount && (
+          <View style={styles.sectionGroup}>
+            <Text style={styles.sectionHeading}>Goal</Text>
+            <View style={styles.walletCard}>
+              <View style={styles.goalTextBlock}>
+                <Text style={styles.cardLabel}>Goal amount</Text>
+                <Text style={styles.goalValue}>{formatBalance(goalAmount, wallet.currency)}</Text>
+                {wallet.settings?.goalReachedAt && (
+                  <Text style={styles.goalReachedText}>
+                    🎉 Goal reached on {new Date(wallet.settings.goalReachedAt).toLocaleDateString()}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
 
         {isCreator && (
           <View style={styles.sectionGroup}>
@@ -443,6 +507,8 @@ const SharedWalletSettingsScreen: React.FC = () => {
                       if (reloadResult.success && reloadResult.wallet) {
                         setWallet(reloadResult.wallet);
                       }
+                    } else {
+                      Alert.alert('Error', result.error || 'Failed to update setting');
                     }
                   }}
                   trackColor={{ false: colors.white10, true: colors.green }}
@@ -476,6 +542,8 @@ const SharedWalletSettingsScreen: React.FC = () => {
                       if (reloadResult.success && reloadResult.wallet) {
                         setWallet(reloadResult.wallet);
                       }
+                    } else {
+                      Alert.alert('Error', result.error || 'Failed to update setting');
                     }
                   }}
                   trackColor={{ false: colors.white10, true: colors.green }}
@@ -509,6 +577,8 @@ const SharedWalletSettingsScreen: React.FC = () => {
                       if (reloadResult.success && reloadResult.wallet) {
                         setWallet(reloadResult.wallet);
                       }
+                    } else {
+                      Alert.alert('Error', result.error || 'Failed to update setting');
                     }
                   }}
                   trackColor={{ false: colors.white10, true: colors.green }}

@@ -267,17 +267,44 @@ exports.startPhoneAuthentication = functions.runWith({
     const { phoneNumber } = data;
     
     // Validate input
-    if (!phoneNumber) {
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
       throw new functions.https.HttpsError('invalid-argument', 'Phone number is required');
     }
     
+    // Remove whitespace for validation
+    const cleanedPhone = phoneNumber.trim().replace(/\s/g, '');
+    
     // Validate phone number format (E.164)
-    if (!phoneNumber.startsWith('+')) {
-      throw new functions.https.HttpsError('invalid-argument', 'Phone number must be in E.164 format');
+    // E.164 format: ^\+[1-9]\d{1,14}$ - must start with +, country code 1-9, followed by 1-14 digits
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    
+    if (!e164Regex.test(cleanedPhone)) {
+      console.error('❌ Invalid phone number format', {
+        phone: cleanedPhone.substring(0, 10) + '...',
+        length: cleanedPhone.length,
+        startsWithPlus: cleanedPhone.startsWith('+')
+      });
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Phone number must be in valid E.164 format (e.g., +1234567890). Country code must start with 1-9, followed by 1-14 digits.'
+      );
     }
 
+    // Additional validation: minimum and maximum length
+    if (cleanedPhone.length < 8) {
+      throw new functions.https.HttpsError('invalid-argument', 'Phone number is too short. Please include country code and full number.');
+    }
+
+    if (cleanedPhone.length > 16) {
+      throw new functions.https.HttpsError('invalid-argument', 'Phone number is too long. Maximum 15 digits after country code.');
+    }
+
+    // Use cleaned phone number for the rest of the function
+    const validatedPhoneNumber = cleanedPhone;
+
     console.log('📱 Starting server-side phone authentication', {
-      phone: phoneNumber.substring(0, 5) + '...' 
+      phone: validatedPhoneNumber.substring(0, 5) + '...',
+      fullLength: validatedPhoneNumber.length
     });
 
     // Generate a unique session ID for this verification attempt
@@ -286,7 +313,7 @@ exports.startPhoneAuthentication = functions.runWith({
     // Store the session in Firestore with a TTL (time to live)
     const sessionDoc = db.collection('phoneAuthSessions').doc(sessionId);
     await sessionDoc.set({
-      phoneNumber: phoneNumber,
+      phoneNumber: validatedPhoneNumber,
       sessionId: sessionId,
       status: 'pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -317,7 +344,7 @@ exports.startPhoneAuthentication = functions.runWith({
       const message = await twilioClient.messages.create({
         body: `WeSplit verification code: ${verificationCode}`,
         from: process.env.TWILIO_PHONE_NUMBER,
-        to: phoneNumber
+        to: validatedPhoneNumber
       });
 
       console.log('✅ SMS sent successfully via Twilio', {
@@ -335,7 +362,22 @@ exports.startPhoneAuthentication = functions.runWith({
       console.log('✅ Verification code sent and session updated');
 
     } catch (twilioError) {
-      console.error('❌ Twilio SMS sending failed:', twilioError.message);
+      // Enhanced error logging for diagnostics
+      const errorCode = twilioError.code || 'UNKNOWN';
+      const errorMessage = twilioError.message || 'Unknown Twilio error';
+      const errorMoreInfo = twilioError.moreInfo || '';
+      
+      console.error('❌ Twilio SMS sending failed:', {
+        message: errorMessage,
+        code: errorCode,
+        moreInfo: errorMoreInfo,
+        phoneNumber: validatedPhoneNumber.substring(0, 10),
+        phoneLength: validatedPhoneNumber.length,
+        hasSid: !!process.env.TWILIO_SID,
+        hasToken: !!process.env.TWILIO_AUTH_TOKKEN,
+        hasPhone: !!process.env.TWILIO_PHONE_NUMBER,
+        twilioPhone: process.env.TWILIO_PHONE_NUMBER
+      });
 
       // Check if Twilio credentials are configured
       if (!process.env.TWILIO_SID || !process.env.TWILIO_AUTH_TOKKEN || !process.env.TWILIO_PHONE_NUMBER) {
@@ -353,8 +395,55 @@ exports.startPhoneAuthentication = functions.runWith({
         console.log(`📱 TEST CODE for ${phoneNumber}: ${testCode}`);
         console.log('⚠️ Configure TWILIO_SID, TWILIO_AUTH_TOKKEN, and TWILIO_PHONE_NUMBER for real SMS');
       } else {
-        // Re-throw Twilio errors
-        throw twilioError;
+        // Provide more specific error messages based on Twilio error codes
+        let userFriendlyError = 'Failed to send SMS verification code';
+        
+        switch (errorCode) {
+          case 21211:
+            userFriendlyError = 'Invalid phone number format. Please use international format (e.g., +1234567890)';
+            break;
+          case 21214:
+            userFriendlyError = 'Twilio phone number configuration error. Please contact support.';
+            break;
+          case 21608:
+          case 21610:
+          case 21614:
+            userFriendlyError = 'This phone number has opted out of receiving messages.';
+            break;
+          case 20003:
+            userFriendlyError = 'Twilio authentication error. Please contact support.';
+            break;
+          case 30008:
+            userFriendlyError = 'Invalid phone number. Please check the number and try again.';
+            break;
+          case 30003:
+            userFriendlyError = 'Phone number is unreachable. Please try again later.';
+            break;
+          case 20429:
+            userFriendlyError = 'Too many requests. Please wait a moment and try again.';
+            break;
+          default:
+            userFriendlyError = `Failed to send SMS: ${errorMessage}`;
+        }
+
+        // Log detailed error for debugging
+        console.error('📋 Twilio Error Details:', {
+          code: errorCode,
+          message: errorMessage,
+          moreInfo: errorMoreInfo,
+          userFriendlyMessage: userFriendlyError
+        });
+
+        // Throw error with user-friendly message
+        throw new functions.https.HttpsError(
+          'internal',
+          userFriendlyError,
+          {
+            twilioErrorCode: errorCode,
+            twilioErrorMessage: errorMessage,
+            twilioMoreInfo: errorMoreInfo
+          }
+        );
       }
     }
 

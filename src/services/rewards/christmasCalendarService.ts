@@ -254,6 +254,27 @@ class ChristmasCalendarService {
         };
       }
 
+      // Check for community badge bonus BEFORE transaction (can't use async in transaction)
+      let pointsMultiplier = 1;
+      let hasActiveCommunityBadge = false;
+      if (normalizedGift.type === 'points') {
+        try {
+          const { checkActiveCommunityBadge } = await import('./communityBadgeBonusService');
+          const badgeCheck = await checkActiveCommunityBadge(userId);
+          hasActiveCommunityBadge = badgeCheck.hasActiveCommunityBadge;
+          if (hasActiveCommunityBadge) {
+            pointsMultiplier = 2; // Double points
+          }
+        } catch (bonusError) {
+          logger.warn('Failed to check community badge for calendar gift', {
+            userId,
+            day,
+            error: bonusError
+          }, 'ChristmasCalendarService');
+          // Continue with base multiplier if check fails
+        }
+      }
+
       // Use transaction to ensure atomicity
       const result = await runTransaction(db, async (transaction) => {
         // Double-check claim status within transaction
@@ -302,8 +323,12 @@ class ChristmasCalendarService {
 
         if (normalizedGift.type === 'points') {
           const pointsGift = normalizedGift as PointsGift;
-          const newPoints = (userData.points || 0) + pointsGift.amount;
-          const newTotalEarned = (userData.total_points_earned || 0) + pointsGift.amount;
+          
+          // Apply community badge bonus (multiplier calculated before transaction)
+          const finalPointsAmount = pointsGift.amount * pointsMultiplier;
+          
+          const newPoints = (userData.points || 0) + finalPointsAmount;
+          const newTotalEarned = (userData.total_points_earned || 0) + finalPointsAmount;
 
           transaction.update(userRef, {
             points: newPoints,
@@ -397,19 +422,36 @@ class ChristmasCalendarService {
 
       // Record points transaction if points were awarded (outside transaction)
       // NOTE: We only record the transaction here, NOT award points again
-      // Points were already added in the Firestore transaction above (line 323-330)
+      // Points were already added in the Firestore transaction above
       if (result.success && normalizedGift.type === 'points') {
         const pointsGift = normalizedGift as PointsGift;
         try {
+          // Final amount with bonus (multiplier was calculated before transaction)
+          const finalAmount = pointsGift.amount * pointsMultiplier;
+          
           // Only record the transaction, don't award points again (they're already added)
           // Use current season for tracking
           const currentSeason = seasonService.getCurrentSeason();
+          const description = hasActiveCommunityBadge
+            ? `Christmas Calendar Day ${day} - ${giftConfig.title} - Community Badge Bonus: ${pointsMultiplier}x`
+            : `Christmas Calendar Day ${day} - ${giftConfig.title}`;
+          
+          if (hasActiveCommunityBadge) {
+            logger.info('Community badge bonus applied to Christmas calendar gift', {
+              userId,
+              day,
+              baseAmount: pointsGift.amount,
+              finalAmount,
+              multiplier: pointsMultiplier
+            }, 'ChristmasCalendarService');
+          }
+          
           await pointsService.recordPointsTransaction(
             userId,
-            pointsGift.amount,
+            finalAmount,
             'quest_completion',
             `christmas_calendar_${this.YEAR}_day_${day}`,
-            `Christmas Calendar Day ${day} - ${giftConfig.title}`,
+            description,
             currentSeason,
             'christmas_calendar'
           );

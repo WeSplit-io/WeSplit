@@ -14,7 +14,6 @@ import {
   getParticipantStatusDisplayText, 
   getParticipantStatusColor 
 } from '../../../utils/statusUtils';
-import BadgeDisplay from '../../../components/profile/BadgeDisplay';
 import UserNameWithBadges from '../../../components/profile/UserNameWithBadges';
 import { firebaseDataService } from '../../../services/data/firebaseDataService';
 
@@ -42,38 +41,86 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
   splitWallet,
 }) => {
   const [participantBadges, setParticipantBadges] = useState<Record<string, { badges: string[]; active_badge?: string }>>({});
+  const [participantsWithWalletAddresses, setParticipantsWithWalletAddresses] = useState<Participant[]>(participants);
 
-  // Fetch badges for all participants
+  // Fetch badges and wallet addresses for all participants
   useEffect(() => {
-    const fetchBadges = async () => {
+    const fetchParticipantData = async () => {
       const badgesMap: Record<string, { badges: string[]; active_badge?: string }> = {};
+      const updatedParticipants: Participant[] = [];
       
       await Promise.all(
         participants.map(async (participant) => {
           try {
             const userId = participant.userId || participant.id;
-            if (!userId) return;
-            
-            const userData = await firebaseDataService.user.getCurrentUser(userId);
-            if (userData.badges && userData.badges.length > 0) {
-              badgesMap[userId] = {
-                badges: userData.badges,
-                active_badge: userData.active_badge
-              };
+            if (!userId) {
+              updatedParticipants.push(participant);
+              return;
             }
+            
+            // Check if wallet address is missing and try to fetch it
+            let walletAddress = participant.walletAddress || participant.wallet_address || '';
+            
+            // If wallet address is missing, try to get it from splitWallet first
+            if (!walletAddress && splitWallet?.participants) {
+              const walletParticipant = splitWallet.participants.find(
+                (p: any) => p.userId === userId
+              );
+              walletAddress = walletParticipant?.walletAddress || '';
+            }
+            
+            // If still missing, fetch from Firebase
+            if (!walletAddress) {
+              try {
+                const userData = await firebaseDataService.user.getCurrentUser(userId);
+                walletAddress = userData?.wallet_address || userData?.walletAddress || '';
+                
+                // Also fetch badges
+                if (userData.badges && userData.badges.length > 0) {
+                  badgesMap[userId] = {
+                    badges: userData.badges,
+                    active_badge: userData.active_badge
+                  };
+                }
+              } catch (error) {
+                // Silently fail - wallet address and badges are optional
+              }
+            } else {
+              // Wallet address exists, just fetch badges
+              try {
+                const userData = await firebaseDataService.user.getCurrentUser(userId);
+                if (userData.badges && userData.badges.length > 0) {
+                  badgesMap[userId] = {
+                    badges: userData.badges,
+                    active_badge: userData.active_badge
+                  };
+                }
+              } catch (error) {
+                // Silently fail - badges are optional
+              }
+            }
+            
+            updatedParticipants.push({
+              ...participant,
+              walletAddress: walletAddress || participant.walletAddress || participant.wallet_address || '',
+            });
           } catch (error) {
-            // Silently fail - badges are optional
+            // If fetch fails, use original participant data
+            updatedParticipants.push(participant);
           }
         })
       );
       
       setParticipantBadges(badgesMap);
+      setParticipantsWithWalletAddresses(updatedParticipants);
     };
 
     if (participants.length > 0) {
-      fetchBadges();
+      fetchParticipantData();
+    } else {
+      setParticipantsWithWalletAddresses(participants);
     }
-  }, [participants]);
+  }, [participants, splitWallet?.participants]);
 
   return (
     <View style={styles.participantsContainer}>
@@ -82,16 +129,23 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
         showsVerticalScrollIndicator={false}
       >
         
-        {participants.map((participant, index) => {
+        {participantsWithWalletAddresses.map((participant, index) => {
           const userId = participant.userId || participant.id;
           const badges = userId ? participantBadges[userId] : undefined;
-          // Use wallet participant data if available for accurate lock status
+          // Use wallet participant data if available for accurate lock status and wallet address
           const walletParticipant = splitWallet?.participants?.find(
             (p: any) => p.userId === (participant.userId || participant.id)
           );
           const isParticipantLocked = walletParticipant ? 
             walletParticipant.status === 'locked' || walletParticipant.amountPaid >= walletParticipant.amountOwed : 
             false;
+          
+          // CRITICAL FIX: Get wallet address from walletParticipant first (most reliable source),
+          // then fall back to participant prop, then try to fetch from Firebase
+          const walletAddress = walletParticipant?.walletAddress || 
+                                participant.walletAddress || 
+                                participant.wallet_address || 
+                                '';
           
           // Check if this is the current user
           const isCurrentUser = currentUserId && (participant.userId || participant.id) === currentUserId;
@@ -105,8 +159,7 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
                 userId={participant.userId || participant.id}
                 userName={participant.name || `Participant ${index + 1}`}
                 size={40}
-                avatarUrl={participant.avatar}
-                showProfileBorder={false}
+                avatarUrl={participant.avatar || walletParticipant?.avatar}
                 style={{
                   width: 40,
                   height: 40,
@@ -118,21 +171,14 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
               <View style={styles.participantInfo}>
                 <UserNameWithBadges
                   userId={participant.userId || participant.id}
-                  userName={`${participant.name || `Participant ${index + 1}`}${isCurrentUser ? ' (You)' : ''}`}
+                  userName={`${participant.name || walletParticipant?.name || `Participant ${index + 1}`}${isCurrentUser ? ' (You)' : ''}`}
                   textStyle={styles.participantName}
-                  showBadges={true}
+                  showBadges={false}
                 />
-                {badges && badges.badges.length > 0 && badges.active_badge && (
-                  <BadgeDisplay
-                    badges={badges.badges}
-                    activeBadge={badges.active_badge}
-                    showAll={false}
-                  />
-                )}
                 <Text style={styles.participantWallet}>
-                  {participant.walletAddress && participant.walletAddress.length > 8 ? 
-                    `${participant.walletAddress.slice(0, 4)}...${participant.walletAddress.slice(-4)}` : 
-                    participant.walletAddress || 'No wallet address'
+                  {walletAddress && walletAddress.length > 8 ? 
+                    `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : 
+                    walletAddress || 'No wallet address'
                   }
                 </Text>
               </View>

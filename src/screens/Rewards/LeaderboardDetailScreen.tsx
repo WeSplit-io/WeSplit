@@ -14,7 +14,7 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { colors, spacing } from '../../theme';
@@ -32,11 +32,12 @@ import UserNameWithBadges from '../../components/profile/UserNameWithBadges';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
 import { TransactionBasedContactService } from '../../services/contacts/transactionBasedContactService';
+import { badgeService } from '../../services/rewards/badgeService';
 
 type LeaderboardFilter = 'friends' | 'global';
 
 const LeaderboardDetailScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<any>>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
   const { state } = useApp();
   const { currentUser } = state;
@@ -168,9 +169,40 @@ const LeaderboardDetailScreen: React.FC = () => {
     return colors.white10;
   }, []);
 
+  // Helper component to render badges, filtering out community badges
+  const RenderFilteredBadges = useCallback(({ badges, activeBadge }: { badges?: string[], activeBadge?: string }) => {
+    // Don't render if no badges or no active badge
+    if (!badges || badges.length === 0 || !activeBadge) {
+      return null;
+    }
+    
+    // BadgeDisplay already filters out community badges, so we can just use it
+    // The filter happens inside BadgeDisplay after badge info is loaded
+    return (
+      <BadgeDisplay
+        badges={badges}
+        activeBadge={activeBadge}
+        showAll={false}
+      />
+    );
+  }, []);
+
   // Memoize leaderboard slices to prevent recalculation on every render
   const topThree = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
   const restOfLeaderboard = useMemo(() => leaderboard.slice(3), [leaderboard]);
+
+  const handleUserPress = useCallback((userId: string) => {
+    if (!userId) {
+      logger.warn('Cannot navigate: userId is missing', { userId }, 'LeaderboardDetailScreen');
+      return;
+    }
+    try {
+      logger.info('Navigating to user profile', { userId }, 'LeaderboardDetailScreen');
+      navigation.navigate('UserProfile', { userId });
+    } catch (error) {
+      logger.error('Failed to navigate to user profile', { error: error instanceof Error ? error.message : String(error), userId }, 'LeaderboardDetailScreen');
+    }
+  }, [navigation]);
 
   const renderTopThree = () => {
     if (topThree.length === 0) return null;
@@ -179,7 +211,12 @@ const LeaderboardDetailScreen: React.FC = () => {
       <View style={styles.topThreeContainer}>
         {/* 2nd Place (Left) */}
         {topThree[1] && (
-          <View style={[styles.topThreeEntry, styles.secondPlace]}>
+          <TouchableOpacity
+            style={[styles.topThreeEntry, styles.secondPlace]}
+            onPress={() => handleUserPress(topThree[1].user_id)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <View style={styles.avatarWrapper}>
               <Avatar
                 avatarUrl={topThree[1].avatar}
@@ -198,20 +235,19 @@ const LeaderboardDetailScreen: React.FC = () => {
                 showBadges={true}
               />
             </View>
-            {topThree[1].badges && topThree[1].badges.length > 0 && topThree[1].active_badge && (
-              <BadgeDisplay
-                badges={topThree[1].badges}
-                activeBadge={topThree[1].active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={topThree[1].badges} activeBadge={topThree[1].active_badge} />
             <Text style={styles.topThreePoints}>{topThree[1].points} pts</Text>
-          </View>
+          </TouchableOpacity>
         )}
 
         {/* 1st Place (Center) */}
         {topThree[0] && (
-          <View style={[styles.topThreeEntry, styles.firstPlace]}>
+          <TouchableOpacity
+            style={[styles.topThreeEntry, styles.firstPlace]}
+            onPress={() => handleUserPress(topThree[0].user_id)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <View style={styles.crownContainer}>
               <MaskedView
                 style={styles.crownGradientMask}
@@ -246,20 +282,19 @@ const LeaderboardDetailScreen: React.FC = () => {
                 showBadges={true}
               />
             </View>
-            {topThree[0].badges && topThree[0].badges.length > 0 && topThree[0].active_badge && (
-              <BadgeDisplay
-                badges={topThree[0].badges}
-                activeBadge={topThree[0].active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={topThree[0].badges} activeBadge={topThree[0].active_badge} />
             <Text style={styles.topThreePoints}>{topThree[0].points} pts</Text>
-          </View>
+          </TouchableOpacity>
         )}
 
         {/* 3rd Place (Right) */}
         {topThree[2] && (
-          <View style={[styles.topThreeEntry, styles.thirdPlace]}>
+          <TouchableOpacity
+            style={[styles.topThreeEntry, styles.thirdPlace]}
+            onPress={() => handleUserPress(topThree[2].user_id)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <View style={styles.avatarWrapper}>
               <Avatar
                 avatarUrl={topThree[2].avatar}
@@ -278,15 +313,9 @@ const LeaderboardDetailScreen: React.FC = () => {
                 showBadges={true}
               />
             </View>
-            {topThree[2].badges && topThree[2].badges.length > 0 && topThree[2].active_badge && (
-              <BadgeDisplay
-                badges={topThree[2].badges}
-                activeBadge={topThree[2].active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={topThree[2].badges} activeBadge={topThree[2].active_badge} />
             <Text style={styles.topThreePoints}>{topThree[2].points} pts</Text>
-          </View>
+          </TouchableOpacity>
         )}
       </View>
     );
@@ -369,11 +398,14 @@ const LeaderboardDetailScreen: React.FC = () => {
 
     if (isCurrentUser) {
       return (
-        <View
+        <TouchableOpacity
           key={entry.user_id}
           ref={userEntryRef}
           onLayout={handleUserEntryLayout}
           collapsable={false}
+          onPress={() => handleUserPress(entry.user_id)}
+          activeOpacity={0.7}
+          hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
         >
           <LinearGradient
             colors={[colors.gradientStart, colors.gradientEnd] as const}
@@ -409,13 +441,7 @@ const LeaderboardDetailScreen: React.FC = () => {
               ]}
               showBadges={true}
             />
-            {entry.badges && entry.badges.length > 0 && entry.active_badge && (
-              <BadgeDisplay
-                badges={entry.badges}
-                activeBadge={entry.active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={entry.badges} activeBadge={entry.active_badge} />
           </View>
         </View>
 
@@ -428,16 +454,19 @@ const LeaderboardDetailScreen: React.FC = () => {
           {entry.points.toLocaleString()} pts
         </Text>
       </LinearGradient>
-    </View>
+    </TouchableOpacity>
     );
     }
 
     return (
-      <View
+      <TouchableOpacity
         key={entry.user_id}
         style={[
           styles.leaderboardEntry,
         ]}
+        onPress={() => handleUserPress(entry.user_id)}
+        activeOpacity={0.7}
+        hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
       >
         <View style={styles.entryRankContainer}>
           <Text style={styles.entryRank}>{entry.rank}</Text>
@@ -454,20 +483,14 @@ const LeaderboardDetailScreen: React.FC = () => {
               textStyle={styles.entryName}
               showBadges={true}
             />
-            {entry.badges && entry.badges.length > 0 && entry.active_badge && (
-              <BadgeDisplay
-                badges={entry.badges}
-                activeBadge={entry.active_badge}
-                showAll={false}
-              />
-            )}
+            <RenderFilteredBadges badges={entry.badges} activeBadge={entry.active_badge} />
           </View>
         </View>
 
         <Text style={styles.entryPoints}>
           {entry.points.toLocaleString()} pts
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -499,13 +522,7 @@ const LeaderboardDetailScreen: React.FC = () => {
             textStyle={styles.userRankName}
             showBadges={true}
           />
-          {userEntry.badges && userEntry.badges.length > 0 && userEntry.active_badge && (
-            <BadgeDisplay
-              badges={userEntry.badges}
-              activeBadge={userEntry.active_badge}
-              showAll={false}
-            />
-          )}
+          <RenderFilteredBadges badges={userEntry.badges} activeBadge={userEntry.active_badge} />
         </View>
         <Text style={styles.userRankPoints}>{userEntry.points.toLocaleString()} pts</Text>
       </LinearGradient>
@@ -632,6 +649,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     maxWidth: 100,
+    width: '100%',
   },
   firstPlace: {
     marginHorizontal: spacing.sm,
@@ -644,6 +662,7 @@ const styles = StyleSheet.create({
   crownContainer: {
     marginBottom: -15,
     zIndex: 10,
+    pointerEvents: 'none', // Allow touches to pass through to parent TouchableOpacity
   },
   crownGradientMask: {
     width: 34,
@@ -661,6 +680,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     backgroundColor: colors.blackGreen,
     marginTop: -20,
+    pointerEvents: 'none', // Allow touches to pass through to parent TouchableOpacity
   },
   rankBadgeText: {
     fontSize: typography.fontSize.md,
@@ -675,10 +695,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: 'center',
     alignItems: 'center',
+    pointerEvents: 'none', // Allow touches to pass through to parent TouchableOpacity
   },
   topThreeNameContainer: {
     alignItems: 'center',
     marginTop: spacing.xs,
+    pointerEvents: 'none', // Allow touches to pass through to parent TouchableOpacity
   },
   topThreeName: {
     fontSize: typography.fontSize.md,
@@ -691,6 +713,7 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.white,
     textAlign: 'center',
+    pointerEvents: 'none', // Allow touches to pass through to parent TouchableOpacity
   },
   leaderboardList: {
     gap: spacing.sm,
@@ -712,6 +735,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    flex: 1,
+    pointerEvents: 'none', // Allow touches to pass through to parent TouchableOpacity
   },
   entryRank: {
     fontSize: typography.fontSize.md,
@@ -726,6 +751,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   entryInfo: {
+    pointerEvents: 'none', // Allow touches to pass through to parent TouchableOpacity
   },
   entryName: {
     fontSize: typography.fontSize.md,
@@ -740,6 +766,7 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.regular,
     color: colors.white,
+    pointerEvents: 'none', // Allow touches to pass through to parent TouchableOpacity
   },
   entryPointsCurrent: {
     color: colors.black,

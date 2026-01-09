@@ -30,6 +30,7 @@ export interface PendingInvitation {
   timestamp: string;
   expiresAt?: string;
   splitType?: 'fair' | 'degen' | 'spend';
+  email?: string; // Email for prefilling in signup/login
   // Original deep link URL for logging purposes
   originalUrl?: string;
 }

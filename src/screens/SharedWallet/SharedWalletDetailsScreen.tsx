@@ -272,6 +272,17 @@ const SharedWalletDetailsScreen: React.FC = () => {
         setWallet(routeWallet);
         setIsLoadingWallet(false);
         loadTransactions();
+        
+        // CRITICAL FIX: Also load user wallet address when routeWallet is provided
+        if (currentUser?.id) {
+          try {
+            const { consolidatedTransactionService } = await import('../../services/blockchain/transaction');
+            const userWalletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
+            setUserWalletAddress(userWalletAddress || '');
+          } catch (error) {
+            logger.warn('Failed to get user wallet address', { error }, 'SharedWalletDetailsScreen');
+          }
+        }
         return;
       }
 

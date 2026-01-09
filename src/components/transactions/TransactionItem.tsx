@@ -108,7 +108,6 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
             userId={displayUser.userId}
             userName={displayUser.userName}
             size={40}
-            showProfileBorder={false}
             style={styles.avatarStyle}
           />
         ) : (

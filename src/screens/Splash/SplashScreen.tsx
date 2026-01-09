@@ -151,21 +151,43 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
               // Update app context with fresh data
               authenticateUser(transformedUser, 'email');
 
-              // Check if user needs to create a profile (has no name/pseudo)
-              const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+              // Check if user needs to create a profile
+              // A user has a profile if they have a name AND have completed onboarding
+              const hasName = transformedUser.name && transformedUser.name.trim() !== '';
+              const hasCompletedOnboarding = transformedUser.hasCompletedOnboarding === true;
+              
+              logger.info('Checking user profile status on splash', {
+                userId: transformedUser.id,
+                hasName,
+                hasCompletedOnboarding,
+                name: transformedUser.name?.substring(0, 10) + '...',
+                email: transformedUser.email?.substring(0, 10) + '...'
+              }, 'SplashScreen');
 
-              if (needsProfile) {
-                logger.info('User needs to create profile (no name), navigating to CreateProfile', { email: transformedUser.email }, 'SplashScreen');
+              if (!hasName) {
+                // User doesn't have a name - needs to create profile
+                logger.info('User needs to create profile (no name), navigating to CreateProfile', { 
+                  email: transformedUser.email,
+                  userId: transformedUser.id
+                }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('CreateProfile', { email: transformedUser.email });
-              } else if (transformedUser.hasCompletedOnboarding) {
-                logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+              } else if (hasCompletedOnboarding) {
+                // User has name and completed onboarding - go to dashboard
+                logger.info('User completed onboarding, navigating to Dashboard', { 
+                  userId: transformedUser.id,
+                  name: transformedUser.name
+                }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('Dashboard');
               } else {
-                logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+                // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+                logger.info('User needs onboarding, navigating to Dashboard', { 
+                  userId: transformedUser.id,
+                  name: transformedUser.name
+                }, 'SplashScreen');
                 setHasNavigated(true);
-                navigation.replace('Onboarding');
+                navigation.replace('Dashboard');
               }
             } else {
               // User document doesn't exist in Firestore - this shouldn't happen but handle gracefully
@@ -223,21 +245,43 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
               // Update app context with fresh data
               authenticateUser(transformedUser, state.authMethod || 'email');
 
-              // Check if user needs to create a profile (has no name/pseudo)
-              const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+              // Check if user needs to create a profile
+              // A user has a profile if they have a name AND have completed onboarding
+              const hasName = transformedUser.name && transformedUser.name.trim() !== '';
+              const hasCompletedOnboarding = transformedUser.hasCompletedOnboarding === true;
+              
+              logger.info('Checking user profile status on splash (app context)', {
+                userId: transformedUser.id,
+                hasName,
+                hasCompletedOnboarding,
+                name: transformedUser.name?.substring(0, 10) + '...',
+                email: transformedUser.email?.substring(0, 10) + '...'
+              }, 'SplashScreen');
 
-              if (needsProfile) {
-                logger.info('User needs to create profile (no name), navigating to CreateProfile', { email: transformedUser.email }, 'SplashScreen');
+              if (!hasName) {
+                // User doesn't have a name - needs to create profile
+                logger.info('User needs to create profile (no name), navigating to CreateProfile', { 
+                  email: transformedUser.email,
+                  userId: transformedUser.id
+                }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('CreateProfile', { email: transformedUser.email });
-              } else if (transformedUser.hasCompletedOnboarding) {
-                logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+              } else if (hasCompletedOnboarding) {
+                // User has name and completed onboarding - go to dashboard
+                logger.info('User completed onboarding, navigating to Dashboard', { 
+                  userId: transformedUser.id,
+                  name: transformedUser.name
+                }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('Dashboard');
               } else {
-                logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+                // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+                logger.info('User needs onboarding, navigating to Dashboard', { 
+                  userId: transformedUser.id,
+                  name: transformedUser.name
+                }, 'SplashScreen');
                 setHasNavigated(true);
-                navigation.replace('Onboarding');
+                navigation.replace('Dashboard');
               }
             } else {
               // User document not found - use app context data
@@ -270,100 +314,29 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
             }
           }
         } else {
-          // User is not authenticated, check for stored email
-          logger.info('User not authenticated, checking for stored email', null, 'SplashScreen');
+          // User is not authenticated - navigate to login screen
+          // NOTE: We don't auto-authenticate here even if user verified within 30 days
+          // The 30-day check happens in AuthMethodsScreen when user enters their email
+          logger.info('User not authenticated, navigating to login', null, 'SplashScreen');
           
           try {
             const storedEmail = await AuthPersistenceService.loadEmail();
             if (storedEmail) {
-              logger.info('Found stored email, checking verification status', { email: storedEmail }, 'SplashScreen');
-              
-              // Check if user has verified within 30 days
-              const hasVerifiedRecently = await Promise.race([
-                firestoreService.hasVerifiedWithin30Days(storedEmail),
-                new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Verification check timeout')), 10000)
-                )
-              ]) as boolean;
-
-              if (hasVerifiedRecently) {
-                logger.info('User has verified within 30 days, auto-authenticating', { email: storedEmail }, 'SplashScreen');
-                
-                // Get user data from Firestore
-                const usersRef = collection(db, 'users');
-                const q = query(usersRef, where('email', '==', storedEmail));
-                const querySnapshot = await getDocs(q);
-
-                if (!querySnapshot.empty) {
-                  const userDoc = querySnapshot.docs[0];
-                  const userData = userDoc.data();
-
-                  // Check if existing user should skip onboarding
-                  const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
-
-                  // Transform to app user format - include ALL user fields from Firestore
-                  const transformedUser = {
-                    // Spread all Firestore data first
-                    ...userData,
-                    // Then override with critical fields
-                    id: userData.id,
-                    name: userData.name,
-                    email: userData.email,
-                    wallet_address: userData.wallet_address || '',
-                    wallet_public_key: userData.wallet_public_key || '',
-                    created_at: userData.created_at,
-                    avatar: userData.avatar || '',
-                    hasCompletedOnboarding: shouldSkipOnboarding,
-                    // Ensure asset fields are included with proper defaults
-                    badges: userData.badges || [],
-                    active_badge: userData.active_badge || undefined,
-                    profile_assets: userData.profile_assets || [],
-                    active_profile_asset: userData.active_profile_asset || undefined,
-                    profile_borders: userData.profile_borders || [],
-                    active_profile_border: userData.active_profile_border || undefined,
-                    wallet_backgrounds: userData.wallet_backgrounds || [],
-                    active_wallet_background: userData.active_wallet_background || undefined,
-                    points: userData.points || 0,
-                    total_points_earned: userData.total_points_earned || 0,
-                  };
-
-                  // Update the global app context with the authenticated user
-                  authenticateUser(transformedUser, 'email');
-
-                  // Check if user needs to create a profile (has no name/pseudo)
-                  const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-
-                  if (needsProfile) {
-                    logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'SplashScreen');
-                    setHasNavigated(true);
-                    navigation.replace('CreateProfile', { email: transformedUser.email });
-                  } else if (transformedUser.hasCompletedOnboarding) {
-                    logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
-                    setHasNavigated(true);
-                    navigation.replace('Dashboard');
-                  } else {
-                    logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
-                    setHasNavigated(true);
-                    navigation.replace('Onboarding');
-                  }
-                  return;
-                }
-              } else {
-                logger.info('User needs re-verification, navigating to AuthMethods with pre-filled email', null, 'SplashScreen');
-                // Navigate to AuthMethods with the stored email pre-filled
-                setHasNavigated(true);
-                navigation.replace('AuthMethods');
-                return;
-              }
+              logger.info('Found stored email, navigating to AuthMethods with pre-filled email', { email: storedEmail }, 'SplashScreen');
+              // Navigate to AuthMethods with the stored email pre-filled
+              // The 30-day verification check will happen when user clicks "Next"
+              setHasNavigated(true);
+              navigation.replace('AuthMethods');
+              return;
             }
           } catch (error) {
             logger.error('Error checking stored email', { error }, 'SplashScreen');
             // Continue to normal flow if check fails
           }
 
-          // No stored email or verification failed, go through onboarding
+          // No stored email, go through onboarding
           if (__DEV__) {
-            logger.info('No stored email or verification failed, navigating to GetStarted', null, 'SplashScreen');
+            logger.info('No stored email, navigating to GetStarted', null, 'SplashScreen');
           }
           setHasNavigated(true);
           navigation.replace('GetStarted');

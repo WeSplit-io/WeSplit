@@ -13,6 +13,7 @@ import {
   Alert,
   Clipboard,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,6 +28,8 @@ import { logger } from '../../services/analytics/loggingService';
 import { getSeasonReward, calculateRewardPoints } from '../../services/rewards/seasonRewardsConfig';
 import { seasonService } from '../../services/rewards/seasonService';
 import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
+import { generateReferralLink } from '../../services/core/deepLinkHandler';
+import QrCodeView from '../../services/core/QrCodeView';
 
 const ReferralScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
@@ -39,6 +42,7 @@ const ReferralScreen: React.FC = () => {
   const [inviteReward, setInviteReward] = useState(0);
   const [friendSplitReward, setFriendSplitReward] = useState(0);
   const [referralCount, setReferralCount] = useState(0);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   useEffect(() => {
     const season = seasonService.getCurrentSeason();
@@ -68,9 +72,24 @@ const ReferralScreen: React.FC = () => {
           referralCode: code 
         }, 'ReferralScreen');
         
-        // Load referral count
-        const referrals = await referralService.getUserReferrals(currentUser.id);
-        setReferralCount(referrals.length);
+        // Use counter field from user document (faster than querying all referrals)
+        // Fallback to querying if counter is not available (for backward compatibility)
+        if (currentUser.referral_count !== undefined) {
+          setReferralCount(currentUser.referral_count);
+        } else {
+          // Fallback: query referrals if counter not available
+          const referrals = await referralService.getUserReferrals(currentUser.id, currentUser.id);
+          setReferralCount(referrals.length);
+          
+          // Update user document with count for future use
+          try {
+            await firebaseDataService.user.updateUser(currentUser.id, {
+              referral_count: referrals.length
+            });
+          } catch (updateError) {
+            logger.warn('Failed to update referral count (non-critical)', { error: updateError }, 'ReferralScreen');
+          }
+        }
       } catch (error) {
         logger.error('Failed to load referral code', error, 'ReferralScreen');
         // Show error but don't block the screen
@@ -85,7 +104,7 @@ const ReferralScreen: React.FC = () => {
     };
 
     loadReferralData();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.referral_count]);
 
   const handleCopyCode = useCallback(async () => {
     if (!referralCode) return;
@@ -103,7 +122,14 @@ const ReferralScreen: React.FC = () => {
     if (!referralCode) return;
     
     try {
-      const shareMessage = `Join WeSplit and earn points together! Downlaod the app here: https://t.me/+v-e8orBns-llNThk and use my referral code: ${referralCode}`;
+      const referralLink = generateReferralLink(referralCode);
+      const shareMessage = [
+        'Join WeSplit and earn points together!',
+        '1) Download the app: https://t.me/+v-e8orBns-llNThk',
+        `2) Open this link on your phone to apply my referral: ${referralLink}`,
+        '',
+        `Fallback: you can also manually enter my referral code: ${referralCode}`
+      ].join('\n');
       await Share.share({
         message: shareMessage,
         title: 'Invite to WeSplit',
@@ -194,6 +220,10 @@ const ReferralScreen: React.FC = () => {
               <PhosphorIcon name="CopySimple" size={20} color={colors.white} weight="regular" />
               <Text style={styles.actionButtonText}>Copy</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => setShowQRModal(true)}>
+              <PhosphorIcon name="QrCode" size={20} color={colors.white} weight="regular" />
+              <Text style={styles.actionButtonText}>QR Code</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
               <PhosphorIcon name="ShareNetwork" size={20} color={colors.white} weight="regular" />
               <Text style={styles.actionButtonText}>Share</Text>
@@ -240,6 +270,60 @@ const ReferralScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Referral QR Code Modal */}
+      <Modal
+        visible={showQRModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowQRModal(false)}
+        statusBarTranslucent={true}
+      >
+        <View style={styles.qrModalOverlay}>
+          <View style={styles.qrModalContent}>
+            <View style={styles.qrModalHeader}>
+              <Text style={styles.qrModalTitle}>Referral QR Code</Text>
+              <TouchableOpacity
+                onPress={() => setShowQRModal(false)}
+                style={styles.qrModalCloseButton}
+              >
+                <PhosphorIcon name="X" size={24} color={colors.white} weight="bold" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.qrModalDescription}>
+              Scan this QR code to apply the referral automatically
+            </Text>
+
+            {referralCode && (
+              <View style={styles.qrCodeContainer}>
+                <QrCodeView
+                  value={generateReferralLink(referralCode)}
+                  size={250}
+                  backgroundColor={colors.white}
+                  color={colors.black}
+                  showButtons={true}
+                  showCopyButton={true}
+                  showShareButton={true}
+                  copyButtonText="Copy Link"
+                  shareButtonText="Share Link"
+                  onCopy={(text) => {
+                    Alert.alert('Copied!', 'Referral link copied to clipboard');
+                  }}
+                  onShare={(text) => {
+                    handleShare();
+                    setShowQRModal(false);
+                  }}
+                />
+              </View>
+            )}
+
+            <View style={styles.qrModalFooter}>
+              <Text style={styles.qrModalCodeText}>Code: {referralCode}</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Container>
   );
 };
@@ -402,6 +486,57 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     color: colors.black,
+  },
+  qrModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qrModalContent: {
+    backgroundColor: colors.blackWhite5,
+    borderRadius: spacing.radiusLg,
+    padding: spacing.xl,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  qrModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: spacing.md,
+  },
+  qrModalTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+  },
+  qrModalCloseButton: {
+    padding: spacing.xs,
+  },
+  qrModalDescription: {
+    fontSize: typography.fontSize.md,
+    color: colors.white70,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  qrCodeContainer: {
+    backgroundColor: colors.white,
+    borderRadius: spacing.radiusLg,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  qrModalFooter: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  qrModalCodeText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
+    letterSpacing: 2,
   },
 });
 

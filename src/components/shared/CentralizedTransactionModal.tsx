@@ -103,7 +103,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   const effectiveSharedWalletId = config.sharedWalletId || sharedWalletId;
   const effectiveRecipientAddress = config.recipientAddress || recipientAddress;
 
-  // Load wallet address on mount
+  // Load wallet address on mount and when modal becomes visible
   useEffect(() => {
     const loadWalletAddress = async () => {
       if (!currentUser?.id) return;
@@ -113,14 +113,21 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
         const walletInfo = await simplifiedWalletService.getWalletInfo(currentUser.id.toString());
         if (walletInfo) {
           setWalletAddress(walletInfo.address);
+          logger.debug('Wallet address loaded for balance', {
+            userId: currentUser.id,
+            address: walletInfo.address
+          }, 'CentralizedTransactionModal');
         }
       } catch (error) {
         logger.error('Failed to load wallet address for balance', { userId: currentUser.id, error }, 'CentralizedTransactionModal');
       }
     };
 
-    loadWalletAddress();
-  }, [currentUser?.id]);
+    // Load immediately and also when modal becomes visible
+    if (visible || !walletAddress) {
+      loadWalletAddress();
+    }
+  }, [currentUser?.id, visible]);
 
   // Live balance for real-time updates
   const { balance: liveBalance } = useLiveBalance(
@@ -157,6 +164,9 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   // Determine effective balance
   // For withdrawals, we need the shared wallet balance, not the user's wallet balance
   const [sharedWalletBalance, setSharedWalletBalance] = useState<number | null>(null);
+  const [sharedWalletAddress, setSharedWalletAddress] = useState<string | null>(null);
+  const [fallbackBalance, setFallbackBalance] = useState<number | null>(null);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   
   useEffect(() => {
     // Reset balance and address when modal closes or context changes
@@ -196,9 +206,71 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     }
   }, [visible, config.context, effectiveSharedWalletId]);
 
-  const effectiveBalance = liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined
-    ? liveBalance.usdcBalance
-    : appWalletBalance;
+  // CRITICAL FIX: Fetch balance as fallback if liveBalance and appWalletBalance are both missing
+  useEffect(() => {
+    if (!visible || !currentUser?.id) {
+      setFallbackBalance(null);
+      return;
+    }
+
+    // Only fetch if both liveBalance and appWalletBalance are missing
+    const needsFallback = (liveBalance?.usdcBalance === null || liveBalance?.usdcBalance === undefined) && 
+                          (appWalletBalance === null || appWalletBalance === undefined || appWalletBalance === 0);
+    
+    if (needsFallback && !isLoadingBalance && !fallbackBalance) {
+      setIsLoadingBalance(true);
+      const fetchBalance = async () => {
+        try {
+          const { getUserBalanceWithFallback } = await import('../../services/shared/balanceCheckUtils');
+          const balanceResult = await getUserBalanceWithFallback(currentUser.id.toString(), {
+            useLiveBalance: true,
+            walletAddress: walletAddress || undefined
+          });
+          
+          if (balanceResult.usdcBalance !== null && balanceResult.usdcBalance !== undefined) {
+            setFallbackBalance(balanceResult.usdcBalance);
+            logger.info('Balance fetched as fallback', {
+              userId: currentUser.id,
+              balance: balanceResult.usdcBalance,
+              source: balanceResult.source
+            }, 'CentralizedTransactionModal');
+          }
+        } catch (error) {
+          logger.error('Failed to fetch fallback balance', {
+            userId: currentUser.id,
+            error: error instanceof Error ? error.message : String(error)
+          }, 'CentralizedTransactionModal');
+        } finally {
+          setIsLoadingBalance(false);
+        }
+      };
+      
+      fetchBalance();
+    }
+  }, [visible, currentUser?.id, liveBalance?.usdcBalance, appWalletBalance, walletAddress, isLoadingBalance, fallbackBalance]);
+
+  // Determine effective balance with proper fallback chain
+  const effectiveBalance = (() => {
+    // For shared wallet withdrawal, use shared wallet balance
+    if (config.context === 'shared_wallet_withdrawal' && sharedWalletBalance !== null) {
+      return sharedWalletBalance;
+    }
+    
+    // Priority: liveBalance > appWalletBalance > fallbackBalance > 0
+    if (liveBalance?.usdcBalance !== null && liveBalance?.usdcBalance !== undefined) {
+      return liveBalance.usdcBalance;
+    }
+    
+    if (appWalletBalance !== null && appWalletBalance !== undefined) {
+      return appWalletBalance;
+    }
+    
+    if (fallbackBalance !== null && fallbackBalance !== undefined) {
+      return fallbackBalance;
+    }
+    
+    return 0;
+  })();
 
   // Determine recipient information - matching screen logic
   const getRecipientInfo = () => {
@@ -251,7 +323,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
       return {
         name: contactName,
         address: contact.email || '',
-        avatar: contact.avatar || contact.photoURL,
+        avatar: contact.avatar,
         walletAddress: contact.wallet_address,
         type: 'friend' as const
       };
@@ -760,9 +832,6 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     };
   }, [finalRecipientInfo, contact]);
 
-  // Store shared wallet address for display
-  const [sharedWalletAddress, setSharedWalletAddress] = useState<string | null>(null);
-
   // Map wallet info to SendComponent format
   // For withdrawals, show shared wallet info; for other transactions, show user's wallet
   const walletInfo: WalletInfo = useMemo(() => {
@@ -876,7 +945,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             onRecipientChange={config.allowExternalDestinations ? handleRecipientChange : undefined}
             showRecipientChange={false}
             amount={amount}
-            onAmountChange={config.showAmountInput ? handleAmountChange : undefined}
+            onAmountChange={config.showAmountInput ? handleAmountChange : () => {}}
             currency="USDC"
             note={note}
             onNoteChange={config.showMemoInput ? handleNoteChange : undefined}

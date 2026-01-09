@@ -17,10 +17,91 @@ import { pendingInvitationService, PendingInvitation } from './pendingInvitation
 import { firebaseDataService } from '../data/firebaseDataService';
 
 // Universal link domains that we recognize
-const UNIVERSAL_LINK_DOMAINS = ['wesplit.io', 'www.wesplit.io'];
+// Primary: wesplit-deeplinks.web.app (Firebase hosting for deep links)
+// Fallback: wesplit.io (main website domain)
+const UNIVERSAL_LINK_DOMAINS = [
+  'wesplit-deeplinks.web.app',  // Primary deep links website
+  'wesplit.io',                  // Main website (fallback)
+  'www.wesplit.io'               // Main website with www (fallback)
+];
+
+/**
+ * Validate callback URL to prevent malicious redirects
+ * Only allows app-scheme URLs (spend://, https://, http://)
+ * Blocks javascript:, data:, and other dangerous protocols
+ */
+function isValidCallbackUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+
+  try {
+    // For app-scheme URLs (e.g., spend://order/123)
+    if (url.includes('://')) {
+      const protocol = url.split('://')[0].toLowerCase();
+      
+      // Allow app schemes (spend://, custom://, etc.) and HTTP(S)
+      const allowedProtocols = ['http', 'https', 'spend'];
+      const isAllowedProtocol = allowedProtocols.some(p => protocol === p || protocol.startsWith(p + '+'));
+      
+      if (!isAllowedProtocol) {
+        // Block dangerous protocols
+        const dangerousProtocols = ['javascript', 'data', 'vbscript', 'file', 'about'];
+        if (dangerousProtocols.some(p => protocol.includes(p))) {
+          return false;
+        }
+      }
+    }
+
+    // Check for dangerous patterns
+    const dangerousPatterns = [
+      /<script/i,           // Script tags
+      /javascript:/i,        // JavaScript protocol
+      /data:text\/html/i,    // Data URLs with HTML
+      /on\w+\s*=/i,          // Event handlers (onclick, etc.)
+      /&#x?[0-9a-f]+/i,      // HTML entities (potential XSS)
+    ];
+
+    if (dangerousPatterns.some(pattern => pattern.test(url))) {
+      return false;
+    }
+
+    // If it's an HTTP(S) URL, validate it properly
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      try {
+        const urlObj = new URL(url);
+        // Only allow HTTP/HTTPS
+        if (!['http:', 'https:'].includes(urlObj.protocol)) {
+          return false;
+        }
+      } catch {
+        return false;
+      }
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface DeepLinkData {
-  action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split' | 'view-split' | 'wallet-linked' | 'wallet-error';
+  action:
+    | 'join'
+    | 'invite'
+    | 'profile'
+    | 'send'
+    | 'transfer'
+    | 'moonpay-success'
+    | 'moonpay-failure'
+    | 'oauth-callback'
+    | 'join-split'
+    | 'view-split'
+    | 'wallet-linked'
+    | 'wallet-error'
+    | 'referral'
+    | 'spend-callback'
+    | 'phantom-callback'; // Phantom auth callback
   inviteId?: string;
   groupId?: string;
   groupName?: string;
@@ -40,6 +121,19 @@ export interface DeepLinkData {
   walletAddress?: string; // Connected wallet address
   signature?: string; // Wallet signature for verification
   linkingError?: string; // Error message if wallet linking failed
+  // Referral-specific
+  referralCode?: string;
+  // Spend callback-specific
+  callbackUrl?: string; // URL to redirect back to Spend app
+  orderId?: string; // Spend order ID
+  status?: 'success' | 'error' | 'cancelled'; // Callback status
+  message?: string; // Optional message for callback
+  // Phantom callback-specific
+  response_type?: 'success' | 'error'; // Phantom callback response type
+  wallet_id?: string; // Phantom wallet identifier
+  authUserId?: string; // Phantom auth user ID
+  provider?: string; // Social provider (google, apple)
+  error?: string; // Error message from Phantom callback
 }
 
 /**
@@ -284,6 +378,105 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
             linkingError: error || 'Unknown wallet error'
           };
         }
+      case 'referral': {
+        // Referral deep link
+        // App-scheme: wesplit://referral/CODE or wesplit://referral?code=CODE
+        // Universal:  https://wesplit-deeplinks.web.app/referral?code=CODE
+        let code = urlObj.searchParams.get('code');
+
+        if (!code && params[0]) {
+          code = params[0];
+        }
+
+        if (!code) {
+          if (__DEV__) {
+            console.warn('🔥 Referral action missing code parameter');
+          }
+          return null;
+        }
+
+        const normalizedCode = code.trim().toUpperCase();
+
+        return {
+          action: 'referral',
+          referralCode: normalizedCode
+        };
+      }
+
+      case 'spend-callback': {
+        // Spend callback deep link - return to Spend app after payment/action
+        // Format (app-scheme): wesplit://spend-callback?callbackUrl=xxx&orderId=xxx&status=success
+        // Format (universal): https://wesplit-deeplinks.web.app/spend-callback?callbackUrl=xxx&orderId=xxx&status=success
+        const callbackUrl = urlObj.searchParams.get('callbackUrl');
+        const orderId = urlObj.searchParams.get('orderId');
+        const status = urlObj.searchParams.get('status') as 'success' | 'error' | 'cancelled' | null;
+        const message = urlObj.searchParams.get('message');
+
+        if (!callbackUrl) {
+          if (__DEV__) {
+            console.warn('🔥 Spend-callback action missing callbackUrl parameter');
+          }
+          return null;
+        }
+
+        // Validate and sanitize callback URL
+        const decodedCallbackUrl = decodeURIComponent(callbackUrl);
+        if (!isValidCallbackUrl(decodedCallbackUrl)) {
+          logger.warn('Invalid callback URL format', {
+            callbackUrl: decodedCallbackUrl.substring(0, 50) // Log only first 50 chars for security
+          }, 'deepLinkHandler');
+          return null;
+        }
+
+        // Validate status value
+        const validStatus = status && ['success', 'error', 'cancelled'].includes(status) 
+          ? (status as 'success' | 'error' | 'cancelled')
+          : 'success';
+
+        logger.debug('Parsed spend-callback deep link', {
+          hasCallbackUrl: !!callbackUrl,
+          orderId: orderId || undefined,
+          status: validStatus,
+          hasMessage: !!message
+          // Note: Not logging full callbackUrl for security
+        }, 'deepLinkHandler');
+
+        return {
+          action: 'spend-callback',
+          callbackUrl: decodedCallbackUrl,
+          orderId: orderId || undefined,
+          status: validStatus,
+          message: message ? decodeURIComponent(message) : undefined
+        };
+      }
+
+      case 'phantom-callback': {
+        // Phantom auth callback deep link
+        // Format (app-scheme): wesplit://phantom-callback?response_type=success&wallet_id=xxx&authUserId=xxx&provider=google
+        // Format (universal): https://wesplit-deeplinks.web.app/phantom-callback?response_type=success&wallet_id=xxx
+        const response_type = urlObj.searchParams.get('response_type') as 'success' | 'error' | null;
+        const wallet_id = urlObj.searchParams.get('wallet_id');
+        const authUserId = urlObj.searchParams.get('authUserId');
+        const provider = urlObj.searchParams.get('provider');
+        const error = urlObj.searchParams.get('error');
+
+        logger.debug('Parsed phantom-callback deep link', {
+          response_type,
+          hasWalletId: !!wallet_id,
+          hasAuthUserId: !!authUserId,
+          provider,
+          hasError: !!error
+        }, 'deepLinkHandler');
+
+        return {
+          action: 'phantom-callback',
+          response_type: response_type || undefined,
+          wallet_id: wallet_id || undefined,
+          authUserId: authUserId || undefined,
+          provider: provider || undefined,
+          error: error ? decodeURIComponent(error) : undefined
+        };
+      }
       
       default:
         if (__DEV__) {
@@ -618,14 +811,21 @@ export function setupDeepLinkListeners(
             // Store the invitation for processing after authentication
             await pendingInvitationService.storePendingInvitation(invitationData, url);
             
-            // Inform user and redirect to authentication
+            // Extract email from invitation data or URL for prefilling
+            const prefilledEmail = invitationData.email || 
+              (url ? new URL(url).searchParams.get('email') : null);
+            
+            // Inform user and redirect to authentication with prefilled email
             Alert.alert(
               'Sign In Required',
               `You've been invited to join "${invitationData.billName || 'a split'}"!\n\nPlease sign in or create an account to join this split. Your invitation will be waiting for you.`,
               [
                 {
                   text: 'Sign In',
-                  onPress: () => navigation.navigate('AuthMethods'),
+                  onPress: () => navigation.navigate('AuthMethods', {
+                    prefilledEmail: prefilledEmail || undefined,
+                    email: prefilledEmail || undefined,
+                  }),
                 },
               ]
             );
@@ -639,6 +839,7 @@ export function setupDeepLinkListeners(
             shareableLink: url, // Pass the original URL
             splitInvitationData: linkData.splitInvitationData,
             splitId: invitationData.splitId,
+            prefilledEmail: invitationData.email, // Pass email for prefilling if needed
             isFromDeepLink: true
           });
           
@@ -722,6 +923,98 @@ export function setupDeepLinkListeners(
           [{ text: 'OK' }]
         );
         break;
+      
+      case 'referral': {
+        // Referral links are meant for onboarding/new users
+        if (!linkData.referralCode) {
+          if (__DEV__) {
+            console.warn('🔥 Referral deep link missing referralCode');
+          }
+          Alert.alert('Invalid Link', 'This referral link is not valid.');
+          return;
+        }
+
+        // If user is not authenticated, route through auth flow with referralCode
+        if (!currentUser?.id) {
+          logger.info('Received referral deep link for unauthenticated user, navigating to AuthMethods', {
+            referralCode: linkData.referralCode
+          }, 'deepLinkHandler');
+
+          navigation.navigate('AuthMethods', {
+            referralCode: linkData.referralCode
+          } as any);
+          return;
+        }
+
+        // If user is already onboarded, just show info (we don't apply referrals mid-life yet)
+        logger.info('Referral deep link opened by already-authenticated user', {
+          userId: currentUser.id,
+          referralCode: linkData.referralCode
+        }, 'deepLinkHandler');
+
+        Alert.alert(
+          'Referral Link',
+          'Referral codes are applied when creating a new account. You are already signed in, so this link will not change your referral status.',
+          [{ text: 'OK' }]
+        );
+        break;
+      }
+
+      case 'spend-callback': {
+        // Handle returning to Spend app after payment/action completion
+        if (!linkData.callbackUrl) {
+          if (__DEV__) {
+            console.warn('🔥 Missing callbackUrl for spend-callback action');
+          }
+          Alert.alert('Error', 'Invalid callback URL.');
+          return;
+        }
+
+        // Validate callback URL before using it
+        if (!isValidCallbackUrl(linkData.callbackUrl)) {
+          logger.error('Invalid callback URL detected', {
+            orderId: linkData.orderId,
+            status: linkData.status
+            // Note: Not logging callbackUrl for security
+          }, 'deepLinkHandler');
+          Alert.alert('Security Error', 'Invalid callback URL. Please contact support.');
+          return;
+        }
+
+        logger.info('Handling Spend callback redirect', {
+          orderId: linkData.orderId,
+          status: linkData.status,
+          hasCallbackUrl: !!linkData.callbackUrl
+          // Note: Not logging full callbackUrl for security
+        }, 'deepLinkHandler');
+
+        // Try to open the callback URL (Spend app or web)
+        Linking.openURL(linkData.callbackUrl).catch((error) => {
+          logger.error('Failed to open Spend callback URL', {
+            orderId: linkData.orderId,
+            error: error instanceof Error ? error.message : String(error)
+            // Note: Not logging callbackUrl for security
+          }, 'deepLinkHandler');
+          
+          Alert.alert(
+            'Redirect Failed',
+            `Unable to redirect to Spend app. Please return manually.\n\nStatus: ${linkData.status || 'success'}`,
+            [{ text: 'OK' }]
+          );
+        });
+
+        // Show success message if provided
+        if (linkData.status === 'success' && linkData.message) {
+          Alert.alert('Success', linkData.message, [{ text: 'OK' }]);
+        } else if (linkData.status === 'error') {
+          Alert.alert(
+            'Error',
+            linkData.message || 'An error occurred during payment processing.',
+            [{ text: 'OK' }]
+          );
+        }
+        break;
+      }
       
       default:
         if (__DEV__) {
@@ -861,6 +1154,93 @@ export function generateWalletErrorLink(provider?: string, error?: string): stri
 }
 
 /**
+ * Generate a referral deep link (universal link) that can be used in shares/QRs.
+ * Currently targets the deeplinks hosting site: wesplit-deeplinks.web.app
+ */
+export function generateReferralLink(referralCode: string): string {
+  const normalizedCode = referralCode.trim().toUpperCase();
+  const baseUrl = 'https://wesplit-deeplinks.web.app/referral';
+  const params = new URLSearchParams({ code: normalizedCode });
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
+ * Generate a Spend callback deep link to return to Spend app after payment/action
+ * 
+ * @param callbackUrl - The URL to redirect back to Spend app (can be app-scheme or web URL)
+ * @param orderId - Optional Spend order ID
+ * @param status - Callback status: 'success', 'error', or 'cancelled'
+ * @param message - Optional message to display
+ * @returns Deep link URL (app-scheme format)
+ * 
+ * @example
+ * generateSpendCallbackLink(
+ *   'spend://order/123/success',
+ *   'ORD-123',
+ *   'success',
+ *   'Payment completed successfully'
+ * )
+ * 
+ * Note: For universal links, use generateSpendCallbackUniversalLink() instead
+ */
+export function generateSpendCallbackLink(
+  callbackUrl: string,
+  orderId?: string,
+  status: 'success' | 'error' | 'cancelled' = 'success',
+  message?: string
+): string {
+  const baseUrl = 'wesplit://spend-callback';
+  const params = new URLSearchParams({
+    callbackUrl: encodeURIComponent(callbackUrl),
+    status
+  });
+
+  if (orderId) {
+    params.append('orderId', orderId);
+  }
+
+  if (message) {
+    params.append('message', encodeURIComponent(message));
+  }
+
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
+ * Generate a universal link for Spend callback (for web fallback)
+ * Uses the deep links website: wesplit-deeplinks.web.app
+ * 
+ * @param callbackUrl - The URL to redirect back to Spend app
+ * @param orderId - Optional Spend order ID
+ * @param status - Callback status
+ * @param message - Optional message
+ * @returns Universal link URL (https://wesplit-deeplinks.web.app/spend-callback?...)
+ */
+export function generateSpendCallbackUniversalLink(
+  callbackUrl: string,
+  orderId?: string,
+  status: 'success' | 'error' | 'cancelled' = 'success',
+  message?: string
+): string {
+  // Use the deep links website for universal links
+  const baseUrl = 'https://wesplit-deeplinks.web.app/spend-callback';
+  const params = new URLSearchParams({
+    callbackUrl: encodeURIComponent(callbackUrl),
+    status
+  });
+
+  if (orderId) {
+    params.append('orderId', orderId);
+  }
+
+  if (message) {
+    params.append('message', encodeURIComponent(message));
+  }
+
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
  * Test function to verify deep link flow
  * This can be called to test the invitation system
  */
@@ -923,5 +1303,8 @@ export const deepLinkHandler = {
   generateTransferLink,
   generateWalletLinkedLink,
   generateWalletErrorLink,
+  generateReferralLink,
+  generateSpendCallbackLink,
+  generateSpendCallbackUniversalLink,
   testDeepLinkFlow
 }; 

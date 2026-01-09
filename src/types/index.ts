@@ -39,7 +39,9 @@ export interface User {
   points_last_updated?: string; // Timestamp when points were last updated
   is_partnership?: boolean; // Partnership status for enhanced rewards
   referral_code?: string; // User's referral code
-  referred_by?: string; // User ID who referred this user
+  referred_by?: string; // User ID who referred this user (internal tracking only, not displayed)
+  referral_count?: number; // Total number of successful referrals (for referring user)
+  referral_code_last_used_at?: string; // Timestamp when referral code was last used
   
   // Christmas calendar rewards
   badges?: string[]; // Array of badge IDs earned

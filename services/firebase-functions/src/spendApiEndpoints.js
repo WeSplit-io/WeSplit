@@ -509,12 +509,80 @@ exports.payParticipantShare = functions.https.onRequest(async (req, res) => {
         newSplitStatus = 'funded';
       }
       
-      // Save updates
+      // Save updates to splits collection
       await splitDoc.ref.update({
         participants: updatedParticipants,
         status: newSplitStatus,
         updatedAt: FieldValue.serverTimestamp()
       });
+      
+      // CRITICAL: Also update splitWallets collection to keep data in sync
+      // The app's funding check uses splitWallets, so both must be updated
+      if (splitData.billId) {
+        try {
+          const splitWalletsRef = db.collection('splitWallets');
+          const walletQuery = await splitWalletsRef
+            .where('billId', '==', splitData.billId)
+            .limit(1)
+            .get();
+          
+          if (!walletQuery.empty) {
+            const walletDoc = walletQuery.docs[0];
+            const walletData = walletDoc.data();
+            const walletParticipants = walletData.participants || [];
+            
+            // Find and update the participant in split wallet
+            const walletParticipantIndex = walletParticipants.findIndex(
+              (p) => p.userId === participantId || p.id === participantId
+            );
+            
+            if (walletParticipantIndex !== -1) {
+              const walletParticipant = walletParticipants[walletParticipantIndex];
+              const updatedWalletParticipants = [...walletParticipants];
+              updatedWalletParticipants[walletParticipantIndex] = {
+                ...walletParticipant,
+                amountPaid: newAmountPaid,
+                status: newStatus === 'paid' ? 'paid' : (newStatus === 'partial' ? 'pending' : walletParticipant.status),
+                transactionSignature: transactionSignature || walletParticipant.transactionSignature,
+                paidAt: newStatus === 'paid' ? new Date().toISOString() : (walletParticipant.paidAt || null)
+              };
+              
+              await walletDoc.ref.update({
+                participants: updatedWalletParticipants,
+                updatedAt: FieldValue.serverTimestamp()
+              });
+              
+              console.log('✅ Updated split wallet participants to match splits collection', {
+                splitId: splitData.id,
+                billId: splitData.billId,
+                walletId: walletDoc.id,
+                participantId,
+                amountPaid: newAmountPaid
+              });
+            } else {
+              console.warn('⚠️ Participant not found in split wallet', {
+                splitId: splitData.id,
+                billId: splitData.billId,
+                participantId,
+                walletParticipants: walletParticipants.map((p) => ({ userId: p.userId, id: p.id }))
+              });
+            }
+          } else {
+            console.warn('⚠️ Split wallet not found for billId', {
+              splitId: splitData.id,
+              billId: splitData.billId
+            });
+            // This is OK - wallet might not be created yet (will be created when user opens app)
+          }
+        } catch (walletUpdateError) {
+          console.error('❌ Error updating split wallet (non-critical):', {
+            error: walletUpdateError instanceof Error ? walletUpdateError.message : String(walletUpdateError),
+            splitId: splitData.id,
+            billId: splitData.billId
+          });
+          // Don't fail the payment if wallet update fails - splits collection is the source of truth
+        }
+      }
       
       // Send webhook notification
       await sendWebhookNotification(splitData, 'split.participant_paid', {
@@ -540,14 +608,36 @@ exports.payParticipantShare = functions.https.onRequest(async (req, res) => {
         });
       }
       
-      return res.status(200).json({
+      // Build response with optional deep link for redirect
+      const response = {
         success: true,
         transactionSignature: transactionSignature || null,
         amountPaid: newAmountPaid,
         remainingAmount: remainingAmount,
         splitStatus: newSplitStatus,
         isFullyFunded: isFullyFunded
-      });
+      };
+
+      // If split has external metadata with callback URL, include deep link
+      if (splitData.externalMetadata?.callbackUrl) {
+        const callbackUrl = splitData.externalMetadata.callbackUrl;
+        const orderId = splitData.externalMetadata.orderId;
+        
+        // Generate deep link to return to Spend app
+        const deepLinkParams = new URLSearchParams({
+          callbackUrl: encodeURIComponent(callbackUrl),
+          status: 'success'
+        });
+        
+        if (orderId) {
+          deepLinkParams.append('orderId', orderId);
+        }
+        
+        response.deepLink = `wesplit://spend-callback?${deepLinkParams.toString()}`;
+        response.redirectUrl = callbackUrl; // Also include direct redirect URL
+      }
+
+      return res.status(200).json(response);
       
     } catch (error) {
       console.error('Error in payParticipantShare:', error);
@@ -867,7 +957,7 @@ exports.searchKnownUsers = functions.https.onRequest(async (req, res) => {
  *       {
  *         "email": "user2@example.com",
  *         "inviteCode": "INV_abc123",
- *         "inviteLink": "https://wesplit.io/join-split?invite=INV_abc123"
+ *         "inviteLink": "https://wesplit-deeplinks.web.app/join-split?invite=INV_abc123"
  *       }
  *     ]
  *   },
@@ -963,10 +1053,12 @@ exports.matchUsersByEmail = functions.https.onRequest(async (req, res) => {
           } else {
             // User exists but opted out - treat as "new" for privacy
             // but mark as needing consent
+            // Note: For matchUsersByEmail, we don't have full split data yet
+            // Generate minimal invite link (will be regenerated in batchInviteParticipants)
             newUsers.push({
               email: email,
               needsConsent: true,
-              inviteLink: generateInviteLinkSync(email, splitId)
+              inviteLink: generateInviteLinkSync(email, splitId, null, creatorId, null)
             });
           }
         });
@@ -974,9 +1066,11 @@ exports.matchUsersByEmail = functions.https.onRequest(async (req, res) => {
         // Add non-found emails as new users
         batch.forEach(email => {
           if (!foundEmails.has(email)) {
+            // Note: For matchUsersByEmail, we don't have full split data yet
+            // Generate minimal invite link (will be regenerated in batchInviteParticipants)
             newUsers.push({
               email: email,
-              inviteLink: generateInviteLinkSync(email, splitId)
+              inviteLink: generateInviteLinkSync(email, splitId, null, creatorId, null)
             });
           }
         });
@@ -1035,22 +1129,41 @@ exports.matchUsersByEmail = functions.https.onRequest(async (req, res) => {
 
 /**
  * Generate invite link synchronously (for non-users)
+ * Creates full invitation data structure that matches PendingInvitation interface
+ * 
+ * @param {string} email - Participant email
+ * @param {string} splitId - Split ID
+ * @param {object} splitData - Full split data (optional, for matchUsersByEmail)
+ * @param {string} inviterId - Inviter user ID (optional)
+ * @param {string} inviterName - Inviter name (optional)
  */
-function generateInviteLinkSync(email, splitId) {
+function generateInviteLinkSync(email, splitId, splitData = null, inviterId = null, inviterName = null) {
+  // Build invitation data matching PendingInvitation interface
   const inviteData = {
-    email: email,
+    type: 'split_invitation',
     splitId: splitId || null,
-    timestamp: Date.now()
+    billName: splitData?.title || 'Split',
+    totalAmount: splitData?.totalAmount || 0,
+    currency: splitData?.currency || 'USDC',
+    creatorId: inviterId || splitData?.creatorId || '',
+    creatorName: inviterName || splitData?.creatorName || 'Someone',
+    timestamp: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+    splitType: splitData?.splitType || 'spend',
+    email: email || null // Include email for prefilling in app
   };
   const encoded = Buffer.from(JSON.stringify(inviteData)).toString('base64url');
-  return `https://wesplit.io/join-split?invite=${encoded}`;
+  // Use deep link domain for universal links (works for all users)
+  // Also include email as query parameter for easy access
+  return `https://wesplit-deeplinks.web.app/join-split?invite=${encoded}&email=${encodeURIComponent(email || '')}`;
 }
 
 /**
  * Generate invite link (async version)
+ * Note: This is a legacy function. Use generateInviteLinkSync with full parameters instead.
  */
-async function generateInviteLink(email, splitId) {
-  return generateInviteLinkSync(email, splitId);
+async function generateInviteLink(email, splitId, splitData = null, inviterId = null, inviterName = null) {
+  return generateInviteLinkSync(email, splitId, splitData, inviterId, inviterName);
 }
 
 /**
@@ -1126,41 +1239,89 @@ async function sendEmailInvitation(email, inviterName, splitTitle, amountOwed, c
     const transporter = createEmailTransporter();
     
     if (!transporter) {
-      console.warn('Email transporter not available, skipping email send');
-      return { sent: false, reason: 'Email service not configured' };
+      const hasEmailUser = !!process.env.EMAIL_USER;
+      const hasEmailPassword = !!process.env.EMAIL_PASSWORD;
+      console.error('❌ Email transporter not available', {
+        hasEmailUser,
+        hasEmailPassword,
+        emailUserLength: process.env.EMAIL_USER?.length || 0,
+        emailPasswordLength: process.env.EMAIL_PASSWORD?.length || 0
+      });
+      return { 
+        sent: false, 
+        reason: 'Email service not configured',
+        error: hasEmailUser && hasEmailPassword ? 'Transporter creation failed' : 'Missing EMAIL_USER or EMAIL_PASSWORD secrets'
+      };
     }
 
     // Verify transporter connection
     try {
       await transporter.verify();
+      console.log('✅ Email transporter verified successfully');
     } catch (verifyError) {
-      console.error('Email transporter verification failed:', verifyError.message);
-      return { sent: false, reason: 'Email service authentication failed' };
+      console.error('❌ Email transporter verification failed:', {
+        error: verifyError.message,
+        code: verifyError.code,
+        command: verifyError.command,
+        response: verifyError.response,
+        responseCode: verifyError.responseCode
+      });
+      return { 
+        sent: false, 
+        reason: 'Email service authentication failed',
+        error: verifyError.message,
+        code: verifyError.code
+      };
     }
 
     const emailUser = process.env.EMAIL_USER?.trim();
+    if (!emailUser) {
+      return { 
+        sent: false, 
+        reason: 'EMAIL_USER secret not set',
+        error: 'EMAIL_USER environment variable is empty'
+      };
+    }
+
     const mailOptions = {
-      from: emailUser || 'noreply@wesplit.app',
+      from: emailUser,
       to: email,
       subject: `${inviterName} invited you to split "${splitTitle}" on WeSplit`,
       html: generateSplitInvitationEmailTemplate(inviterName, splitTitle, amountOwed, currency, inviteLink)
     };
 
+    console.log('📧 Attempting to send email invitation', {
+      from: emailUser,
+      to: email,
+      splitTitle
+    });
+
     const info = await transporter.sendMail(mailOptions);
     console.log('✅ Split invitation email sent successfully:', {
       messageId: info.messageId,
       to: email,
-      splitTitle
+      splitTitle,
+      accepted: info.accepted,
+      rejected: info.rejected
     });
 
     return { sent: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Error sending split invitation email:', {
       error: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
       email,
       splitTitle
     });
-    return { sent: false, reason: error.message };
+    return { 
+      sent: false, 
+      reason: error.message || 'Unknown error',
+      error: error.message,
+      code: error.code
+    };
   }
 }
 
@@ -1191,7 +1352,9 @@ async function sendEmailInvitation(email, inviterName, splitTitle, amountOwed, c
  *   "sendNotifications": true  // Optional, default true
  * }
  */
-exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => {
+exports.batchInviteParticipants = functions.runWith({
+  secrets: ['EMAIL_USER', 'EMAIL_PASSWORD']
+}).https.onRequest(async (req, res) => {
   return cors(req, res, async () => {
     try {
       // Only allow POST
@@ -1241,7 +1404,8 @@ exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => 
         addedExisting: [],      // Existing users added directly to split
         pendingInvites: [],     // New users - pending account creation
         alreadyParticipant: [], // Already in the split
-        failed: []              // Failed invitations
+        failed: [],             // Failed invitations
+        emailStatus: []         // Email sending status for each participant
       };
       
       // Process each participant
@@ -1311,7 +1475,7 @@ exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => 
           // TODO: Send push notification to user
           
         } else {
-          // New user - create pending invitation
+          // New user - create pending invitation AND add to split participants
           const pendingInvite = {
             splitId: splitId,
             email: email,
@@ -1330,7 +1494,35 @@ exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => 
           // Store pending invitation
           await db.collection('pending_invitations').add(pendingInvite);
           
-          const inviteLink = generateInviteLinkSync(email, splitId);
+          // CRITICAL: Add to split participants array so they show in UI
+          // Use email as temporary ID until user joins
+          const invitedParticipant = {
+            userId: null, // Will be set when user joins
+            email: email,
+            name: participant.name || email.split('@')[0],
+            walletAddress: '', // Will be set when user joins
+            amountOwed: amountOwed,
+            amountPaid: 0,
+            status: 'invited', // Status: invited (pending acceptance)
+            avatar: '',
+            invitedAt: new Date().toISOString(),
+            invitedBy: inviterId
+          };
+          
+          // Add to split participants array
+          await splitDoc.ref.update({
+            participants: FieldValue.arrayUnion(invitedParticipant),
+            updatedAt: FieldValue.serverTimestamp()
+          });
+          
+          // Generate invite link with full invitation data
+          const inviteLink = generateInviteLinkSync(
+            email, 
+            splitId, 
+            splitData, 
+            inviterId, 
+            inviterName
+          );
           
           results.pendingInvites.push({
             email: email,
@@ -1350,14 +1542,39 @@ exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => 
               inviteLink
             );
             
+            // Track email status
+            results.emailStatus.push({
+              email: email,
+              sent: emailResult.sent,
+              reason: emailResult.reason || (emailResult.sent ? 'success' : 'unknown'),
+              messageId: emailResult.messageId || null,
+              error: emailResult.error || null
+            });
+            
             if (!emailResult.sent) {
-              console.warn('Failed to send email invitation', {
+              console.error('❌ Failed to send email invitation', {
                 email,
                 reason: emailResult.reason,
-                splitId
-          });
+                error: emailResult.error,
+                splitId,
+                hasEmailUser: !!process.env.EMAIL_USER,
+                hasEmailPassword: !!process.env.EMAIL_PASSWORD
+              });
               // Don't fail the invitation if email fails - log and continue
+            } else {
+              console.log('✅ Email invitation sent successfully', {
+                email,
+                messageId: emailResult.messageId,
+                splitId
+              });
             }
+          } else {
+            // Track that email was skipped
+            results.emailStatus.push({
+              email: email,
+              sent: false,
+              reason: 'notifications_disabled'
+            });
           }
         }
       }
@@ -1375,16 +1592,47 @@ exports.batchInviteParticipants = functions.https.onRequest(async (req, res) => 
         }
       }
       
-      return res.status(200).json({
+      // Calculate email statistics
+      const emailStats = {
+        total: results.emailStatus.length,
+        sent: results.emailStatus.filter(e => e.sent).length,
+        failed: results.emailStatus.filter(e => !e.sent && e.reason !== 'notifications_disabled').length,
+        skipped: results.emailStatus.filter(e => e.reason === 'notifications_disabled').length
+      };
+      
+      // Build response with optional deep link for redirect
+      const response = {
         success: true,
         results: results,
         summary: {
+          total: participants.length, // Total participants in request
           addedExisting: results.addedExisting.length,
           pendingInvites: results.pendingInvites.length,
           alreadyParticipant: results.alreadyParticipant.length,
-          failed: results.failed.length
+          failed: results.failed.length,
+          emailStatus: emailStats
         }
-      });
+      };
+
+      // If split has external metadata with callback URL, include deep link
+      if (splitData.externalMetadata?.callbackUrl) {
+        const callbackUrl = splitData.externalMetadata.callbackUrl;
+        const orderId = splitData.externalMetadata.orderId;
+        
+        // Generate deep link to view split in WeSplit app
+        const viewSplitParams = new URLSearchParams({
+          splitId: splitId
+        });
+        
+        if (splitData.creatorId) {
+          viewSplitParams.append('userId', splitData.creatorId);
+        }
+        
+        response.deepLink = `wesplit://view-split?${viewSplitParams.toString()}`;
+        response.redirectUrl = callbackUrl; // Also include direct redirect URL
+      }
+
+      return res.status(200).json(response);
       
     } catch (error) {
       console.error('Error in batchInviteParticipants:', error);

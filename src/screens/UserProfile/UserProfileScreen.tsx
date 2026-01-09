@@ -27,7 +27,7 @@ import { logger } from '../../services/analytics/loggingService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { badgeService } from '../../services/rewards/badgeService';
 import { userInteractionService, UserInteraction } from '../../services/user/userInteractionService';
-import { getBadgeInfo } from '../../services/rewards/badgeConfig';
+// Badge info is already included in claimedBadges from badgeService
 import { getAssetInfo } from '../../services/rewards/assetConfig';
 import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
@@ -51,7 +51,8 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [claimedBadges, setClaimedBadges] = useState<any[]>([]);
-  const [communityBadges, setCommunityBadges] = useState<any[]>([]);
+  // Community badges are disabled - not loading or displaying them
+  const [communityBadges] = useState<any[]>([]);
   const [interactions, setInteractions] = useState<UserInteraction[]>([]);
   const [loadingInteractions, setLoadingInteractions] = useState(false);
   const [profileBorderUrl, setProfileBorderUrl] = useState<string | null>(null);
@@ -419,21 +420,12 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
               size={110}
               avatarUrl={profileUser.avatar}
               style={styles.avatar}
-              borderImageUrl={profileBorderUrl || undefined}
             />
           </View>
           <View style={styles.nameContainer}>
             <View style={styles.nameRow}>
               <Text style={styles.userName}>{displayName}</Text>
-              {communityBadges.map((badge) => (
-                <CommunityBadge
-                  key={badge.badgeId}
-                  icon={badge.icon}
-                  iconUrl={badge.imageUrl}
-                  title={badge.title}
-                  size={24}
-                />
-              ))}
+              {/* Community badges are disabled - not displaying them */}
             </View>
             <Text style={styles.userId}>{displayId}</Text>
           </View>
@@ -466,29 +458,36 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
             <Text style={styles.sectionTitle}>Badges</Text>
             {claimedBadges.length > 0 ? (
               <View style={styles.badgesGrid}>
-                {claimedBadges.map((badge) => {
-                  const badgeInfo = getBadgeInfo(badge.badgeId);
-                  if (!badgeInfo) return null;
+                {claimedBadges
+                  .filter((badge) => {
+                    // Filter out community badges - they should not be displayed with labels
+                    // Community badges are shown via CommunityBadge component next to names
+                    return badge && !badge.isCommunityBadge;
+                  })
+                  .map((badge) => {
+                    // Badge data is already included from badgeService.getUserClaimedBadges
+                    // It includes title, icon, imageUrl from database
+                    if (!badge) return null;
 
-                  return (
-                    <View key={badge.badgeId} style={styles.badgeCardWrapper}>
-                      <View style={styles.badgeCard}>
-                        {badge.imageUrl ? (
-                          <Image
-                            source={{ uri: badge.imageUrl }}
-                            style={styles.badgeImage}
-                            resizeMode="contain"
-                          />
-                        ) : (
-                          <Text style={styles.badgeIcon}>{badge.icon}</Text>
-                        )}
-                        <Text style={styles.badgeTitle} numberOfLines={1}>
-                          {badge.title}
-                        </Text>
+                    return (
+                      <View key={badge.badgeId} style={styles.badgeCardWrapper}>
+                        <View style={styles.badgeCard}>
+                          {badge.imageUrl && badge.imageUrl.startsWith('http') ? (
+                            <Image
+                              source={{ uri: badge.imageUrl }}
+                              style={styles.badgeImage}
+                              resizeMode="contain"
+                            />
+                          ) : badge.icon ? (
+                            <Text style={styles.badgeIcon}>{badge.icon}</Text>
+                          ) : null}
+                          <Text style={styles.badgeTitle} numberOfLines={1}>
+                            {badge.title || badge.badgeId}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  );
-                })}
+                    );
+                  })}
               </View>
             ) : (
               <View style={styles.emptyState}>

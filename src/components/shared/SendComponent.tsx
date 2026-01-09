@@ -197,8 +197,6 @@ const SendComponent: React.FC<SendComponentProps> = ({
               size={48}
               avatarUrl={recipient.avatarUrl}
               style={styles.recipientAvatar}
-              showBorder={false}
-              showProfileBorder={false}
             />
           ) : recipient.icon ? (
             <View style={[styles.recipientIcon, { backgroundColor: (recipient.iconColor || colors.green) + '30' }]}>

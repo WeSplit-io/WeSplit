@@ -255,11 +255,14 @@ const VerificationScreen: React.FC = () => {
           const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
           if (needsProfile) {
+            // Preserve referral code from route params
+            const referralCode = route.params?.referralCode;
             (navigation as any).reset({
               index: 0,
               routes: [{ name: 'CreateProfile', params: {
                 email: transformedUser.email,
-                phoneNumber: transformedUser.phone
+                phoneNumber: transformedUser.phone,
+                referralCode: referralCode
               } }],
             });
           } else {
@@ -330,16 +333,20 @@ const VerificationScreen: React.FC = () => {
               const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
               if (needsProfile) {
+                // Preserve referral code from route params
+                const referralCode = route.params?.referralCode;
                 logger.info('User needs to create profile (no name), navigating to CreateProfile', {
                   method: route.params?.phoneNumber ? 'phone' : 'email',
                   phoneNumber: transformedUser.phone,
-                  email: transformedUser.email
+                  email: transformedUser.email,
+                  hasReferralCode: !!referralCode
                 }, 'VerificationScreen');
                 (navigation as any).reset({
                   index: 0,
                   routes: [{ name: 'CreateProfile', params: {
                     email: transformedUser.email,
-                    phoneNumber: transformedUser.phone
+                    phoneNumber: transformedUser.phone,
+                    referralCode: referralCode
                   } }],
                 });
               } else {
@@ -403,12 +410,18 @@ const VerificationScreen: React.FC = () => {
               const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
               if (needsProfile) {
-                logger.info('Phone user needs to create profile (no name, fallback case), navigating to CreateProfile', { phoneNumber: transformedUser.phone }, 'VerificationScreen');
+                // Preserve referral code from route params
+                const referralCode = route.params?.referralCode;
+                logger.info('Phone user needs to create profile (no name, fallback case), navigating to CreateProfile', { 
+                  phoneNumber: transformedUser.phone,
+                  hasReferralCode: !!referralCode
+                }, 'VerificationScreen');
                 (navigation as any).reset({
                   index: 0,
                   routes: [{ name: 'CreateProfile', params: {
                     phoneNumber: transformedUser.phone,
-                    email: transformedUser.email
+                    email: transformedUser.email,
+                    referralCode: referralCode
                   } }],
                 });
               } else {
@@ -478,12 +491,18 @@ const VerificationScreen: React.FC = () => {
             const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
             if (needsProfile) {
-              logger.info('Phone user needs to create profile (no name, Firestore error fallback), navigating to CreateProfile', { phoneNumber: transformedUser.phone }, 'VerificationScreen');
+              // Preserve referral code from route params
+              const referralCode = route.params?.referralCode;
+              logger.info('Phone user needs to create profile (no name, Firestore error fallback), navigating to CreateProfile', { 
+                phoneNumber: transformedUser.phone,
+                hasReferralCode: !!referralCode
+              }, 'VerificationScreen');
               (navigation as any).reset({
                 index: 0,
                 routes: [{ name: 'CreateProfile', params: {
                   phoneNumber: transformedUser.phone,
-                  email: transformedUser.email
+                  email: transformedUser.email,
+                  referralCode: referralCode
                 } }],
               });
             } else {
@@ -511,19 +530,57 @@ const VerificationScreen: React.FC = () => {
       if (__DEV__) { logger.info('Authentication successful', { user: authResponse.user }, 'VerificationScreen'); }
       
       // CRITICAL: Sign user into Firebase Auth using custom token if available
-      // This ensures auth.currentUser is set, which is required for phone linking
+      // This ensures auth.currentUser is set, which is required for Firestore operations
       if (authResponse.customToken) {
         try {
-          const { signInWithCustomToken } = await import('firebase/auth');
+          const { signInWithCustomToken, onAuthStateChanged } = await import('firebase/auth');
           const { auth } = await import('../../config/firebase/firebase');
+          
+          // Sign in with custom token
           await signInWithCustomToken(auth, authResponse.customToken);
-          if (__DEV__) { logger.info('✅ Signed in to Firebase Auth with custom token', null, 'VerificationScreen'); }
+          logger.info('✅ Signed in to Firebase Auth with custom token', null, 'VerificationScreen');
+          
+          // CRITICAL: Wait for auth state to propagate before accessing Firestore
+          // This ensures Firestore security rules recognize the authenticated user
+          const authReady = await new Promise<boolean>((resolve) => {
+            if (auth.currentUser && auth.currentUser.uid === authResponse.user.id) {
+              resolve(true);
+              return;
+            }
+            
+            const unsubscribe = onAuthStateChanged(auth, (user) => {
+              if (user && user.uid === authResponse.user.id) {
+                unsubscribe();
+                resolve(true);
+              }
+            });
+            
+            // Timeout after 3 seconds
+            setTimeout(() => {
+              unsubscribe();
+              resolve(!!auth.currentUser && auth.currentUser.uid === authResponse.user.id);
+            }, 3000);
+          });
+          
+          if (!authReady) {
+            logger.warn('Auth state not ready after sign-in, Firestore operations may fail', {
+              userId: authResponse.user.id,
+              hasCurrentUser: !!auth.currentUser
+            }, 'VerificationScreen');
+          } else {
+            logger.info('✅ Auth state ready, Firestore operations can proceed', {
+              userId: authResponse.user.id
+            }, 'VerificationScreen');
+          }
         } catch (tokenError) {
-          logger.warn('Failed to sign in with custom token (non-critical)', tokenError, 'VerificationScreen');
-          // Continue anyway - user is still authenticated in app context
+          logger.error('Failed to sign in with custom token', tokenError, 'VerificationScreen');
+          // This is critical - without auth, Firestore operations will fail
+          throw new Error('Failed to authenticate. Please try again.');
         }
       } else {
         logger.warn('No custom token returned from verification - user may not be signed into Firebase Auth', null, 'VerificationScreen');
+        // For new users, we still need to sign them in - this should not happen
+        // But if it does, we'll try to continue and let Firestore rules handle it
       }
       
       // Transform API response to match User type (snake_case)
@@ -539,31 +596,50 @@ const VerificationScreen: React.FC = () => {
         hasCompletedOnboarding: authResponse.user.hasCompletedOnboarding || false
       };
       
-      // CRITICAL FIX: If Firebase Functions didn't return user data, fetch it from Firestore
-      if (!transformedUser.name || !transformedUser.wallet_address) {
-        if (__DEV__) { logger.info('Firebase Functions returned empty data, fetching from Firestore', null, 'VerificationScreen'); }
+      // CRITICAL: Always fetch fresh user data from Firestore after verification
+      // This ensures we have the latest lastVerifiedAt timestamp and all user fields
+      // NOTE: This will only work if user is authenticated (auth.currentUser is set)
+      try {
+        const { firestoreService } = await import('../../config/firebase/firebase');
+        const freshUserData = await firestoreService.getUserDocument(transformedUser.id);
         
-        try {
-          const { firestoreService } = await import('../../config/firebase/firebase');
-          const existingUserData = await firestoreService.getUserDocument(transformedUser.id);
-          
-          if (existingUserData && existingUserData.name && existingUserData.wallet_address) {
-            if (__DEV__) { logger.info('Found existing user data in Firestore', { existingUserData }, 'VerificationScreen'); }
-            
-            // Update transformed user with existing data
-            transformedUser = {
-              ...transformedUser,
-              name: existingUserData.name,
-              wallet_address: existingUserData.wallet_address,
-              wallet_public_key: existingUserData.wallet_public_key || existingUserData.wallet_address,
-              hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false
-            };
-            
-            if (__DEV__) { logger.info('Updated user data from Firestore', { transformedUser }, 'VerificationScreen'); }
+        if (freshUserData) {
+          if (__DEV__) { 
+            logger.info('Fetched fresh user data from Firestore after verification', { 
+              userId: transformedUser.id,
+              hasLastVerifiedAt: !!freshUserData.lastVerifiedAt,
+              lastVerifiedAt: freshUserData.lastVerifiedAt
+            }, 'VerificationScreen'); 
           }
-        } catch (firestoreError) {
-          if (__DEV__) { console.warn('⚠️ Could not fetch user data from Firestore:', firestoreError); }
+          
+          // Update transformed user with fresh Firestore data (includes lastVerifiedAt)
+          transformedUser = {
+            ...transformedUser,
+            name: freshUserData.name || transformedUser.name,
+            email: freshUserData.email || transformedUser.email,
+            wallet_address: freshUserData.wallet_address || transformedUser.wallet_address,
+            wallet_public_key: freshUserData.wallet_public_key || freshUserData.wallet_address || transformedUser.wallet_public_key,
+            created_at: freshUserData.created_at || transformedUser.created_at,
+            avatar: freshUserData.avatar || transformedUser.avatar,
+            hasCompletedOnboarding: freshUserData.hasCompletedOnboarding !== undefined ? freshUserData.hasCompletedOnboarding : transformedUser.hasCompletedOnboarding,
+            // Include lastVerifiedAt for reference (though it's not part of User type)
+            lastVerifiedAt: freshUserData.lastVerifiedAt
+          };
+          
+          if (__DEV__) { 
+            logger.info('Updated user data with fresh Firestore data', { 
+              userId: transformedUser.id,
+              hasLastVerifiedAt: !!transformedUser.lastVerifiedAt
+            }, 'VerificationScreen'); 
+          }
+        } else {
+          if (__DEV__) { 
+            logger.warn('User document not found in Firestore after verification', { userId: transformedUser.id }, 'VerificationScreen'); 
+          }
         }
+      } catch (firestoreError) {
+        logger.warn('Could not fetch fresh user data from Firestore after verification (non-critical)', firestoreError, 'VerificationScreen');
+        // Continue with transformed user from API response
       }
       
       if (__DEV__) {
@@ -594,23 +670,54 @@ const VerificationScreen: React.FC = () => {
         // Non-critical, continue with authentication
       }
 
-      // Check if user needs to create a profile (has no name/pseudo)
-      const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+      // Check if user needs to create a profile
+      // A user has a profile if they have a name AND have completed onboarding
+      const hasName = transformedUser.name && transformedUser.name.trim() !== '';
+      const hasCompletedOnboarding = transformedUser.hasCompletedOnboarding === true;
       
-      if (needsProfile) {
-        logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'VerificationScreen');
+      logger.info('Checking user profile status after verification', {
+        userId: transformedUser.id,
+        hasName,
+        hasCompletedOnboarding,
+        name: transformedUser.name?.substring(0, 10) + '...',
+        email: transformedUser.email?.substring(0, 10) + '...'
+      }, 'VerificationScreen');
+      
+      if (!hasName) {
+        // User doesn't have a name - needs to create profile
+        const referralCode = route.params?.referralCode;
+        logger.info('User needs to create profile (no name), navigating to CreateProfile', {
+          userId: transformedUser.id,
+          hasReferralCode: !!referralCode
+        }, 'VerificationScreen');
         (navigation as any).reset({
           index: 0,
-          routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
+          routes: [{ name: 'CreateProfile', params: { 
+            email: transformedUser.email,
+            referralCode: referralCode
+          } }],
         });
-      } else {
-        // User already has a name, go directly to Dashboard
-        logger.info('User already has name, navigating to Dashboard', { name: transformedUser.name }, 'VerificationScreen');
+      } else if (hasCompletedOnboarding) {
+        // User has name and completed onboarding - go to dashboard
+        logger.info('User has profile and completed onboarding, navigating to Dashboard', { 
+          userId: transformedUser.id,
+          name: transformedUser.name 
+        }, 'VerificationScreen');
         (navigation as any).reset({
           index: 0,
           routes: [{ name: 'Dashboard' }],
         });
-        }
+      } else {
+        // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+        logger.info('User has name but needs onboarding, navigating to Dashboard', { 
+          userId: transformedUser.id,
+          name: transformedUser.name 
+        }, 'VerificationScreen');
+        (navigation as any).reset({
+          index: 0,
+          routes: [{ name: 'Dashboard' }],
+        });
+      }
       } else {
         throw new Error('Email or phone number not found');
       }
