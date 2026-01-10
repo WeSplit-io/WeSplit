@@ -18,6 +18,7 @@ import { AuthPersistenceService } from '../../services/core/authPersistenceServi
 import { isPhantomSocialLoginEnabled, isPhantomEnabled } from '../../config/features';
 import { PhantomAuthButton } from '../../components/auth/PhantomAuthButton';
 import { authService } from '../../services/auth/AuthService';
+import { PhantomAuthService } from '../../services/auth/PhantomAuthService';
 import { isValidPhoneNumber as validatePhoneE164, normalizePhoneNumber } from '../../utils/validation/phone';
 
 type RootStackParamList = {
@@ -134,6 +135,18 @@ const AuthMethodsScreen: React.FC = () => {
             hasCompletedOnboarding: true
           };
 
+          // Save email to persistence (consistent with email/phone auth)
+          if (appUser.email) {
+            try {
+              await AuthPersistenceService.saveEmail(appUser.email);
+              logger.info('Email saved to SecureStore after Google Phantom auth', {
+                email: appUser.email.substring(0, 5) + '...'
+              }, 'AuthMethodsScreen');
+            } catch (error) {
+              logger.warn('Failed to save email after Google Phantom auth (non-critical)', error, 'AuthMethodsScreen');
+            }
+          }
+
           updateUser(appUser);
           authenticateUser(appUser, 'social');
 
@@ -151,12 +164,37 @@ const AuthMethodsScreen: React.FC = () => {
     }
 
     // Fallback: handle phantom users (Apple auth or when Firebase user not available)
-    const walletInfo = await authService.ensureUserWallet(phantomUser.id);
+    // Ensure Firebase Auth user exists for Apple auth before wallet operations
+    let firebaseUserId = phantomUser.firebaseUserId;
+    
+    if (!firebaseUserId && phantomUser.socialProvider === 'apple') {
+      // For Apple auth, create Firebase Auth user if missing
+      try {
+        const phantomAuthService = PhantomAuthService.getInstance();
+        const appleEmail = phantomUser.email || `${phantomUser.id}@apple.phantom.app`;
+        const result = await phantomAuthService.ensureFirebaseAuthUserForPhantom(phantomUser, appleEmail);
+        if (result?.success && result?.firebaseUserId) {
+          firebaseUserId = result.firebaseUserId;
+          logger.info('Created Firebase Auth user for Apple Phantom auth', {
+            phantomUserId: phantomUser.id,
+            firebaseUserId
+          }, 'AuthMethodsScreen');
+        }
+      } catch (error) {
+        logger.warn('Failed to create Firebase Auth user for Apple Phantom auth', {
+          error: error instanceof Error ? error.message : String(error)
+        }, 'AuthMethodsScreen');
+      }
+    }
+
+    // Use Firebase UID if available, otherwise fall back to Phantom ID
+    const walletUserId = firebaseUserId || phantomUser.id;
+    const walletInfo = await authService.ensureUserWallet(walletUserId);
     const walletAddress = walletInfo?.walletAddress || phantomUser.phantomWalletAddress;
     const walletPublicKey = walletInfo?.walletPublicKey || phantomUser.phantomWalletAddress;
 
     const appUser = {
-      id: phantomUser.id,
+      id: firebaseUserId || phantomUser.id,
       name: phantomUser.name || '',
       email: phantomUser.email || '',
       wallet_address: walletAddress,
@@ -167,6 +205,18 @@ const AuthMethodsScreen: React.FC = () => {
       avatar: phantomUser.avatar || '',
       hasCompletedOnboarding: true
     };
+
+    // Save email to persistence (consistent with email/phone auth)
+    if (appUser.email) {
+      try {
+        await AuthPersistenceService.saveEmail(appUser.email);
+        logger.info('Email saved to SecureStore after Phantom auth', {
+          email: appUser.email.substring(0, 5) + '...'
+        }, 'AuthMethodsScreen');
+      } catch (error) {
+        logger.warn('Failed to save email after Phantom auth (non-critical)', error, 'AuthMethodsScreen');
+      }
+    }
 
     updateUser(appUser);
     authenticateUser(appUser, 'social');
@@ -592,6 +642,16 @@ const AuthMethodsScreen: React.FC = () => {
           {/* Phantom Social Login - Show if enabled */}
           {isPhantomSocialLoginEnabled() ? (
             <View style={styles.socialSection}>
+              {__DEV__ && (
+                <View style={{ marginBottom: 12, padding: 12, backgroundColor: '#1F2937', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F59E0B' }}>
+                  <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '600', marginBottom: 4 }}>
+                    ⚠️ Phantom Auth - App is Private
+                  </Text>
+                  <Text style={{ color: '#9CA3AF', fontSize: 11, lineHeight: 16 }}>
+                    Your app is currently "Private" in Phantom Portal. Contact Phantom support to make it public. Use email/phone auth for immediate testing.
+                  </Text>
+                </View>
+              )}
               <PhantomAuthButton
                 fullWidth={true}
                 onSuccess={async (phantomUser) => {
@@ -608,10 +668,21 @@ const AuthMethodsScreen: React.FC = () => {
                   let errorMessage = 'Failed to authenticate with Phantom';
                   let errorTitle = 'Authentication Failed';
 
-                  if (error?.includes('check team status') || error?.includes('not allowed to proceed') || error?.includes('team status') || error?.includes('not allowed')) {
-                    errorTitle = 'Phantom Portal Approval Required';
-                    errorMessage = 'Your app ID (ab881c51-6335-49b9-8800-0e4ad7d21ca3) needs approval from Phantom Portal.\n\nSteps to fix:\n1. Visit https://phantom.app/developers\n2. Sign in with your Phantom wallet\n3. Find your app and submit for approval\n4. Wait 1-3 business days\n\nFor immediate development testing, use email or phone authentication instead.';
-                  } else if (error?.includes('network') || error?.includes('connection')) {
+                  // Check for Phantom Portal approval errors (multiple variations)
+                  const errorLower = error?.toLowerCase() || '';
+                  if (
+                    errorLower.includes('check team status') || 
+                    errorLower.includes('not allowed to proceed') || 
+                    errorLower.includes('team status') || 
+                    errorLower.includes('not allowed') ||
+                    errorLower.includes('unknown error occurred while checking') ||
+                    errorLower.includes('you\'re not allowed') ||
+                    errorLower.includes('you are not allowed') ||
+                    errorLower.includes('unknown error occurred')
+                  ) {
+                    errorTitle = 'Phantom App is Private';
+                    errorMessage = 'Your app (ID: ab881c51-6335-49b9-8800-0e4ad7d21ca3) is currently set to "Private" in Phantom Portal.\n\nTo fix:\n1. Visit https://phantom.app/developers\n2. Your app shows as "Private" - this restricts access to team members only\n3. Contact Phantom support to request making your app public\n4. Include your app ID and explain you need public access for production\n\nFor immediate development testing, use email or phone authentication instead.';
+                  } else if (errorLower.includes('network') || errorLower.includes('connection')) {
                     errorMessage = 'Network connection issue. Please check your internet connection and try again.';
                   }
 

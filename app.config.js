@@ -24,7 +24,7 @@ function getEnvVar(key, defaultValue = undefined) {
 
 module.exports = {
   expo: {
-    name: "WeSplit Beta",
+    name: "WeSplit",
     slug: "WeSplit",
     version: "1.1.2",
     // Changed from "portrait" to "default" to allow all orientations
@@ -38,7 +38,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
-      displayName: "WeSplit Beta",
+      displayName: "WeSplit",
       buildNumber: "62",
       deploymentTarget: "15.1",
       googleServicesFile: "./GoogleService-Info.plist", // Uncomment when file is added
@@ -70,7 +70,7 @@ module.exports = {
     scheme: "wesplit",
     android: {
       package: "com.wesplit.app",
-      displayName: "WeSplit Beta",
+      displayName: "WeSplit",
       versionCode: 11262,
       googleServicesFile: "./google-services.json", // Uncomment when file is added
       adaptiveIcon: {

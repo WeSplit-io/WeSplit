@@ -222,7 +222,7 @@ export const PRIVY_CONFIG = {
 export const PHANTOM_CONFIG = {
   appId: process.env.EXPO_PUBLIC_PHANTOM_APP_ID,
   appOrigin: process.env.EXPO_PUBLIC_PHANTOM_APP_ORIGIN || 'https://wesplit.io',
-  redirectUri: process.env.EXPO_PUBLIC_PHANTOM_REDIRECT_URI || 'wesplit://auth/phantom-callback',
+  redirectUri: process.env.EXPO_PUBLIC_PHANTOM_REDIRECT_URI || 'wesplit://phantom-callback',
   // Feature flags for gradual rollout - enable in dev by default
   features: {
     socialLogin: __DEV__ ? true : (process.env.EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN === 'true'),

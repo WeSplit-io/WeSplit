@@ -184,15 +184,24 @@ class PhantomAuthService {
         this.currentUser = existingUser;
         logger.info('Existing Phantom user updated', { userId: existingUser.id }, 'PhantomAuthService');
 
-        // For existing users, ensure Firebase Auth user exists if provider is Google
-        if (provider === 'google' && userEmail && !existingUser.firebaseUserId) {
+        // For existing users, ensure Firebase Auth user exists for both Google and Apple
+        if ((provider === 'google' || provider === 'apple') && userEmail && !existingUser.firebaseUserId) {
           await this.ensureFirebaseAuthUserForPhantom(existingUser, userEmail);
         }
+
+        // Ensure wallet exists for existing user (in service layer)
+        const walletInfo = await this.ensureWalletForPhantomUser(existingUser);
 
         return {
           success: true,
           user: existingUser,
-          wallet: { address: walletAddress, publicKey: walletAddress }
+          wallet: walletInfo ? { 
+            address: walletInfo.walletAddress, 
+            publicKey: walletInfo.walletPublicKey 
+          } : { 
+            address: walletAddress, 
+            publicKey: walletAddress 
+          }
         };
       } else {
         // Create new Phantom user
@@ -229,9 +238,9 @@ class PhantomAuthService {
           lastLoginAt: Date.now(),
         };
 
-        // For Google provider, create Firebase Auth user and Firestore user record
-        if (provider === 'google' && finalEmail) {
-          logger.info('Creating Firebase Auth user for Google Phantom auth', {
+        // For both Google and Apple providers, create Firebase Auth user and Firestore user record
+        if ((provider === 'google' || provider === 'apple') && finalEmail) {
+          logger.info('Creating Firebase Auth user for Phantom auth', {
             phantomUserId: newUser.id,
             email: finalEmail,
             provider
@@ -239,10 +248,11 @@ class PhantomAuthService {
 
           const firebaseResult = await this.createFirebaseAuthUserForPhantom(newUser, finalEmail);
           if (!firebaseResult.success) {
-            logger.error('Failed to create Firebase Auth user for Phantom Google auth', {
+            logger.error('Failed to create Firebase Auth user for Phantom auth', {
               error: firebaseResult.error,
               phantomUserId: newUser.id,
-              email: finalEmail
+              email: finalEmail,
+              provider
             }, 'PhantomAuthService');
             return {
               success: false,
@@ -255,17 +265,28 @@ class PhantomAuthService {
           logger.info('Successfully linked Phantom user to Firebase Auth user', {
             phantomUserId: newUser.id,
             firebaseUserId: firebaseResult.firebaseUserId,
-            email: finalEmail
+            email: finalEmail,
+            provider
           }, 'PhantomAuthService');
         }
 
         await this.createPhantomUser(newUser);
         this.currentUser = newUser;
         logger.info('New Phantom user created', { userId: newUser.id, hasFirebaseLink: !!newUser.firebaseUserId }, 'PhantomAuthService');
+
+        // Ensure wallet exists for new user (in service layer)
+        const walletInfo = await this.ensureWalletForPhantomUser(newUser);
+
         return {
           success: true,
           user: newUser,
-          wallet: { address: walletAddress, publicKey: walletAddress }
+          wallet: walletInfo ? { 
+            address: walletInfo.walletAddress, 
+            publicKey: walletInfo.walletPublicKey 
+          } : { 
+            address: walletAddress, 
+            publicKey: walletAddress 
+          }
         };
       }
 
@@ -279,9 +300,9 @@ class PhantomAuthService {
   }
 
   /**
-   * Create Firebase Auth user for Phantom Google authentication
+   * Create Firebase Auth user for Phantom authentication (Google or Apple)
    */
-  private async createFirebaseAuthUserForPhantom(phantomUser: PhantomUser, email: string): Promise<{ success: boolean; firebaseUserId?: string; error?: string }> {
+  public async createFirebaseAuthUserForPhantom(phantomUser: PhantomUser, email: string): Promise<{ success: boolean; firebaseUserId?: string; error?: string }> {
     try {
       const { getFunctions, httpsCallable } = await import('firebase/functions');
       const firebaseConfig = await import('../../config/firebase/firebase');
@@ -324,21 +345,57 @@ class PhantomAuthService {
   /**
    * Ensure Firebase Auth user exists for existing Phantom user
    */
-  private async ensureFirebaseAuthUserForPhantom(phantomUser: PhantomUser, email: string): Promise<void> {
+  public async ensureFirebaseAuthUserForPhantom(phantomUser: PhantomUser, email: string): Promise<{ success: boolean; firebaseUserId?: string; error?: string }> {
     try {
       if (!email) {
         logger.warn('Cannot ensure Firebase Auth user - no email provided', { phantomUserId: phantomUser.id }, 'PhantomAuthService');
-        return;
+        return { success: false, error: 'Email is required' };
       }
 
       const result = await this.createFirebaseAuthUserForPhantom(phantomUser, email);
       if (result.success && result.firebaseUserId) {
         phantomUser.firebaseUserId = result.firebaseUserId;
         await this.updatePhantomUser(phantomUser);
+        return { success: true, firebaseUserId: result.firebaseUserId };
       }
+      return result;
     } catch (error) {
       logger.error('Failed to ensure Firebase Auth user for existing Phantom user', error, 'PhantomAuthService');
-      // Don't throw - this is not critical for existing users
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to ensure Firebase Auth user'
+      };
+    }
+  }
+
+  /**
+   * Ensure wallet exists for Phantom user (in service layer)
+   */
+  private async ensureWalletForPhantomUser(phantomUser: PhantomUser): Promise<{ walletAddress: string; walletPublicKey: string } | null> {
+    try {
+      const { authService } = await import('./AuthService');
+      
+      // Use Firebase UID if available, otherwise use Phantom ID
+      const userId = phantomUser.firebaseUserId || phantomUser.id;
+      const walletResult = await authService.ensureUserWallet(userId);
+      
+      if (walletResult) {
+        logger.info('Wallet ensured for Phantom user', {
+          phantomUserId: phantomUser.id,
+          firebaseUserId: phantomUser.firebaseUserId,
+          walletAddress: walletResult.walletAddress
+        }, 'PhantomAuthService');
+        return {
+          walletAddress: walletResult.walletAddress,
+          walletPublicKey: walletResult.walletPublicKey
+        };
+      }
+      
+      logger.warn('Failed to ensure wallet for Phantom user', { userId }, 'PhantomAuthService');
+      return null;
+    } catch (error) {
+      logger.error('Failed to ensure wallet for Phantom user', error, 'PhantomAuthService');
+      return null;
     }
   }
 
@@ -687,7 +744,7 @@ class PhantomAuthService {
     const params = new URLSearchParams({
       provider,
       state,
-      redirect_uri: 'wesplit://auth/phantom-callback',
+      redirect_uri: 'wesplit://phantom-callback',
       scope: 'wallet:create user:read',
       response_type: 'code'
     });

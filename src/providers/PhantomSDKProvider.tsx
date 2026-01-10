@@ -108,7 +108,7 @@ export const PhantomSDKProvider: React.FC<PhantomSDKProviderProps> = ({
       console.warn('⚠️ Phantom configuration issues detected. If you get "check team status" or "not allowed" errors:');
       console.warn('   1. Visit https://phantom.app/developers');
       console.warn('   2. Find your app with ID: ab881c51-6335-49b9-8800-0e4ad7d21ca3');
-      console.warn('   3. Submit for approval and wait 1-3 business days');
+      console.warn('   3. If your app shows as "Private", contact Phantom support to make it public');
       console.warn('   4. Or use email/phone authentication for immediate development testing');
     }
   }
