@@ -223,12 +223,14 @@ export const PHANTOM_CONFIG = {
   appId: process.env.EXPO_PUBLIC_PHANTOM_APP_ID,
   appOrigin: process.env.EXPO_PUBLIC_PHANTOM_APP_ORIGIN || 'https://wesplit.io',
   redirectUri: process.env.EXPO_PUBLIC_PHANTOM_REDIRECT_URI || 'wesplit://phantom-callback',
-  // Feature flags for gradual rollout - enable in dev by default
+  // Feature flags for gradual rollout
+  // In production, enable via environment variables (EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN=true, etc.)
+  // In development, enabled by default for testing
   features: {
     socialLogin: __DEV__ ? true : (process.env.EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN === 'true'),
     splitWallets: __DEV__ ? true : (process.env.EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS === 'true'),
-    autoConfirm: __DEV__ ? false : (process.env.EXPO_PUBLIC_PHANTOM_AUTO_CONFIRM === 'true'),
-    multiChain: __DEV__ ? false : (process.env.EXPO_PUBLIC_PHANTOM_MULTI_CHAIN === 'true'),
+    autoConfirm: process.env.EXPO_PUBLIC_PHANTOM_AUTO_CONFIRM === 'true',
+    multiChain: process.env.EXPO_PUBLIC_PHANTOM_MULTI_CHAIN === 'true',
   }
 };
 

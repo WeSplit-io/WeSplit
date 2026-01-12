@@ -50,8 +50,10 @@ export interface UsePhantomWalletReturn {
 }
 
 export const usePhantomWallet = (): UsePhantomWalletReturn => {
-  // Block in production
-  if (!__DEV__) {
+  // Check if Phantom is enabled via feature flags
+  const { isPhantomEnabled } = require('../config/features');
+  
+  if (!isPhantomEnabled()) {
     return {
       isConnected: false,
       isConnecting: false,
@@ -59,9 +61,9 @@ export const usePhantomWallet = (): UsePhantomWalletReturn => {
       walletAddress: null,
       connectWallet: async () => {},
       disconnectWallet: async () => {},
-      createSplitWallet: async () => ({ success: false, error: 'Phantom integration disabled' }),
-      signTransaction: async () => ({ success: false, error: 'Phantom integration disabled' }),
-      signMessage: async () => ({ success: false, error: 'Phantom integration disabled' }),
+      createSplitWallet: async () => ({ success: false, error: 'Phantom integration not configured' }),
+      signTransaction: async () => ({ success: false, error: 'Phantom integration not configured' }),
+      signMessage: async () => ({ success: false, error: 'Phantom integration not configured' }),
       switchNetwork: async () => {},
       getBalance: async () => 0,
     };

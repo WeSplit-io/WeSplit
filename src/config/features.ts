@@ -26,23 +26,15 @@ const getEnvironmentFeatures = (): FeatureFlags => {
   // Shared wallet is now production-ready and enabled in all environments
   const sharedWalletEnabled = true;
 
-  // In production, disable experimental features by default
-  if (!__DEV__) {
-    return {
-      PHANTOM_SDK_ENABLED: false,
-      PHANTOM_SOCIAL_LOGIN: false,
-      PHANTOM_SPLIT_WALLETS: false,
-      PHANTOM_AUTO_CONFIRM: false,
-      PHANTOM_MULTI_CHAIN: false,
-      SHARED_WALLET_ENABLED: sharedWalletEnabled, // Enabled in production
-    };
-  }
+  // Check if Phantom is configured (works in both dev and production)
+  const isPhantomConfigValid = isPhantomConfigured();
 
-  // In development/staging, enable based on env config
+  // Enable Phantom features based on configuration, not just dev mode
+  // In production, features are enabled via environment variables
   return {
-    PHANTOM_SDK_ENABLED: isPhantomConfigured(),
-    PHANTOM_SOCIAL_LOGIN: isPhantomConfigured() && PHANTOM_CONFIG.features.socialLogin,
-    PHANTOM_SPLIT_WALLETS: isPhantomConfigured() && PHANTOM_CONFIG.features.splitWallets,
+    PHANTOM_SDK_ENABLED: isPhantomConfigValid,
+    PHANTOM_SOCIAL_LOGIN: isPhantomConfigValid && PHANTOM_CONFIG.features.socialLogin,
+    PHANTOM_SPLIT_WALLETS: isPhantomConfigValid && PHANTOM_CONFIG.features.splitWallets,
     PHANTOM_AUTO_CONFIRM: PHANTOM_CONFIG.features.autoConfirm,
     PHANTOM_MULTI_CHAIN: PHANTOM_CONFIG.features.multiChain,
     SHARED_WALLET_ENABLED: sharedWalletEnabled, // Enabled in all environments

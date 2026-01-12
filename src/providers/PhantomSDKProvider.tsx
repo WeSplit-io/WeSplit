@@ -75,8 +75,8 @@ export const PhantomSDKProvider: React.FC<PhantomSDKProviderProps> = ({
   // Validate configuration
   const configValidation = validatePhantomConfiguration();
 
-  // In development, always try to render the provider with any valid config
-  // This allows testing even with unapproved app IDs
+  // Render provider if basic config is present (works in both dev and production)
+  // In development, skipPortalCheck allows testing even with unapproved app IDs
   const hasBasicConfig = PHANTOM_CONFIG.appId && PHANTOM_CONFIG.appOrigin && PHANTOM_CONFIG.redirectUri;
   const shouldRenderProvider = hasBasicConfig || (__DEV__ && skipPortalCheck);
 

@@ -642,16 +642,6 @@ const AuthMethodsScreen: React.FC = () => {
           {/* Phantom Social Login - Show if enabled */}
           {isPhantomSocialLoginEnabled() ? (
             <View style={styles.socialSection}>
-              {__DEV__ && (
-                <View style={{ marginBottom: 12, padding: 12, backgroundColor: '#1F2937', borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#F59E0B' }}>
-                  <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '600', marginBottom: 4 }}>
-                    ⚠️ Phantom Auth - App is Private
-                  </Text>
-                  <Text style={{ color: '#9CA3AF', fontSize: 11, lineHeight: 16 }}>
-                    Your app is currently "Private" in Phantom Portal. Contact Phantom support to make it public. Use email/phone auth for immediate testing.
-                  </Text>
-                </View>
-              )}
               <PhantomAuthButton
                 fullWidth={true}
                 onSuccess={async (phantomUser) => {

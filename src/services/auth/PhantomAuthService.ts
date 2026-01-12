@@ -50,12 +50,6 @@ class PhantomAuthService {
    * Initialize Phantom Auth for the app
    */
   public async initialize(): Promise<void> {
-    // Block in production
-    if (!__DEV__) {
-      logger.info('Phantom Auth disabled in production', null, 'PhantomAuthService');
-      return;
-    }
-
     const phantomConnect = PhantomConnectService.getInstance();
 
     // Configure for app authentication (not just splits)
@@ -87,14 +81,6 @@ class PhantomAuthService {
     phantomUser: any,
     provider: 'google' | 'apple'
   ): Promise<PhantomAuthResult> {
-    // Block in production
-    if (!__DEV__) {
-      return {
-        success: false,
-        error: 'Phantom authentication is currently disabled'
-      };
-    }
-
     try {
       logger.info('Processing authenticated Phantom user', {
         userKeys: phantomUser ? Object.keys(phantomUser) : 'undefined',

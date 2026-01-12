@@ -119,15 +119,6 @@ class PhantomConnectService {
    * This service provides the configuration and callback handling.
    */
   public async connect(options: PhantomConnectOptions = {}): Promise<PhantomConnectResult> {
-    // Block in production
-    if (!__DEV__) {
-      logger.info('Phantom Connect disabled in production', null, 'PhantomConnectService');
-      return {
-        success: false,
-        error: 'Phantom Connect is disabled in production'
-      };
-    }
-
     try {
       logger.info('Initiating Phantom connection', {
         preferredMethod: options.preferredMethod || 'social',
