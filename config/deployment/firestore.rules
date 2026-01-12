@@ -395,6 +395,27 @@ service cloud.firestore {
       // Only server-side (Admin SDK) can access - block all client access
       allow read, write: if false; // Admin SDK bypasses this
     }
+
+    // Phantom users collection - users can read/write their own Phantom auth records
+    // Used by Phantom authentication flow to store Phantom user data
+    match /phantom_users/{phantomUserId} {
+      // Users can read their own Phantom user record
+      // Note: authUserId may not match Firebase UID, so we allow authenticated reads
+      // Application code enforces proper access control
+      allow read: if request.auth != null;
+      
+      // Users can create their own Phantom user record
+      // Document ID should match the authUserId from Phantom SDK
+      allow create: if request.auth != null;
+      
+      // Users can update their own Phantom user record
+      // Application code ensures users can only update their own records
+      allow update: if request.auth != null;
+      
+      // Deletions should be restricted (data retention)
+      // Phantom user records should be preserved for account recovery
+      allow delete: if false;
+    }
   }
 } 
 

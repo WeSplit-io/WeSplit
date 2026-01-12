@@ -183,9 +183,34 @@ class SimplifiedWalletService {
           }, 'SimplifiedWalletService');
           
           // Try comprehensive recovery as fallback
+          // BUT: Skip if this is an external wallet (e.g., Phantom) - external wallets don't need recovery
           try {
             const { firebaseDataService } = await import('../../data/firebaseDataService');
             const userData = await firebaseDataService.user.getCurrentUser(userId);
+            
+            // CRITICAL: Skip recovery for external wallets - they're managed by external providers
+            if (userData?.wallet_type === 'external') {
+              logger.info('Skipping wallet recovery for external wallet (e.g., Phantom)', {
+                userId,
+                walletAddress: userData.wallet_address,
+                walletType: userData.wallet_type
+              }, 'SimplifiedWalletService');
+              
+              // Return the external wallet - no recovery needed
+              const result: WalletCreationResult = {
+                success: true,
+                wallet: {
+                  address: userData.wallet_address,
+                  publicKey: userData.wallet_public_key || userData.wallet_address,
+                  secretKey: '', // External wallets don't have private keys in our system
+                  isConnected: true,
+                  walletName: 'External Wallet',
+                  walletType: 'external'
+                }
+              };
+              this.walletRecoveryCache.set(userId, result);
+              return result;
+            }
             
             if (userData?.wallet_address) {
               logger.info('Attempting comprehensive recovery with database address', { 

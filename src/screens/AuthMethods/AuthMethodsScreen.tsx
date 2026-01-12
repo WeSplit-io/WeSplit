@@ -9,7 +9,7 @@ import {
   Platform,
   Linking
 } from 'react-native';
-import { useNavigation, useRoute, NavigationProp } from '@react-navigation/native';
+import { useNavigation, useRoute, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { styles } from './styles';
 import { Container, Header, Button, Input, LoadingScreen, Tabs } from '../../components/shared';
 import { useApp } from '../../context/AppContext';
@@ -19,6 +19,7 @@ import { isPhantomSocialLoginEnabled, isPhantomEnabled } from '../../config/feat
 import { PhantomAuthButton } from '../../components/auth/PhantomAuthButton';
 import { authService } from '../../services/auth/AuthService';
 import { PhantomAuthService } from '../../services/auth/PhantomAuthService';
+import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { isValidPhoneNumber as validatePhoneE164, normalizePhoneNumber } from '../../utils/validation/phone';
 
 type RootStackParamList = {
@@ -69,6 +70,10 @@ const AuthMethodsScreen: React.FC = () => {
   useEffect(() => {
     const loadPersistedData = async () => {
       try {
+        // NOTE: We do NOT reset the Phantom logout flag here
+        // The flag should only be reset when user explicitly opens the Phantom modal
+        // This prevents auto-connect from triggering immediately after logout
+
         // Priority: route params > persisted email
         if (prefilledEmail) {
           setEmail(prefilledEmail);
@@ -120,19 +125,22 @@ const AuthMethodsScreen: React.FC = () => {
             phantomUserId: phantomUser.id
           }, 'AuthMethodsScreen');
 
+          // Get user data from Firestore to check profile status (consistent with email/phone auth)
+          const existingUserData = await firebaseDataService.user.getCurrentUser(currentFirebaseUser.uid);
+          
           // Ensure user has a wallet and create user object
           const walletInfo = await authService.ensureUserWallet(currentFirebaseUser.uid);
           const appUser = {
             id: currentFirebaseUser.uid,
-            name: currentFirebaseUser.displayName || phantomUser.name || '',
+            name: existingUserData?.name || currentFirebaseUser.displayName || phantomUser.name || '',
             email: currentFirebaseUser.email || phantomUser.email || '',
-            wallet_address: walletInfo?.walletAddress || '',
-            wallet_public_key: walletInfo?.walletPublicKey || '',
+            wallet_address: walletInfo?.walletAddress || existingUserData?.wallet_address || '',
+            wallet_public_key: walletInfo?.walletPublicKey || existingUserData?.wallet_public_key || '',
             created_at: currentFirebaseUser.metadata.creationTime || new Date().toISOString(),
-            avatar: currentFirebaseUser.photoURL || phantomUser.avatar || '',
+            avatar: existingUserData?.avatar || currentFirebaseUser.photoURL || phantomUser.avatar || '',
             emailVerified: currentFirebaseUser.emailVerified,
             lastLoginAt: currentFirebaseUser.metadata.lastSignInTime || new Date().toISOString(),
-            hasCompletedOnboarding: true
+            hasCompletedOnboarding: existingUserData?.hasCompletedOnboarding || false
           };
 
           // Save email to persistence (consistent with email/phone auth)
@@ -143,17 +151,59 @@ const AuthMethodsScreen: React.FC = () => {
                 email: appUser.email.substring(0, 5) + '...'
               }, 'AuthMethodsScreen');
             } catch (error) {
-              logger.warn('Failed to save email after Google Phantom auth (non-critical)', error, 'AuthMethodsScreen');
+              logger.warn('Failed to save email after Google Phantom auth (non-critical)', {
+                error: error instanceof Error ? error.message : String(error)
+              }, 'AuthMethodsScreen');
             }
           }
 
           updateUser(appUser);
           authenticateUser(appUser, 'social');
 
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Dashboard' }],
-          });
+          // Check if user needs to create profile (consistent with email/phone auth)
+          const hasName = appUser.name && appUser.name.trim() !== '';
+          const hasCompletedOnboarding = appUser.hasCompletedOnboarding === true;
+          
+          logger.info('Checking Phantom user profile status', {
+            userId: appUser.id,
+            hasName,
+            hasCompletedOnboarding,
+            name: appUser.name?.substring(0, 10) + '...'
+          }, 'AuthMethodsScreen');
+
+          if (!hasName) {
+            // User doesn't have a name - needs to create profile
+            logger.info('Phantom user needs to create profile (no name), navigating to CreateProfile', {
+              userId: appUser.id,
+              email: appUser.email
+            }, 'AuthMethodsScreen');
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'CreateProfile', params: {
+                email: appUser.email
+              } }],
+            });
+          } else if (hasCompletedOnboarding) {
+            // User has name and completed onboarding - go to dashboard
+            logger.info('Phantom user has profile and completed onboarding, navigating to Dashboard', {
+              userId: appUser.id,
+              name: appUser.name
+            }, 'AuthMethodsScreen');
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Dashboard' }],
+            });
+          } else {
+            // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+            logger.info('Phantom user has name but needs onboarding, navigating to Dashboard', {
+              userId: appUser.id,
+              name: appUser.name
+            }, 'AuthMethodsScreen');
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Dashboard' }],
+            });
+          }
           return;
         }
       } catch (error) {
@@ -187,23 +237,55 @@ const AuthMethodsScreen: React.FC = () => {
       }
     }
 
-    // Use Firebase UID if available, otherwise fall back to Phantom ID
-    const walletUserId = firebaseUserId || phantomUser.id;
-    const walletInfo = await authService.ensureUserWallet(walletUserId);
-    const walletAddress = walletInfo?.walletAddress || phantomUser.phantomWalletAddress;
-    const walletPublicKey = walletInfo?.walletPublicKey || phantomUser.phantomWalletAddress;
+    // For Phantom users, use their Phantom wallet address directly
+    // Don't create a new WeSplit wallet - use the Phantom wallet they authenticated with
+    const walletAddress = phantomUser.phantomWalletAddress;
+    const walletPublicKey = phantomUser.phantomWalletAddress; // For Solana, address is the public key
+    
+    // Update user record in Firestore with Phantom wallet address if Firebase user exists
+    if (firebaseUserId && walletAddress) {
+      try {
+        // Update Firestore user record with Phantom wallet address
+        await firebaseDataService.user.updateUser(firebaseUserId, {
+          wallet_address: walletAddress,
+          wallet_public_key: walletPublicKey,
+          wallet_type: 'external', // Mark as external wallet (Phantom)
+          wallet_status: 'healthy'
+        });
+        logger.info('Updated user record with Phantom wallet address', {
+          firebaseUserId,
+          walletAddress: walletAddress.substring(0, 8) + '...'
+        }, 'AuthMethodsScreen');
+      } catch (error) {
+        logger.warn('Failed to update user record with Phantom wallet (non-critical)', {
+          error: error instanceof Error ? error.message : String(error)
+        }, 'AuthMethodsScreen');
+      }
+    }
+
+    // Get user data from Firestore to check profile status (consistent with email/phone auth)
+    let existingUserData = null;
+    if (firebaseUserId) {
+      try {
+        existingUserData = await firebaseDataService.user.getCurrentUser(firebaseUserId);
+      } catch (error) {
+        logger.warn('Failed to get user data from Firestore for Phantom auth', {
+          error: error instanceof Error ? error.message : String(error)
+        }, 'AuthMethodsScreen');
+      }
+    }
 
     const appUser = {
       id: firebaseUserId || phantomUser.id,
-      name: phantomUser.name || '',
-      email: phantomUser.email || '',
-      wallet_address: walletAddress,
-      wallet_public_key: walletPublicKey,
+      name: existingUserData?.name || phantomUser.name || '',
+      email: phantomUser.email || existingUserData?.email || '',
+      wallet_address: walletAddress || existingUserData?.wallet_address || '',
+      wallet_public_key: walletPublicKey || existingUserData?.wallet_public_key || '',
       created_at: typeof phantomUser.createdAt === 'number'
         ? new Date(phantomUser.createdAt).toISOString()
-        : phantomUser.createdAt || new Date().toISOString(),
-      avatar: phantomUser.avatar || '',
-      hasCompletedOnboarding: true
+        : phantomUser.createdAt || existingUserData?.created_at || new Date().toISOString(),
+      avatar: existingUserData?.avatar || phantomUser.avatar || '',
+      hasCompletedOnboarding: existingUserData?.hasCompletedOnboarding || false
     };
 
     // Save email to persistence (consistent with email/phone auth)
@@ -214,17 +296,59 @@ const AuthMethodsScreen: React.FC = () => {
           email: appUser.email.substring(0, 5) + '...'
         }, 'AuthMethodsScreen');
       } catch (error) {
-        logger.warn('Failed to save email after Phantom auth (non-critical)', error, 'AuthMethodsScreen');
+        logger.warn('Failed to save email after Phantom auth (non-critical)', {
+          error: error instanceof Error ? error.message : String(error)
+        }, 'AuthMethodsScreen');
       }
     }
 
     updateUser(appUser);
     authenticateUser(appUser, 'social');
 
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Dashboard' }],
-    });
+    // Check if user needs to create profile (consistent with email/phone auth)
+    const hasName = appUser.name && appUser.name.trim() !== '';
+    const hasCompletedOnboarding = appUser.hasCompletedOnboarding === true;
+    
+    logger.info('Checking Phantom user profile status', {
+      userId: appUser.id,
+      hasName,
+      hasCompletedOnboarding,
+      name: appUser.name?.substring(0, 10) + '...'
+    }, 'AuthMethodsScreen');
+
+    if (!hasName) {
+      // User doesn't have a name - needs to create profile
+      logger.info('Phantom user needs to create profile (no name), navigating to CreateProfile', {
+        userId: appUser.id,
+        email: appUser.email
+      }, 'AuthMethodsScreen');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'CreateProfile', params: {
+          email: appUser.email
+        } }],
+      });
+    } else if (hasCompletedOnboarding) {
+      // User has name and completed onboarding - go to dashboard
+      logger.info('Phantom user has profile and completed onboarding, navigating to Dashboard', {
+        userId: appUser.id,
+        name: appUser.name
+      }, 'AuthMethodsScreen');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Dashboard' }],
+      });
+    } else {
+      // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
+      logger.info('Phantom user has name but needs onboarding, navigating to Dashboard', {
+        userId: appUser.id,
+        name: appUser.name
+      }, 'AuthMethodsScreen');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Dashboard' }],
+      });
+    }
   };
 
   // Handle email authentication

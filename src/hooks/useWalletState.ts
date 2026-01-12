@@ -54,6 +54,38 @@ export const useWalletState = (userId?: string) => {
       
       logger.info('Ensuring wallet for user', { userId }, 'useWalletState');
       
+      // Check if user has external wallet (e.g., Phantom) - skip recovery for external wallets
+      try {
+        const { firebaseDataService } = await import('../services/data/firebaseDataService');
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        
+        if (userData?.wallet_type === 'external' && userData?.wallet_address) {
+          logger.info('User has external wallet (e.g., Phantom), using it directly', {
+            userId,
+            walletAddress: userData.wallet_address,
+            walletType: userData.wallet_type
+          }, 'useWalletState');
+          
+          // Get balance for external wallet
+          const balance = await walletService.getUserWalletBalance(userId);
+          
+          setState(prev => ({
+            ...prev,
+            address: userData.wallet_address,
+            publicKey: userData.wallet_public_key || userData.wallet_address,
+            isConnected: true, // External wallets are always connected (managed by provider)
+            balance,
+            totalUSD: balance?.totalUSD || 0,
+            isInitialized: true,
+            error: null
+          }));
+          
+          return true;
+        }
+      } catch (userDataError) {
+        logger.debug('Could not check wallet type, proceeding with normal wallet ensure', { userId, error: userDataError }, 'useWalletState');
+      }
+      
       const walletResult = await walletService.ensureUserWallet(userId);
 
       if (walletResult.success && walletResult.wallet) {

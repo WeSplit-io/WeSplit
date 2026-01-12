@@ -98,6 +98,22 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               const { walletService } = await import('../../../services/blockchain/wallet');
               const { AuthPersistenceService } = await import('../../../services/core/authPersistenceService');
               const { clearAesKeyCache } = await import('../../../services/security/secureVault');
+              const { PhantomAuthService } = await import('../../../services/auth/PhantomAuthService');
+
+              // Step 0: Sign out from Phantom if user is using Phantom auth
+              // Check if user has external wallet (likely Phantom)
+              if (currentUser?.wallet_type === 'external') {
+                try {
+                  const phantomService = PhantomAuthService.getInstance();
+                  await phantomService.signOut();
+                  if (__DEV__) { logger.info('Phantom signOut completed', null, 'ProfileScreen'); }
+                } catch (phantomError) {
+                  logger.warn('Failed to sign out from Phantom (non-critical)', {
+                    error: phantomError instanceof Error ? phantomError.message : String(phantomError)
+                  }, 'ProfileScreen');
+                  // Continue with logout even if Phantom signOut fails
+                }
+              }
 
               // Step 1: Sign out from Firebase Auth
               await authService.signOut();

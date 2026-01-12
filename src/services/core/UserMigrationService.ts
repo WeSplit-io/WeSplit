@@ -4,7 +4,7 @@
  * Uses email as primary identifier, Firebase UID as secondary
  */
 
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteField } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, setDoc, addDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { User } from '../../types/index';
 import { logger } from '../analytics/loggingService';
@@ -275,9 +275,13 @@ export class UserMigrationService {
    */
   private static async createNewUser(firebaseUser: any): Promise<User> {
     try {
+      // CRITICAL: Use the Firebase UID as the document ID to satisfy Firestore security rules
+      // The rule requires: request.auth.uid == userId (where userId is the document ID)
+      const userId = firebaseUser.uid;
+      
       const userData = {
-        id: firebaseUser.uid,
-        firebase_uid: firebaseUser.uid,
+        id: userId,
+        firebase_uid: userId,
         name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
         email: firebaseUser.email || '',
         wallet_address: '',
@@ -294,10 +298,14 @@ export class UserMigrationService {
         total_points_earned: 0
       };
       
-      const userRef = await addDoc(collection(db, 'users'), userData);
+      // Use setDoc with the Firebase UID as document ID (not addDoc with auto-generated ID)
+      // This ensures the Firestore security rule (request.auth.uid == userId) is satisfied
+      const userRef = doc(db, 'users', userId);
+      await setDoc(userRef, userData);
+      
       const newUser = {
         ...userData,
-        id: userRef.id
+        id: userId
       } as User;
       
       logger.info('Created new user', { 
@@ -317,9 +325,13 @@ export class UserMigrationService {
    */
   private static async createNewUserWithPhone(firebaseUser: any, phoneNumber: string): Promise<User> {
     try {
+      // CRITICAL: Use the Firebase UID as the document ID to satisfy Firestore security rules
+      // The rule requires: request.auth.uid == userId (where userId is the document ID)
+      const userId = firebaseUser.uid;
+      
       const userData = {
-        id: firebaseUser.uid,
-        firebase_uid: firebaseUser.uid,
+        id: userId,
+        firebase_uid: userId,
         name: firebaseUser.displayName || phoneNumber.substring(0, 5) + '...' || 'User',
         email: firebaseUser.email || '', // Email may be empty for phone-only users
         phone: phoneNumber,
@@ -339,10 +351,14 @@ export class UserMigrationService {
         total_points_earned: 0
       };
       
-      const userRef = await addDoc(collection(db, 'users'), userData);
+      // Use setDoc with the Firebase UID as document ID (not addDoc with auto-generated ID)
+      // This ensures the Firestore security rule (request.auth.uid == userId) is satisfied
+      const userRef = doc(db, 'users', userId);
+      await setDoc(userRef, userData);
+      
       const newUser = {
         ...userData,
-        id: userRef.id
+        id: userId
       } as User;
       
       logger.info('Created new user (phone)', { 

@@ -514,14 +514,33 @@ const CreateProfileScreen: React.FC = () => {
             existingUser = await firebaseDataService.user.getCurrentUser(state.currentUser.id);
           } else if (phoneNumber) {
             // Fallback: try to find by phone number
-            const usersByPhone = await firebaseDataService.user.getUsersByPhone(phoneNumber);
-            if (usersByPhone && usersByPhone.length > 0) {
-              existingUser = usersByPhone[0];
-            }
+            existingUser = await firebaseDataService.user.getUserByPhone(phoneNumber);
           }
         } else {
-          // For email authentication, check by email
-          existingUser = await firebaseDataService.user.getUserByEmail(email);
+          // For email authentication, first check by Firebase Auth UID (catches Phantom users)
+          // Then fall back to email lookup
+          if (auth?.currentUser?.uid) {
+            try {
+              existingUser = await firebaseDataService.user.getCurrentUser(auth.currentUser.uid);
+              if (existingUser) {
+                logger.info('Found user by Firebase Auth UID', {
+                  userId: existingUser.id,
+                  hasWallet: !!existingUser.wallet_address,
+                  walletType: existingUser.wallet_type
+                }, 'CreateProfileScreen');
+              }
+            } catch (error) {
+              logger.debug('User not found by Firebase Auth UID, trying email lookup', {
+                uid: auth.currentUser.uid,
+                error: error instanceof Error ? error.message : String(error)
+              }, 'CreateProfileScreen');
+            }
+          }
+          
+          // Fallback: check by email if not found by UID
+          if (!existingUser) {
+            existingUser = await firebaseDataService.user.getUserByEmail(email);
+          }
         }
         
         if (existingUser && existingUser.name && existingUser.name.trim() !== '') {
@@ -683,21 +702,44 @@ const CreateProfileScreen: React.FC = () => {
 
           if (existingUser) {
             // User exists, update their profile data
+            // CRITICAL: Preserve existing wallet_address if user has one (e.g., Phantom wallet)
+            const updateData: any = {
+              name: pseudo,
+              avatar: avatar || existingUser.avatar,
+              hasCompletedOnboarding: true
+            };
+            
+            // Preserve wallet info if it exists (especially for Phantom/external wallets)
+            if (existingUser.wallet_address) {
+              updateData.wallet_address = existingUser.wallet_address;
+              updateData.wallet_public_key = existingUser.wallet_public_key || existingUser.wallet_address;
+              if (existingUser.wallet_type) {
+                updateData.wallet_type = existingUser.wallet_type;
+              }
+              if (existingUser.wallet_status) {
+                updateData.wallet_status = existingUser.wallet_status;
+              }
+              logger.info('Preserving existing wallet address for user', {
+                userId: existingUser.id,
+                walletAddress: existingUser.wallet_address.substring(0, 8) + '...',
+                walletType: existingUser.wallet_type
+              }, 'CreateProfileScreen');
+            }
+            
             logger.info('Email user exists, updating profile data', { userId: existingUser.id, name: pseudo }, 'CreateProfileScreen');
-          user = await firebaseDataService.user.updateUser(existingUser.id, {
-            name: pseudo,
-            avatar: avatar || existingUser.avatar,
-            hasCompletedOnboarding: true
-          });
+            user = await firebaseDataService.user.updateUser(existingUser.id, updateData);
         } else {
           // User doesn't exist, create new user
+          // Check if this is a Phantom user by checking if we have a wallet from Phantom auth
+          // For Phantom users, the wallet should already be set in the user record created by PhantomAuthService
+          // But if we're here, the user record wasn't found, so we'll create it
           // Note: wallet_address is required by User type, but may not exist during onboarding
-          // We'll use an empty string as placeholder - wallet will be created later
+          // We'll use an empty string as placeholder - wallet will be created later (unless it's a Phantom user)
           logger.info('User does not exist, creating new user', { email, name: pseudo }, 'CreateProfileScreen');
           user = await firebaseDataService.user.createUser({
             email,
             name: pseudo,
-            wallet_address: '', // Placeholder - will be set when wallet is created
+            wallet_address: '', // Placeholder - will be set when wallet is created (or preserved if Phantom)
             avatar: avatar || undefined,
             hasCompletedOnboarding: true
           });

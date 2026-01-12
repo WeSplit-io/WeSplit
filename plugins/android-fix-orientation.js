@@ -48,7 +48,7 @@ module.exports = function withAndroidOrientationFix(config) {
       application['activity-alias'].forEach((alias) => {
         if (alias.$) {
           if (alias.$['android:screenOrientation']) {
-            delete alias.$['android:screenOrientation'];
+          delete alias.$['android:screenOrientation'];
           }
           // Also remove tools:replace if it exists for screenOrientation
           if (alias.$['tools:replace'] && alias.$['tools:replace'].includes('android:screenOrientation')) {

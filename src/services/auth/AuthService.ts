@@ -816,6 +816,21 @@ class AuthService {
       // Check if user already has wallet in database
       const existingUser = await firebaseDataService.user.getCurrentUser(userId);
       if (existingUser?.wallet_address) {
+        // CRITICAL: If user has an external wallet (e.g., Phantom), don't create a new app-generated wallet
+        if (existingUser.wallet_type === 'external') {
+          logger.info('User has external wallet (e.g., Phantom), skipping app-generated wallet creation', {
+            userId,
+            walletAddress: existingUser.wallet_address,
+            walletType: existingUser.wallet_type
+          }, 'AuthService');
+          
+          // Return the existing external wallet - no need to create a new one
+          return {
+            walletAddress: existingUser.wallet_address,
+            walletPublicKey: existingUser.wallet_public_key || existingUser.wallet_address
+          };
+        }
+        
         // Check if wallet exists on device
         const hasWalletOnDevice = await walletService.hasWalletOnDevice(userId);
 

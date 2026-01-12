@@ -619,6 +619,35 @@ export class WalletRecoveryService {
     try {
       logger.info('Starting comprehensive wallet recovery', { userId, hasEmail: !!userEmail }, 'WalletRecoveryService');
 
+      // CRITICAL: Check if this is an external wallet (e.g., Phantom) - skip recovery for external wallets
+      // External wallets don't have mnemonics/private keys stored locally - they're managed by the external provider
+      try {
+        const { firebaseDataService } = await import('../../data/firebaseDataService');
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        
+        if (userData?.wallet_type === 'external' && userData?.wallet_address) {
+          logger.info('Skipping wallet recovery for external wallet (e.g., Phantom) - wallet is managed by external provider', {
+            userId,
+            walletAddress: userData.wallet_address,
+            walletType: userData.wallet_type
+          }, 'WalletRecoveryService');
+          
+          // Return success with the external wallet address - no recovery needed
+          return {
+            success: true,
+            wallet: {
+              address: userData.wallet_address,
+              publicKey: userData.wallet_public_key || userData.wallet_address,
+              privateKey: '', // External wallets don't have private keys in our system
+              isExternal: true
+            },
+            isExternal: true
+          };
+        }
+      } catch (userDataError) {
+        logger.debug('Could not check wallet type, proceeding with recovery', { userId, error: userDataError }, 'WalletRecoveryService');
+      }
+
       // Try to migrate old production wallets first
       const migrationResult = await this.migrateOldProductionWallets(userId);
       if (migrationResult) {
@@ -1101,6 +1130,35 @@ export class WalletRecoveryService {
   static async performComprehensiveRecovery(userId: string, expectedAddress: string): Promise<WalletRecoveryResult> {
     try {
       logger.debug('Starting comprehensive recovery', { userId, expectedAddress }, 'WalletRecoveryService');
+      
+      // CRITICAL: Check if this is an external wallet (e.g., Phantom) - skip recovery for external wallets
+      // External wallets don't have mnemonics/private keys stored locally - they're managed by the external provider
+      try {
+        const { firebaseDataService } = await import('../../data/firebaseDataService');
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        
+        if (userData?.wallet_type === 'external') {
+          logger.info('Skipping wallet recovery for external wallet (e.g., Phantom) - wallet is managed by external provider', {
+            userId,
+            walletAddress: expectedAddress,
+            walletType: userData.wallet_type
+          }, 'WalletRecoveryService');
+          
+          // Return success with the external wallet address - no recovery needed
+          return {
+            success: true,
+            wallet: {
+              address: expectedAddress,
+              publicKey: userData.wallet_public_key || expectedAddress,
+              privateKey: '', // External wallets don't have private keys in our system
+              isExternal: true
+            },
+            isExternal: true
+          };
+        }
+      } catch (userDataError) {
+        logger.debug('Could not check wallet type, proceeding with recovery', { userId, error: userDataError }, 'WalletRecoveryService');
+      }
       
       // 0. Try to migrate old production wallets first
       const migrationResult = await this.migrateOldProductionWallets(userId);
