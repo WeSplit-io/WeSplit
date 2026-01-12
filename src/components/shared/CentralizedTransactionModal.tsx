@@ -89,6 +89,8 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
 
   // ✅ CRITICAL: Prevent multiple transaction executions (debouncing)
   const isExecutingRef = useRef(false);
+  // Track if auto-execution has been attempted (prevents infinite loops)
+  const hasAutoExecutedRef = useRef(false);
 
   // Get currentUser from props or AppContext
   const { state: appState } = useApp();
@@ -139,8 +141,13 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
 
   // Reset amount and note when config or visible changes (matching screen behavior)
   useEffect(() => {
-    if (!visible) return; // Only reset when modal becomes visible
+    if (!visible) {
+      // Reset auto-execution flag when modal closes
+      hasAutoExecutedRef.current = false;
+      return;
+    }
     
+    // Reset form when modal becomes visible
     if (config.prefilledAmount && config.prefilledAmount > 0) {
       setAmount(formatAmountWithComma(config.prefilledAmount));
     } else {
@@ -148,6 +155,8 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     }
     setNote(config.prefilledNote || '');
     setValidationError(null);
+    // Reset auto-execution flag when modal opens with new config
+    hasAutoExecutedRef.current = false;
   }, [visible, config.prefilledAmount, config.prefilledNote, config.context]);
 
   // Log modal visibility changes for debugging
@@ -754,12 +763,9 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     }
   }, [amount, config.context, currentUser, finalRecipientInfo, contact, wallet, requestId, isSettlement, effectiveSplitWalletId, effectiveSplitId, effectiveBillId, effectiveSharedWalletId, centralizedTransactionHandler]);
 
-  // For spend split payment, auto-execute on mount (matching screen behavior)
-  useEffect(() => {
-    if (config.context === 'spend_split_payment' && effectiveSplitId && effectiveSplitWalletId) {
-      handleExecuteTransaction();
-    }
-  }, [config.context, effectiveSplitId, effectiveSplitWalletId, handleExecuteTransaction]);
+  // ✅ REMOVED: Auto-execution for spend_split_payment
+  // Transactions to split wallets should only occur when user explicitly triggers them
+  // User must click the "Send" or "Confirm" button to execute the transaction
 
   // Calculate network fee (3%)
   const numAmount = parseFloat(amount.replace(',', '.')) || 0;

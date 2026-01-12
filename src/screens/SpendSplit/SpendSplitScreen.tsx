@@ -829,11 +829,39 @@ const SpendSplitScreen: React.FC<SpendSplitScreenProps> = ({ navigation, route }
           const updatedWalletResult = await SplitWalletService.getSplitWallet(wallet.id);
           if (updatedWalletResult.success && updatedWalletResult.wallet) {
             setSplitWallet(updatedWalletResult.wallet);
+            
+            // ✅ CRITICAL: Check immediately if split is full and trigger merchant payment
+            // Don't wait for polling - check right after participant payment succeeds
+            const updatedWallet = updatedWalletResult.wallet;
+            const allParticipantsPaid = updatedWallet.participants.every((p: any) => p.status === 'paid');
+            const totalPaid = updatedWallet.participants.reduce((sum: number, p: any) => sum + (p.amountPaid || 0), 0);
+            
+            // Check if payment threshold is met for SPEND
+            if (allParticipantsPaid && splitData && SpendPaymentModeService.isPaymentThresholdMet(splitData, totalPaid)) {
+              // Check if payment has already been processed
+              if (!SpendPaymentModeService.isPaymentAlreadyProcessed(splitData)) {
+                logger.info('SPEND split is full - automatically triggering merchant payment', {
+                  splitId: splitData.id,
+                  splitWalletId: updatedWallet.id,
+                  totalPaid,
+                  threshold: SpendPaymentModeService.getPaymentThreshold(splitData),
+                }, 'SpendSplitScreen');
+                
+                // Trigger merchant payment immediately
+                checkPaymentCompletion();
+              }
+            } else {
+              // If not full yet, still check after delay (for edge cases)
+              setTimeout(() => checkPaymentCompletion(), 2000);
+            }
+          } else {
+            // Fallback: trigger payment completion check after delay if wallet reload failed
+            setTimeout(() => checkPaymentCompletion(), 2000);
           }
+        } else {
+          // Fallback: trigger payment completion check after delay
+          setTimeout(() => checkPaymentCompletion(), 2000);
         }
-
-        // Trigger payment completion check
-        setTimeout(() => checkPaymentCompletion(), 2000);
       },
       onError: (error) => {
         logger.error('Payment failed', {
