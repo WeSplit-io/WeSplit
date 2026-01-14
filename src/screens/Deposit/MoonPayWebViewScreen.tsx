@@ -9,6 +9,7 @@ import { firebaseDataService } from '../../services/data';
 import styles from './styles';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
+import { isMoonPayEnabled } from '../../config/features';
 
 interface MoonPayWebViewParams {
   url: string;
@@ -38,6 +39,22 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Prevent multiple screen loads
   const [hasLoaded, setHasLoaded] = useState(false);
+
+  // Check if MoonPay is enabled - if not, redirect back immediately
+  useEffect(() => {
+    if (!isMoonPayEnabled()) {
+      Alert.alert(
+        'Feature Unavailable',
+        'Credit/Debit card funding via MoonPay is currently unavailable. This feature will be available in a future update. Please use Crypto Transfer to deposit funds.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    }
+  }, [navigation]);
+
+  // Don't render if MoonPay is disabled
+  if (!isMoonPayEnabled()) {
+    return null;
+  }
 
   logger.debug('Screen loaded with params', {
     url,

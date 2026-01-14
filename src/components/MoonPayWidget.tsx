@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Alert, Clipboard, Linking, StyleSheet } from 'react-native';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { useApp } from '../context/AppContext';
@@ -7,6 +7,7 @@ import { firebaseMoonPayService } from '../services/integrations/external';
 import { colors } from '../theme/colors';
 import { logger } from '../services/core';
 import { Input, Button, Modal } from './shared';
+import { isMoonPayEnabled } from '../config/features';
 
 interface MoonPayWidgetProps {
   isVisible: boolean;
@@ -29,7 +30,26 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [amount, setAmount] = useState(initialAmount?.toString() || '100');
 
+  // Ensure MoonPay is disabled if feature flag is off
+  useEffect(() => {
+    if (!isMoonPayEnabled() && isVisible) {
+      onClose();
+      Alert.alert(
+        'Feature Unavailable',
+        'Credit/Debit card funding via MoonPay is currently unavailable. This feature will be available in a future update. Please use Crypto Transfer to deposit funds.'
+      );
+    }
+  }, [isVisible, onClose]);
+
   const handleOpenMoonPay = async () => {
+    // Double-check feature flag before proceeding
+    if (!isMoonPayEnabled()) {
+      Alert.alert(
+        'Feature Unavailable',
+        'Credit/Debit card funding via MoonPay is currently unavailable. This feature will be available in a future update. Please use Crypto Transfer to deposit funds.'
+      );
+      return;
+    }
     try {
       setIsLoading(true);
       logger.info('Opening purchase flow', null, 'MoonPayWidget');
@@ -154,9 +174,14 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
     }
   };
 
+  // Don't render if MoonPay is disabled
+  if (!isMoonPayEnabled()) {
+    return null;
+  }
+
   return (
       <Modal
-      visible={isVisible}
+      visible={isVisible && isMoonPayEnabled()}
       onClose={handleClose}
       title="Deposit Crypto"
       description="Purchase USDC using your credit or debit card"

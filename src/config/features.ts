@@ -4,7 +4,7 @@
  * Controls rollout of experimental features per environment
  */
 
-import { PHANTOM_CONFIG } from './env';
+import { PHANTOM_CONFIG, isProduction } from './env';
 import { isPhantomConfigured } from '../providers/PhantomSDKProvider';
 
 export interface FeatureFlags {
@@ -17,6 +17,9 @@ export interface FeatureFlags {
 
   // Shared Wallet Feature
   SHARED_WALLET_ENABLED: boolean;
+
+  // MoonPay Integration (DISABLED in production for App Store compliance)
+  MOONPAY_ENABLED: boolean;
 
   // Other features can be added here
 }
@@ -31,6 +34,12 @@ const getEnvironmentFeatures = (): FeatureFlags => {
 
   // Enable Phantom features based on configuration, not just dev mode
   // In production, features are enabled via environment variables
+  
+  // MoonPay is DISABLED in production for App Store compliance
+  // Guideline 2.1: WeSplit does not provide cryptocurrency exchange services
+  // MoonPay integration is disabled to avoid being classified as an exchange
+  const moonpayEnabled = !isProduction && (process.env.EXPO_PUBLIC_MOONPAY_ENABLED === 'true');
+  
   return {
     PHANTOM_SDK_ENABLED: isPhantomConfigValid,
     PHANTOM_SOCIAL_LOGIN: isPhantomConfigValid && PHANTOM_CONFIG.features.socialLogin,
@@ -38,6 +47,7 @@ const getEnvironmentFeatures = (): FeatureFlags => {
     PHANTOM_AUTO_CONFIRM: PHANTOM_CONFIG.features.autoConfirm,
     PHANTOM_MULTI_CHAIN: PHANTOM_CONFIG.features.multiChain,
     SHARED_WALLET_ENABLED: sharedWalletEnabled, // Enabled in all environments
+    MOONPAY_ENABLED: moonpayEnabled, // Disabled in production
   };
 };
 
@@ -50,6 +60,7 @@ export const isPhantomSplitWalletsEnabled = (): boolean => FEATURES.PHANTOM_SPLI
 export const isPhantomAutoConfirmEnabled = (): boolean => FEATURES.PHANTOM_AUTO_CONFIRM;
 export const isPhantomMultiChainEnabled = (): boolean => FEATURES.PHANTOM_MULTI_CHAIN;
 export const isSharedWalletEnabled = (): boolean => FEATURES.SHARED_WALLET_ENABLED;
+export const isMoonPayEnabled = (): boolean => FEATURES.MOONPAY_ENABLED;
 
 // Feature flag overrides (for testing/debugging)
 export const overrideFeatureFlag = (flag: keyof FeatureFlags, value: boolean): void => {

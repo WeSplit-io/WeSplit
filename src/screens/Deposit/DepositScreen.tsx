@@ -7,6 +7,7 @@ import MoonPayWidget from '../../components/MoonPayWidget';
 import styles from './styles';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
+import { isMoonPayEnabled } from '../../config/features';
 
 interface DepositParams {
   targetWallet?: {
@@ -124,20 +125,22 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
         </View>
         </View>
         
-        {/* MoonPay Widget */}
-        <MoonPayWidget
-          isVisible={showMoonPayWidget}
-          onClose={() => setShowMoonPayWidget(false)}
-          onSuccess={() => {
-            setShowMoonPayWidget(false);
-            params.onSuccess?.();
-          }}
-          onError={(error) => {
-            console.error('🔍 DepositScreen: MoonPay error:', error);
-          }}
-          amount={params.prefillAmount}
-          navigation={navigation}
-        />
+        {/* MoonPay Widget - Only render if MoonPay is enabled (disabled in production) */}
+        {isMoonPayEnabled() && (
+          <MoonPayWidget
+            isVisible={showMoonPayWidget}
+            onClose={() => setShowMoonPayWidget(false)}
+            onSuccess={() => {
+              setShowMoonPayWidget(false);
+              params.onSuccess?.();
+            }}
+            onError={(error) => {
+              console.error('🔍 DepositScreen: MoonPay error:', error);
+            }}
+            amount={params.prefillAmount}
+            navigation={navigation}
+          />
+        )}
       </View>
     </Container>
   );
