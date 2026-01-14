@@ -11,8 +11,36 @@ echo ""
 
 # Company Wallet Secrets
 echo "1. Setting Company Wallet Secrets..."
-echo 'HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN' | firebase functions:secrets:set COMPANY_WALLET_ADDRESS
-echo '[65,160,52,47,45,137,3,148,31,68,218,138,28,87,159,106,25,146,144,26,62,115,163,200,181,218,153,110,238,93,175,196,247,171,236,126,249,226,121,47,95,94,152,248,83,3,53,129,63,165,55,207,255,128,61,237,73,223,151,87,161,99,247,67]' | firebase functions:secrets:set COMPANY_WALLET_SECRET_KEY
+echo "⚠️  WARNING: This script requires COMPANY_WALLET_ADDRESS and COMPANY_WALLET_SECRET_KEY environment variables"
+echo "   Do NOT commit secrets to version control!"
+echo ""
+
+if [ -z "$COMPANY_WALLET_ADDRESS" ]; then
+    echo "❌ Error: COMPANY_WALLET_ADDRESS environment variable is not set"
+    echo "   Set it with: export COMPANY_WALLET_ADDRESS='your-wallet-address'"
+    exit 1
+fi
+
+if [ -z "$COMPANY_WALLET_SECRET_KEY" ]; then
+    echo "❌ Error: COMPANY_WALLET_SECRET_KEY environment variable is not set"
+    echo "   Set it with: export COMPANY_WALLET_SECRET_KEY='[your-secret-key-array]'"
+    exit 1
+fi
+
+# Validate address format
+if [[ ${#COMPANY_WALLET_ADDRESS} -lt 32 || ${#COMPANY_WALLET_ADDRESS} -gt 44 ]]; then
+    echo "❌ Error: Invalid wallet address length (expected 32-44 characters)"
+    exit 1
+fi
+
+# Validate secret key format
+if ! echo "$COMPANY_WALLET_SECRET_KEY" | grep -qE '^\[[0-9, ]+\]$'; then
+    echo "❌ Error: Invalid secret key format. Expected JSON array like [65,160,52,...]"
+    exit 1
+fi
+
+echo "$COMPANY_WALLET_ADDRESS" | firebase functions:secrets:set COMPANY_WALLET_ADDRESS
+echo "$COMPANY_WALLET_SECRET_KEY" | firebase functions:secrets:set COMPANY_WALLET_SECRET_KEY
 echo "✅ Company wallet secrets set"
 echo ""
 

@@ -116,7 +116,7 @@ Company wallet address is fetched from Firebase Secrets:
 
 **Firebase Function:** `getCompanyWalletAddress`
 **Secret Name:** `COMPANY_WALLET_ADDRESS`
-**Expected Value:** `HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN`
+**Expected Value:** `YOUR_COMPANY_WALLET_ADDRESS` (set in Firebase Secrets)
 
 **Verification:**
 ```bash
@@ -148,7 +148,7 @@ npm run test:secrets
 
 ### Expected Output
 ```
-✅ Company wallet address: HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN
+✅ Company wallet address: YOUR_COMPANY_WALLET_ADDRESS
 ✅ Fee payer: Company wallet (always)
 ✅ Fee calculation: Centralized via FeeService
 ✅ Fee collection: Separate USDC transfer instruction

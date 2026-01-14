@@ -152,6 +152,19 @@ class AuthService {
       // NOTE: Wallet and login time updates require authentication
       // These will be handled after sign-in with custom token in VerificationScreen
       // We skip them here to avoid permission errors before auth is ready
+      
+      // Store device fingerprint (non-blocking, requires userId)
+      if (result.user?.id) {
+        try {
+          const { deviceFingerprintService } = await import('../security/deviceFingerprintService');
+          await deviceFingerprintService.storeDeviceFingerprint(result.user.id);
+        } catch (fingerprintError) {
+          logger.warn('Failed to store device fingerprint (non-critical)', {
+            error: fingerprintError instanceof Error ? fingerprintError.message : String(fingerprintError)
+          }, 'AuthService');
+          // Don't fail authentication if fingerprint storage fails
+        }
+      }
     }
 
     return {
@@ -746,6 +759,17 @@ class AuthService {
 
       // Update last login time
       await this.updateLastLoginTime(userCredential.user.uid);
+
+      // Store device fingerprint (non-blocking)
+      try {
+        const { deviceFingerprintService } = await import('../security/deviceFingerprintService');
+        await deviceFingerprintService.storeDeviceFingerprint(userCredential.user.uid);
+      } catch (fingerprintError) {
+        logger.warn('Failed to store device fingerprint (non-critical)', {
+          error: fingerprintError instanceof Error ? fingerprintError.message : String(fingerprintError)
+        }, 'AuthService');
+        // Don't fail authentication if fingerprint storage fails
+      }
 
       logger.info('✅ Server-side Phone Sign-In successful', {
         userId: userCredential.user.uid,

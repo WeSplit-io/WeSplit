@@ -14,7 +14,7 @@ import { auth } from '../../config/firebase/firebase';
 import { AuthPersistenceService } from '../../services/core/authPersistenceService';
 
 // Dynamic code length based on verification type
-const getCodeLength = (phoneNumber?: string) => phoneNumber ? 6 : 4; // 6 digits for phone, 4 for email
+const getCodeLength = (phoneNumber?: string) => phoneNumber ? 6 : 6; // 6 digits for phone, 6 for email
 const RESEND_SECONDS = 30;
 
 const VerificationScreen: React.FC = () => {

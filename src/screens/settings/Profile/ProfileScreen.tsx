@@ -93,24 +93,102 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             try {
               if (__DEV__) { logger.info('Starting logout process', null, 'ProfileScreen'); }
 
+              // ✅ CRITICAL: Set Phantom logout flag FIRST (before any imports or async operations)
+              // This prevents auto-connect from triggering during logout
+              if (currentUser?.wallet_type === 'external') {
+                try {
+                  const { PhantomAuthService } = await import('../../../services/auth/PhantomAuthService');
+                  const phantomService = PhantomAuthService.getInstance();
+                  phantomService.setLogoutFlag();
+                  if (__DEV__) { logger.info('Phantom logout flag set immediately', null, 'ProfileScreen'); }
+                } catch (phantomFlagError) {
+                  logger.warn('Failed to set Phantom logout flag (non-critical)', {
+                    error: phantomFlagError instanceof Error ? phantomFlagError.message : String(phantomFlagError)
+                  }, 'ProfileScreen');
+                  // Continue with logout even if flag setting fails
+                }
+              }
+
               // Import required services
-              const { authService } = await import('../../../services/auth');
+              // ✅ CRITICAL: Import AuthService directly (not from index) to avoid module resolution issues
+              // Use the same pattern as other screens (AuthMethodsScreen, DashboardScreen, etc.)
+              let authService;
+              try {
+                const authServiceModule = await import('../../../services/auth/AuthService');
+                // Handle both named export and default export
+                authService = authServiceModule.authService || authServiceModule.default;
+                
+                if (!authService) {
+                  logger.error('authService is undefined after import', {
+                    hasAuthService: !!authServiceModule.authService,
+                    hasDefault: !!authServiceModule.default,
+                    moduleKeys: Object.keys(authServiceModule)
+                  }, 'ProfileScreen');
+                  throw new Error('authService is not available');
+                }
+                
+                if (typeof authService.signOut !== 'function') {
+                  logger.error('authService.signOut is not a function', {
+                    authServiceType: typeof authService,
+                    authServiceKeys: Object.keys(authService || {})
+                  }, 'ProfileScreen');
+                  throw new Error('authService.signOut method is missing');
+                }
+              } catch (importError) {
+                logger.error('Failed to import authService', {
+                  error: importError instanceof Error ? importError.message : String(importError)
+                }, 'ProfileScreen');
+                // Fallback: try importing from index
+                try {
+                  const indexModule = await import('../../../services/auth');
+                  authService = indexModule.authService;
+                  if (!authService || typeof authService.signOut !== 'function') {
+                    throw new Error('authService not available from index');
+                  }
+                } catch (fallbackError) {
+                  logger.error('Failed to import authService from index as fallback', {
+                    error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+                  }, 'ProfileScreen');
+                  // Still try to continue with logout using AppContext
+                  Alert.alert(
+                    'Logout Error',
+                    'Unable to import authentication service. Clearing app state and navigating to login screen.',
+                    [{ text: 'OK' }]
+                  );
+                  logoutUser();
+                  navigation.replace('AuthMethods');
+                  return;
+                }
+              }
+              
               const { walletService } = await import('../../../services/blockchain/wallet');
               const { AuthPersistenceService } = await import('../../../services/core/authPersistenceService');
               const { clearAesKeyCache } = await import('../../../services/security/secureVault');
               const { PhantomAuthService } = await import('../../../services/auth/PhantomAuthService');
 
               // Step 0: Sign out from Phantom if user is using Phantom auth
+              // ✅ CRITICAL: Do this FIRST to set logout flag before any navigation or state changes
               // Check if user has external wallet (likely Phantom)
               if (currentUser?.wallet_type === 'external') {
                 try {
                   const phantomService = PhantomAuthService.getInstance();
+                  // Ensure logout flag is still set (in case it wasn't set above)
+                  phantomService.setLogoutFlag();
+                  
+                  // Then perform full sign out
                   await phantomService.signOut();
                   if (__DEV__) { logger.info('Phantom signOut completed', null, 'ProfileScreen'); }
                 } catch (phantomError) {
                   logger.warn('Failed to sign out from Phantom (non-critical)', {
                     error: phantomError instanceof Error ? phantomError.message : String(phantomError)
                   }, 'ProfileScreen');
+                  // Still set logout flag even if signOut fails
+                  try {
+                    const phantomService = PhantomAuthService.getInstance();
+                    phantomService.setLogoutFlag();
+                  } catch (flagError) {
+                    // Ignore flag setting errors
+                  }
                   // Continue with logout even if Phantom signOut fails
                 }
               }
@@ -177,7 +255,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
               if (__DEV__) { logger.info('Logout completed successfully', null, 'ProfileScreen'); }
 
-              // Step 6: Navigate to auth methods screen
+              // Step 6: Small delay before navigation to ensure logout flag is set and SDK is disconnected
+              // This prevents race conditions where auto-connect might trigger during navigation
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // Step 7: Navigate to auth methods screen
               navigation.replace('AuthMethods');
 
             } catch (error) {

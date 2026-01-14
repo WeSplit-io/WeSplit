@@ -74,25 +74,49 @@ async function testSecretsDirectly() {
     return false;
   }
   
+  // Parse secret key - support both JSON array and base64 formats
+  // (Same logic as transactionSigningService.js)
+  // Declare outside if block so it's accessible for keypair creation
+  let secretKeyArray;
+  
   console.log('\nCOMPANY_WALLET_SECRET_KEY:');
   if (companyWalletSecretKey) {
     console.log(`  ✅ Found: ${companyWalletSecretKey.length} characters`);
-    
-    // Try to parse as JSON array
     try {
-      const secretKeyArray = JSON.parse(companyWalletSecretKey);
-      if (Array.isArray(secretKeyArray) && secretKeyArray.length === 64) {
-        console.log(`  ✅ Valid format: Array of ${secretKeyArray.length} numbers`);
-        console.log(`  First 5 values: [${secretKeyArray.slice(0, 5).join(', ')}...]`);
-        console.log(`  Last 5 values: [...${secretKeyArray.slice(-5).join(', ')}]`);
-      } else {
-        console.log(`  ❌ Invalid format: Expected array of 64 numbers, got ${Array.isArray(secretKeyArray) ? `array of ${secretKeyArray.length}` : typeof secretKeyArray}`);
+      // First, try to parse as JSON array directly (for backward compatibility)
+      secretKeyArray = JSON.parse(companyWalletSecretKey);
+      console.log(`  ✅ Format: JSON array`);
+    } catch (jsonError) {
+      // If JSON parsing fails, try base64 decoding
+      try {
+        console.log(`  ℹ️  Not JSON format, trying base64...`);
+        const decoded = Buffer.from(companyWalletSecretKey, 'base64');
+        
+        // Try to parse the decoded value as JSON (in case it's base64-encoded JSON)
+        try {
+          secretKeyArray = JSON.parse(decoded.toString('utf8'));
+          console.log(`  ✅ Format: Base64-encoded JSON array`);
+        } catch (nestedJsonError) {
+          // If that fails, treat the decoded bytes as the raw secret key array
+          secretKeyArray = Array.from(decoded);
+          console.log(`  ✅ Format: Base64-encoded raw bytes`);
+        }
+      } catch (base64Error) {
+        console.log(`  ❌ Failed to parse: Not valid JSON or base64`);
+        console.log(`     JSON error: ${jsonError.message}`);
+        console.log(`     Base64 error: ${base64Error.message}`);
         return false;
       }
-    } catch (parseError) {
-      console.log(`  ❌ Failed to parse as JSON: ${parseError.message}`);
+    }
+    
+    if (!Array.isArray(secretKeyArray) || secretKeyArray.length !== 64) {
+      console.log(`  ❌ Invalid format: Expected array of 64 numbers, got ${Array.isArray(secretKeyArray) ? `array of ${secretKeyArray.length}` : typeof secretKeyArray}`);
       return false;
     }
+    
+    console.log(`  ✅ Valid format: Array of ${secretKeyArray.length} numbers`);
+    console.log(`  First 5 values: [${secretKeyArray.slice(0, 5).join(', ')}...]`);
+    console.log(`  Last 5 values: [...${secretKeyArray.slice(-5).join(', ')}]`);
   } else {
     console.log('  ❌ Missing');
     return false;
@@ -101,7 +125,7 @@ async function testSecretsDirectly() {
   // Test keypair creation
   try {
     const { Keypair } = require('@solana/web3.js');
-    const secretKeyArray = JSON.parse(companyWalletSecretKey);
+    // Use the parsed secretKeyArray (already parsed above)
     const keypair = Keypair.fromSecretKey(Buffer.from(secretKeyArray));
     const derivedAddress = keypair.publicKey.toBase58();
     

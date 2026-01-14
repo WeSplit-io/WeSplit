@@ -42,15 +42,21 @@ async function testGetCompanyWalletAddress() {
     
     if (result.data && result.data.success && result.data.address) {
       const address = result.data.address;
+      const expectedAddress = process.env.COMPANY_WALLET_ADDRESS;
+      
       console.log('\n✅ SUCCESS!');
       console.log(`   Address: ${address}`);
       console.log(`   Length: ${address.length} characters`);
-      console.log(`   Expected: HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN`);
       
-      if (address === 'HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN') {
-        console.log('   ✅ Address matches expected value!');
+      if (expectedAddress) {
+        console.log(`   Expected: ${expectedAddress}`);
+        if (address === expectedAddress) {
+          console.log('   ✅ Address matches expected value!');
+        } else {
+          console.log('   ⚠️  Address does not match expected value');
+        }
       } else {
-        console.log('   ⚠️  Address does not match expected value');
+        console.log('   ℹ️  Set COMPANY_WALLET_ADDRESS env var to verify address matches');
       }
     } else {
       console.log('\n❌ ERROR: Invalid response format');

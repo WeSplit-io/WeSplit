@@ -20,7 +20,10 @@ const firebaseConfig = {
 
 // Configuration
 const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // Devnet USDC
-const COMPANY_WALLET_ADDRESS = 'HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN';
+const COMPANY_WALLET_ADDRESS = process.env.COMPANY_WALLET_ADDRESS;
+if (!COMPANY_WALLET_ADDRESS) {
+  throw new Error('COMPANY_WALLET_ADDRESS environment variable is required for tests');
+}
 const RPC_URL = process.env.RPC_URL || 'https://api.devnet.solana.com';
 
 // Test configuration

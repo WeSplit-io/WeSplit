@@ -92,6 +92,18 @@ export const PhantomAuthButton: React.FC<PhantomAuthButtonProps> = ({
 
   // Memoize handler to prevent recreation and infinite loops
   const handleSuccessfulConnection = useCallback(async (connectedUser: any) => {
+    // ✅ CRITICAL: Check logout flag FIRST before any processing
+    const authService = PhantomAuthService.getInstance();
+    const isLoggedOut = authService.getIsLoggedOut();
+    
+    if (isLoggedOut) {
+      logger.info('Blocking connection attempt - user has logged out', {
+        authUserId: connectedUser?.authUserId,
+        authProvider: connectedUser?.authProvider
+      }, 'PhantomAuthButton');
+      return; // Don't process any connections if user has logged out
+    }
+    
     // Guard against concurrent processing
     if (processingRef.current || hasProcessedConnection || hasErrored) {
       logger.debug('Connection processing blocked', {
@@ -146,9 +158,27 @@ export const PhantomAuthButton: React.FC<PhantomAuthButtonProps> = ({
 
   // Listen for modal close after explicit user authentication (not auto-connect)
   useEffect(() => {
-    // CRITICAL: Check logout flag FIRST before any processing
+    // ✅ CRITICAL: Check logout flag FIRST before any processing
+    // This must be checked on every render to prevent race conditions
     const authService = PhantomAuthService.getInstance();
     const isLoggedOut = authService.getIsLoggedOut();
+    
+    // ✅ CRITICAL: If logged out, completely block all auto-connect processing
+    // Don't even check other conditions if user has logged out
+    if (isLoggedOut) {
+      // Check if this is an auto-connect attempt
+      if (user && (user as any).source === 'auto-connect') {
+        logger.info('Blocking auto-connect after logout - user needs to explicitly authenticate', {
+          authUserId: user.authUserId,
+          authProvider: user.authProvider,
+          status: user.status,
+          source: (user as any).source,
+          isLoggedOut
+        }, 'PhantomAuthButton');
+        return; // Don't process anything if user has logged out
+      }
+      // For explicit auth, still allow (user opened modal intentionally)
+    }
     
     // Only process if modal was opened and is now closed, and we have a connected user
     // But ignore auto-connect sources (session restoration)
@@ -159,17 +189,25 @@ export const PhantomAuthButton: React.FC<PhantomAuthButtonProps> = ({
       const isExplicitAuth = user.authUserId && user.authProvider && userSource !== 'auto-connect';
 
       if (isExplicitAuth) {
-        // Explicit authentication - always process (user opened modal)
-        logger.info('Modal closed with explicitly authenticated user, processing', {
-          authUserId: user.authUserId,
-          authProvider: user.authProvider,
-          status: user.status,
-          source: userSource
-        }, 'PhantomAuthButton');
+        // Explicit authentication - only process if not logged out
+        if (!isLoggedOut) {
+          logger.info('Modal closed with explicitly authenticated user, processing', {
+            authUserId: user.authUserId,
+            authProvider: user.authProvider,
+            status: user.status,
+            source: userSource
+          }, 'PhantomAuthButton');
 
-        handleSuccessfulConnection(user);
+          handleSuccessfulConnection(user);
+        } else {
+          logger.info('Blocking explicit auth after logout - logout flag is set', {
+            authUserId: user.authUserId,
+            authProvider: user.authProvider,
+            isLoggedOut
+          }, 'PhantomAuthButton');
+        }
       } else if (userSource === 'auto-connect') {
-        // CRITICAL: Block auto-connect if user has logged out
+        // CRITICAL: Block auto-connect if user has logged out (double-check)
         if (isLoggedOut) {
           logger.info('Blocking auto-connect after logout - user needs to explicitly authenticate', {
             authUserId: user.authUserId,
@@ -266,16 +304,21 @@ export const PhantomAuthButton: React.FC<PhantomAuthButtonProps> = ({
   // Reset processed state when connection changes (for re-authentication)
   // BUT: Don't reset if user has logged out (prevents auto-connect after logout)
   useEffect(() => {
+    // ✅ CRITICAL: Check logout flag FIRST before any state changes
+    const authService = PhantomAuthService.getInstance();
+    const isLoggedOut = authService.getIsLoggedOut();
+    
+    // If logged out, never reset processed state (prevents auto-connect)
+    if (isLoggedOut) {
+      return; // Keep processed state to block auto-connect
+    }
+    
     if (!isConnected || !user) {
-      const authService = PhantomAuthService.getInstance();
       // Only reset if user hasn't logged out
-      // If logged out, keep the processed state to prevent auto-connect
-      if (!authService.getIsLoggedOut()) {
-        setHasProcessedConnection(false);
-        setHasErrored(false);
-        setLastError(null);
-        processingRef.current = false;
-      }
+      setHasProcessedConnection(false);
+      setHasErrored(false);
+      setLastError(null);
+      processingRef.current = false;
     }
   }, [isConnected, user]);
 

@@ -4,10 +4,19 @@
 # This script helps find and clean up the old company wallet address
 
 OLD_ADDRESS="5DUShi8F8uncFtffTg64ki5TZEoNopXjRKyzZiz8u87T"
-NEW_ADDRESS="HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN"
+# NEW_ADDRESS should be set by user - read from environment variable or prompt
+NEW_ADDRESS="${NEW_ADDRESS:-}"
 
 echo "🔍 Searching for old company wallet address: $OLD_ADDRESS"
 echo ""
+
+# Check if NEW_ADDRESS is set
+if [ -z "$NEW_ADDRESS" ]; then
+    echo "⚠️  NEW_ADDRESS not set. This script will only check for the old address."
+    echo "   To set a new address, run: NEW_ADDRESS='your-new-address' ./CLEANUP_SCRIPT.sh"
+    echo "   Or set it as an environment variable: export NEW_ADDRESS='your-new-address'"
+    echo ""
+fi
 
 # 1. Check Firebase Secrets
 echo "1️⃣  Checking Firebase Secrets..."
@@ -16,8 +25,12 @@ if [ -d "services/firebase-functions" ]; then
     CURRENT_FIREBASE=$(firebase functions:secrets:access COMPANY_WALLET_ADDRESS 2>&1 | head -1)
     if [[ "$CURRENT_FIREBASE" == *"$OLD_ADDRESS"* ]]; then
         echo "   ⚠️  Firebase Secret has OLD address!"
-        echo "   Run: echo '$NEW_ADDRESS' | firebase functions:secrets:set COMPANY_WALLET_ADDRESS"
-    elif [[ "$CURRENT_FIREBASE" == *"$NEW_ADDRESS"* ]]; then
+        if [ -n "$NEW_ADDRESS" ]; then
+            echo "   Run: echo '$NEW_ADDRESS' | firebase functions:secrets:set COMPANY_WALLET_ADDRESS"
+        else
+            echo "   Run: echo 'YOUR_NEW_WALLET_ADDRESS' | firebase functions:secrets:set COMPANY_WALLET_ADDRESS"
+        fi
+    elif [ -n "$NEW_ADDRESS" ] && [[ "$CURRENT_FIREBASE" == *"$NEW_ADDRESS"* ]]; then
         echo "   ✅ Firebase Secret has NEW address"
     else
         echo "   ℹ️  Could not check Firebase Secret (may need to be set)"
@@ -35,8 +48,12 @@ if command -v eas &> /dev/null; then
     EAS_SECRET=$(eas secret:get --name EXPO_PUBLIC_COMPANY_WALLET_ADDRESS 2>&1)
     if [[ "$EAS_SECRET" == *"$OLD_ADDRESS"* ]]; then
         echo "   ⚠️  EAS Secret has OLD address!"
-        echo "   Run: eas secret:create --scope project --name EXPO_PUBLIC_COMPANY_WALLET_ADDRESS --value '$NEW_ADDRESS' --force"
-    elif [[ "$EAS_SECRET" == *"$NEW_ADDRESS"* ]]; then
+        if [ -n "$NEW_ADDRESS" ]; then
+            echo "   Run: eas secret:create --scope project --name EXPO_PUBLIC_COMPANY_WALLET_ADDRESS --value '$NEW_ADDRESS' --force"
+        else
+            echo "   Run: eas secret:create --scope project --name EXPO_PUBLIC_COMPANY_WALLET_ADDRESS --value 'YOUR_NEW_WALLET_ADDRESS' --force"
+        fi
+    elif [ -n "$NEW_ADDRESS" ] && [[ "$EAS_SECRET" == *"$NEW_ADDRESS"* ]]; then
         echo "   ✅ EAS Secret has NEW address"
     else
         echo "   ℹ️  EAS Secret not found or not accessible"

@@ -11,10 +11,11 @@
 
 ```bash
 # Company Wallet Address
-echo 'HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN' | firebase functions:secrets:set COMPANY_WALLET_ADDRESS
+echo 'YOUR_COMPANY_WALLET_ADDRESS' | firebase functions:secrets:set COMPANY_WALLET_ADDRESS
 
-# Company Wallet Secret Key (JSON array format)
-echo '[65,160,52,47,45,137,3,148,31,68,218,138,28,87,159,106,25,146,144,26,62,115,163,200,181,218,153,110,238,93,175,196,247,171,236,126,249,226,121,47,95,94,152,248,83,3,53,129,63,165,55,207,255,128,61,237,73,223,151,87,161,99,247,67]' | firebase functions:secrets:set COMPANY_WALLET_SECRET_KEY
+# Company Wallet Secret Key (JSON array format - 64 numbers)
+echo '[YOUR_SECRET_KEY_ARRAY]' | firebase functions:secrets:set COMPANY_WALLET_SECRET_KEY
+# Example format: [65,160,52,47,...,247,67] (64 numbers total)
 ```
 
 ### 2. Email Configuration (REQUIRED for email verification)
@@ -76,10 +77,11 @@ cd services/firebase-functions
 
 ```bash
 # Set company wallet address
-echo 'HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN' | firebase functions:secrets:set COMPANY_WALLET_ADDRESS
+echo 'YOUR_COMPANY_WALLET_ADDRESS' | firebase functions:secrets:set COMPANY_WALLET_ADDRESS
 
-# Set company wallet secret key
-echo '[65,160,52,47,45,137,3,148,31,68,218,138,28,87,159,106,25,146,144,26,62,115,163,200,181,218,153,110,238,93,175,196,247,171,236,126,249,226,121,47,95,94,152,248,83,3,53,129,63,165,55,207,255,128,61,237,73,223,151,87,161,99,247,67]' | firebase functions:secrets:set COMPANY_WALLET_SECRET_KEY
+# Set company wallet secret key (JSON array format - 64 numbers)
+echo '[YOUR_SECRET_KEY_ARRAY]' | firebase functions:secrets:set COMPANY_WALLET_SECRET_KEY
+# Example format: [65,160,52,47,...,247,67] (64 numbers total)
 ```
 
 ### Step 2: Set Email Secrets

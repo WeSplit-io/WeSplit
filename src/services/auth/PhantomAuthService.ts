@@ -60,6 +60,15 @@ class PhantomAuthService {
   }
 
   /**
+   * Set logout flag immediately (called before async operations during logout)
+   * This prevents race conditions where auto-connect might trigger before signOut completes
+   */
+  public setLogoutFlag(): void {
+    this.isLoggedOut = true;
+    logger.info('Phantom logout flag set immediately', null, 'PhantomAuthService');
+  }
+
+  /**
    * Reset logout flag (called when user explicitly authenticates)
    */
   public resetLogoutFlag(): void {
@@ -947,6 +956,11 @@ class PhantomAuthService {
    */
   public async signOut(): Promise<void> {
     try {
+      // ✅ CRITICAL: Set logout flag FIRST to prevent any auto-connect during logout
+      // This must happen before any async operations to prevent race conditions
+      this.isLoggedOut = true;
+      logger.info('Logout flag set - blocking auto-connect', null, 'PhantomAuthService');
+      
       // First, disconnect from Phantom SDK if callback is registered
       if (this.disconnectCallback) {
         try {
@@ -970,7 +984,7 @@ class PhantomAuthService {
       // Clear local session
       this.currentUser = null;
       
-      // Set logout flag to prevent auto-connect from re-authenticating
+      // Ensure logout flag is still set (in case it was reset somehow)
       this.isLoggedOut = true;
 
       logger.info('Phantom user signed out successfully', null, 'PhantomAuthService');

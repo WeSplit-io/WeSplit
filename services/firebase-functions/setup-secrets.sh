@@ -50,21 +50,41 @@ echo ""
 
 # 1. Company Wallet Address
 echo "1. Company Wallet Address"
-echo "   Address: HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN"
 read -p "   Set COMPANY_WALLET_ADDRESS? (y/n): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    set_secret "COMPANY_WALLET_ADDRESS" "HfokbWfQPH6CpWwoKjENFnhbcYfU5cr7gPB7GsHkxHpN" "Company wallet address"
+    read -p "   Enter company wallet address: " company_wallet_address
+    if [[ ${#company_wallet_address} -lt 32 || ${#company_wallet_address} -gt 44 ]]; then
+        echo -e "${RED}   ⚠️  Invalid address length (expected 32-44 characters)${NC}"
+        exit 1
+    fi
+    set_secret "COMPANY_WALLET_ADDRESS" "$company_wallet_address" "Company wallet address"
 fi
 
 # 2. Company Wallet Secret Key
 echo "2. Company Wallet Secret Key"
-echo "   Format: JSON array [65,160,52,47,...]"
+echo "   Format: JSON array [65,160,52,47,...] (64 numbers)"
 read -p "   Set COMPANY_WALLET_SECRET_KEY? (y/n): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    SECRET_KEY="[65,160,52,47,45,137,3,148,31,68,218,138,28,87,159,106,25,146,144,26,62,115,163,200,181,218,153,110,238,93,175,196,247,171,236,126,249,226,121,47,95,94,152,248,83,3,53,129,63,165,55,207,255,128,61,237,73,223,151,87,161,99,247,67]"
-    set_secret "COMPANY_WALLET_SECRET_KEY" "$SECRET_KEY" "Company wallet secret key"
+    read -sp "   Enter company wallet secret key (JSON array): " company_wallet_secret_key
+    echo
+    # Validate it's a JSON array
+    if ! echo "$company_wallet_secret_key" | grep -qE '^\[[0-9, ]+\]$'; then
+        echo -e "${RED}   ⚠️  Invalid format. Expected JSON array like [65,160,52,...]${NC}"
+        exit 1
+    fi
+    # Validate it has 64 elements (rough check)
+    element_count=$(echo "$company_wallet_secret_key" | tr ',' '\n' | grep -oE '[0-9]+' | wc -l | tr -d ' ')
+    if [ "$element_count" -ne 64 ]; then
+        echo -e "${YELLOW}   ⚠️  Warning: Expected 64 numbers in array, found $element_count${NC}"
+        read -p "   Continue anyway? (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
+    set_secret "COMPANY_WALLET_SECRET_KEY" "$company_wallet_secret_key" "Company wallet secret key"
 fi
 
 # 3. Email Configuration

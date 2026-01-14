@@ -322,13 +322,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const logoutUser = useCallback(async () => {
     try {
+      // ✅ CRITICAL: Set Phantom logout flag FIRST to prevent auto-connect during logout
+      const { PhantomAuthService } = await import('../services/auth/PhantomAuthService');
+      const phantomService = PhantomAuthService.getInstance();
+      phantomService.setLogoutFlag(); // Set flag immediately before any async operations
+      
       // Sign out from Firebase Auth
       const { authService } = await import('../services/auth/AuthService');
       await authService.signOut();
 
-      // Sign out from Phantom if applicable
-      const { PhantomAuthService } = await import('../services/auth/PhantomAuthService');
-      const phantomService = PhantomAuthService.getInstance();
+      // Sign out from Phantom if applicable (full sign out after flag is set)
       await phantomService.signOut();
 
       // Clear app state
@@ -337,7 +340,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       logger.info('User signed out from all services', null, 'AppContext');
     } catch (error) {
       logger.error('Error during logout', error, 'AppContext');
-      // Still clear app state even if sign out fails
+      // Still set logout flag and clear app state even if sign out fails
+      try {
+        const { PhantomAuthService } = await import('../services/auth/PhantomAuthService');
+        const phantomService = PhantomAuthService.getInstance();
+        phantomService.setLogoutFlag();
+      } catch (flagError) {
+        // Ignore flag setting errors
+      }
       dispatch({ type: 'LOGOUT_USER' });
     }
   }, []);

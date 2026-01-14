@@ -1,0 +1,67 @@
+site_name: WeSplit Documentation
+site_description: WeSplit - Split expenses socially, settle instantly with crypto
+site_author: WeSplit Team
+site_url: https://YOUR_USERNAME.github.io/WeSplit
+
+repo_name: WeSplit
+repo_url: https://github.com/YOUR_USERNAME/WeSplit
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: dark
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+
+nav:
+  - Home: index.md
+  - Corbits Integration:
+    - Integration Plan: CORBITS_X402_INTEGRATION_PLAN.md
+  - Development:
+    - Authentication: AUTH_CONFIG_STATUS.md
+    - Phantom Integration: PHANTOM_INTEGRATION_PLAN.md
+  - Features:
+    - Badges: BADGE_SETUP_SUMMARY.md
+    - Referrals: REFERRAL_SYSTEM_COMPLETE.md
+  - Testing:
+    - Quick Test Guide: QUICK_TEST_GUIDE.md
+    - Local Build: LOCAL_BUILD_SETUP.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - git-revision-date-localized

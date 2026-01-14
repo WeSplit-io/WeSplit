@@ -28,6 +28,8 @@ import { getAssetInfo } from '../../../services/rewards/assetConfig';
 import { resolveStorageUrl } from '../../../services/shared/storageUrlService';
 import AssetSelectionModal from '../AssetSelection/AssetSelectionModal';
 import { badgeService } from '../../../services/rewards/badgeService';
+import EmailVerificationModal from '../../../components/auth/EmailVerificationModal';
+import { sendVerificationCode, verifyCode, sendEmailChangeNotification } from '../../../services/data/firebaseFunctionsService';
 // Badge info is loaded from database via badgeService
 
 interface AccountSettingsScreenProps {
@@ -64,6 +66,12 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
   // Account deletion states
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deletionProgress, setDeletionProgress] = useState<{ currentStep: string; progress: number; currentCollection: string } | null>(null);
+  
+  // Email verification states
+  const [showReAuthModal, setShowReAuthModal] = useState(false);
+  const [showNewEmailModal, setShowNewEmailModal] = useState(false);
+  const [isSendingReAuthCode, setIsSendingReAuthCode] = useState(false);
+  const [isSendingNewEmailCode, setIsSendingNewEmailCode] = useState(false);
   
   // Avatar upload states
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -324,16 +332,106 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
       return;
     }
     
+    // SECURITY: Check if email is being changed
+    const emailChanged = email.trim() && email.trim() !== currentUser?.email;
+    
+    if (emailChanged) {
+      // Step 1: Require re-authentication with current email
+      try {
+        setIsSendingReAuthCode(true);
+        const reAuthResult = await sendVerificationCode(currentUser.email);
+        setIsSendingReAuthCode(false);
+        
+        if (!reAuthResult.success) {
+          Alert.alert('Error', reAuthResult.error || 'Failed to send verification code to your current email');
+          return;
+        }
+        
+        // Show re-authentication modal
+        setShowReAuthModal(true);
+        return; // Exit early - modal will handle continuation
+      } catch (error) {
+        setIsSendingReAuthCode(false);
+        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to send verification code');
+        return;
+      }
+    }
+    
+    // If email hasn't changed, proceed with normal profile update
+    await proceedWithProfileUpdate();
+  };
+
+  const handleReAuthVerify = async (code: string) => {
+    try {
+      const verifyResult = await verifyCode(currentUser!.email, code);
+      
+      if (!verifyResult.success) {
+        throw new Error(verifyResult.message || 'Invalid verification code');
+      }
+      
+      // Re-auth successful, close modal and proceed to new email verification
+      setShowReAuthModal(false);
+      
+      // Step 2: Send verification code to NEW email
+      try {
+        setIsSendingNewEmailCode(true);
+        const newEmailResult = await sendVerificationCode(email.trim());
+        setIsSendingNewEmailCode(false);
+        
+        if (!newEmailResult.success) {
+          Alert.alert('Error', newEmailResult.error || 'Failed to send verification code to new email');
+          return;
+        }
+        
+        // Show new email verification modal
+        setShowNewEmailModal(true);
+      } catch (error) {
+        setIsSendingNewEmailCode(false);
+        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to send verification code');
+      }
+    } catch (error) {
+      throw error; // Re-throw to be handled by modal
+    }
+  };
+
+  const handleNewEmailVerify = async (code: string) => {
+    try {
+      const verifyResult = await verifyCode(email.trim(), code);
+      
+      if (!verifyResult.success) {
+        throw new Error(verifyResult.message || 'Invalid verification code');
+      }
+      
+      // New email verified, close modal
+      setShowNewEmailModal(false);
+      
+      // Step 3: Send notification to old email (non-blocking)
+      try {
+        await sendEmailChangeNotification(currentUser!.email, email.trim(), currentUser!.id.toString());
+        logger.info('Email change notification sent', { oldEmail: currentUser!.email, newEmail: email.trim() }, 'AccountSettingsScreen');
+      } catch (notifError) {
+        logger.warn('Failed to send email change notification (non-critical)', notifError as Record<string, unknown>, 'AccountSettingsScreen');
+        // Continue even if notification fails
+      }
+      
+      // Step 4: Proceed with profile update
+      await proceedWithProfileUpdate();
+    } catch (error) {
+      throw error; // Re-throw to be handled by modal
+    }
+  };
+
+  const proceedWithProfileUpdate = async () => {
     try {
       setIsUploadingAvatar(true);
       
-      let finalAvatarUrl = currentUser.avatar;
+      let finalAvatarUrl = currentUser!.avatar;
       
       // If avatar has changed and is a local URI, upload it
-      if (avatar && avatar !== currentUser.avatar && avatar.startsWith('file://')) {
+      if (avatar && avatar !== currentUser!.avatar && avatar.startsWith('file://')) {
         logger.info('Uploading new avatar', null, 'AccountSettingsScreen');
         const uploadResult = await AvatarUploadFallbackService.uploadAvatarWithFallback(
-          currentUser.id.toString(), 
+          currentUser!.id.toString(), 
           avatar
         );
         
@@ -355,10 +453,10 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           Alert.alert('Error', uploadResult.error || 'Failed to upload avatar');
           return;
         }
-      } else if (avatar === null && currentUser.avatar) {
+      } else if (avatar === null && currentUser!.avatar) {
         // Avatar was removed
         logger.info('Removing avatar', null, 'AccountSettingsScreen');
-        const deleteResult = await AvatarUploadFallbackService.deleteAvatar(currentUser.id.toString());
+        const deleteResult = await AvatarUploadFallbackService.deleteAvatar(currentUser!.id.toString());
         
         if (deleteResult.success) {
           finalAvatarUrl = '';
@@ -371,7 +469,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
       
       // Update user profile
       await updateUser({
-        ...currentUser,
+        ...currentUser!,
         name: pseudo.trim(),
         email: email.trim(),
         avatar: finalAvatarUrl,
@@ -1296,6 +1394,33 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           }
         }}
       /> */}
+      
+      {/* Email Verification Modals */}
+      <EmailVerificationModal
+        visible={showReAuthModal}
+        email={currentUser?.email || ''}
+        onVerify={handleReAuthVerify}
+        onCancel={() => {
+          setShowReAuthModal(false);
+          setIsSendingReAuthCode(false);
+        }}
+        title="Re-authentication Required"
+        description={`To change your email, we need to verify your identity. Enter the verification code sent to ${currentUser?.email || 'your current email'}.`}
+        loading={isSendingReAuthCode}
+      />
+      
+      <EmailVerificationModal
+        visible={showNewEmailModal}
+        email={email.trim()}
+        onVerify={handleNewEmailVerify}
+        onCancel={() => {
+          setShowNewEmailModal(false);
+          setIsSendingNewEmailCode(false);
+        }}
+        title="Verify New Email"
+        description={`Enter the verification code sent to ${email.trim()} to complete the email change.`}
+        loading={isSendingNewEmailCode}
+      />
     </Container>
   );
 };

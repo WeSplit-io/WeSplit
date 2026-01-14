@@ -42,7 +42,33 @@ async function testTransactionSigningService() {
   // Simulate the initialization process from transactionSigningService.js
   try {
     console.log('1️⃣  Parsing secret key...');
-    const secretKeyArray = JSON.parse(companyWalletSecretKey);
+    let secretKeyArray;
+    try {
+      // First, try to parse as JSON array directly (for backward compatibility)
+      secretKeyArray = JSON.parse(companyWalletSecretKey);
+      console.log(`   ✅ Format: JSON array`);
+    } catch (jsonError) {
+      // If JSON parsing fails, try base64 decoding
+      try {
+        console.log(`   ℹ️  Not JSON format, trying base64...`);
+        const decoded = Buffer.from(companyWalletSecretKey, 'base64');
+        
+        // Try to parse the decoded value as JSON (in case it's base64-encoded JSON)
+        try {
+          secretKeyArray = JSON.parse(decoded.toString('utf8'));
+          console.log(`   ✅ Format: Base64-encoded JSON array`);
+        } catch (nestedJsonError) {
+          // If that fails, treat the decoded bytes as the raw secret key array
+          secretKeyArray = Array.from(decoded);
+          console.log(`   ✅ Format: Base64-encoded raw bytes`);
+        }
+      } catch (base64Error) {
+        console.log(`   ❌ Failed to parse: Not valid JSON or base64`);
+        console.log(`      JSON error: ${jsonError.message}`);
+        console.log(`      Base64 error: ${base64Error.message}`);
+        return false;
+      }
+    }
     
     if (!Array.isArray(secretKeyArray) || secretKeyArray.length !== 64) {
       console.log(`   ❌ Invalid format: Expected array of 64 numbers, got ${Array.isArray(secretKeyArray) ? secretKeyArray.length : typeof secretKeyArray}`);

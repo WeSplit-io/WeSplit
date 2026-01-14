@@ -76,6 +76,9 @@ const verifyCodeFunction = httpsCallable(functionsRegion, 'verifyCode', {
 const checkEmailUserExistsFunction = httpsCallable(functionsRegion, 'checkEmailUserExists', {
   timeout: 30000 // 30 seconds timeout
 });
+const sendEmailChangeNotificationFunction = httpsCallable(functionsRegion, 'sendEmailChangeNotification', {
+  timeout: 30000 // 30 seconds timeout
+});
 
 export interface FirebaseAuthResponse {
   success: boolean;
@@ -127,8 +130,8 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
   }
   
   try {
-    // Generate a 4-digit verification code
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    // Generate a 6-digit verification code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     
     
     // First, store the verification code in Firestore
@@ -140,7 +143,7 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
       code: code,
       used: false,
       created_at: serverTimestamp(),
-      expires_at: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes from now
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes from now (camelCase to match Firebase Function)
     };
     
     await addDoc(collection(db, 'verificationCodes'), verificationData);
@@ -197,7 +200,7 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
 /**
  * Verify code via Firebase Functions
  */
-export async function verifyCode(email: string, code: string): Promise<FirebaseVerificationResponse> {
+export async function verifyCode(email: string, code: string, captchaToken?: string): Promise<FirebaseVerificationResponse> {
   if (__DEV__) { logger.info('verifyCode called (Firebase Functions)', null, 'firebaseFunctionsService'); }
   if (__DEV__) { logger.debug('Email and Code', { email, code }, 'firebaseFunctionsService'); }
   
@@ -278,7 +281,8 @@ export async function verifyCode(email: string, code: string): Promise<FirebaseV
     // Call Firebase Function to verify code
     const result = await verifyCodeFunction({
       email: email.trim(),
-      code: code.trim()
+      code: code.trim(),
+      captchaToken: captchaToken
     });
     
     const response = result.data as FirebaseVerificationResponse;
@@ -324,7 +328,11 @@ export async function verifyCode(email: string, code: string): Promise<FirebaseV
     if (error.code === 'functions/not-found') {
       throw new Error('Invalid or expired verification code. Please request a new code.');
     } else if (error.code === 'functions/invalid-argument') {
-      throw new Error('Invalid code format. Please enter a 4-digit code.');
+      throw new Error('Invalid code format. Please enter a 6-digit code.');
+    } else if (error.code === 'functions/permission-denied') {
+      throw new Error(error.message || 'Too many failed attempts. Please complete CAPTCHA and try again.');
+    } else if (error.code === 'functions/resource-exhausted') {
+      throw new Error(error.message || 'Too many verification attempts. Please wait 5 minutes or request a new code.');
     } else if (error.message) {
       throw new Error(error.message);
     } else {
@@ -388,6 +396,47 @@ export async function checkEmailUserExists(email: string): Promise<{ success: bo
       throw new Error(errorMessage);
     } else {
       throw new Error('Failed to check user existence. Please try again.');
+    }
+  }
+}
+
+/**
+ * Send email change notification to old email address
+ */
+export async function sendEmailChangeNotification(oldEmail: string, newEmail: string, userId: string): Promise<{ success: boolean; error?: string }> {
+  if (__DEV__) { logger.info('sendEmailChangeNotification called', { oldEmail: oldEmail.substring(0, 5) + '...', newEmail: newEmail.substring(0, 5) + '...' }, 'firebaseFunctionsService'); }
+  
+  try {
+    const result = await sendEmailChangeNotificationFunction({
+      oldEmail: oldEmail.trim(),
+      newEmail: newEmail.trim(),
+      userId: userId
+    });
+    
+    const response = result.data as { success: boolean; message?: string };
+    
+    if (response.success) {
+      if (__DEV__) { logger.info('Email change notification sent successfully', null, 'firebaseFunctionsService'); }
+      return { success: true };
+    } else {
+      throw new Error(response.message || 'Failed to send email change notification');
+    }
+  } catch (error: unknown) {
+    if (__DEV__) { console.error('❌ Error sending email change notification:', error); }
+    
+    const errorCode = (error as any)?.code;
+    const errorMessage = (error as any)?.message || '';
+    
+    if (errorCode === 'functions/unauthenticated') {
+      throw new Error('Authentication required to change email');
+    } else if (errorCode === 'functions/permission-denied') {
+      throw new Error('You can only change your own email');
+    } else if (errorCode === 'functions/invalid-argument') {
+      throw new Error('Invalid email format');
+    } else if (errorMessage) {
+      throw new Error(errorMessage);
+    } else {
+      throw new Error('Failed to send email change notification. Please try again.');
     }
   }
 }

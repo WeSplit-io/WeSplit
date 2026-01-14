@@ -213,4 +213,6 @@ deadcode-report.json
 pipeline-test-report.json
 .secrets`
 
+# MkDocs build output
+site/
 docs/

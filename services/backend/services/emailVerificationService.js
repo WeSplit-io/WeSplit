@@ -17,9 +17,9 @@ const emailTransporter = process.env.NODE_ENV === 'production'
     })
   : null; // Skip email transporter in development
 
-// Generate a random 4-digit code
+// Generate a random 6-digit code
 function generateCode() {
-  return Math.floor(1000 + Math.random() * 9000).toString();
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 async function sendVerificationCode(email) {
@@ -53,7 +53,7 @@ async function sendVerificationCode(email) {
     // 2. Generate code
     const code = generateCode();
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
 
     // 3. Store code in Firestore
     const verificationRef = db.collection('verification_codes').doc();

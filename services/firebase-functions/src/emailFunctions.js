@@ -55,7 +55,7 @@ function generateEmailTemplate(code) {
         </div>
 
         <p style="color: rgba(255, 255, 255, 0.50); font-size: 14px; margin-top: 32px; font-weight: 400;">
-          This code will expire in 10 minutes. If you didn't request this code, please ignore this email.
+          This code will expire in 5 minutes. If you didn't request this code, please ignore this email.
         </p>
 
         <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.10); text-align: center;">
@@ -161,8 +161,8 @@ exports.sendVerificationEmail = functions.runWith({
       throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
     }
     
-    if (!/^\d{4}$/.test(code)) {
-      throw new functions.https.HttpsError('invalid-argument', 'Code must be 4 digits');
+    if (!/^\d{6}$/.test(code)) {
+      throw new functions.https.HttpsError('invalid-argument', 'Code must be 6 digits');
     }
 
     // Rate limiting: Check if too many requests for this email
@@ -275,10 +275,11 @@ exports.sendVerificationEmail = functions.runWith({
 
 /**
  * HTTP Callable Function: Verify code
+ * SECURITY: Added rate limiting, attempt counter, and CAPTCHA requirement
  */
 exports.verifyCode = functions.https.onCall(async (data, context) => {
   try {
-    const { email, code } = data;
+    const { email, code, captchaToken } = data;
     
     // Sanitize email by trimming whitespace and newlines
     const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
@@ -294,8 +295,84 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
     }
     
-    if (!/^\d{4}$/.test(code)) {
-      throw new functions.https.HttpsError('invalid-argument', 'Code must be 4 digits');
+    // SECURITY: Changed from 4 to 6 digits
+    if (!/^\d{6}$/.test(code)) {
+      throw new functions.https.HttpsError('invalid-argument', 'Code must be 6 digits');
+    }
+
+    // SECURITY: Get IP address for rate limiting
+    const clientIp = context.rawRequest?.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+                     context.rawRequest?.connection?.remoteAddress || 
+                     'unknown';
+
+    // SECURITY: Rate limiting per email + IP
+    const rateLimitKey = `verify_attempts_${sanitizedEmail}_${clientIp}`;
+    const rateLimitRef = db.collection('rateLimits').doc(rateLimitKey);
+    const rateLimitDoc = await rateLimitRef.get();
+    
+    let attempts = 0;
+    let lastAttempt = null;
+    let requiresCaptcha = false;
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    
+    if (rateLimitDoc.exists) {
+      const rateLimitData = rateLimitDoc.data();
+      attempts = rateLimitData.attempts || 0;
+      lastAttempt = rateLimitData.lastAttempt?.toDate ? rateLimitData.lastAttempt.toDate() : new Date(rateLimitData.lastAttempt);
+      
+      // Reset counter if last attempt was more than 5 minutes ago
+      if (lastAttempt < fiveMinutesAgo) {
+        attempts = 0;
+      } else {
+        // Check if CAPTCHA is required (after 3 failed attempts)
+        if (attempts >= 3) {
+          requiresCaptcha = true;
+          
+          // Require CAPTCHA token if attempts >= 3
+          if (!captchaToken) {
+            // Log suspicious activity
+            await db.collection('securityLogs').add({
+              type: 'otp_brute_force_attempt',
+              email: sanitizedEmail,
+              ip: clientIp,
+              attempts: attempts,
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              requiresCaptcha: true
+            });
+            
+            throw new functions.https.HttpsError(
+              'permission-denied',
+              'Too many failed attempts. Please complete CAPTCHA and try again.'
+            );
+          }
+          
+          // Verify CAPTCHA token (simple validation for now - placeholder for future CAPTCHA service integration)
+          if (!captchaToken || captchaToken.length < 10) {
+            throw new functions.https.HttpsError(
+              'permission-denied',
+              'Invalid CAPTCHA token. Please complete CAPTCHA verification.'
+            );
+          }
+        }
+        
+        // Block after 5 attempts in 5 minutes
+        if (attempts >= 5) {
+          // Log security event
+          await db.collection('securityLogs').add({
+            type: 'otp_brute_force_blocked',
+            email: sanitizedEmail,
+            ip: clientIp,
+            attempts: attempts,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+          });
+          
+          throw new functions.https.HttpsError(
+            'resource-exhausted',
+            'Too many verification attempts. Please wait 5 minutes or request a new code.'
+          );
+        }
+      }
     }
 
     // Find the verification code in Firestore
@@ -307,21 +384,71 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
     
     const querySnapshot = await q.get();
     
+    // SECURITY: Increment attempts on failure BEFORE checking code
     if (querySnapshot.empty) {
+      const newAttempts = attempts + 1;
+      await rateLimitRef.set({
+        email: sanitizedEmail,
+        ip: clientIp,
+        attempts: newAttempts,
+        lastAttempt: admin.firestore.FieldValue.serverTimestamp(),
+        requiresCaptcha: newAttempts >= 3
+      }, { merge: true });
+      
+      // Log failed attempt
+      await db.collection('securityLogs').add({
+        type: 'otp_verification_failed',
+        email: sanitizedEmail,
+        ip: clientIp,
+        attempts: newAttempts,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
       throw new functions.https.HttpsError('not-found', 'Invalid or expired verification code');
     }
 
     const doc = querySnapshot.docs[0];
     const verificationData = doc.data();
     
-    // Check if code is expired
-    const expiresAt = verificationData.expiresAt?.toDate ? 
-      verificationData.expiresAt.toDate() : 
-      new Date(verificationData.expiresAt);
-    
-    if (new Date() > expiresAt) {
+    // Check if code is expired (support both camelCase and snake_case for backward compatibility)
+    let expiresAt;
+    if (verificationData.expiresAt) {
+      expiresAt = verificationData.expiresAt?.toDate ? 
+        verificationData.expiresAt.toDate() : 
+        new Date(verificationData.expiresAt);
+    } else if (verificationData.expires_at) {
+      // Backward compatibility: handle snake_case field name
+      expiresAt = verificationData.expires_at?.toDate ? 
+        verificationData.expires_at.toDate() : 
+        new Date(verificationData.expires_at);
+    } else {
+      // Fallback: assume expired if no expiration field found
       throw new functions.https.HttpsError('deadline-exceeded', 'Verification code has expired');
     }
+    
+    if (new Date() > expiresAt) {
+      // Increment attempts on expired code
+      const newAttempts = attempts + 1;
+      await rateLimitRef.set({
+        email: sanitizedEmail,
+        ip: clientIp,
+        attempts: newAttempts,
+        lastAttempt: admin.firestore.FieldValue.serverTimestamp(),
+        requiresCaptcha: newAttempts >= 3
+      }, { merge: true });
+      
+      throw new functions.https.HttpsError('deadline-exceeded', 'Verification code has expired');
+    }
+
+    // SECURITY: Code is valid - reset rate limit and log success
+    await rateLimitRef.delete(); // Clear rate limit on success
+    
+    await db.collection('securityLogs').add({
+      type: 'otp_verification_success',
+      email: sanitizedEmail,
+      ip: clientIp,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     // Create or get Firebase user first (before marking code as used)
     let firebaseUser;
@@ -445,6 +572,103 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
     }
     
     throw new functions.https.HttpsError('internal', 'Failed to verify code');
+  }
+});
+
+/**
+ * HTTP Callable Function: Send email change notification to old email address
+ * SECURITY: Requires authentication and verifies user can only change their own email
+ */
+exports.sendEmailChangeNotification = functions.https.onCall(async (data, context) => {
+  try {
+    const { oldEmail, newEmail, userId } = data;
+    
+    // SECURITY: Require authentication
+    if (!context.auth || !context.auth.uid) {
+      throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+    }
+    
+    // SECURITY: Verify user can only change their own email
+    if (context.auth.uid !== userId) {
+      throw new functions.https.HttpsError('permission-denied', 'You can only change your own email');
+    }
+    
+    const sanitizedOldEmail = oldEmail?.trim().replace(/\s+/g, '') || '';
+    const sanitizedNewEmail = newEmail?.trim().replace(/\s+/g, '') || '';
+    
+    if (!sanitizedOldEmail || !sanitizedNewEmail) {
+      throw new functions.https.HttpsError('invalid-argument', 'Both old and new email are required');
+    }
+    
+    if (!sanitizedOldEmail.includes('@') || !sanitizedNewEmail.includes('@')) {
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
+    }
+    
+    // Create transporter
+    let transporter;
+    try {
+      transporter = createTransporter();
+    } catch (configError) {
+      throw new functions.https.HttpsError('failed-precondition', 'Email service not configured');
+    }
+    
+    // Generate notification email template
+    const emailTemplate = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #A5EA15 0%, #53EF97 100%); padding: 48px; text-align: center; color: #061113;">
+          <h1 style="margin: 0; font-size: 36px; font-weight: 600; letter-spacing: -0.5px;">WeSplit</h1>
+        </div>
+        <div style="padding: 48px; background: #061113;">
+          <h2 style="color: #FFFFFF; margin-bottom: 24px; font-size: 32px; font-weight: 600; line-height: 40px; letter-spacing: -0.5px;">Email Address Changed</h2>
+          <p style="color: rgba(255, 255, 255, 0.70); line-height: 24px; margin-bottom: 32px; font-size: 16px; font-weight: 400;">
+            Your WeSplit account email address has been changed from <strong style="color: #FFFFFF;">${sanitizedOldEmail}</strong> to <strong style="color: #FFFFFF;">${sanitizedNewEmail}</strong>.
+          </p>
+          <p style="color: rgba(255, 255, 255, 0.70); line-height: 24px; margin-bottom: 32px; font-size: 16px; font-weight: 400;">
+            If you did not make this change, please contact support immediately.
+          </p>
+          <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.10); text-align: center;">
+            <p style="color: rgba(255, 255, 255, 0.30); font-size: 12px; font-weight: 400;">
+              © 2024 WeSplit. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    const emailUser = process.env.EMAIL_USER?.trim();
+    const mailOptions = {
+      from: emailUser || 'noreply@wesplit.app',
+      to: sanitizedOldEmail,
+      subject: 'WeSplit - Email Address Changed',
+      html: emailTemplate
+    };
+    
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`Email change notification sent to ${sanitizedOldEmail}`);
+    } catch (sendError) {
+      console.error('Error sending email change notification:', sendError);
+      // Don't fail the function if email sending fails - log it
+    }
+    
+    // Log email change
+    await db.collection('securityLogs').add({
+      type: 'email_change',
+      userId: userId,
+      oldEmail: sanitizedOldEmail,
+      newEmail: sanitizedNewEmail,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { success: true, message: 'Notification sent successfully' };
+  } catch (error) {
+    console.error('Error sending email change notification:', error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError('internal', 'Failed to send notification');
   }
 });
 
