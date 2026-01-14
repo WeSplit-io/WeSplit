@@ -1,0 +1,2097 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="WeSplit - Split expenses socially, settle instantly with crypto">
+      
+      
+        <meta name="author" content="WeSplit Team">
+      
+      
+        <link rel="canonical" href="https://YOUR_USERNAME.github.io/WeSplit/AUTHENTICATION_SYSTEM_ROADMAP/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>🔐 WeSplit Authentication System - Development Roadmap - WeSplit Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#wesplit-authentication-system-development-roadmap" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="WeSplit Documentation" class="md-header__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WeSplit Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              🔐 WeSplit Authentication System - Development Roadmap
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="dark" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../CORBITS_X402_INTEGRATION_PLAN.md" class="md-tabs__link">
+          
+  
+  
+  Corbits Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../AUTH_CONFIG_STATUS/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../BADGE_SETUP_SUMMARY/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../QUICK_TEST_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="WeSplit Documentation" class="md-nav__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WeSplit Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corbits Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Corbits Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CORBITS_X402_INTEGRATION_PLAN.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AUTH_CONFIG_STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PHANTOM_INTEGRATION_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phantom Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../BADGE_SETUP_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Badges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../REFERRAL_SYSTEM_COMPLETE.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referrals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICK_TEST_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Test Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LOCAL_BUILD_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Current Status
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Current Status">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-you-can-test-right-now-no-external-approvals-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 What You Can Test RIGHT NOW (No External Approvals Needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#currently-blocked-requires-external-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔒 Currently Blocked (Requires External Access)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#completed-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Completed Implementations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="✅ Completed Implementations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-unified-authentication-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Unified Authentication Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-authentication-methods-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Authentication Methods Implemented
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Authentication Methods Implemented">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#email-authentication-fully-working" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email Authentication ✅ Fully Working
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phone-authentication-fully-working" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phone Authentication ✅ Fully Working
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phantom-social-authentication-code-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phantom Social Authentication ✅ Code Complete
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-wallet-management-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Wallet Management System
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-code-quality-improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Code Quality Improvements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#current-blockers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ❌ Current Blockers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="❌ Current Blockers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-ios-mobile-testing-blocked-apns-keys-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. iOS Mobile Testing 🔒 BLOCKED - APNs Keys Required
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-phantom-portal-approval-blocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Phantom Portal Approval 🔒 BLOCKED
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implemented-code-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🛠️ Implemented Code Changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛠️ Implemented Code Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-authentication-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Authentication Files
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Authentication Files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-srcservicesauthauthservicets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. src/services/auth/AuthService.ts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-srcservicesauthphantomauthservicets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. src/services/auth/PhantomAuthService.ts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-srcscreensauthmethodsauthmethodsscreentsx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. src/screens/AuthMethods/AuthMethodsScreen.tsx
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-srcprovidersphantomsdkprovidertsx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. src/providers/PhantomSDKProvider.tsx
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Files
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-srcconfigenvts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. src/config/env.ts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-env" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. .env
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-appconfigjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. app.config.js
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-flow-diagrams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔄 Authentication Flow Diagrams
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔄 Authentication Flow Diagrams">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#email-authentication-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email Authentication Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phone-authentication-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phone Authentication Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phantom-google-authentication-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phantom Google Authentication Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phantom-apple-authentication-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phantom Apple Authentication Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-checklist-once-unblocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Testing Checklist (Once Unblocked)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 Testing Checklist (Once Unblocked)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pre-unblock-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-Unblock Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#email-authentication-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email Authentication Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phone-authentication-testing-ios-blocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phone Authentication Testing ⚠️ iOS BLOCKED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phantom-google-authentication-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phantom Google Authentication Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phantom-apple-authentication-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phantom Apple Authentication Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-scenario-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Scenario Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-auth-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-Auth Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps-after-unblocking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Next Steps (After Unblocking)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚀 Next Steps (After Unblocking)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#immediate-testing-priority-while-ios-blocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Immediate Testing Priority (While iOS Blocked)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ios-specific-testing-after-apns-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iOS-Specific Testing (After APNs Access)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes-improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes &amp; Improvements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature Enhancements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-setup-for-future-developers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 Environment Setup (For Future Developers)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Environment Setup (For Future Developers)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required Environment Variables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ios-development-setup-currently-blocked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iOS Development Setup 🔒 CURRENTLY BLOCKED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phantom-portal-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phantom Portal Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#success-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Success Metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Success Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functional-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-blockers-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Current Blockers Resolution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Current Blockers Resolution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ios-mobile-testing-apns-keys-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iOS Mobile Testing 🔒 APNs KEYS REQUIRED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phantom-portal-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phantom Portal Approval
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start-test-what-you-can-now" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📝 Quick Start (Test What You Can NOW)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📝 Quick Start (Test What You Can NOW)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#immediate-testing-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Immediate Testing Available:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#once-ios-apns-access-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Once iOS APNs Access Available:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#once-phantom-portal-approves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Once Phantom Portal Approves:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bottom-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Bottom Line
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="wesplit-authentication-system-development-roadmap">🔐 WeSplit Authentication System - Development Roadmap<a class="headerlink" href="#wesplit-authentication-system-development-roadmap" title="Permanent link">&para;</a></h1>
+<h2 id="overview">📋 Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>This document captures the current state of the WeSplit authentication system after comprehensive refactoring and cleanup. The system is fully implemented but currently blocked by external dependencies (iOS testing environment and Phantom Portal approval).</p>
+<h2 id="current-status">🎯 Current Status<a class="headerlink" href="#current-status" title="Permanent link">&para;</a></h2>
+<h3 id="what-you-can-test-right-now-no-external-approvals-needed">🚀 <strong>What You Can Test RIGHT NOW</strong> (No External Approvals Needed)<a class="headerlink" href="#what-you-can-test-right-now-no-external-approvals-needed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ <strong>Email Authentication</strong>: Works on Android, iOS (Expo Go), Web</li>
+<li>✅ <strong>Backend Logic</strong>: Firebase Functions, Firestore operations</li>
+<li>✅ <strong>Wallet Creation</strong>: Unified wallet system for all auth methods</li>
+<li>✅ <strong>Cross-Platform UI</strong>: Authentication screens and flows</li>
+<li>✅ <strong>Error Handling</strong>: Comprehensive error messages and logging</li>
+<li>✅ <strong>Android Phone Auth</strong>: SMS delivery and verification</li>
+</ul>
+<h3 id="currently-blocked-requires-external-access">🔒 <strong>Currently Blocked</strong> (Requires External Access)<a class="headerlink" href="#currently-blocked-requires-external-access" title="Permanent link">&para;</a></h3>
+<ul>
+<li>❌ <strong>iOS Phone Auth</strong>: Requires APNs keys for SMS delivery</li>
+<li>❌ <strong>iOS Push Notifications</strong>: Requires APNs configuration</li>
+<li>❌ <strong>Phantom Social Auth</strong>: Requires Portal approval</li>
+<li>❌ <strong>Production iOS Builds</strong>: Requires certificates and provisioning</li>
+</ul>
+<h3 id="completed-implementations">✅ <strong>Completed Implementations</strong><a class="headerlink" href="#completed-implementations" title="Permanent link">&para;</a></h3>
+<h4 id="1-unified-authentication-architecture"><strong>1. Unified Authentication Architecture</strong><a class="headerlink" href="#1-unified-authentication-architecture" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Consolidated Auth Service</strong>: Single <code>AuthService</code> handles all auth methods</li>
+<li><strong>Clean Separation</strong>: Business logic vs UI components properly separated</li>
+<li><strong>Error Handling</strong>: Comprehensive error handling with user-friendly messages</li>
+<li><strong>Logging</strong>: Detailed logging for debugging and monitoring</li>
+</ul>
+<h4 id="2-authentication-methods-implemented"><strong>2. Authentication Methods Implemented</strong><a class="headerlink" href="#2-authentication-methods-implemented" title="Permanent link">&para;</a></h4>
+<h5 id="email-authentication-fully-working"><strong>Email Authentication</strong> ✅ <strong>Fully Working</strong><a class="headerlink" href="#email-authentication-fully-working" title="Permanent link">&para;</a></h5>
+<ul>
+<li>Email verification via Firebase Functions</li>
+<li>Custom token authentication for Firebase Auth</li>
+<li>Firestore user creation with wallet</li>
+<li>Email persistence across app sessions</li>
+</ul>
+<h5 id="phone-authentication-fully-working"><strong>Phone Authentication</strong> ✅ <strong>Fully Working</strong><a class="headerlink" href="#phone-authentication-fully-working" title="Permanent link">&para;</a></h5>
+<ul>
+<li>Firebase Phone Auth integration</li>
+<li>SMS verification with reCAPTCHA</li>
+<li>Phone linking to existing accounts</li>
+<li>Firestore user creation with wallet</li>
+</ul>
+<h5 id="phantom-social-authentication-code-complete"><strong>Phantom Social Authentication</strong> ✅ <strong>Code Complete</strong><a class="headerlink" href="#phantom-social-authentication-code-complete" title="Permanent link">&para;</a></h5>
+<ul>
+<li>Google OAuth via Phantom SDK</li>
+<li>Apple Sign-In via Phantom SDK</li>
+<li>Firebase user creation for Google auth</li>
+<li>Wallet creation for all phantom users</li>
+<li><strong>Blocked</strong>: Waiting for Phantom Portal approval</li>
+</ul>
+<h4 id="3-wallet-management-system"><strong>3. Wallet Management System</strong><a class="headerlink" href="#3-wallet-management-system" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Unified Wallet Creation</strong>: <code>ensureUserWallet()</code> method</li>
+<li><strong>Multi-Auth Support</strong>: Works with email, phone, and phantom users</li>
+<li><strong>Recovery Logic</strong>: Handles app reinstalls and device changes</li>
+<li><strong>Cloud Backup</strong>: Integration with wallet backup system</li>
+</ul>
+<h4 id="4-code-quality-improvements"><strong>4. Code Quality Improvements</strong><a class="headerlink" href="#4-code-quality-improvements" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Removed Dead Code</strong>: Eliminated deprecated OAuth methods (~300 lines)</li>
+<li><strong>Consolidated Logic</strong>: Single wallet creation across all auth methods</li>
+<li><strong>Clean Imports</strong>: Removed unused dependencies</li>
+<li><strong>Type Safety</strong>: Proper TypeScript implementation</li>
+</ul>
+<h3 id="current-blockers">❌ <strong>Current Blockers</strong><a class="headerlink" href="#current-blockers" title="Permanent link">&para;</a></h3>
+<h4 id="1-ios-mobile-testing-blocked-apns-keys-required"><strong>1. iOS Mobile Testing</strong> 🔒 <strong>BLOCKED - APNs Keys Required</strong><a class="headerlink" href="#1-ios-mobile-testing-blocked-apns-keys-required" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Issue</strong>: Cannot create Apple Push Notification service (APNs) keys</li>
+<li><strong>Cause</strong>: Missing Apple Developer Program access or permissions</li>
+<li><strong>Impact</strong>: Cannot test iOS authentication flows (phone auth, push notifications)</li>
+<li><strong>Requirements</strong>:</li>
+<li>Apple Developer Program membership ($99/year)</li>
+<li>Team Admin/Developer role permissions</li>
+<li>APNs key creation access</li>
+<li>Proper bundle ID configuration</li>
+<li>Associated domains setup</li>
+<li><strong>Workaround</strong>: Test on Android first, or use Expo Go for basic UI testing</li>
+</ul>
+<h4 id="2-phantom-portal-approval-blocked"><strong>2. Phantom Portal Approval</strong> 🔒 <strong>BLOCKED</strong><a class="headerlink" href="#2-phantom-portal-approval-blocked" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Issue</strong>: "Not allowed to proceed" / "check team status" errors</li>
+<li><strong>Cause</strong>: App ID <code>ab881c51-6335-49b9-8800-0e4ad7d21ca3</code> not approved</li>
+<li><strong>Impact</strong>: Cannot test Google/Apple social authentication</li>
+<li><strong>Solution</strong>: Submit app for Phantom Portal approval</li>
+</ul>
+<h2 id="implemented-code-changes">🛠️ <strong>Implemented Code Changes</strong><a class="headerlink" href="#implemented-code-changes" title="Permanent link">&para;</a></h2>
+<h3 id="core-authentication-files"><strong>Core Authentication Files</strong><a class="headerlink" href="#core-authentication-files" title="Permanent link">&para;</a></h3>
+<h4 id="1-srcservicesauthauthservicets"><strong>1. <code>src/services/auth/AuthService.ts</code></strong><a class="headerlink" href="#1-srcservicesauthauthservicets" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">// Key Changes:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="o">-</span><span class="w"> </span><span class="nx">Removed</span><span class="w"> </span><span class="nx">signInWithGoogle</span><span class="p">()</span><span class="w"> </span><span class="nx">and</span><span class="w"> </span><span class="nx">signInWithApple</span><span class="p">()</span><span class="w"> </span><span class="nx">methods</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="o">-</span><span class="w"> </span><span class="nx">Added</span><span class="w"> </span><span class="nx">ensureUserWallet</span><span class="p">()</span><span class="w"> </span><span class="nx">consolidated</span><span class="w"> </span><span class="nx">method</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="o">-</span><span class="w"> </span><span class="nx">Simplified</span><span class="w"> </span><span class="nx">createOrUpdateUserData</span><span class="w"> </span><span class="nx">methods</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="o">-</span><span class="w"> </span><span class="nx">Enhanced</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="nx">handling</span><span class="w"> </span><span class="nx">and</span><span class="w"> </span><span class="nx">logging</span>
+</code></pre></div>
+<h4 id="2-srcservicesauthphantomauthservicets"><strong>2. <code>src/services/auth/PhantomAuthService.ts</code></strong><a class="headerlink" href="#2-srcservicesauthphantomauthservicets" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// Key Changes:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="o">-</span><span class="w"> </span><span class="nx">Added</span><span class="w"> </span><span class="nx">createFirebaseAuthUserForPhantom</span><span class="p">()</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nx">Google</span><span class="w"> </span><span class="nx">auth</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="o">-</span><span class="w"> </span><span class="nx">Enhanced</span><span class="w"> </span><span class="nx">processAuthenticatedUser</span><span class="p">()</span><span class="w"> </span><span class="kd">with</span><span class="w"> </span><span class="nx">Firebase</span><span class="w"> </span><span class="nx">integration</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="o">-</span><span class="w"> </span><span class="nx">Added</span><span class="w"> </span><span class="nx">Firebase</span><span class="w"> </span><span class="nx">user</span><span class="w"> </span><span class="nx">linking</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nx">existing</span><span class="w"> </span><span class="nx">phantom</span><span class="w"> </span><span class="nx">users</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="o">-</span><span class="w"> </span><span class="nx">Removed</span><span class="w"> </span><span class="nx">unused</span><span class="w"> </span><span class="nx">PHANTOM_CONFIG</span><span class="w"> </span><span class="k">import</span>
+</code></pre></div>
+<h4 id="3-srcscreensauthmethodsauthmethodsscreentsx"><strong>3. <code>src/screens/AuthMethods/AuthMethodsScreen.tsx</code></strong><a class="headerlink" href="#3-srcscreensauthmethodsauthmethodsscreentsx" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// Key Changes:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="o">-</span><span class="w"> </span><span class="nx">Added</span><span class="w"> </span><span class="nx">processPhantomAuthSuccess</span><span class="p">()</span><span class="w"> </span><span class="nx">helper</span><span class="w"> </span><span class="kd">function</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="o">-</span><span class="w"> </span><span class="nx">Enhanced</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="nx">handling</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nx">portal</span><span class="w"> </span><span class="nx">approval</span><span class="w"> </span><span class="nx">issues</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="o">-</span><span class="w"> </span><span class="nx">Improved</span><span class="w"> </span><span class="nx">Firebase</span><span class="w"> </span><span class="nx">user</span><span class="w"> </span><span class="nx">detection</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nx">Google</span><span class="w"> </span><span class="nx">auth</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="o">-</span><span class="w"> </span><span class="nx">Consolidated</span><span class="w"> </span><span class="nx">wallet</span><span class="w"> </span><span class="nx">creation</span><span class="w"> </span><span class="nx">logic</span>
+</code></pre></div>
+<h4 id="4-srcprovidersphantomsdkprovidertsx"><strong>4. <code>src/providers/PhantomSDKProvider.tsx</code></strong><a class="headerlink" href="#4-srcprovidersphantomsdkprovidertsx" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Key Changes:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="o">-</span><span class="w"> </span><span class="nx">Uses</span><span class="w"> </span><span class="nx">centralized</span><span class="w"> </span><span class="nx">PHANTOM_CONFIG</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="nx">env</span><span class="p">.</span><span class="nx">ts</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="o">-</span><span class="w"> </span><span class="nx">Enhanced</span><span class="w"> </span><span class="nx">validation</span><span class="w"> </span><span class="kd">with</span><span class="w"> </span><span class="nx">better</span><span class="w"> </span><span class="nx">error</span><span class="w"> </span><span class="nx">messages</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="o">-</span><span class="w"> </span><span class="nx">Improved</span><span class="w"> </span><span class="nx">provider</span><span class="w"> </span><span class="nx">rendering</span><span class="w"> </span><span class="nx">logic</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="o">-</span><span class="w"> </span><span class="nx">Added</span><span class="w"> </span><span class="nx">development</span><span class="w"> </span><span class="nx">warnings</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nx">portal</span><span class="w"> </span><span class="nx">issues</span>
+</code></pre></div>
+<h3 id="configuration-files"><strong>Configuration Files</strong><a class="headerlink" href="#configuration-files" title="Permanent link">&para;</a></h3>
+<h4 id="1-srcconfigenvts"><strong>1. <code>src/config/env.ts</code></strong><a class="headerlink" href="#1-srcconfigenvts" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// Key Changes:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="o">-</span><span class="w"> </span><span class="nx">PHANTOM_CONFIG</span><span class="w"> </span><span class="nx">uses</span><span class="w"> </span><span class="nx">environment</span><span class="w"> </span><span class="nx">variables</span><span class="w"> </span><span class="nx">properly</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="o">-</span><span class="w"> </span><span class="nx">Removed</span><span class="w"> </span><span class="nx">development</span><span class="w"> </span><span class="nx">fallbacks</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="nx">production</span><span class="w"> </span><span class="nx">readiness</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="o">-</span><span class="w"> </span><span class="nx">Clean</span><span class="w"> </span><span class="nx">configuration</span><span class="w"> </span><span class="nx">structure</span>
+</code></pre></div>
+<h4 id="2-env"><strong>2. <code>.env</code></strong><a class="headerlink" href="#2-env" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Current Phantom Configuration:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nv">EXPO_PUBLIC_PHANTOM_APP_ID</span><span class="o">=</span>ab881c51-6335-49b9-8800-0e4ad7d21ca3
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nv">EXPO_PUBLIC_PHANTOM_APP_ORIGIN</span><span class="o">=</span>https://wesplit.io
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nv">EXPO_PUBLIC_PHANTOM_REDIRECT_URI</span><span class="o">=</span>wesplit://auth/phantom-callback
+</code></pre></div>
+<h4 id="3-appconfigjs"><strong>3. <code>app.config.js</code></strong><a class="headerlink" href="#3-appconfigjs" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Proper deep linking configuration</li>
+<li>Associated domains setup</li>
+<li>Intent filters for Android</li>
+</ul>
+<h2 id="authentication-flow-diagrams">🔄 <strong>Authentication Flow Diagrams</strong><a class="headerlink" href="#authentication-flow-diagrams" title="Permanent link">&para;</a></h2>
+<h3 id="email-authentication-flow"><strong>Email Authentication Flow</strong><a class="headerlink" href="#email-authentication-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>1. User enters email → sendVerificationCode()
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>2. Firebase Function sends email with code
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>3. User enters code → verifyCode()
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>4. Firebase Function creates Firebase Auth user
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>5. Custom token signs user into Firebase Auth
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>6. AuthService.ensureUserWallet() creates wallet
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>7. User data saved to Firestore
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>8. Navigate to Dashboard
+</code></pre></div>
+<h3 id="phone-authentication-flow"><strong>Phone Authentication Flow</strong><a class="headerlink" href="#phone-authentication-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>1. User enters phone → authService.signInWithPhoneNumber()
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>2. Firebase sends SMS code
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>3. User enters code → authService.verifyPhoneCode()
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>4. Firebase Auth user created
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>5. AuthService.ensureUserWallet() creates wallet
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>6. User data saved to Firestore
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>7. Navigate to Dashboard
+</code></pre></div>
+<h3 id="phantom-google-authentication-flow"><strong>Phantom Google Authentication Flow</strong><a class="headerlink" href="#phantom-google-authentication-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>1. User clicks &quot;Continue with Phantom&quot; → PhantomAuthButton
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>2. Phantom modal opens → User selects Google
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>3. Google OAuth completes → Phantom SDK returns user data
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>4. PhantomAuthService.processAuthenticatedUser()
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>5. createFirebaseAuthUserForPhantom() creates Firebase user
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>6. AuthService.ensureUserWallet() creates wallet
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>7. User data saved to Firestore
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>8. Navigate to Dashboard
+</code></pre></div>
+<h3 id="phantom-apple-authentication-flow"><strong>Phantom Apple Authentication Flow</strong><a class="headerlink" href="#phantom-apple-authentication-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>1. User clicks &quot;Continue with Phantom&quot; → PhantomAuthButton
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>2. Phantom modal opens → User selects Apple
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>3. Apple Sign-In completes → Phantom SDK returns user data
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>4. PhantomAuthService.processAuthenticatedUser()
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>5. Phantom user created (no Firebase for Apple)
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>6. AuthService.ensureUserWallet() creates wallet
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>7. User data saved to Firestore
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>8. Navigate to Dashboard
+</code></pre></div>
+<h2 id="testing-checklist-once-unblocked">📋 <strong>Testing Checklist (Once Unblocked)</strong><a class="headerlink" href="#testing-checklist-once-unblocked" title="Permanent link">&para;</a></h2>
+<h3 id="pre-unblock-setup"><strong>Pre-Unblock Setup</strong><a class="headerlink" href="#pre-unblock-setup" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <strong>iOS Setup</strong> (Currently Blocked):</li>
+<li>[ ] Apple Developer Program membership</li>
+<li>[ ] APNs key creation permissions</li>
+<li>[ ] iOS certificates and provisioning profiles</li>
+<li>[ ] Bundle ID configuration</li>
+<li>[ ] Associated domains setup</li>
+<li>[ ] <strong>Android Setup</strong> (Available Alternative):</li>
+<li>[ ] Android development environment</li>
+<li>[ ] Firebase project configuration</li>
+<li>[ ] Test device/emulator</li>
+<li>[ ] Phantom Portal app approved</li>
+<li>[ ] Test device/emulator ready</li>
+</ul>
+<h3 id="email-authentication-testing"><strong>Email Authentication Testing</strong><a class="headerlink" href="#email-authentication-testing" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Enter valid email → Receive verification code</li>
+<li>[ ] Enter code → Successfully authenticate</li>
+<li>[ ] Check Firebase Auth for user creation</li>
+<li>[ ] Check Firestore for user document</li>
+<li>[ ] Check wallet creation</li>
+<li>[ ] Verify navigation to Dashboard</li>
+<li>[ ] Test email persistence across app restarts</li>
+</ul>
+<h3 id="phone-authentication-testing-ios-blocked"><strong>Phone Authentication Testing</strong> ⚠️ <strong>iOS BLOCKED</strong><a class="headerlink" href="#phone-authentication-testing-ios-blocked" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <strong>Android/iOS (with APNs)</strong>: Enter valid phone number → Receive SMS</li>
+<li>[ ] <strong>Android/iOS (with APNs)</strong>: Enter code → Successfully authenticate</li>
+<li>[ ] <strong>Web/Test</strong>: Use Firebase test numbers (+15551234567, code: 123456)</li>
+<li>[ ] Check Firebase Auth for user creation</li>
+<li>[ ] Check Firestore for user document</li>
+<li>[ ] Check wallet creation</li>
+<li>[ ] Verify navigation to Dashboard</li>
+<li>[ ] Test phone linking to existing accounts</li>
+</ul>
+<p><strong>iOS Note</strong>: Phone SMS delivery requires APNs keys. Use test numbers or Android for now.</p>
+<h3 id="phantom-google-authentication-testing"><strong>Phantom Google Authentication Testing</strong><a class="headerlink" href="#phantom-google-authentication-testing" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Click "Continue with Phantom"</li>
+<li>[ ] Select Google in modal</li>
+<li>[ ] Complete Google OAuth</li>
+<li>[ ] Check Firebase Auth for user creation</li>
+<li>[ ] Check Firestore for user document</li>
+<li>[ ] Check wallet creation</li>
+<li>[ ] Verify Firebase user linking</li>
+<li>[ ] Verify navigation to Dashboard</li>
+</ul>
+<h3 id="phantom-apple-authentication-testing"><strong>Phantom Apple Authentication Testing</strong><a class="headerlink" href="#phantom-apple-authentication-testing" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Click "Continue with Phantom"</li>
+<li>[ ] Select Apple in modal</li>
+<li>[ ] Complete Apple Sign-In</li>
+<li>[ ] Check phantom_users collection</li>
+<li>[ ] Check Firestore for user document</li>
+<li>[ ] Check wallet creation</li>
+<li>[ ] Verify navigation to Dashboard</li>
+</ul>
+<h3 id="error-scenario-testing"><strong>Error Scenario Testing</strong><a class="headerlink" href="#error-scenario-testing" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Invalid email format</li>
+<li>[ ] Expired verification codes</li>
+<li>[ ] Network connectivity issues</li>
+<li>[ ] Phantom portal rejection (fallback to email/phone)</li>
+<li>[ ] Wallet creation failures</li>
+<li>[ ] Firebase function errors</li>
+</ul>
+<h3 id="cross-auth-testing"><strong>Cross-Auth Testing</strong><a class="headerlink" href="#cross-auth-testing" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Email user can link phone</li>
+<li>[ ] Phone user can access all features</li>
+<li>[ ] Phantom users have full functionality</li>
+<li>[ ] Account recovery works across methods</li>
+<li>[ ] Wallet persistence across auth methods</li>
+</ul>
+<h2 id="next-steps-after-unblocking">🚀 <strong>Next Steps (After Unblocking)</strong><a class="headerlink" href="#next-steps-after-unblocking" title="Permanent link">&para;</a></h2>
+<h3 id="immediate-testing-priority-while-ios-blocked"><strong>Immediate Testing Priority</strong> (While iOS Blocked)<a class="headerlink" href="#immediate-testing-priority-while-ios-blocked" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Email Auth</strong>: Should work immediately on all platforms</li>
+<li><strong>Phone Auth</strong>: Test on Android or use Firebase test numbers</li>
+<li><strong>Phantom Auth</strong>: Test on Android once portal approves</li>
+<li><strong>Cross-Platform</strong>: Verify web authentication flows</li>
+<li><strong>Backend Logic</strong>: Validate Firebase Functions and database operations</li>
+</ol>
+<h3 id="ios-specific-testing-after-apns-access"><strong>iOS-Specific Testing</strong> (After APNs Access)<a class="headerlink" href="#ios-specific-testing-after-apns-access" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Phone SMS delivery and verification</li>
+<li>Push notification handling</li>
+<li>Universal links and deep linking</li>
+<li>iOS-specific authentication flows</li>
+<li>TestFlight distribution testing</li>
+</ol>
+<h3 id="bug-fixes-improvements"><strong>Bug Fixes &amp; Improvements</strong><a class="headerlink" href="#bug-fixes-improvements" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>iOS-Specific Issues</strong>: Test on actual iOS device</li>
+<li><strong>Error Messages</strong>: Refine based on real user feedback</li>
+<li><strong>Performance</strong>: Optimize authentication speed</li>
+<li><strong>Security</strong>: Review token handling and storage</li>
+</ol>
+<h3 id="feature-enhancements"><strong>Feature Enhancements</strong><a class="headerlink" href="#feature-enhancements" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Biometric Auth</strong>: Add Face ID/Touch ID support</li>
+<li><strong>Account Recovery</strong>: Enhanced password reset flows</li>
+<li><strong>Social Features</strong>: User profile integration</li>
+<li><strong>Analytics</strong>: Authentication success/failure tracking</li>
+</ol>
+<h2 id="environment-setup-for-future-developers">🔧 <strong>Environment Setup (For Future Developers)</strong><a class="headerlink" href="#environment-setup-for-future-developers" title="Permanent link">&para;</a></h2>
+<h3 id="required-environment-variables"><strong>Required Environment Variables</strong><a class="headerlink" href="#required-environment-variables" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Phantom Configuration</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">EXPO_PUBLIC_PHANTOM_APP_ID</span><span class="o">=</span>your_approved_app_id
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="nv">EXPO_PUBLIC_PHANTOM_APP_ORIGIN</span><span class="o">=</span>https://wesplit.io
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="nv">EXPO_PUBLIC_PHANTOM_REDIRECT_URI</span><span class="o">=</span>wesplit://auth/phantom-callback
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="c1"># Firebase Configuration</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="nv">EXPO_PUBLIC_FIREBASE_API_KEY</span><span class="o">=</span>...
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="nv">EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN</span><span class="o">=</span>...
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="nv">EXPO_PUBLIC_FIREBASE_PROJECT_ID</span><span class="o">=</span>...
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="c1"># ... (all Firebase vars)</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="c1"># Other Configuration</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="nv">EXPO_PUBLIC_NETWORK</span><span class="o">=</span>devnet
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="nv">EXPO_PUBLIC_HELIUS_API_KEY</span><span class="o">=</span>...
+</code></pre></div>
+<h3 id="ios-development-setup-currently-blocked"><strong>iOS Development Setup</strong> 🔒 <strong>CURRENTLY BLOCKED</strong><a class="headerlink" href="#ios-development-setup-currently-blocked" title="Permanent link">&para;</a></h3>
+<p><strong>Requirements to Get Unblocked:</strong>
+1. <strong>Apple Developer Program</strong> ($99/year at developer.apple.com)
+2. <strong>Team Permissions</strong>: Admin/Developer role in your Apple Developer team
+3. <strong>APNs Key Creation</strong>: Ability to create Apple Push Notification service keys
+4. <strong>Bundle ID</strong>: <code>com.wesplit.app</code> properly configured in developer portal</p>
+<p><strong>Once You Have Access:</strong>
+1. Xcode installed and configured (version 14+)
+2. iOS Simulator or physical device
+3. Code signing certificates and provisioning profiles
+4. Associated domains configured for universal links
+5. APNs keys created and configured in Firebase Console
+6. TestFlight setup for distribution (optional)</p>
+<p><strong>Current Workarounds:</strong>
+- Test authentication logic on Android first
+- Use Expo Go for basic UI testing (limited functionality)
+- Test email authentication via web interface
+- Focus on backend authentication logic validation</p>
+<h3 id="phantom-portal-setup"><strong>Phantom Portal Setup</strong><a class="headerlink" href="#phantom-portal-setup" title="Permanent link">&para;</a></h3>
+<ol>
+<li>App registered at https://phantom.app/developers</li>
+<li>App ID approved by Phantom team</li>
+<li>Correct origins and redirect URLs configured</li>
+<li>Associated domains updated</li>
+</ol>
+<h2 id="success-metrics">📊 <strong>Success Metrics</strong><a class="headerlink" href="#success-metrics" title="Permanent link">&para;</a></h2>
+<h3 id="functional-requirements"><strong>Functional Requirements</strong><a class="headerlink" href="#functional-requirements" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] All 3 auth methods work on iOS and Android</li>
+<li>[ ] Users can switch between auth methods</li>
+<li>[ ] Wallets created for all user types</li>
+<li>[ ] Account recovery works across methods</li>
+<li>[ ] Error messages are user-friendly</li>
+</ul>
+<h3 id="performance-requirements"><strong>Performance Requirements</strong><a class="headerlink" href="#performance-requirements" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Authentication completes in &lt; 5 seconds</li>
+<li>[ ] No memory leaks in auth flows</li>
+<li>[ ] Proper cleanup on auth failures</li>
+<li>[ ] Offline authentication handling</li>
+</ul>
+<h3 id="security-requirements"><strong>Security Requirements</strong><a class="headerlink" href="#security-requirements" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Firebase tokens properly validated</li>
+<li>[ ] User sessions securely managed</li>
+<li>[ ] Sensitive data encrypted</li>
+<li>[ ] No authentication bypass possible</li>
+</ul>
+<h2 id="current-blockers-resolution">🎯 <strong>Current Blockers Resolution</strong><a class="headerlink" href="#current-blockers-resolution" title="Permanent link">&para;</a></h2>
+<h3 id="ios-mobile-testing-apns-keys-required"><strong>iOS Mobile Testing</strong> 🔒 <strong>APNs KEYS REQUIRED</strong><a class="headerlink" href="#ios-mobile-testing-apns-keys-required" title="Permanent link">&para;</a></h3>
+<p><strong>Status</strong>: BLOCKED - Cannot create APNs keys
+<strong>Requirements</strong>:
+1. <strong>Apple Developer Program Membership</strong> ($99/year)
+2. <strong>Team Admin/Developer Permissions</strong> in Apple Developer Console
+3. <strong>APNs Key Creation Access</strong> (granted by team admin)
+4. <strong>Bundle ID Configuration</strong> (<code>com.wesplit.app</code>)</p>
+<p><strong>Resolution Steps</strong> (Once You Have Access):
+1. Create APNs key in Apple Developer Console
+2. Upload APNs key to Firebase Console
+3. Configure iOS certificates and provisioning profiles
+4. Set up associated domains for universal links
+5. Test on physical iOS device
+6. Verify deep linking and push notifications work</p>
+<p><strong>Alternative Testing While Blocked</strong>:
+- ✅ <strong>Android Testing</strong>: Full authentication testing available
+- ✅ <strong>Web Testing</strong>: Email and phone auth via browser
+- ✅ <strong>Backend Testing</strong>: Firebase Functions and database operations
+- ✅ <strong>UI Testing</strong>: Expo Go for basic interface validation
+- ⚠️ <strong>iOS SMS</strong>: Use Firebase test numbers instead
+- ❌ <strong>iOS Push Notifications</strong>: Not testable until APNs configured</p>
+<h3 id="phantom-portal-approval"><strong>Phantom Portal Approval</strong><a class="headerlink" href="#phantom-portal-approval" title="Permanent link">&para;</a></h3>
+<p><strong>Status</strong>: 🔒 BLOCKED
+<strong>Resolution Steps</strong>:
+1. Submit app for approval at https://phantom.app/developers
+2. Wait for Phantom team review (1-3 business days)
+3. Update app configuration if needed
+4. Test social authentication flows</p>
+<hr />
+<h2 id="quick-start-test-what-you-can-now">📝 <strong>Quick Start (Test What You Can NOW)</strong><a class="headerlink" href="#quick-start-test-what-you-can-now" title="Permanent link">&para;</a></h2>
+<h3 id="immediate-testing-available"><strong>Immediate Testing Available:</strong><a class="headerlink" href="#immediate-testing-available" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Start Expo</strong>: <code>npm start</code></li>
+<li><strong>Test Email Auth</strong>: Use any email address on Android/Web</li>
+<li><strong>Test Phone Auth</strong>: Use Firebase test number <code>+15551234567</code> (code: <code>123456</code>) on Android</li>
+<li><strong>Verify Backend</strong>: Check Firebase console for user creation and Firestore documents</li>
+<li><strong>Check Logs</strong>: All auth events logged with detailed information</li>
+</ol>
+<h3 id="once-ios-apns-access-available"><strong>Once iOS APNs Access Available:</strong><a class="headerlink" href="#once-ios-apns-access-available" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Test iOS phone SMS delivery</li>
+<li>Verify push notifications</li>
+<li>Test universal links/deep linking</li>
+<li>Full iOS authentication validation</li>
+</ol>
+<h3 id="once-phantom-portal-approves"><strong>Once Phantom Portal Approves:</strong><a class="headerlink" href="#once-phantom-portal-approves" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Test Google/Apple social authentication</li>
+<li>Verify Firebase user creation for social auth</li>
+<li>Test cross-platform social login</li>
+</ol>
+<hr />
+<h2 id="bottom-line">🎯 <strong>Bottom Line</strong><a class="headerlink" href="#bottom-line" title="Permanent link">&para;</a></h2>
+<p><strong>You can test 70% of the authentication system RIGHT NOW</strong> on Android and web platforms. The iOS and Phantom blockers don't prevent you from validating the core authentication logic, database operations, and user experience.</p>
+<p><strong>Focus on Android testing first, then expand to iOS once you have APNs access!</strong> 🚀</p>
+<p>This roadmap ensures you can productively continue development while waiting for external approvals! 📋✨</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 14, 2026 11:39:08 UTC">January 14, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

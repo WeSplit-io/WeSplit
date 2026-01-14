@@ -1,0 +1,2622 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="WeSplit - Split expenses socially, settle instantly with crypto">
+      
+      
+        <meta name="author" content="WeSplit Team">
+      
+      
+        <link rel="canonical" href="https://YOUR_USERNAME.github.io/WeSplit/guides/WALLET_PERSISTENCE/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Wallet Persistence Across App Updates - Comprehensive Guide - WeSplit Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#wallet-persistence-across-app-updates-comprehensive-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WeSplit Documentation" class="md-header__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WeSplit Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Wallet Persistence Across App Updates - Comprehensive Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="dark" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-tabs__link">
+          
+  
+  
+  Corbits Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../AUTH_CONFIG_STATUS/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../BADGE_SETUP_SUMMARY/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../QUICK_TEST_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WeSplit Documentation" class="md-nav__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WeSplit Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corbits Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Corbits Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../AUTH_CONFIG_STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PHANTOM_INTEGRATION_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phantom Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../BADGE_SETUP_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Badges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../REFERRAL_SYSTEM_COMPLETE.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referrals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../QUICK_TEST_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Test Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../LOCAL_BUILD_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem Statement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Problem Statement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#root-causes-identified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Root Causes Identified
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solutions-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solutions Implemented
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Solutions Implemented">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-fixed-securestore-production-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Fixed SecureStore Production Issues ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-added-email-based-wallet-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Added Email-Based Wallet Recovery ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-improved-firebase-auth-state-restoration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Improved Firebase Auth State Restoration ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-enhanced-wallet-storage-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Enhanced Wallet Storage Verification ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#technical-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Technical Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#storage-priority-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Priority Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovery-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#email-hashing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email Hashing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-test-5-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Test (5 minutes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comprehensive-test-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comprehensive Test Scenarios
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Comprehensive Test Scenarios">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-1-basic-wallet-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 1: Basic Wallet Persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-2-email-based-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 2: Email-Based Recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-3-asyncstorage-cleared" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 3: AsyncStorage Cleared
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-4-multiple-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 4: Multiple Updates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-5-storage-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 5: Storage Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#automated-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log Monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#code-audit-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code Audit &amp; Best Practices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Code Audit &amp; Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#code-quality-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Code Quality Assessment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="✅ Code Quality Assessment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strengths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strengths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#areas-for-improvement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Areas for Improvement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#best-practices-applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices Applied
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices Applied">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#security-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Security Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Error Handling Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Performance Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-organization-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Code Organization Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Improvements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring &amp; Maintenance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monitoring &amp; Maintenance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-metrics-to-monitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Metrics to Monitor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-monitoring-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log Monitoring Queries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maintenance-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maintenance Tasks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issue-new-wallet-created-after-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue: New Wallet Created After Update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-wallet-not-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue: Wallet Not Found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-authentication-fails-after-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue: Authentication Fails After Update
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Success Criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conclusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#code-audit-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code Audit Summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Code Audit Summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overall-assessment-excellent-a-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overall Assessment: ✅ Excellent (A-)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documents
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="wallet-persistence-across-app-updates-comprehensive-guide">Wallet Persistence Across App Updates - Comprehensive Guide<a class="headerlink" href="#wallet-persistence-across-app-updates-comprehensive-guide" title="Permanent link">&para;</a></h1>
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#executive-summary">Executive Summary</a></li>
+<li><a href="#problem-statement">Problem Statement</a></li>
+<li><a href="#root-causes-identified">Root Causes Identified</a></li>
+<li><a href="#solutions-implemented">Solutions Implemented</a></li>
+<li><a href="#technical-architecture">Technical Architecture</a></li>
+<li><a href="#testing-guide">Testing Guide</a></li>
+<li><a href="#code-audit--best-practices">Code Audit &amp; Best Practices</a></li>
+<li><a href="#monitoring--maintenance">Monitoring &amp; Maintenance</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ol>
+<hr />
+<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
+<p>This document consolidates the complete audit, implementation, and testing guide for wallet persistence across app updates. The system ensures that user wallet credentials persist securely even when:
+- App is updated via TestFlight
+- AsyncStorage is cleared
+- Firebase Auth state is lost
+- UserId changes between app versions</p>
+<p><strong>Status</strong>: ✅ All critical fixes implemented and tested
+<strong>Impact</strong>: High - Prevents wallet loss during app updates
+<strong>Risk Level</strong>: Low - All changes are backward compatible</p>
+<hr />
+<h2 id="problem-statement">Problem Statement<a class="headerlink" href="#problem-statement" title="Permanent link">&para;</a></h2>
+<p>Users were experiencing wallet credential loss after app updates in TestFlight/beta builds. Symptoms included:
+- Wallet address changing after app update
+- New wallet being created instead of recovering existing one
+- Authentication state being lost
+- User funds becoming inaccessible</p>
+<h3 id="root-causes-identified">Root Causes Identified<a class="headerlink" href="#root-causes-identified" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>AsyncStorage Cleared on Updates</strong></li>
+<li>iOS/Android clear AsyncStorage when downloading new app versions</li>
+<li>Firebase Auth relies on AsyncStorage for persistence</li>
+<li>
+<p>Wallet recovery attempted before auth state restored</p>
+</li>
+<li>
+<p><strong>Expo SecureStore Production Issues</strong></p>
+</li>
+<li>SecureStore has known reliability issues in production builds</li>
+<li>Not guaranteed to persist across all update scenarios</li>
+<li>
+<p>Was being used as primary storage method</p>
+</li>
+<li>
+<p><strong>Firebase Auth State Restoration Timing</strong></p>
+</li>
+<li>Wallet recovery attempted before auth state fully restored</li>
+<li>Race condition between auth restoration and wallet recovery</li>
+<li>
+<p>User appeared unauthenticated, triggering new wallet creation</p>
+</li>
+<li>
+<p><strong>No Email-Based Fallback</strong></p>
+</li>
+<li>Wallet storage keyed only by userId (Firebase UID)</li>
+<li>If userId changed, wallet became unrecoverable</li>
+<li>No alternative identifier for wallet lookup</li>
+</ol>
+<hr />
+<h2 id="solutions-implemented">Solutions Implemented<a class="headerlink" href="#solutions-implemented" title="Permanent link">&para;</a></h2>
+<h3 id="1-fixed-securestore-production-issues">1. Fixed SecureStore Production Issues ✅<a class="headerlink" href="#1-fixed-securestore-production-issues" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>src/services/security/secureVault.ts</code></p>
+<p><strong>Implementation</strong>:
+- Made Keychain (iOS) + MMKV (Android) <strong>primary storage</strong>
+- SecureStore is now <strong>LAST RESORT only</strong>
+- Added explicit error handling and warnings
+- Enhanced logging for debugging</p>
+<p><strong>Key Changes</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">// Primary: Keychain+MMKV (reliable in production)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">kv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getStorage</span><span class="p">();</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">key</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">kv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">enc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">encryptAesGcm</span><span class="p">(</span><span class="nx">key</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="p">);</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nx">kv</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">name</span><span class="si">}</span><span class="sb">_ct_</span><span class="si">${</span><span class="nx">userId</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="nx">enc</span><span class="p">.</span><span class="nx">ct</span><span class="p">);</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nx">kv</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">name</span><span class="si">}</span><span class="sb">_iv_</span><span class="si">${</span><span class="nx">userId</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="nx">enc</span><span class="p">.</span><span class="nx">iv</span><span class="p">);</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span><span class="p">;</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">}</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1">// LAST RESORT: SecureStore (has issues in production)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1">// Only used if Keychain+MMKV completely fails</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">SecureStore</span><span class="o">?</span><span class="p">.</span><span class="nx">setItemAsync</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">warn</span><span class="p">(</span><span class="s1">&#39;secureVault: Used SecureStore fallback&#39;</span><span class="p">);</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="c1">// ... fallback storage</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Impact</strong>:
+- ✅ Wallet credentials stored in hardware-backed secure storage
+- ✅ Persists reliably across app updates
+- ✅ Better security (Keychain uses secure enclave on iOS)</p>
+<hr />
+<h3 id="2-added-email-based-wallet-recovery">2. Added Email-Based Wallet Recovery ✅<a class="headerlink" href="#2-added-email-based-wallet-recovery" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>src/services/blockchain/wallet/walletRecoveryService.ts</code></p>
+<p><strong>Implementation</strong>:
+- Added <code>hashEmail()</code> method using SHA-256
+- Modified <code>storeWallet()</code> to store by both userId and email hash
+- Modified <code>recoverWallet()</code> to attempt email-based recovery as fallback
+- Automatic re-storage with current userId when email-based recovery succeeds</p>
+<p><strong>Key Changes</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// Store by userId (primary)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">await</span><span class="w"> </span><span class="nx">secureVault</span><span class="p">.</span><span class="nx">store</span><span class="p">(</span><span class="nx">userId</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;privateKey&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">wallet</span><span class="p">.</span><span class="nx">privateKey</span><span class="p">);</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1">// Also store by email hash (backup)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">userEmail</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">emailHash</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">hashEmail</span><span class="p">(</span><span class="nx">userEmail</span><span class="p">);</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">secureVault</span><span class="p">.</span><span class="nx">store</span><span class="p">(</span><span class="nx">emailHash</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;privateKey&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">wallet</span><span class="p">.</span><span class="nx">privateKey</span><span class="p">);</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">}</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1">// Recovery: Try userId first, then email hash</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="kd">const</span><span class="w"> </span><span class="nx">recoveryResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">walletRecoveryService</span><span class="p">.</span><span class="nx">recoverWallet</span><span class="p">(</span><span class="nx">userId</span><span class="p">,</span><span class="w"> </span><span class="nx">userEmail</span><span class="p">);</span>
+</code></pre></div></p>
+<p><strong>Impact</strong>:
+- ✅ Wallet recoverable even if userId changes
+- ✅ Email provides stable identifier across app versions
+- ✅ Automatic migration when email-based wallet found</p>
+<hr />
+<h3 id="3-improved-firebase-auth-state-restoration">3. Improved Firebase Auth State Restoration ✅<a class="headerlink" href="#3-improved-firebase-auth-state-restoration" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>src/screens/Splash/SplashScreen.tsx</code></p>
+<p><strong>Implementation</strong>:
+- Added explicit wait for Firebase Auth state restoration (up to 3 seconds)
+- Uses <code>onAuthStateChanged</code> to wait for auth state
+- Handles AsyncStorage being cleared</p>
+<p><strong>Key Changes</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// Wait for auth state to be fully restored</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">let</span><span class="w"> </span><span class="nx">firebaseUser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">auth</span><span class="p">.</span><span class="nx">currentUser</span><span class="p">;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">firebaseUser</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Promise</span><span class="p">((</span><span class="nx">resolve</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">unsubscribe</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">auth</span><span class="p">.</span><span class="nx">onAuthStateChanged</span><span class="p">((</span><span class="nx">user</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nx">unsubscribe</span><span class="p">();</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">      </span><span class="nx">firebaseUser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">user</span><span class="p">;</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="nx">resolve</span><span class="p">(</span><span class="nx">user</span><span class="p">);</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="p">});</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nx">setTimeout</span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">resolve</span><span class="p">(</span><span class="kc">null</span><span class="p">),</span><span class="w"> </span><span class="mf">3000</span><span class="p">);</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">  </span><span class="p">});</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Impact</strong>:
+- ✅ Prevents premature wallet recovery attempts
+- ✅ Handles AsyncStorage being cleared
+- ✅ Ensures user is authenticated before wallet operations</p>
+<hr />
+<h3 id="4-enhanced-wallet-storage-verification">4. Enhanced Wallet Storage Verification ✅<a class="headerlink" href="#4-enhanced-wallet-storage-verification" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>src/services/blockchain/wallet/simplifiedWalletService.ts</code></p>
+<p><strong>Implementation</strong>:
+- Verifies wallet can be recovered immediately after storage
+- Retry logic if verification fails
+- Better error messages</p>
+<p><strong>Key Changes</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Verify wallet was stored correctly</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">verificationResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">verifyWalletStorage</span><span class="p">(</span><span class="nx">userId</span><span class="p">,</span><span class="w"> </span><span class="nx">wallet</span><span class="p">.</span><span class="nx">address</span><span class="p">);</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">verificationResult</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="c1">// Retry storage</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">retryStored</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">walletRecoveryService</span><span class="p">.</span><span class="nx">storeWallet</span><span class="p">(...);</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="c1">// Verify again</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Impact</strong>:
+- ✅ Catches storage failures immediately
+- ✅ Ensures wallet can be recovered
+- ✅ Better error handling</p>
+<hr />
+<h2 id="technical-architecture">Technical Architecture<a class="headerlink" href="#technical-architecture" title="Permanent link">&para;</a></h2>
+<h3 id="storage-priority-order">Storage Priority Order<a class="headerlink" href="#storage-priority-order" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Primary</strong>: Keychain (iOS) + MMKV (Android)</li>
+<li>Hardware-backed security</li>
+<li>Persists across app updates</li>
+<li>Reliable in production</li>
+<li>
+<p>Uses AES-GCM encryption</p>
+</li>
+<li>
+<p><strong>Backup</strong>: Email hash-based storage</p>
+</li>
+<li>SHA-256 hash of normalized email</li>
+<li>Allows recovery when userId changes</li>
+<li>
+<p>Automatic migration to current userId</p>
+</li>
+<li>
+<p><strong>Last Resort</strong>: SecureStore</p>
+</li>
+<li>Only used if Keychain+MMKV fails</li>
+<li>Has known issues in production</li>
+<li>Logged as warning when used</li>
+</ol>
+<h3 id="recovery-flow">Recovery Flow<a class="headerlink" href="#recovery-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>User Logs In
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    ↓
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Firebase Auth Restored (wait up to 3s)
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    ↓
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>ensureUserWallet(userId)
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    ↓
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>Get User Email from Database
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    ↓
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>recoverWallet(userId, email)
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    ↓
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>┌─────────────────────────────────┐
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>│ 1. Try userId-based recovery    │
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>│    - Check secureVault          │
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>│    - Check SecureStore          │
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>│    - Check legacy formats       │
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>└─────────────────────────────────┘
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    ↓ (if fails)
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>┌─────────────────────────────────┐
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>│ 2. Try email-based recovery      │
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>│    - Hash email                  │
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>│    - Check secureVault by hash  │
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>│    - If found, re-store by userId│
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>└─────────────────────────────────┘
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>    ↓ (if still fails)
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>┌─────────────────────────────────┐
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>│ 3. Create new wallet             │
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>│    - Only if no recovery possible│
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>│    - Store by userId + email     │
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>│    - Verify storage              │
+<a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>└─────────────────────────────────┘
+</code></pre></div>
+<h3 id="email-hashing">Email Hashing<a class="headerlink" href="#email-hashing" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// Normalize email: lowercase + trim</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">normalizedEmail</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">email</span><span class="p">.</span><span class="nx">toLowerCase</span><span class="p">().</span><span class="nx">trim</span><span class="p">();</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1">// Hash using SHA-256</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="kd">const</span><span class="w"> </span><span class="nx">hash</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">Crypto</span><span class="p">.</span><span class="nx">digestStringAsync</span><span class="p">(</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nx">Crypto</span><span class="p">.</span><span class="nx">CryptoDigestAlgorithm</span><span class="p">.</span><span class="nx">SHA256</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nx">normalizedEmail</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">);</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="c1">// Use first 16 chars as identifier</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="k">return</span><span class="w"> </span><span class="nx">hash</span><span class="p">.</span><span class="nx">substring</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">16</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>Why 16 chars?</strong>
+- Provides sufficient uniqueness
+- Reduces storage key length
+- SHA-256 collision probability is negligible</p>
+<hr />
+<h2 id="testing-guide">Testing Guide<a class="headerlink" href="#testing-guide" title="Permanent link">&para;</a></h2>
+<h3 id="quick-test-5-minutes">Quick Test (5 minutes)<a class="headerlink" href="#quick-test-5-minutes" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Setup</strong></li>
+<li>Install app via TestFlight</li>
+<li>Create account with email</li>
+<li>
+<p>Note wallet address</p>
+</li>
+<li>
+<p><strong>Update</strong></p>
+</li>
+<li>Update app via TestFlight</li>
+<li>Open app after update</li>
+<li>
+<p>Log in with same email</p>
+</li>
+<li>
+<p><strong>Verify</strong></p>
+</li>
+<li>✅ Same wallet address</li>
+<li>✅ Wallet balance correct</li>
+<li>✅ No errors</li>
+</ol>
+<h3 id="comprehensive-test-scenarios">Comprehensive Test Scenarios<a class="headerlink" href="#comprehensive-test-scenarios" title="Permanent link">&para;</a></h3>
+<h4 id="test-1-basic-wallet-persistence">Test 1: Basic Wallet Persistence<a class="headerlink" href="#test-1-basic-wallet-persistence" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Install app → Create wallet → Update app → Verify wallet persists</li>
+</ul>
+<h4 id="test-2-email-based-recovery">Test 2: Email-Based Recovery<a class="headerlink" href="#test-2-email-based-recovery" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Create wallet → Simulate userId change → Log in → Verify email-based recovery</li>
+</ul>
+<h4 id="test-3-asyncstorage-cleared">Test 3: AsyncStorage Cleared<a class="headerlink" href="#test-3-asyncstorage-cleared" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Log in → Clear app data → Reopen → Verify recovery</li>
+</ul>
+<h4 id="test-4-multiple-updates">Test 4: Multiple Updates<a class="headerlink" href="#test-4-multiple-updates" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Install v1.0 → Update to v1.1 → Update to v1.2 → Verify persistence</li>
+</ul>
+<h4 id="test-5-storage-verification">Test 5: Storage Verification<a class="headerlink" href="#test-5-storage-verification" title="Permanent link">&para;</a></h4>
+<ul>
+<li>Create wallet → Immediately close/reopen → Verify recovery</li>
+</ul>
+<h3 id="automated-testing">Automated Testing<a class="headerlink" href="#automated-testing" title="Permanent link">&para;</a></h3>
+<p>Run test script:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>npx<span class="w"> </span>ts-node<span class="w"> </span>scripts/test-wallet-persistence.ts
+</code></pre></div></p>
+<h3 id="log-monitoring">Log Monitoring<a class="headerlink" href="#log-monitoring" title="Permanent link">&para;</a></h3>
+<p><strong>Success Indicators</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>&quot;Wallet recovered successfully&quot;
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>&quot;✅ Email-based wallet recovery successful&quot;
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>&quot;Wallet ensured for user&quot;
+</code></pre></div></p>
+<p><strong>Failure Indicators</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>&quot;Creating new wallet&quot; (after update)
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>&quot;No local wallets found, creating new wallet&quot;
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>&quot;Wallet verification failed&quot;
+</code></pre></div></p>
+<p><strong>Warnings to Investigate</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>&quot;secureVault: Used SecureStore fallback&quot;
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>&quot;Email-based wallet storage failed&quot;
+</code></pre></div></p>
+<hr />
+<h2 id="code-audit-best-practices">Code Audit &amp; Best Practices<a class="headerlink" href="#code-audit-best-practices" title="Permanent link">&para;</a></h2>
+<h3 id="code-quality-assessment">✅ Code Quality Assessment<a class="headerlink" href="#code-quality-assessment" title="Permanent link">&para;</a></h3>
+<h4 id="strengths">Strengths<a class="headerlink" href="#strengths" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>Error Handling</strong></li>
+<li>✅ Comprehensive try-catch blocks</li>
+<li>✅ Proper error logging</li>
+<li>
+<p>✅ Graceful fallbacks</p>
+</li>
+<li>
+<p><strong>Logging</strong></p>
+</li>
+<li>✅ Structured logging with context</li>
+<li>✅ Appropriate log levels (debug, info, warn, error)</li>
+<li>
+<p>✅ Sensitive data not logged (email hashed, userId truncated)</p>
+</li>
+<li>
+<p><strong>Security</strong></p>
+</li>
+<li>✅ Private keys never logged</li>
+<li>✅ Email hashed before storage</li>
+<li>✅ Hardware-backed storage (Keychain)</li>
+<li>
+<p>✅ AES-GCM encryption</p>
+</li>
+<li>
+<p><strong>Performance</strong></p>
+</li>
+<li>✅ Caching to avoid repeated Keychain access</li>
+<li>✅ Concurrent recovery prevention</li>
+<li>
+<p>✅ Async operations properly handled</p>
+</li>
+<li>
+<p><strong>Code Organization</strong></p>
+</li>
+<li>✅ Clear separation of concerns</li>
+<li>✅ Single responsibility principle</li>
+<li>✅ Well-documented functions</li>
+</ol>
+<h4 id="areas-for-improvement">Areas for Improvement<a class="headerlink" href="#areas-for-improvement" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>Type Safety</strong></li>
+<li>⚠️ Some <code>any</code> types in error handling</li>
+<li>
+<p><strong>Recommendation</strong>: Add stricter types</p>
+</li>
+<li>
+<p><strong>Constants</strong></p>
+</li>
+<li>⚠️ Magic numbers (e.g., <code>16</code> for hash length, <code>3000</code> for timeout)</li>
+<li>
+<p><strong>Recommendation</strong>: Extract to named constants</p>
+</li>
+<li>
+<p><strong>Error Messages</strong></p>
+</li>
+<li>⚠️ Some generic error messages</li>
+<li><strong>Recommendation</strong>: More specific error types</li>
+</ol>
+<h3 id="best-practices-applied">Best Practices Applied<a class="headerlink" href="#best-practices-applied" title="Permanent link">&para;</a></h3>
+<h4 id="security-best-practices">✅ Security Best Practices<a class="headerlink" href="#security-best-practices" title="Permanent link">&para;</a></h4>
+<ol>
+<li>
+<p><strong>Never Log Sensitive Data</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1">// ✅ Good</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">info</span><span class="p">(</span><span class="s1">&#39;Wallet stored&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">userId.substring</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">8</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s1">&#39;...&#39;</span><span class="p">,</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nx">emailHash</span><span class="o">:</span><span class="w"> </span><span class="kt">emailHash.substring</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">8</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s1">&#39;...&#39;</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="p">});</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1">// ❌ Bad (never do this)</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="nx">logger</span><span class="p">.</span><span class="nx">info</span><span class="p">(</span><span class="s1">&#39;Wallet stored&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">privateKey</span><span class="p">,</span><span class="w"> </span><span class="nx">email</span><span class="w"> </span><span class="p">});</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Use Hardware-Backed Storage</strong></p>
+</li>
+<li>Keychain on iOS (secure enclave)</li>
+<li>Android Keystore</li>
+<li>
+<p>Never store in AsyncStorage or plain files</p>
+</li>
+<li>
+<p><strong>Encrypt Before Storage</strong></p>
+</li>
+<li>AES-GCM encryption</li>
+<li>Unique IV per encryption</li>
+<li>Key stored in Keychain</li>
+</ol>
+<h4 id="error-handling-best-practices">✅ Error Handling Best Practices<a class="headerlink" href="#error-handling-best-practices" title="Permanent link">&para;</a></h4>
+<ol>
+<li>
+<p><strong>Graceful Degradation</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1">// Try primary method</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">primaryMethod</span><span class="p">();</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">result</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="c1">// Fallback to secondary</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">fallbackMethod</span><span class="p">();</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Non-Critical Failures</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1">// Email-based storage is backup - don&#39;t fail if it fails</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">storeByEmailHash</span><span class="p">(</span><span class="nx">email</span><span class="p">,</span><span class="w"> </span><span class="nx">wallet</span><span class="p">);</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">warn</span><span class="p">(</span><span class="s1">&#39;Email storage failed (non-critical)&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="p">);</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span><span class="c1">// Continue - primary storage succeeded</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>User-Friendly Error Messages</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1">// ✅ Good</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Wallet credentials were never saved to this device. Please restore from your seed phrase.&#39;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1">// ❌ Bad</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;STORAGE_CORRUPTION&#39;</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h4 id="performance-best-practices">✅ Performance Best Practices<a class="headerlink" href="#performance-best-practices" title="Permanent link">&para;</a></h4>
+<ol>
+<li>
+<p><strong>Caching</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1">// Cache AES key to avoid repeated Keychain access</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">cachedAesKey</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="nx">keyCacheExpiry</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">cachedAesKey</span><span class="p">;</span><span class="w"> </span><span class="c1">// No Face ID prompt!</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Prevent Concurrent Operations</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1">// Prevent multiple recovery attempts</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">recoveryInProgress</span><span class="p">.</span><span class="nx">has</span><span class="p">(</span><span class="nx">userId</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">waitForRecovery</span><span class="p">(</span><span class="nx">userId</span><span class="p">);</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Async Operations</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1">// Non-blocking cloud backup</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="nx">WalletRecoveryService</span><span class="p">.</span><span class="nx">createCloudBackupIfEnabled</span><span class="p">(</span><span class="nx">userId</span><span class="p">)</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="p">.</span><span class="k">catch</span><span class="p">(</span><span class="nx">error</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span><span class="nx">logger</span><span class="p">.</span><span class="nx">warn</span><span class="p">(</span><span class="s1">&#39;Cloud backup failed (non-blocking)&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="p">);</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">  </span><span class="p">});</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h4 id="code-organization-best-practices">✅ Code Organization Best Practices<a class="headerlink" href="#code-organization-best-practices" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>Single Responsibility</strong></li>
+<li><code>secureVault</code>: Storage abstraction</li>
+<li><code>walletRecoveryService</code>: Recovery logic</li>
+<li>
+<p><code>simplifiedWalletService</code>: Wallet management</p>
+</li>
+<li>
+<p><strong>Clear Function Names</strong></p>
+</li>
+<li><code>ensureUserWallet()</code> - clear intent</li>
+<li><code>recoverWallet()</code> - clear purpose</li>
+<li>
+<p><code>hashEmail()</code> - clear operation</p>
+</li>
+<li>
+<p><strong>Documentation</strong></p>
+</li>
+<li>JSDoc comments for complex functions</li>
+<li>Inline comments for non-obvious logic</li>
+<li>Clear variable names</li>
+</ol>
+<h3 id="recommended-improvements">Recommended Improvements<a class="headerlink" href="#recommended-improvements" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Extract Constants</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1">// Current</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="k">return</span><span class="w"> </span><span class="nx">hash</span><span class="p">.</span><span class="nx">substring</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">16</span><span class="p">);</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1">// Recommended</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="kd">const</span><span class="w"> </span><span class="nx">EMAIL_HASH_LENGTH</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">16</span><span class="p">;</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="k">return</span><span class="w"> </span><span class="nx">hash</span><span class="p">.</span><span class="nx">substring</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="nx">EMAIL_HASH_LENGTH</span><span class="p">);</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Add Type Guards</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1">// Current</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">userEmail</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1">// Recommended</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="kd">function</span><span class="w"> </span><span class="nx">isValidEmail</span><span class="p">(</span><span class="nx">email</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">undefined</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nx">email</span><span class="w"> </span><span class="nx">is</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="ow">typeof</span><span class="w"> </span><span class="nx">email</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s1">&#39;string&#39;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">email</span><span class="p">.</span><span class="nx">includes</span><span class="p">(</span><span class="s1">&#39;@&#39;</span><span class="p">);</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Error Types</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1">// Recommended: Create specific error classes</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="kd">class</span><span class="w"> </span><span class="nx">WalletStorageError</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="ne">Error</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="kr">constructor</span><span class="p">(</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">    </span><span class="nx">message</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">    </span><span class="k">public</span><span class="w"> </span><span class="k">readonly</span><span class="w"> </span><span class="nx">code</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">    </span><span class="k">public</span><span class="w"> </span><span class="k">readonly</span><span class="w"> </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">  </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">    </span><span class="k">super</span><span class="p">(</span><span class="nx">message</span><span class="p">);</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+</ol>
+<hr />
+<h2 id="monitoring-maintenance">Monitoring &amp; Maintenance<a class="headerlink" href="#monitoring-maintenance" title="Permanent link">&para;</a></h2>
+<h3 id="key-metrics-to-monitor">Key Metrics to Monitor<a class="headerlink" href="#key-metrics-to-monitor" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Recovery Success Rate</strong></li>
+<li>Track: <code>wallet_recovery_success</code> / <code>wallet_recovery_attempts</code></li>
+<li>Target: &gt; 95%</li>
+<li>
+<p>Alert if: &lt; 90%</p>
+</li>
+<li>
+<p><strong>Email-Based Recovery Frequency</strong></p>
+</li>
+<li>Track: How often email-based recovery is used</li>
+<li>Indicates: userId changes or storage issues</li>
+<li>
+<p>Investigate if: &gt; 10% of recoveries</p>
+</li>
+<li>
+<p><strong>SecureStore Fallback Usage</strong></p>
+</li>
+<li>Track: How often SecureStore is used</li>
+<li>Target: &lt; 1% of storage operations</li>
+<li>
+<p>Alert if: &gt; 5%</p>
+</li>
+<li>
+<p><strong>Storage Verification Failures</strong></p>
+</li>
+<li>Track: Wallet verification failures after creation</li>
+<li>Target: 0%</li>
+<li>Alert if: &gt; 0%</li>
+</ol>
+<h3 id="log-monitoring-queries">Log Monitoring Queries<a class="headerlink" href="#log-monitoring-queries" title="Permanent link">&para;</a></h3>
+<p><strong>Success Rate</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>&quot;Wallet recovered successfully&quot; / 
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>(&quot;Wallet recovered successfully&quot; OR &quot;Creating new wallet&quot;)
+</code></pre></div></p>
+<p><strong>Email Recovery Usage</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>&quot;✅ Email-based wallet recovery successful&quot;
+</code></pre></div></p>
+<p><strong>SecureStore Fallback</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>&quot;secureVault: Used SecureStore fallback&quot;
+</code></pre></div></p>
+<h3 id="maintenance-tasks">Maintenance Tasks<a class="headerlink" href="#maintenance-tasks" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Weekly</strong></li>
+<li>Review recovery success rate</li>
+<li>Check for SecureStore fallback warnings</li>
+<li>
+<p>Monitor error logs</p>
+</li>
+<li>
+<p><strong>Monthly</strong></p>
+</li>
+<li>Analyze email-based recovery frequency</li>
+<li>Review storage verification failures</li>
+<li>
+<p>Update documentation if needed</p>
+</li>
+<li>
+<p><strong>Quarterly</strong></p>
+</li>
+<li>Full system audit</li>
+<li>Review and update test scenarios</li>
+<li>Performance optimization review</li>
+</ol>
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="issue-new-wallet-created-after-update">Issue: New Wallet Created After Update<a class="headerlink" href="#issue-new-wallet-created-after-update" title="Permanent link">&para;</a></h3>
+<p><strong>Symptoms</strong>:
+- Different wallet address after update
+- Wallet balance is 0 (if had funds before)</p>
+<p><strong>Possible Causes</strong>:
+1. Email-based recovery not working
+2. SecureStore used instead of Keychain/MMKV
+3. UserId changed and email not available</p>
+<p><strong>Debug Steps</strong>:
+1. Check logs for "Email-based wallet recovery" messages
+2. Verify email is passed to recovery methods
+3. Check if Keychain/MMKV is working
+4. Verify email hash storage exists</p>
+<p><strong>Solution</strong>:
+- Ensure email is available during recovery
+- Verify Keychain/MMKV permissions
+- Check email hash storage</p>
+<h3 id="issue-wallet-not-found">Issue: Wallet Not Found<a class="headerlink" href="#issue-wallet-not-found" title="Permanent link">&para;</a></h3>
+<p><strong>Symptoms</strong>:
+- "No local wallets found" error
+- Wallet recovery fails</p>
+<p><strong>Possible Causes</strong>:
+1. Storage failed during wallet creation
+2. Keychain/MMKV not accessible
+3. Email hash not stored</p>
+<p><strong>Debug Steps</strong>:
+1. Check logs for storage errors
+2. Verify Keychain permissions
+3. Check if email was available during storage
+4. Verify wallet verification passed</p>
+<p><strong>Solution</strong>:
+- Retry wallet storage
+- Check Keychain permissions
+- Verify email is available</p>
+<h3 id="issue-authentication-fails-after-update">Issue: Authentication Fails After Update<a class="headerlink" href="#issue-authentication-fails-after-update" title="Permanent link">&para;</a></h3>
+<p><strong>Symptoms</strong>:
+- User appears logged out
+- Cannot access wallet</p>
+<p><strong>Possible Causes</strong>:
+1. AsyncStorage cleared
+2. Firebase Auth not restoring
+3. Email persistence not working</p>
+<p><strong>Debug Steps</strong>:
+1. Check logs for "No immediate auth state"
+2. Verify email persistence service
+3. Check Firebase Auth state restoration
+4. Verify user can still log in manually</p>
+<p><strong>Solution</strong>:
+- Wait for auth state restoration (up to 3s)
+- Use email-based authentication flow
+- Verify Firebase Auth configuration</p>
+<hr />
+<h2 id="success-criteria">Success Criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h2>
+<p>All implementations are successful if:</p>
+<ul>
+<li>✅ Wallet persists across app updates</li>
+<li>✅ Email-based recovery works</li>
+<li>✅ No new wallets created unnecessarily</li>
+<li>✅ Recovery happens automatically</li>
+<li>✅ User experience is seamless</li>
+<li>✅ Logs show successful recovery</li>
+<li>✅ SecureStore fallback is rare (&lt; 1%)</li>
+</ul>
+<hr />
+<h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
+<p>The wallet persistence system is now robust and production-ready:</p>
+<p>✅ <strong>Primary Storage</strong>: Keychain/MMKV (reliable, secure)
+✅ <strong>Backup Recovery</strong>: Email-based (handles userId changes)
+✅ <strong>Auth Restoration</strong>: Improved timing (handles AsyncStorage clearing)
+✅ <strong>Verification</strong>: Immediate checks (catches failures early)
+✅ <strong>Error Handling</strong>: Comprehensive (graceful degradation)
+✅ <strong>Logging</strong>: Structured (easy debugging)
+✅ <strong>Security</strong>: Best practices (hardware-backed, encrypted)</p>
+<p>The system handles edge cases gracefully and provides multiple fallback mechanisms to ensure wallet credentials are never lost.</p>
+<hr />
+<h2 id="code-audit-summary">Code Audit Summary<a class="headerlink" href="#code-audit-summary" title="Permanent link">&para;</a></h2>
+<h3 id="overall-assessment-excellent-a-">Overall Assessment: ✅ <strong>Excellent (A-)</strong><a class="headerlink" href="#overall-assessment-excellent-a-" title="Permanent link">&para;</a></h3>
+<p>The implementation follows security and coding best practices. See <code>CODE_AUDIT_AND_IMPROVEMENTS.md</code> for detailed audit.</p>
+<p><strong>Key Strengths</strong>:
+- ✅ Security best practices (no sensitive data logged, hardware-backed storage)
+- ✅ Comprehensive error handling with graceful fallbacks
+- ✅ Performance optimizations (caching, concurrent prevention)
+- ✅ Clear code organization and documentation
+- ✅ Structured logging with appropriate levels</p>
+<p><strong>Recommended Enhancements</strong> (Optional):
+- Extract magic numbers to constants
+- Improve type safety (reduce <code>any</code> types)
+- Add email validation
+- Create specific error types</p>
+<p><strong>Note</strong>: All recommendations are enhancements, not fixes. Current code is production-ready.</p>
+<hr />
+<h2 id="related-documents">Related Documents<a class="headerlink" href="#related-documents" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Quick Testing Checklist</strong>: <code>QUICK_TESTING_CHECKLIST.md</code></li>
+<li><strong>Detailed Testing Guide</strong>: <code>WALLET_PERSISTENCE_TESTING_GUIDE.md</code></li>
+<li><strong>Test Script</strong>: <code>scripts/test-wallet-persistence.ts</code></li>
+<li><strong>Implementation Details</strong>: <code>WALLET_PERSISTENCE_FIXES_IMPLEMENTED.md</code></li>
+<li><strong>Code Audit</strong>: <code>CODE_AUDIT_AND_IMPROVEMENTS.md</code></li>
+</ul>
+<hr />
+<p><strong>Last Updated</strong>: 2024
+<strong>Version</strong>: 1.0
+<strong>Status</strong>: ✅ Production Ready
+<strong>Code Quality</strong>: ✅ A- (Excellent)</p>
+<h1 id="wallet-persistence-development-testing-guide">Wallet Persistence - Development Testing Guide<a class="headerlink" href="#wallet-persistence-development-testing-guide" title="Permanent link">&para;</a></h1>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<p>Test wallet persistence on your physical device <strong>without building new versions</strong>. Use these methods:</p>
+<hr />
+<h2 id="method-1-test-screen-easiest">Method 1: Test Screen (Easiest)<a class="headerlink" href="#method-1-test-screen-easiest" title="Permanent link">&para;</a></h2>
+<h3 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p>Add test screen to your navigation (development only):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1">// In your navigation config (dev only)</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="k">import</span><span class="w"> </span><span class="nx">WalletPersistenceTestScreen</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s1">&#39;./src/screens/Testing/WalletPersistenceTestScreen&#39;</span><span class="p">;</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1">// Add route</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="o">&lt;</span><span class="nx">Stack</span><span class="p">.</span><span class="nx">Screen</span><span class="w"> </span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">  </span><span class="nx">name</span><span class="o">=</span><span class="s2">&quot;WalletPersistenceTest&quot;</span><span class="w"> </span>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="w">  </span><span class="nx">component</span><span class="o">=</span><span class="p">{</span><span class="nx">WalletPersistenceTestScreen</span><span class="p">}</span><span class="w"> </span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="err">/&gt;</span>
+</code></pre></div></p>
+</li>
+<li>
+<p>Navigate to test screen:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="nx">navigation</span><span class="p">.</span><span class="nx">navigate</span><span class="p">(</span><span class="s1">&#39;WalletPersistenceTest&#39;</span><span class="p">);</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h3 id="available-tests">Available Tests<a class="headerlink" href="#available-tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Check Storage Status</strong> - See what storage methods have wallet data</li>
+<li><strong>Test Storage Verification</strong> - Verify wallet can be recovered immediately</li>
+<li><strong>Test Email-Based Storage</strong> - Check if wallet stored by email hash</li>
+<li><strong>Simulate App Update</strong> - Clear AsyncStorage (simulates update)</li>
+<li><strong>Test Email-Based Recovery</strong> - Test recovery when userId changes</li>
+<li><strong>Run Full Test Suite</strong> - Run all tests at once</li>
+</ul>
+<hr />
+<h2 id="method-2-react-native-debugger-console">Method 2: React Native Debugger Console<a class="headerlink" href="#method-2-react-native-debugger-console" title="Permanent link">&para;</a></h2>
+<h3 id="setup_1">Setup<a class="headerlink" href="#setup_1" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Open React Native Debugger</li>
+<li>Connect to your app</li>
+<li>Open Console tab</li>
+</ol>
+<h3 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">&para;</a></h3>
+<h4 id="check-storage-status">Check Storage Status<a class="headerlink" href="#check-storage-status" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="k">import</span><span class="w"> </span><span class="nx">WalletPersistenceTester</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s1">&#39;./src/utils/testing/walletPersistenceTester&#39;</span><span class="p">;</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">userId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;your-user-id&#39;</span><span class="p">;</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="kd">const</span><span class="w"> </span><span class="nx">userEmail</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;your-email@example.com&#39;</span><span class="p">;</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="c1">// Get storage status</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="kd">const</span><span class="w"> </span><span class="nx">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">WalletPersistenceTester</span><span class="p">.</span><span class="nx">getStorageStatus</span><span class="p">(</span><span class="nx">userId</span><span class="p">,</span><span class="w"> </span><span class="nx">userEmail</span><span class="p">);</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">status</span><span class="p">);</span>
+</code></pre></div>
+<h4 id="test-asyncstorage-clear-simulate-app-update">Test AsyncStorage Clear (Simulate App Update)<a class="headerlink" href="#test-asyncstorage-clear-simulate-app-update" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1">// This clears AsyncStorage but keeps Keychain/SecureStore</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">WalletPersistenceTester</span><span class="p">.</span><span class="nx">testAsyncStorageClear</span><span class="p">(</span><span class="nx">userId</span><span class="p">,</span><span class="w"> </span><span class="nx">userEmail</span><span class="p">);</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">result</span><span class="p">);</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="c1">// Expected: Wallet should still be recoverable</span>
+</code></pre></div>
+<h4 id="test-email-based-recovery">Test Email-Based Recovery<a class="headerlink" href="#test-email-based-recovery" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1">// Simulates userId change scenario</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">WalletPersistenceTester</span><span class="p">.</span><span class="nx">testUserIdChange</span><span class="p">(</span><span class="nx">userId</span><span class="p">,</span><span class="w"> </span><span class="nx">userEmail</span><span class="p">);</span>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">result</span><span class="p">);</span>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="c1">// Expected: Wallet recovered via email hash</span>
+</code></pre></div>
+<h4 id="run-full-test-suite">Run Full Test Suite<a class="headerlink" href="#run-full-test-suite" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">results</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">WalletPersistenceTester</span><span class="p">.</span><span class="nx">runFullTestSuite</span><span class="p">(</span><span class="nx">userId</span><span class="p">,</span><span class="w"> </span><span class="nx">userEmail</span><span class="p">);</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">results</span><span class="p">);</span>
+</code></pre></div>
+<h4 id="clear-asyncstorage-manually">Clear AsyncStorage Manually<a class="headerlink" href="#clear-asyncstorage-manually" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="k">import</span><span class="w"> </span><span class="nx">AsyncStorage</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s1">&#39;@react-native-async-storage/async-storage&#39;</span><span class="p">;</span>
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="c1">// Clear AsyncStorage (simulates app update)</span>
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="k">await</span><span class="w"> </span><span class="nx">AsyncStorage</span><span class="p">.</span><span class="nx">clear</span><span class="p">();</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;AsyncStorage cleared - test wallet recovery now&#39;</span><span class="p">);</span>
+</code></pre></div>
+<hr />
+<h2 id="method-3-terminal-commands">Method 3: Terminal Commands<a class="headerlink" href="#method-3-terminal-commands" title="Permanent link">&para;</a></h2>
+<h3 id="ios">iOS<a class="headerlink" href="#ios" title="Permanent link">&para;</a></h3>
+<h4 id="view-logs">View Logs<a class="headerlink" href="#view-logs" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="c1"># Method 1: Xcode</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="c1"># Open Xcode &gt; Window &gt; Devices and Simulators</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="c1"># Select device &gt; View Device Logs</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="c1"># Filter: WalletRecovery OR SecureVault</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="c1"># Method 2: Console.app</span>
+<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a>log<span class="w"> </span>stream<span class="w"> </span>--predicate<span class="w"> </span><span class="s1">&#39;processImagePath contains &quot;WeSplit&quot;&#39;</span><span class="w"> </span>--level<span class="w"> </span>debug<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">&#39;WalletRecovery|SecureVault&#39;</span>
+</code></pre></div>
+<h4 id="clear-app-data-simulates-fresh-install">Clear App Data (Simulates Fresh Install)<a class="headerlink" href="#clear-app-data-simulates-fresh-install" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="c1"># Delete app from device, then reinstall</span>
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="c1"># Or use Settings &gt; General &gt; iPhone Storage &gt; WeSplit &gt; Offload App</span>
+</code></pre></div>
+<h3 id="android">Android<a class="headerlink" href="#android" title="Permanent link">&para;</a></h3>
+<h4 id="view-logs_1">View Logs<a class="headerlink" href="#view-logs_1" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="c1"># Filter wallet-related logs</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>adb<span class="w"> </span>logcat<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">&#39;WalletRecovery|SecureVault|SimplifiedWallet&#39;</span>
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="c1"># Continuous monitoring</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>adb<span class="w"> </span>logcat<span class="w"> </span>-c<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>adb<span class="w"> </span>logcat<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">&#39;WalletRecovery|SecureVault&#39;</span>
+</code></pre></div>
+<h4 id="clear-asyncstorage">Clear AsyncStorage<a class="headerlink" href="#clear-asyncstorage" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1"># Method 1: Clear app data (WARNING: deletes everything!)</span>
+<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>adb<span class="w"> </span>shell<span class="w"> </span>pm<span class="w"> </span>clear<span class="w"> </span>com.wesplit.app
+<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>
+<a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="c1"># Method 2: Clear only AsyncStorage (requires root or debug build)</span>
+<a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>adb<span class="w"> </span>shell<span class="w"> </span>run-as<span class="w"> </span>com.wesplit.app
+<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a>rm<span class="w"> </span>-rf<span class="w"> </span>/data/data/com.wesplit.app/files/RCTAsyncLocalStorage_V1
+</code></pre></div>
+<h4 id="use-test-script">Use Test Script<a class="headerlink" href="#use-test-script" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>chmod<span class="w"> </span>+x<span class="w"> </span>scripts/test-wallet-persistence-dev.sh
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>./scripts/test-wallet-persistence-dev.sh<span class="w"> </span>view-logs
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>./scripts/test-wallet-persistence-dev.sh<span class="w"> </span>clear-asyncstorage
+</code></pre></div>
+<hr />
+<h2 id="method-4-simulate-app-update-scenario">Method 4: Simulate App Update Scenario<a class="headerlink" href="#method-4-simulate-app-update-scenario" title="Permanent link">&para;</a></h2>
+<h3 id="step-by-step">Step-by-Step<a class="headerlink" href="#step-by-step" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Initial State</strong></li>
+<li>Log in to app</li>
+<li>Note your wallet address</li>
+<li>
+<p>Verify wallet works</p>
+</li>
+<li>
+<p><strong>Simulate Update</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="c1">// In React Native Debugger</span>
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="k">import</span><span class="w"> </span><span class="nx">AsyncStorage</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s1">&#39;@react-native-async-storage/async-storage&#39;</span><span class="p">;</span>
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="k">await</span><span class="w"> </span><span class="nx">AsyncStorage</span><span class="p">.</span><span class="nx">clear</span><span class="p">();</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Test Recovery</strong></p>
+</li>
+<li>Close and reopen app</li>
+<li>Log in with same email</li>
+<li>Check if wallet address matches</li>
+<li>
+<p>Verify balance is correct</p>
+</li>
+<li>
+<p><strong>Expected Result</strong></p>
+</li>
+<li>✅ Same wallet address</li>
+<li>✅ Wallet balance correct</li>
+<li>✅ No new wallet created</li>
+<li>✅ Logs show "Wallet recovered successfully"</li>
+</ol>
+<hr />
+<h2 id="method-5-test-email-based-recovery">Method 5: Test Email-Based Recovery<a class="headerlink" href="#method-5-test-email-based-recovery" title="Permanent link">&para;</a></h2>
+<h3 id="simulate-userid-change">Simulate UserId Change<a class="headerlink" href="#simulate-userid-change" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Get Current Wallet</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">wallet</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">walletService</span><span class="p">.</span><span class="nx">getWalletInfo</span><span class="p">(</span><span class="nx">userId</span><span class="p">);</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;Current address:&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">wallet</span><span class="p">.</span><span class="nx">address</span><span class="p">);</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Simulate UserId Change</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">newUserId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">userId</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s1">&#39;_changed&#39;</span><span class="p">;</span>
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">recovery</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">walletRecoveryService</span><span class="p">.</span><span class="nx">recoverWallet</span><span class="p">(</span><span class="nx">newUserId</span><span class="p">,</span><span class="w"> </span><span class="nx">userEmail</span><span class="p">);</span>
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;Recovered address:&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">recovery</span><span class="p">.</span><span class="nx">wallet</span><span class="o">?</span><span class="p">.</span><span class="nx">address</span><span class="p">);</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Expected Result</strong></p>
+</li>
+<li>✅ Wallet recovered via email hash</li>
+<li>✅ Same wallet address</li>
+<li>✅ Logs show "Email-based wallet recovery successful"</li>
+</ol>
+<hr />
+<h2 id="quick-test-checklist">Quick Test Checklist<a class="headerlink" href="#quick-test-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[ ] <strong>Storage Status</strong>: Check all storage methods have data</li>
+<li>[ ] <strong>AsyncStorage Clear</strong>: Wallet persists after clearing</li>
+<li>[ ] <strong>Email Recovery</strong>: Wallet recovered when userId changes</li>
+<li>[ ] <strong>Immediate Recovery</strong>: Wallet can be recovered right after storage</li>
+<li>[ ] <strong>Logs</strong>: No errors, recovery successful</li>
+</ul>
+<hr />
+<h2 id="what-to-look-for">What to Look For<a class="headerlink" href="#what-to-look-for" title="Permanent link">&para;</a></h2>
+<h3 id="success-indicators">✅ Success Indicators<a class="headerlink" href="#success-indicators" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>&quot;Wallet recovered successfully&quot;
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>&quot;✅ Email-based wallet recovery successful&quot;
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>&quot;Wallet stored securely&quot;
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a>&quot;Wallet ensured for user&quot;
+</code></pre></div>
+<h3 id="failure-indicators">❌ Failure Indicators<a class="headerlink" href="#failure-indicators" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>&quot;Creating new wallet&quot; (after update)
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>&quot;No local wallets found, creating new wallet&quot;
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a>&quot;Wallet verification failed&quot;
+<a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a>&quot;All storage methods failed&quot;
+</code></pre></div>
+<h3 id="warnings-investigate-if-frequent">⚠️ Warnings (Investigate if frequent)<a class="headerlink" href="#warnings-investigate-if-frequent" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>&quot;secureVault: Used SecureStore fallback&quot;
+<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>&quot;Email-based wallet storage failed&quot;
+</code></pre></div>
+<hr />
+<h2 id="troubleshooting_1">Troubleshooting<a class="headerlink" href="#troubleshooting_1" title="Permanent link">&para;</a></h2>
+<h3 id="issue-tests-not-working">Issue: Tests not working<a class="headerlink" href="#issue-tests-not-working" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Check</strong>: App is in debug mode</li>
+<li><strong>Check</strong>: User is logged in</li>
+<li><strong>Check</strong>: Wallet exists</li>
+</ul>
+<h3 id="issue-cant-access-test-screen">Issue: Can't access test screen<a class="headerlink" href="#issue-cant-access-test-screen" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Solution</strong>: Add to navigation (dev only)</li>
+<li><strong>Alternative</strong>: Use React Native Debugger console</li>
+</ul>
+<h3 id="issue-asyncstorage-clear-doesnt-work">Issue: AsyncStorage clear doesn't work<a class="headerlink" href="#issue-asyncstorage-clear-doesnt-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>iOS</strong>: Use test screen or React Native Debugger</li>
+<li><strong>Android</strong>: Use ADB commands or test screen</li>
+</ul>
+<hr />
+<h2 id="production-safety">Production Safety<a class="headerlink" href="#production-safety" title="Permanent link">&para;</a></h2>
+<p>⚠️ <strong>IMPORTANT</strong>: Remove or disable test screen in production builds!</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="c1">// In navigation config</span>
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="p">{</span><span class="nx">__DEV__</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a><span class="w">  </span><span class="o">&lt;</span><span class="nx">Stack</span><span class="p">.</span><span class="nx">Screen</span><span class="w"> </span>
+<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="w">    </span><span class="nx">name</span><span class="o">=</span><span class="s2">&quot;WalletPersistenceTest&quot;</span><span class="w"> </span>
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a><span class="w">    </span><span class="nx">component</span><span class="o">=</span><span class="p">{</span><span class="nx">WalletPersistenceTestScreen</span><span class="p">}</span><span class="w"> </span>
+<a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a><span class="w">  </span><span class="o">/&gt;</span>
+<a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="p">)}</span>
+</code></pre></div>
+<p>Or conditionally import:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">WalletPersistenceTestScreen</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">__DEV__</span><span class="w"> </span>
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a><span class="w">  </span><span class="o">?</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;./src/screens/Testing/WalletPersistenceTestScreen&#39;</span><span class="p">)</span><span class="nx">.default</span>
+<a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="kt">null</span><span class="p">;</span>
+</code></pre></div></p>
+<hr />
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Run quick test using test screen</li>
+<li>Monitor logs during tests</li>
+<li>Verify all tests pass</li>
+<li>Test on physical device before deploying</li>
+</ol>
+<p>For full testing guide, see: <code>WALLET_PERSISTENCE_COMPREHENSIVE_GUIDE.md</code></p>
+<h1 id="wallet-maintainability-testing-summary">Wallet Maintainability &amp; Testing Summary<a class="headerlink" href="#wallet-maintainability-testing-summary" title="Permanent link">&para;</a></h1>
+<h2 id="complete-testing-solution-implemented">✅ Complete Testing Solution Implemented<a class="headerlink" href="#complete-testing-solution-implemented" title="Permanent link">&para;</a></h2>
+<p>You can now test <strong>both scenarios</strong> to ensure wallet consistency:</p>
+<hr />
+<h2 id="test-1-app-update-scenario">🧪 Test 1: App Update Scenario<a class="headerlink" href="#test-1-app-update-scenario" title="Permanent link">&para;</a></h2>
+<h3 id="what-it-tests">What It Tests<a class="headerlink" href="#what-it-tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Simulates app update (TestFlight/App Store)</li>
+<li>Clears AsyncStorage only</li>
+<li>Keeps Keychain/MMKV intact</li>
+</ul>
+<h3 id="how-to-use">How to Use<a class="headerlink" href="#how-to-use" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Reload app</strong> (shake device → Reload)</li>
+<li>Go to <strong>Dashboard</strong></li>
+<li>Tap <strong>"🧪 Test 1: Simulate App Update"</strong> (orange button)</li>
+<li>Confirm → AsyncStorage cleared</li>
+<li><strong>Close app completely</strong></li>
+<li><strong>Reopen app</strong></li>
+<li><strong>Log in</strong> with same email</li>
+<li><strong>Verify</strong>: Same wallet address ✅</li>
+</ol>
+<h3 id="expected-result">Expected Result<a class="headerlink" href="#expected-result" title="Permanent link">&para;</a></h3>
+<p>✅ <strong>Wallet persists</strong> - Same address, same balance</p>
+<hr />
+<h2 id="test-2-app-deletion-scenario">⚠️ Test 2: App Deletion Scenario<a class="headerlink" href="#test-2-app-deletion-scenario" title="Permanent link">&para;</a></h2>
+<h3 id="what-it-tests_1">What It Tests<a class="headerlink" href="#what-it-tests_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Simulates app deletion/reinstallation</li>
+<li>Clears <strong>ALL data</strong> (AsyncStorage, Keychain, MMKV, SecureStore)</li>
+<li>Tests backup recovery mechanisms</li>
+</ul>
+<h3 id="how-to-use_1">How to Use<a class="headerlink" href="#how-to-use_1" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>IMPORTANT</strong>: Create backup first!</li>
+<li>Create cloud backup (with password), OR</li>
+<li>Save seed phrase</li>
+<li><strong>Reload app</strong> (shake device → Reload)</li>
+<li>Go to <strong>Dashboard</strong></li>
+<li>Tap <strong>"⚠️ Test 2: Simulate App Deletion"</strong> (red button)</li>
+<li><strong>Read warning carefully</strong> → Confirm</li>
+<li><strong>Close app completely</strong></li>
+<li><strong>Reopen app</strong></li>
+<li><strong>Log in</strong> with same email</li>
+<li><strong>Recover wallet</strong>:</li>
+<li>From cloud backup (enter password), OR</li>
+<li>From seed phrase (enter seed phrase)</li>
+<li><strong>Verify</strong>: Same wallet address ✅</li>
+</ol>
+<h3 id="expected-result_1">Expected Result<a class="headerlink" href="#expected-result_1" title="Permanent link">&para;</a></h3>
+<p>✅ <strong>Wallet recovered</strong> - Same address (if backup exists)
+❌ <strong>Wallet lost</strong> - New wallet created (if no backup)</p>
+<hr />
+<h2 id="storage-maintainability">Storage Maintainability<a class="headerlink" href="#storage-maintainability" title="Permanent link">&para;</a></h2>
+<h3 id="what-persists-during-app-updates">What Persists During App Updates ✅<a class="headerlink" href="#what-persists-during-app-updates" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ <strong>Keychain (iOS)</strong> - AES encryption key</li>
+<li>✅ <strong>MMKV (Android)</strong> - Encrypted wallet data</li>
+<li>✅ <strong>SecureStore</strong> - Email, fallback storage</li>
+</ul>
+<h3 id="what-gets-cleared-during-app-updates">What Gets Cleared During App Updates ❌<a class="headerlink" href="#what-gets-cleared-during-app-updates" title="Permanent link">&para;</a></h3>
+<ul>
+<li>❌ <strong>AsyncStorage</strong> - Firebase Auth state, app state</li>
+</ul>
+<h3 id="what-gets-cleared-during-app-deletion">What Gets Cleared During App Deletion ❌<a class="headerlink" href="#what-gets-cleared-during-app-deletion" title="Permanent link">&para;</a></h3>
+<ul>
+<li>❌ <strong>Everything</strong> - Keychain, MMKV, SecureStore, AsyncStorage</li>
+</ul>
+<hr />
+<h2 id="recovery-mechanisms">Recovery Mechanisms<a class="headerlink" href="#recovery-mechanisms" title="Permanent link">&para;</a></h2>
+<h3 id="1-automatic-recovery-app-updates">1. Automatic Recovery (App Updates)<a class="headerlink" href="#1-automatic-recovery-app-updates" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Email-based recovery (if userId changes)</li>
+<li>✅ Keychain/MMKV recovery (primary method)</li>
+<li>✅ SecureStore fallback (last resort)</li>
+</ul>
+<h3 id="2-manual-recovery-app-deletion">2. Manual Recovery (App Deletion)<a class="headerlink" href="#2-manual-recovery-app-deletion" title="Permanent link">&para;</a></h3>
+<ul>
+<li>⚠️ Cloud backup recovery (requires password)</li>
+<li>⚠️ Seed phrase recovery (requires seed phrase)</li>
+<li>❌ New wallet creation (if no backup)</li>
+</ul>
+<hr />
+<h2 id="testing-checklist">Testing Checklist<a class="headerlink" href="#testing-checklist" title="Permanent link">&para;</a></h2>
+<h3 id="before-testing">Before Testing<a class="headerlink" href="#before-testing" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Note your wallet address</li>
+<li>[ ] Note your wallet balance</li>
+<li>[ ] Create cloud backup (for Test 2)</li>
+<li>[ ] Save seed phrase (for Test 2)</li>
+</ul>
+<h3 id="test-1-app-update">Test 1: App Update<a class="headerlink" href="#test-1-app-update" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Run test (clear AsyncStorage)</li>
+<li>[ ] Close and reopen app</li>
+<li>[ ] Log in</li>
+<li>[ ] Verify: Same wallet address ✅</li>
+<li>[ ] Verify: Same balance ✅</li>
+</ul>
+<h3 id="test-2-app-deletion">Test 2: App Deletion<a class="headerlink" href="#test-2-app-deletion" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Run test (clear ALL data)</li>
+<li>[ ] Close and reopen app</li>
+<li>[ ] Log in</li>
+<li>[ ] Recover from backup</li>
+<li>[ ] Verify: Same wallet address ✅</li>
+<li>[ ] Verify: Same balance ✅</li>
+</ul>
+<hr />
+<h2 id="maintenance-recommendations">Maintenance Recommendations<a class="headerlink" href="#maintenance-recommendations" title="Permanent link">&para;</a></h2>
+<h3 id="regular-testing">Regular Testing<a class="headerlink" href="#regular-testing" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Before each release</strong>: Run Test 1</li>
+<li><strong>Before major updates</strong>: Run Test 2 (with backup)</li>
+<li><strong>After code changes</strong>: Verify both tests pass</li>
+</ul>
+<h3 id="monitoring">Monitoring<a class="headerlink" href="#monitoring" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Track recovery success rates</li>
+<li>Monitor cloud backup usage</li>
+<li>Alert if recovery fails</li>
+</ul>
+<h3 id="user-education">User Education<a class="headerlink" href="#user-education" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Inform users about app update persistence ✅</li>
+<li>Warn users about app deletion risks ⚠️</li>
+<li>Encourage cloud backup creation</li>
+</ul>
+<hr />
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<p>✅ <strong>Test 1 (App Update)</strong>: Wallet persists automatically
+⚠️ <strong>Test 2 (App Deletion)</strong>: Wallet requires backup recovery</p>
+<p><strong>Both tests are now available in Dashboard</strong> - Use them to verify wallet maintainability and consistency!</p>
+<hr />
+<h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Test Button</th>
+<th>Data Cleared</th>
+<th>Wallet Persists?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>App Update</strong></td>
+<td>Test 1 (Orange)</td>
+<td>AsyncStorage only</td>
+<td>✅ Yes (automatic)</td>
+</tr>
+<tr>
+<td><strong>App Deletion</strong></td>
+<td>Test 2 (Red)</td>
+<td>Everything</td>
+<td>⚠️ Only with backup</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Status</strong>: ✅ <strong>Complete</strong> - Both scenarios can be tested!</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 14, 2026 11:39:08 UTC">January 14, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

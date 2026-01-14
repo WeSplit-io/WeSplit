@@ -1,0 +1,2184 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="WeSplit - Split expenses socially, settle instantly with crypto">
+      
+      
+        <meta name="author" content="WeSplit Team">
+      
+      
+        <link rel="canonical" href="https://YOUR_USERNAME.github.io/WeSplit/guides/SPEND_INTEGRATION/SPEND_SPLITS_COMPLETE_LOGIC/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>SPEND Splits - Complete Logic Summary - WeSplit Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#spend-splits-complete-logic-summary" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="WeSplit Documentation" class="md-header__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WeSplit Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              SPEND Splits - Complete Logic Summary
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="dark" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-tabs__link">
+          
+  
+  
+  Corbits Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../AUTH_CONFIG_STATUS/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../BADGE_SETUP_SUMMARY/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../QUICK_TEST_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="WeSplit Documentation" class="md-nav__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WeSplit Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corbits Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Corbits Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../AUTH_CONFIG_STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../PHANTOM_INTEGRATION_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phantom Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../BADGE_SETUP_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Badges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../REFERRAL_SYSTEM_COMPLETE.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referrals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../QUICK_TEST_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Test Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../LOCAL_BUILD_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🏗️ Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🏗️ Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#system-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔄 Complete Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔄 Complete Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-split-creation-spend-wesplit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Split Creation (SPEND → WeSplit)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-participant-invitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Participant Invitation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-payment-collection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Payment Collection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-automatic-merchant-payment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Automatic Merchant Payment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 Key Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Key Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-split-creation-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Split Creation Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-payment-mode-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Payment Mode Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-merchant-payment-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Merchant Payment Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-spend-split-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Spend Split Screen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-deep-link-handler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Deep Link Handler
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-structures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Data Structures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Data Structures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#split-document-firestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Split Document (Firestore)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#split-wallet-document-firestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Split Wallet Document (Firestore)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🌐 API Endpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🌐 API Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-create-split-from-payment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Create Split from Payment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-batch-invite-participants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Batch Invite Participants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-pay-participant-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Pay Participant Share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-get-split-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Get Split Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-spend-webhook-incoming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Spend Webhook (Incoming)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deep-links-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔗 Deep Links &amp; Callbacks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔗 Deep Links &amp; Callbacks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deep-link-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deep Link Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#payment-processing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        💰 Payment Processing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="💰 Payment Processing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#participant-payment-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Payment Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#merchant-payment-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merchant Payment Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔒 Security
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔒 Security">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#url-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        URL Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Protection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#payment-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Payment Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Error Handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚠️ Error Handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#payment-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Payment Failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📈 Status Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#webhook-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔄 Webhook Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔄 Webhook Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#wesplit-spend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeSplit → SPEND
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spend-wesplit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SPEND → WeSplit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Key Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📚 Related Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="spend-splits-complete-logic-summary">SPEND Splits - Complete Logic Summary<a class="headerlink" href="#spend-splits-complete-logic-summary" title="Permanent link">&para;</a></h1>
+<p><strong>Date</strong>: 2025-01-27<br />
+<strong>Status</strong>: ✅ Complete Implementation<br />
+<strong>Version</strong>: 1.0.0</p>
+<hr />
+<h2 id="table-of-contents">📋 Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#architecture">Architecture</a></li>
+<li><a href="#complete-flow">Complete Flow</a></li>
+<li><a href="#key-components">Key Components</a></li>
+<li><a href="#data-structures">Data Structures</a></li>
+<li><a href="#api-endpoints">API Endpoints</a></li>
+<li><a href="#deep-links--callbacks">Deep Links &amp; Callbacks</a></li>
+<li><a href="#payment-processing">Payment Processing</a></li>
+<li><a href="#security">Security</a></li>
+<li><a href="#error-handling">Error Handling</a></li>
+</ol>
+<hr />
+<h2 id="overview">🎯 Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>SPEND Splits enable users to split bills from SPEND orders and automatically pay merchants when the payment threshold is met. The system handles:</p>
+<ul>
+<li><strong>Split Creation</strong>: From SPEND orders via API</li>
+<li><strong>Participant Management</strong>: Inviting and managing participants</li>
+<li><strong>Payment Collection</strong>: Participants pay their shares</li>
+<li><strong>Automatic Merchant Payment</strong>: When threshold is met, funds are sent to SPEND treasury</li>
+<li><strong>Webhooks</strong>: Bidirectional communication with SPEND</li>
+<li><strong>Deep Links</strong>: Seamless navigation between SPEND and WeSplit apps</li>
+</ul>
+<hr />
+<h2 id="architecture">🏗️ Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<h3 id="system-components">System Components<a class="headerlink" href="#system-components" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────────┐
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│   SPEND App     │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>└────────┬────────┘
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>         │ API Calls
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>         ▼
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>┌─────────────────────────────────┐
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│   WeSplit Firebase Functions    │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│  - createSplitFromPayment        │
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│  - batchInviteParticipants       │
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│  - payParticipantShare           │
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│  - getSplitStatus                │
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│  - spendWebhook                  │
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>└────────┬────────────────────────┘
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>         │
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>         ▼
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>┌─────────────────────────────────┐
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│      Firestore Database         │
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│  - splits collection             │
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│  - split_wallets collection     │
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│  - pending_invitations          │
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│  - webhook_logs                 │
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>└────────┬────────────────────────┘
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>         │
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>         ▼
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>┌─────────────────────────────────┐
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│    WeSplit Mobile App           │
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│  - SpendSplitScreen             │
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│  - Payment processing           │
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│  - Deep link handling           │
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>└────────┬────────────────────────┘
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>         │
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>         ▼
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>┌─────────────────────────────────┐
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>│    Solana Blockchain            │
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>│  - Split wallet creation        │
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>│  - Participant payments        │
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>│  - Merchant payment             │
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>└─────────────────────────────────┘
+</code></pre></div>
+<hr />
+<h2 id="complete-flow">🔄 Complete Flow<a class="headerlink" href="#complete-flow" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-split-creation-spend-wesplit">Phase 1: Split Creation (SPEND → WeSplit)<a class="headerlink" href="#phase-1-split-creation-spend-wesplit" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>1. User clicks &quot;Pay with WeSplit&quot; in SPEND
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>   ↓
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>2. SPEND calls POST /createSplitFromPayment
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>   Request: {
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>     email, amount, currency,
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>     metadata: {
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>       treasuryWallet: &quot;SPEND_TREASURY_ADDRESS&quot;,
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>       orderId: &quot;ORD-123&quot;,
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>       callbackUrl: &quot;spend://order/ORD-123/success&quot;,
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>       webhookUrl: &quot;https://spend.com/webhook&quot;,
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>       webhookSecret: &quot;secret&quot;,
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>       paymentThreshold: 1.0
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>     },
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>     order: { /* SP3ND order data */ }
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>   }
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>   ↓
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>3. WeSplit API validates:
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>   - ✅ Payment data structure
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>   - ✅ Callback URL (security check)
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>   - ✅ Treasury wallet format
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>   - ✅ Order ID presence
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>   ↓
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>4. API creates split document in Firestore:
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>   {
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>     id: &quot;split_123...&quot;,
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>     splitType: &quot;spend&quot;,
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>     totalAmount: 100.00,
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>     currency: &quot;USDC&quot;,
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>     status: &quot;pending&quot;,
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>     externalMetadata: {
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>       paymentMode: &quot;merchant_gateway&quot;,
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>       treasuryWallet: &quot;SPEND_TREASURY&quot;,
+<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>       orderId: &quot;ORD-123&quot;,
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>       callbackUrl: &quot;spend://order/ORD-123/success&quot;,
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>       paymentStatus: &quot;pending&quot;,
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>       paymentThreshold: 1.0,
+<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>       orderData: { /* Full SP3ND order */ }
+<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>     },
+<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>     participants: [/* Creator only initially */]
+<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>   }
+<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>   ↓
+<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>5. API returns:
+<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a>   {
+<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>     success: true,
+<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>     data: {
+<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a>       splitId: &quot;split_123...&quot;,
+<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a>       userId: &quot;user_456&quot;,
+<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a>       redirectUrl: &quot;spend://order/ORD-123/success?splitId=...&quot;
+<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a>     }
+<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a>   }
+<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a>   ↓
+<a id="__codelineno-1-52" name="__codelineno-1-52" href="#__codelineno-1-52"></a>6. SPEND redirects user to WeSplit:
+<a id="__codelineno-1-53" name="__codelineno-1-53" href="#__codelineno-1-53"></a>   URL: https://wesplit-deeplinks.web.app/view-split?splitId=split_123&amp;userId=user_456
+</code></pre></div>
+<hr />
+<h3 id="phase-2-participant-invitation">Phase 2: Participant Invitation<a class="headerlink" href="#phase-2-participant-invitation" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>1. User opens WeSplit app (via deep link)
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>   ↓
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>2. App navigates to SpendSplitScreen
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>   ↓
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>3. User can invite participants:
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>   Option A: Via API (SPEND side)
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>   - SPEND calls POST /batchInviteParticipants
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>   - WeSplit processes invitations
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>   - Existing users: Added directly
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>   - New users: Pending invitations created
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>   Option B: Via App (User side)
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>   - User clicks &quot;Invite Participants&quot;
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>   - Selects contacts
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>   - Invitations sent via email/SMS
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>   ↓
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>4. Participants receive invitations:
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>   - Email with deep link
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>   - Deep link: https://wesplit-deeplinks.web.app/join-split?data=...
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>   ↓
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>5. Participants join split:
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>   - Click invitation link
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>   - Create account (if new)
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>   - Join split
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>   - Added to participants array
+</code></pre></div>
+<hr />
+<h3 id="phase-3-payment-collection">Phase 3: Payment Collection<a class="headerlink" href="#phase-3-payment-collection" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>1. Participant opens split in WeSplit app
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>   ↓
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>2. User clicks &quot;Pay My Share&quot;
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>   ↓
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>3. App checks if split wallet exists:
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>   - If not: Creates split wallet on Solana
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>   - If yes: Uses existing wallet
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>   ↓
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>4. User confirms payment:
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>   - Amount: Their share (amountOwed)
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>   - Destination: Split wallet address
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>   - Context: &#39;fair_split_contribution&#39;
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>   ↓
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>5. Transaction executed:
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>   - User&#39;s wallet → Split wallet
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>   - Transaction signature recorded
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>   - Participant status: &#39;paid&#39;
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>   - amountPaid updated
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>   ↓
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>6. Payment recorded in Firestore:
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>   - Split document: participants[].amountPaid updated
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>   - Split wallet: participants[].amountPaid updated
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>   - Transaction logged
+</code></pre></div>
+<hr />
+<h3 id="phase-4-automatic-merchant-payment">Phase 4: Automatic Merchant Payment<a class="headerlink" href="#phase-4-automatic-merchant-payment" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>1. Payment threshold check (polling every 10 seconds):
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>   - Total paid &gt;= (totalAmount * paymentThreshold)
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>   - All participants have paid
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>   ↓
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>2. Threshold met → Trigger merchant payment:
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>   - Check: !isPaymentAlreadyProcessed()
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>   - Status: &#39;processing&#39;
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>   ↓
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>3. Execute merchant payment:
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>   - Source: Split wallet
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>   - Destination: SPEND treasury wallet
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>   - Amount: split.totalAmount
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>   - Memo: &quot;SP3ND Order: {orderId}&quot;
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>   - Context: &#39;spend_split_payment&#39;
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>   ↓
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>4. Transaction executed:
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>   - SplitWalletPayments.extractFairSplitFunds()
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>   - UnifiedWithdrawalService.withdraw()
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>   - On-chain transaction to treasury
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>   ↓
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>5. Payment status updated:
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>   - externalMetadata.paymentStatus: &#39;paid&#39;
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>   - externalMetadata.paymentTransactionSig: &quot;tx_signature&quot;
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>   - split.status: &#39;completed&#39;
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>   ↓
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>6. Webhook sent to SPEND (async):
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>   - Event: &#39;split.funded&#39;
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>   - Payload: { order_id, split_id, transaction_signature, amount, ... }
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>   - Retry logic: 3 attempts with exponential backoff
+<a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>   ↓
+<a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a>7. Notifications sent (async):
+<a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>   - All participants notified
+<a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a>   - &quot;Payment Sent to SPEND ✅&quot;
+<a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a>   ↓
+<a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a>8. Deep link callback (if callbackUrl provided):
+<a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a>   - Generate: wesplit://spend-callback?callbackUrl=...&amp;status=success
+<a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a>   - User can return to SPEND app
+</code></pre></div>
+<hr />
+<h2 id="key-components">🔧 Key Components<a class="headerlink" href="#key-components" title="Permanent link">&para;</a></h2>
+<h3 id="1-split-creation-service">1. Split Creation Service<a class="headerlink" href="#1-split-creation-service" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>services/firebase-functions/src/externalPaymentIntegration.js</code></p>
+<p><strong>Function</strong>: <code>createSplitFromPayment()</code></p>
+<p><strong>Responsibilities</strong>:
+- ✅ Validates payment data
+- ✅ Validates callback URL (security)
+- ✅ Extracts SP3ND order data
+- ✅ Converts currency to USDC
+- ✅ Creates split document
+- ✅ Stores external metadata
+- ✅ Returns splitId and userId</p>
+<p><strong>Key Logic</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// Determine split type</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">hasTreasuryWallet</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">metadata</span><span class="p">.</span><span class="nx">treasuryWallet</span><span class="o">?</span><span class="p">.</span><span class="nx">trim</span><span class="p">()</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="p">;</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">splitType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">hasTreasuryWallet</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="s1">&#39;spend&#39;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fair&#39;</span><span class="p">;</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1">// Build externalMetadata</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nx">externalMetadata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nx">paymentMode</span><span class="o">:</span><span class="w"> </span><span class="nx">hasTreasuryWallet</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="s1">&#39;merchant_gateway&#39;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;personal&#39;</span><span class="p">,</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nx">treasuryWallet</span><span class="o">:</span><span class="w"> </span><span class="nx">metadata</span><span class="p">.</span><span class="nx">treasuryWallet</span><span class="p">,</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nx">orderId</span><span class="o">:</span><span class="w"> </span><span class="nx">sp3ndOrder</span><span class="o">?</span><span class="p">.</span><span class="nx">id</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nx">metadata</span><span class="p">.</span><span class="nx">orderId</span><span class="p">,</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="nx">callbackUrl</span><span class="o">:</span><span class="w"> </span><span class="nx">metadata</span><span class="p">.</span><span class="nx">callbackUrl</span><span class="p">,</span><span class="w"> </span><span class="c1">// Validated</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">  </span><span class="nx">paymentStatus</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;pending&#39;</span><span class="p">,</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">  </span><span class="nx">paymentThreshold</span><span class="o">:</span><span class="w"> </span><span class="nx">metadata</span><span class="p">.</span><span class="nx">paymentThreshold</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">  </span><span class="nx">orderData</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* Full SP3ND order */</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="p">};</span>
+</code></pre></div></p>
+<hr />
+<h3 id="2-payment-mode-service">2. Payment Mode Service<a class="headerlink" href="#2-payment-mode-service" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>src/services/integrations/spend/SpendPaymentModeService.ts</code></p>
+<p><strong>Responsibilities</strong>:
+- ✅ Determines payment mode (personal vs merchant_gateway)
+- ✅ Checks if merchant payment required
+- ✅ Validates payment threshold
+- ✅ Checks if payment already processed
+- ✅ Extracts order ID, treasury wallet, etc.</p>
+<p><strong>Key Methods</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nx">getPaymentMode</span><span class="p">(</span><span class="nx">split</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;personal&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s1">&#39;merchant_gateway&#39;</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nx">requiresMerchantPayment</span><span class="p">(</span><span class="nx">split</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nx">isPaymentThresholdMet</span><span class="p">(</span><span class="nx">split</span><span class="p">,</span><span class="w"> </span><span class="nx">totalPaid</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nx">isPaymentAlreadyProcessed</span><span class="p">(</span><span class="nx">split</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="nx">getTreasuryWallet</span><span class="p">(</span><span class="nx">split</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">undefined</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="nx">getOrderId</span><span class="p">(</span><span class="nx">split</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">undefined</span>
+</code></pre></div></p>
+<hr />
+<h3 id="3-merchant-payment-service">3. Merchant Payment Service<a class="headerlink" href="#3-merchant-payment-service" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>src/services/integrations/spend/SpendMerchantPaymentService.ts</code></p>
+<p><strong>Function</strong>: <code>processMerchantPayment()</code></p>
+<p><strong>Responsibilities</strong>:
+- ✅ Validates split and wallet
+- ✅ Checks payment threshold
+- ✅ Prevents duplicate payments (idempotency)
+- ✅ Executes payment to treasury
+- ✅ Updates payment status atomically
+- ✅ Sends webhook to SPEND
+- ✅ Notifies participants</p>
+<p><strong>Key Logic</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1">// 1. Validate</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">requiresMerchantPayment</span><span class="p">(</span><span class="nx">split</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nx">error</span><span class="p">;</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">isPaymentAlreadyProcessed</span><span class="p">(</span><span class="nx">split</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nx">already_processed</span><span class="p">;</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">isPaymentThresholdMet</span><span class="p">(</span><span class="nx">split</span><span class="p">,</span><span class="w"> </span><span class="nx">totalPaid</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nx">threshold_not_met</span><span class="p">;</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1">// 2. Mark as processing (atomic)</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="nx">updatePaymentStatus</span><span class="p">(</span><span class="nx">split</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">paymentStatus</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;processing&#39;</span><span class="w"> </span><span class="p">});</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="c1">// 3. Execute payment</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">sendPaymentToMerchant</span><span class="p">(</span><span class="nx">split</span><span class="p">,</span><span class="w"> </span><span class="nx">splitWalletId</span><span class="p">,</span><span class="w"> </span><span class="nx">creatorId</span><span class="p">);</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="c1">// 4. Update status</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">success</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">  </span><span class="nx">updatePaymentStatus</span><span class="p">(</span><span class="nx">split</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">    </span><span class="nx">paymentStatus</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;paid&#39;</span><span class="p">,</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="w">    </span><span class="nx">paymentTransactionSig</span><span class="o">:</span><span class="w"> </span><span class="kt">result.transactionSignature</span><span class="w"> </span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">  </span><span class="p">});</span>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="w">  </span><span class="nx">updateSplitStatus</span><span class="p">(</span><span class="nx">split</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;completed&#39;</span><span class="p">);</span>
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a><span class="p">}</span>
+<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>
+<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="c1">// 5. Async operations (non-blocking)</span>
+<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="nx">callWebhookAsync</span><span class="p">(</span><span class="nx">split</span><span class="p">,</span><span class="w"> </span><span class="nx">transactionSignature</span><span class="p">,</span><span class="w"> </span><span class="nx">amount</span><span class="p">);</span>
+<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="nx">notifyParticipantsAsync</span><span class="p">(</span><span class="nx">split</span><span class="p">,</span><span class="w"> </span><span class="nx">transactionSignature</span><span class="p">,</span><span class="w"> </span><span class="nx">amount</span><span class="p">);</span>
+</code></pre></div></p>
+<hr />
+<h3 id="4-spend-split-screen">4. Spend Split Screen<a class="headerlink" href="#4-spend-split-screen" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>src/screens/SpendSplit/SpendSplitScreen.tsx</code></p>
+<p><strong>Responsibilities</strong>:
+- ✅ Displays split details
+- ✅ Shows payment progress
+- ✅ Handles participant payments
+- ✅ Monitors payment threshold
+- ✅ Triggers automatic merchant payment
+- ✅ Handles callback redirects</p>
+<p><strong>Key Features</strong>:
+- Polling: Checks payment completion every 10 seconds
+- Auto-payment: Triggers when threshold met
+- Wallet creation: Creates split wallet if needed
+- Deep links: Handles callback redirects</p>
+<hr />
+<h3 id="5-deep-link-handler">5. Deep Link Handler<a class="headerlink" href="#5-deep-link-handler" title="Permanent link">&para;</a></h3>
+<p><strong>File</strong>: <code>src/services/core/deepLinkHandler.ts</code></p>
+<p><strong>Responsibilities</strong>:
+- ✅ Parses deep link URLs
+- ✅ Validates callback URLs (security)
+- ✅ Handles spend-callback action
+- ✅ Redirects users to SPEND app</p>
+<p><strong>Key Actions</strong>:
+- <code>view-split</code>: Open split from SPEND
+- <code>spend-callback</code>: Return to SPEND after payment
+- <code>join-split</code>: Join split from invitation</p>
+<hr />
+<h2 id="data-structures">📊 Data Structures<a class="headerlink" href="#data-structures" title="Permanent link">&para;</a></h2>
+<h3 id="split-document-firestore">Split Document (Firestore)<a class="headerlink" href="#split-document-firestore" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;split_1234567890_abc&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nx">billId</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;bill_123...&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nx">title</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Order ORD-123&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Split for Amazon order&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nx">totalAmount</span><span class="o">:</span><span class="w"> </span><span class="kt">100.00</span><span class="p">,</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="nx">currency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;USDC&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="nx">splitType</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;spend&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;pending&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;active&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;completed&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;cancelled&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span><span class="nx">creatorId</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;user_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="nx">creatorName</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;John Doe&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">  </span><span class="nx">participants</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">      </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;user_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">      </span><span class="nx">email</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;john@example.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;John Doe&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="w">      </span><span class="nx">walletAddress</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;14NMW...&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="w">      </span><span class="nx">amountOwed</span><span class="o">:</span><span class="w"> </span><span class="kt">50.00</span><span class="p">,</span>
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="w">      </span><span class="nx">amountPaid</span><span class="o">:</span><span class="w"> </span><span class="kt">50.00</span><span class="p">,</span>
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="w">      </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;paid&quot;</span>
+<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a><span class="w">  </span><span class="nx">externalMetadata</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a><span class="w">    </span><span class="nx">paymentMode</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;merchant_gateway&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a><span class="w">    </span><span class="nx">treasuryWallet</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2nkTRv3qxk7n2eYYjFAndReVXaV7sTF3Z9pNimvp5jcp&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a><span class="w">    </span><span class="nx">orderId</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;ORD-123&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a><span class="w">    </span><span class="nx">orderNumber</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;ORD-1234567890&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a><span class="w">    </span><span class="nx">orderStatus</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Payment_Pending&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-29" name="__codelineno-8-29" href="#__codelineno-8-29"></a><span class="w">    </span><span class="nx">store</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;amazon&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-30" name="__codelineno-8-30" href="#__codelineno-8-30"></a><span class="w">    </span><span class="nx">callbackUrl</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;spend://order/ORD-123/success&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-31" name="__codelineno-8-31" href="#__codelineno-8-31"></a><span class="w">    </span><span class="nx">webhookUrl</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;https://spend.com/webhook&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-32" name="__codelineno-8-32" href="#__codelineno-8-32"></a><span class="w">    </span><span class="nx">webhookSecret</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;secret&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-33" name="__codelineno-8-33" href="#__codelineno-8-33"></a><span class="w">    </span><span class="nx">paymentStatus</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;pending&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;processing&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;paid&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;failed&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-34" name="__codelineno-8-34" href="#__codelineno-8-34"></a><span class="w">    </span><span class="nx">paymentThreshold</span><span class="o">:</span><span class="w"> </span><span class="kt">1.0</span><span class="p">,</span>
+<a id="__codelineno-8-35" name="__codelineno-8-35" href="#__codelineno-8-35"></a><span class="w">    </span><span class="nx">paymentTransactionSig</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;tx_signature&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-36" name="__codelineno-8-36" href="#__codelineno-8-36"></a><span class="w">    </span><span class="nx">paymentAttempts</span><span class="o">:</span><span class="w"> </span><span class="kt">0</span><span class="p">,</span>
+<a id="__codelineno-8-37" name="__codelineno-8-37" href="#__codelineno-8-37"></a><span class="w">    </span><span class="nx">orderData</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* Full SP3ND order */</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-8-38" name="__codelineno-8-38" href="#__codelineno-8-38"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-8-39" name="__codelineno-8-39" href="#__codelineno-8-39"></a><span class="w">  </span><span class="nx">createdAt</span><span class="o">:</span><span class="w"> </span><span class="kt">Timestamp</span><span class="p">,</span>
+<a id="__codelineno-8-40" name="__codelineno-8-40" href="#__codelineno-8-40"></a><span class="w">  </span><span class="nx">updatedAt</span><span class="o">:</span><span class="w"> </span><span class="kt">Timestamp</span>
+<a id="__codelineno-8-41" name="__codelineno-8-41" href="#__codelineno-8-41"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="split-wallet-document-firestore">Split Wallet Document (Firestore)<a class="headerlink" href="#split-wallet-document-firestore" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;wallet_123...&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nx">billId</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;bill_123...&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nx">walletAddress</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;SPLIT_WALLET_ADDRESS&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="nx">totalAmount</span><span class="o">:</span><span class="w"> </span><span class="kt">100.00</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nx">currency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;USDC&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="nx">creatorId</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;user_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;active&quot;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s2">&quot;completed&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="nx">participants</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">      </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;user_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">      </span><span class="nx">amountOwed</span><span class="o">:</span><span class="w"> </span><span class="kt">50.00</span><span class="p">,</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">      </span><span class="nx">amountPaid</span><span class="o">:</span><span class="w"> </span><span class="kt">50.00</span><span class="p">,</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">      </span><span class="nx">walletAddress</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;USER_WALLET&quot;</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">  </span><span class="nx">createdAt</span><span class="o">:</span><span class="w"> </span><span class="kt">Timestamp</span><span class="p">,</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="w">  </span><span class="nx">updatedAt</span><span class="o">:</span><span class="w"> </span><span class="kt">Timestamp</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="api-endpoints">🌐 API Endpoints<a class="headerlink" href="#api-endpoints" title="Permanent link">&para;</a></h2>
+<h3 id="1-create-split-from-payment">1. Create Split from Payment<a class="headerlink" href="#1-create-split-from-payment" title="Permanent link">&para;</a></h3>
+<p><strong>Endpoint</strong>: <code>POST /createSplitFromPayment</code></p>
+<p><strong>Purpose</strong>: Create split from SPEND order</p>
+<p><strong>Request</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p">{</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">&quot;email&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;customer@example.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">100.00</span><span class="p">,</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="nt">&quot;currency&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;USDC&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">    </span><span class="nt">&quot;treasuryWallet&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SPEND_TREASURY_ADDRESS&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="nt">&quot;orderId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ORD-123&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="nt">&quot;callbackUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;spend://order/ORD-123/success&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nt">&quot;webhookUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://spend.com/webhook&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="nt">&quot;webhookSecret&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;secret&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="nt">&quot;paymentThreshold&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">  </span><span class="nt">&quot;order&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* SP3ND order data */</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Response</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">{</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nt">&quot;splitId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;split_123...&quot;</span><span class="p">,</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nt">&quot;userId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;user_456&quot;</span><span class="p">,</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="nt">&quot;redirectUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;spend://order/ORD-123/success?splitId=...&quot;</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h3 id="2-batch-invite-participants">2. Batch Invite Participants<a class="headerlink" href="#2-batch-invite-participants" title="Permanent link">&para;</a></h3>
+<p><strong>Endpoint</strong>: <code>POST /batchInviteParticipants</code></p>
+<p><strong>Purpose</strong>: Invite multiple participants to split</p>
+<p><strong>Request</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">{</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">&quot;splitId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;split_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">&quot;inviterId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;user_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">&quot;inviterName&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;John Doe&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nt">&quot;participants&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="p">{</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">      </span><span class="nt">&quot;email&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;user1@example.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;User One&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">      </span><span class="nt">&quot;amountOwed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">33.33</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="w">  </span><span class="nt">&quot;sendNotifications&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Response</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">&quot;addedExisting&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">],</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="nt">&quot;pendingInvites&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">],</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="nt">&quot;alreadyParticipant&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="nt">&quot;failed&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">  </span><span class="nt">&quot;deepLink&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;wesplit://view-split?splitId=...&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">  </span><span class="nt">&quot;redirectUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;spend://order/ORD-123/success&quot;</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h3 id="3-pay-participant-share">3. Pay Participant Share<a class="headerlink" href="#3-pay-participant-share" title="Permanent link">&para;</a></h3>
+<p><strong>Endpoint</strong>: <code>POST /payParticipantShare</code></p>
+<p><strong>Purpose</strong>: Record participant payment</p>
+<p><strong>Request</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">&quot;splitId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;split_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">&quot;participantId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;user_456&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nt">&quot;amount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">33.33</span><span class="p">,</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span><span class="nt">&quot;currency&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;USDC&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="nt">&quot;transactionSignature&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;tx_signature&quot;</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Response</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">&quot;amountPaid&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">33.33</span><span class="p">,</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span><span class="nt">&quot;remainingAmount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span><span class="nt">&quot;splitStatus&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;active&quot;</span><span class="p">,</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span><span class="nt">&quot;isFullyFunded&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span><span class="nt">&quot;deepLink&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;wesplit://spend-callback?callbackUrl=...&amp;status=success&quot;</span><span class="p">,</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">  </span><span class="nt">&quot;redirectUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;spend://order/ORD-123/success&quot;</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h3 id="4-get-split-status">4. Get Split Status<a class="headerlink" href="#4-get-split-status" title="Permanent link">&para;</a></h3>
+<p><strong>Endpoint</strong>: <code>GET /getSplitStatus?splitId=split_123</code></p>
+<p><strong>Purpose</strong>: Get current split status</p>
+<p><strong>Response</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="p">{</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="nt">&quot;split&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;split_123&quot;</span><span class="p">,</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;active&quot;</span><span class="p">,</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">    </span><span class="nt">&quot;totalAmount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">100.00</span><span class="p">,</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">    </span><span class="nt">&quot;amountCollected&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">66.66</span><span class="p">,</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">    </span><span class="nt">&quot;completionPercentage&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;66.66&quot;</span><span class="p">,</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">    </span><span class="nt">&quot;participantsCount&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">    </span><span class="nt">&quot;participantsPaid&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">    </span><span class="nt">&quot;externalMetadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="w">      </span><span class="nt">&quot;orderId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ORD-123&quot;</span><span class="p">,</span>
+<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="w">      </span><span class="nt">&quot;paymentStatus&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pending&quot;</span><span class="p">,</span>
+<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="w">      </span><span class="nt">&quot;paymentThreshold&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
+<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h3 id="5-spend-webhook-incoming">5. Spend Webhook (Incoming)<a class="headerlink" href="#5-spend-webhook-incoming" title="Permanent link">&para;</a></h3>
+<p><strong>Endpoint</strong>: <code>POST /spendWebhook</code></p>
+<p><strong>Purpose</strong>: Receive order status updates from SPEND</p>
+<p><strong>Request</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p">{</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">&quot;event&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;order.shipped&quot;</span><span class="p">,</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="nt">&quot;order_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ORD-123&quot;</span><span class="p">,</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;shipped&quot;</span><span class="p">,</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="nt">&quot;tracking_number&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1Z999AA...&quot;</span><span class="p">,</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-01-27T10:00:00Z&quot;</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Response</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="p">{</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Webhook received and processed&quot;</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h2 id="deep-links-callbacks">🔗 Deep Links &amp; Callbacks<a class="headerlink" href="#deep-links-callbacks" title="Permanent link">&para;</a></h2>
+<h3 id="deep-link-flow">Deep Link Flow<a class="headerlink" href="#deep-link-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>SPEND → WeSplit:
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>  URL: https://wesplit-deeplinks.web.app/view-split?splitId=...&amp;userId=...
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>  Action: Opens SpendSplitScreen
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>WeSplit → SPEND:
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>  URL: wesplit://spend-callback?callbackUrl=spend://order/ORD-123/success&amp;status=success
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>  Action: Opens SPEND app with callback
+</code></pre></div>
+<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Callback URLs validated</li>
+<li>✅ Dangerous protocols blocked</li>
+<li>✅ Script injection prevented</li>
+<li>✅ Secure logging (no sensitive data)</li>
+</ul>
+<hr />
+<h2 id="payment-processing">💰 Payment Processing<a class="headerlink" href="#payment-processing" title="Permanent link">&para;</a></h2>
+<h3 id="participant-payment-flow">Participant Payment Flow<a class="headerlink" href="#participant-payment-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>1. User clicks &quot;Pay My Share&quot;
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>   ↓
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>2. App validates:
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>   - User balance sufficient
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>   - Split wallet exists (creates if needed)
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>   - Amount correct
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>   ↓
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>3. Transaction executed:
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>   - User wallet → Split wallet
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>   - Amount: amountOwed
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>   - Context: &#39;fair_split_contribution&#39;
+<a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>   ↓
+<a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a>4. Payment recorded:
+<a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a>   - participant.amountPaid += amount
+<a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a>   - participant.status = &#39;paid&#39;
+<a id="__codelineno-20-16" name="__codelineno-20-16" href="#__codelineno-20-16"></a>   - Split totalPaid updated
+<a id="__codelineno-20-17" name="__codelineno-20-17" href="#__codelineno-20-17"></a>   ↓
+<a id="__codelineno-20-18" name="__codelineno-20-18" href="#__codelineno-20-18"></a>5. Threshold check:
+<a id="__codelineno-20-19" name="__codelineno-20-19" href="#__codelineno-20-19"></a>   - If totalPaid &gt;= threshold: Trigger merchant payment
+</code></pre></div>
+<h3 id="merchant-payment-flow">Merchant Payment Flow<a class="headerlink" href="#merchant-payment-flow" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>1. Threshold met (polling detects)
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>   ↓
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>2. Validation:
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>   - requiresMerchantPayment() = true
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>   - isPaymentThresholdMet() = true
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>   - !isPaymentAlreadyProcessed() = true
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>   ↓
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>3. Mark as processing (atomic):
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>   - paymentStatus: &#39;processing&#39;
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>   - idempotencyKey: generated
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>   ↓
+<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>4. Execute payment:
+<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>   - SplitWalletPayments.extractFairSplitFunds()
+<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>   - Split wallet → Treasury wallet
+<a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>   - Memo: &quot;SP3ND Order: {orderId}&quot;
+<a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>   ↓
+<a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>5. Update status (atomic):
+<a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a>   - paymentStatus: &#39;paid&#39;
+<a id="__codelineno-21-19" name="__codelineno-21-19" href="#__codelineno-21-19"></a>   - paymentTransactionSig: &quot;tx_signature&quot;
+<a id="__codelineno-21-20" name="__codelineno-21-20" href="#__codelineno-21-20"></a>   - split.status: &#39;completed&#39;
+<a id="__codelineno-21-21" name="__codelineno-21-21" href="#__codelineno-21-21"></a>   ↓
+<a id="__codelineno-21-22" name="__codelineno-21-22" href="#__codelineno-21-22"></a>6. Async operations:
+<a id="__codelineno-21-23" name="__codelineno-21-23" href="#__codelineno-21-23"></a>   - Webhook to SPEND
+<a id="__codelineno-21-24" name="__codelineno-21-24" href="#__codelineno-21-24"></a>   - Notifications to participants
+<a id="__codelineno-21-25" name="__codelineno-21-25" href="#__codelineno-21-25"></a>   - Deep link callback (if provided)
+</code></pre></div>
+<hr />
+<h2 id="security_1">🔒 Security<a class="headerlink" href="#security_1" title="Permanent link">&para;</a></h2>
+<h3 id="url-validation">URL Validation<a class="headerlink" href="#url-validation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Callback URLs validated before use</li>
+<li>✅ Dangerous protocols blocked (<code>javascript:</code>, <code>data:</code>, etc.)</li>
+<li>✅ Script injection patterns detected</li>
+<li>✅ Only safe protocols allowed</li>
+</ul>
+<h3 id="data-protection">Data Protection<a class="headerlink" href="#data-protection" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Sensitive data not logged</li>
+<li>✅ Callback URLs not exposed in logs</li>
+<li>✅ Webhook secrets never logged</li>
+<li>✅ Secure error messages</li>
+</ul>
+<h3 id="payment-security">Payment Security<a class="headerlink" href="#payment-security" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Idempotency keys prevent duplicates</li>
+<li>✅ Atomic status updates</li>
+<li>✅ Transaction verification</li>
+<li>✅ Threshold validation</li>
+</ul>
+<hr />
+<h2 id="error-handling">⚠️ Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
+<h3 id="payment-failures">Payment Failures<a class="headerlink" href="#payment-failures" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Retry logic for webhooks</li>
+<li>✅ Status tracking (failed attempts)</li>
+<li>✅ Error messages to users</li>
+<li>✅ Logging for debugging</li>
+</ul>
+<h3 id="validation-errors">Validation Errors<a class="headerlink" href="#validation-errors" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Clear error messages</li>
+<li>✅ Field-level validation</li>
+<li>✅ Type checking</li>
+<li>✅ Required field checks</li>
+</ul>
+<hr />
+<h2 id="status-flow">📈 Status Flow<a class="headerlink" href="#status-flow" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>pending → active → completed
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>   ↓         ↓
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>   └─────────┴─→ cancelled
+</code></pre></div>
+<p><strong>Payment Status</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>pending → processing → paid
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>   ↓
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>failed (can retry)
+</code></pre></div></p>
+<hr />
+<h2 id="webhook-flow">🔄 Webhook Flow<a class="headerlink" href="#webhook-flow" title="Permanent link">&para;</a></h2>
+<h3 id="wesplit-spend">WeSplit → SPEND<a class="headerlink" href="#wesplit-spend" title="Permanent link">&para;</a></h3>
+<p><strong>Events</strong>:
+- <code>split.created</code>
+- <code>split.participant_added</code>
+- <code>split.participant_paid</code>
+- <code>split.funded</code> ⭐ (triggers when threshold met)
+- <code>split.cancelled</code></p>
+<p><strong>Retry Logic</strong>:
+- 3 attempts
+- Delays: 1s, 2s, 4s
+- Exponential backoff</p>
+<h3 id="spend-wesplit">SPEND → WeSplit<a class="headerlink" href="#spend-wesplit" title="Permanent link">&para;</a></h3>
+<p><strong>Events</strong>:
+- <code>order.status_changed</code>
+- <code>order.shipped</code>
+- <code>order.delivered</code>
+- <code>order.cancelled</code></p>
+<p><strong>Updates</strong>:
+- Split externalMetadata.orderStatus
+- Tracking information
+- Delivery status</p>
+<hr />
+<h2 id="key-features">✅ Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Automatic Payment</strong>: When threshold met, payment sent automatically</li>
+<li><strong>Idempotency</strong>: Prevents duplicate payments</li>
+<li><strong>Atomic Updates</strong>: Status updates are atomic</li>
+<li><strong>Webhooks</strong>: Bidirectional communication</li>
+<li><strong>Deep Links</strong>: Seamless navigation</li>
+<li><strong>Security</strong>: URL validation, data protection</li>
+<li><strong>Error Handling</strong>: Comprehensive error handling</li>
+<li><strong>Retry Logic</strong>: Webhook retries with backoff</li>
+</ol>
+<hr />
+<h2 id="related-documentation">📚 Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>API Reference</strong>: <code>SPEND_API_REFERENCE.md</code></li>
+<li><strong>Security Guide</strong>: <code>DEEP_LINK_SECURITY_GUIDE.md</code></li>
+<li><strong>Integration Guide</strong>: <code>SPEND_INTEGRATION_QUICK_REFERENCE.md</code></li>
+<li><strong>Deep Link Flow</strong>: <code>DEEP_LINK_FLOW.md</code></li>
+</ul>
+<hr />
+<p><strong>Last Updated</strong>: 2025-01-27<br />
+<strong>Status</strong>: ✅ Production Ready</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 14, 2026 11:39:08 UTC">January 14, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,1620 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="WeSplit - Split expenses socially, settle instantly with crypto">
+      
+      
+        <meta name="author" content="WeSplit Team">
+      
+      
+        <link rel="canonical" href="https://YOUR_USERNAME.github.io/WeSplit/features/SHARED_WALLET_UI_INTEGRATION/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Shared Wallet Feature - UI/UX Integration Plan - WeSplit Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#shared-wallet-feature-uiux-integration-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WeSplit Documentation" class="md-header__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WeSplit Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Shared Wallet Feature - UI/UX Integration Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="dark" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-tabs__link">
+          
+  
+  
+  Corbits Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../AUTH_CONFIG_STATUS/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../BADGE_SETUP_SUMMARY/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../QUICK_TEST_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WeSplit Documentation" class="md-nav__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WeSplit Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corbits Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Corbits Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../AUTH_CONFIG_STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PHANTOM_INTEGRATION_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phantom Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../BADGE_SETUP_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Badges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../REFERRAL_SYSTEM_COMPLETE.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referrals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../QUICK_TEST_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Test Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../LOCAL_BUILD_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#navigation-integration-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📍 Navigation Integration Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📍 Navigation Integration Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-main-navigation-bar-bottom-tab-bar-updated-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Main Navigation Bar (Bottom Tab Bar) - UPDATED APPROACH
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#screen-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎨 Screen Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎨 Screen Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#screen-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Screen Hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#screen-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📱 Screen Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📱 Screen Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-splitslist-screen-enhanced-with-tabs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. SplitsList Screen (Enhanced with Tabs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎨 Design Considerations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎨 Design Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#visual-differentiation-from-splits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Differentiation from Splits:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consistency:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Implementation Checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 Implementation Checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-navigation-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Navigation &amp; List
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-creation-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Creation Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-details-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Details &amp; Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-funding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Funding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-invitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Invitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-6-card-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Card Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Implementation Status
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚀 Implementation Status">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#completed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Completed:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔄 Next Steps:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📝 Notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="shared-wallet-feature-uiux-integration-plan">Shared Wallet Feature - UI/UX Integration Plan<a class="headerlink" href="#shared-wallet-feature-uiux-integration-plan" title="Permanent link">&para;</a></h1>
+<h2 id="navigation-integration-points">📍 Navigation Integration Points<a class="headerlink" href="#navigation-integration-points" title="Permanent link">&para;</a></h2>
+<h3 id="1-main-navigation-bar-bottom-tab-bar-updated-approach">1. <strong>Main Navigation Bar (Bottom Tab Bar) - UPDATED APPROACH</strong><a class="headerlink" href="#1-main-navigation-bar-bottom-tab-bar-updated-approach" title="Permanent link">&para;</a></h3>
+<p>Currently has: Home, Pools (SplitsList), Split (BillCamera), Rewards, Contacts</p>
+<p><strong>✅ IMPLEMENTED APPROACH:</strong>
+- <strong>Center Button (Split)</strong>: Opens a Modal with choice between:
+  - "Create Split" → Navigate to BillCamera (existing flow)
+  - "Create Shared Wallet" → Navigate to CreateSharedWallet (new flow)
+- <strong>Pools Tab (SplitsList)</strong>: Enhanced with Tabs component at top:
+  - Tab 1: "Splits" → Shows existing splits with filters (All, Active, Closed)
+  - Tab 2: "Shared Wallets" → Shows shared wallets list
+- <strong>Filter Tabs</strong>: Only visible when "Splits" tab is active</p>
+<p><strong>Benefits</strong>:
+- ✅ Keeps NavBar clean (no new tab needed)
+- ✅ Natural discovery through center button
+- ✅ Unified view in Pools tab
+- ✅ Clear separation between Splits and Shared Wallets</p>
+<hr />
+<h2 id="screen-structure">🎨 Screen Structure<a class="headerlink" href="#screen-structure" title="Permanent link">&para;</a></h2>
+<h3 id="screen-hierarchy">Screen Hierarchy<a class="headerlink" href="#screen-hierarchy" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>SharedWalletsList (Main List)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  ├── SharedWalletDetails (View/Manage)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  │   ├── SharedWalletFunding (Add Funds)
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  │   │   ├── FundFromInAppWallet
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  │   │   ├── FundFromExternalWallet
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  │   │   └── FundViaMoonPay
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  │   ├── SharedWalletInvite (Invite Users)
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  │   ├── SharedWalletSettings (Settings)
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  │   └── SharedWalletTransactions (Transaction History)
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  └── CreateSharedWallet (Create New)
+</code></pre></div>
+<hr />
+<h2 id="screen-details">📱 Screen Details<a class="headerlink" href="#screen-details" title="Permanent link">&para;</a></h2>
+<h3 id="1-splitslist-screen-enhanced-with-tabs">1. <strong>SplitsList Screen</strong> (Enhanced with Tabs)<a class="headerlink" href="#1-splitslist-screen-enhanced-with-tabs" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: Pools tab in NavBar</p>
+<p><strong>Layout</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>┌─────────────────────────────────┐
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>│  Pools                    [+ New] │ ← Header with create button
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├─────────────────────────────────┤
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│  [Tabs: Splits | Shared Wallets] │ ← NEW: Top-level tabs
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├─────────────────────────────────┤
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│  [Filter: All | Active | Closed] │ ← Only shown when &quot;Splits&quot; tab active
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>├─────────────────────────────────┤
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>│  ┌───────────────────────────┐  │
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>│  │ Split/Shared Wallet Cards  │  │
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>│  └───────────────────────────┘  │
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>└─────────────────────────────────┘
+</code></pre></div></p>
+<p><strong>Shared Wallets View</strong> (when "Shared Wallets" tab active):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>┌─────────────────────────────────┐
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>│  Pools                    [+ New] │
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>├─────────────────────────────────┤
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│  [Tabs: Splits | Shared Wallets] │ ← &quot;Shared Wallets&quot; selected
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>├─────────────────────────────────┤
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│  ┌───────────────────────────┐  │
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│  │ 🏠 Apartment Rent          │  │ ← Shared Wallet Card
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>│  │ $1,250.00 USDC            │  │
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>│  │ 👥 3 members              │  │
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>│  │ You: $416.67              │  │
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>│  │ [View Details →]          │  │
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>│  └───────────────────────────┘  │
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>└─────────────────────────────────┘
+</code></pre></div>
+│  ┌───────────────────────────┐  │
+│  │ 🏠 Apartment Rent          │  │ ← Wallet Card
+│  │ $1,250.00 USDC            │  │
+│  │ 👥 3 members              │  │
+│  │ You: $416.67              │  │
+│  │ [View Details →]          │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  ┌───────────────────────────┐  │
+│  │ 🎉 Party Fund              │  │
+│  │ $500.00 USDC              │  │
+│  │ 👥 5 members              │  │
+│  │ You: $100.00              │  │
+│  │ [View Details →]          │  │
+│  └───────────────────────────┘  │
+└─────────────────────────────────┘
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>**Features**:
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>- List of all shared wallets user is part of
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>- Filter: All / My Wallets (created by me) / Shared With Me
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>- Each card shows: Name, Total Balance, Member Count, User&#39;s Share
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>- Pull to refresh
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>- Empty state with &quot;Create Shared Wallet&quot; CTA
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>---
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>### 2. **CreateChoiceModal** (NEW - Entry Point)
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>**Location**: Opens when center button (Split) in NavBar is clicked
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>**Layout**:
+</code></pre></div>
+┌─────────────────────────────────┐
+│  ──── (Handle)                  │
+├─────────────────────────────────┤
+│  Create New                     │
+│  Choose what you want to create │
+├─────────────────────────────────┤
+│  ┌───────────────────────────┐  │
+│  │ 📄 Create Split           │  │
+│  │    Split a bill with      │  │
+│  │    friends                │  │
+│  │    [Select →]             │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  ┌───────────────────────────┐  │
+│  │ 💰 Create Shared Wallet    │  │
+│  │    Shared account for     │  │
+│  │    ongoing expenses       │  │
+│  │    [Select →]             │  │
+│  └───────────────────────────┘  │
+└─────────────────────────────────┘
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>**Flow**:
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>- User clicks center button → Modal opens
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>- User selects option → Modal closes → Navigate to appropriate screen
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>### 3. **CreateSharedWallet Screen**
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>**Entry Point**: Selected from CreateChoiceModal
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>**Layout**:
+</code></pre></div>
+┌─────────────────────────────────┐
+│  ← Create Shared Wallet         │
+├─────────────────────────────────┤
+│                                  │
+│  Wallet Name                     │
+│  [<strong><em>_</em></strong><strong><em>_</em></strong><strong>]              │
+│                                  │
+│  Description (Optional)          │
+│  [________________]              │
+│  [________________]              │
+│                                  │
+│  Initial Members                │
+│  ┌───────────────────────────┐  │
+│  │ 👤 You (Creator)          │  │
+│  │ 👤 John Doe        [×]    │  │
+│  │ 👤 Jane Smith      [×]    │  │
+│  └───────────────────────────┘  │
+│  [+ Add Members]                 │
+│                                  │
+│  [Create Shared Wallet]          │
+└─────────────────────────────────┘
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>**Flow**:
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>1. Enter wallet name
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>2. (Optional) Add description
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>3. Add initial members (from contacts)
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>4. Create wallet → Navigate to SharedWalletDetails
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>---
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>### 3. **SharedWalletDetails Screen** (Main Management)
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>**Layout**:
+</code></pre></div>
+┌─────────────────────────────────┐
+│  ← Apartment Rent        [⚙️]   │ ← Settings icon
+├─────────────────────────────────┤
+│                                  │
+│  Total Balance                   │
+│  $1,250.00 USDC                 │
+│                                  │
+│  Your Share                      │
+│  $416.67 USDC                   │
+│                                  │
+│  ┌───────────────────────────┐  │
+│  │ [+ Add Funds]             │  │ ← Primary action
+│  └───────────────────────────┘  │
+│                                  │
+│  Members (3)                     │
+│  ┌───────────────────────────┐  │
+│  │ 👤 You (Creator)          │  │
+│  │    $416.67               │  │
+│  │ 👤 John Doe               │  │
+│  │    $416.67               │  │
+│  │ 👤 Jane Smith             │  │
+│  │    $416.67               │  │
+│  └───────────────────────────┘  │
+│  [+ Invite Members]              │
+│                                  │
+│  Recent Activity                 │
+│  ┌───────────────────────────┐  │
+│  │ 💰 You added $100.00      │  │
+│  │   2 hours ago             │  │
+│  │ 💸 John paid $50.00       │  │
+│  │   1 day ago               │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  [View All Transactions]          │
+└─────────────────────────────────┘
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>**Features**:
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>- View total balance and user&#39;s share
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>- Add funds button (primary action)
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>- Member list with individual contributions
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>- Invite members
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>- Recent transactions
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>- Settings (for creator only)
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>---
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>### 4. **SharedWalletFunding Screen** (Add Funds)
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>**Layout**:
+</code></pre></div>
+┌─────────────────────────────────┐
+│  ← Add Funds to Apartment Rent  │
+├─────────────────────────────────┤
+│                                  │
+│  Amount                          │
+│  $[_____.</strong>] USDC               │
+│                                  │
+│  Fund From                       │
+│  ┌───────────────────────────┐  │
+│  │ 💰 In-App Wallet          │  │
+│  │    Balance: $500.00       │  │
+│  │    [Select →]             │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  ┌───────────────────────────┐  │
+│  │ 🔗 External Wallet        │  │
+│  │    Phantom, Solflare...  │  │
+│  │    [Select →]             │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  ┌───────────────────────────┐  │
+│  │ 💳 Credit/Debit Card      │  │
+│  │    Via MoonPay            │  │
+│  │    [Select →]             │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  [Continue]                      │
+└─────────────────────────────────┘
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>**Flow**:
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>1. Enter amount
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>2. Select funding source
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>3. Navigate to specific funding screen
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>4. Complete transaction
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>5. Return to SharedWalletDetails with success message
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>---
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>### 5. **SharedWalletInvite Screen**
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>**Layout**:
+</code></pre></div>
+┌─────────────────────────────────┐
+│  ← Invite to Apartment Rent     │
+├─────────────────────────────────┤
+│                                  │
+│  Current Members (3)             │
+│  ┌───────────────────────────┐  │
+│  │ 👤 You                    │  │
+│  │ 👤 John Doe               │  │
+│  │ 👤 Jane Smith             │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  Invite New Members              │
+│  ┌───────────────────────────┐  │
+│  │ 🔍 Search contacts...      │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  ┌───────────────────────────┐  │
+│  │ 👤 Mike Johnson    [+ Add]│  │
+│  │ 👤 Sarah Wilson   [+ Add] │  │
+│  └───────────────────────────┘  │
+│                                  │
+│  [Send Invitations]              │
+└─────────────────────────────────┘
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>---
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>## 🎯 Entry Points Summary
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>### Primary Entry Points:
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>1. **NavBar Tab**: &quot;Shared Wallets&quot; (new tab)
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>2. **Dashboard Action**: &quot;Shared Wallet&quot; button in action grid
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>3. **SplitsList**: Optional filter/toggle (if not separate tab)
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>### Secondary Entry Points:
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>- Profile/Settings: &quot;My Shared Wallets&quot; section
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>- Transaction History: Link to shared wallet if transaction is from shared wallet
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>---
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>## 🔄 User Flows
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>### Flow 1: Create &amp; Fund Shared Wallet
+</code></pre></div>
+Dashboard → [+ Shared Wallet] 
+  → CreateSharedWallet 
+  → SharedWalletDetails 
+  → [+ Add Funds] 
+  → SharedWalletFunding 
+  → [Select: In-App Wallet] 
+  → Confirmation 
+  → Success → Back to SharedWalletDetails
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>### Flow 2: Invite &amp; Top Up
+</code></pre></div>
+SharedWalletsList → [Select Wallet] 
+  → SharedWalletDetails 
+  → [+ Invite Members] 
+  → SharedWalletInvite 
+  → [Send Invitations] 
+  → Back to SharedWalletDetails 
+  → [+ Add Funds] 
+  → [Select: MoonPay] 
+  → MoonPay Flow 
+  → Success
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>### Flow 3: Use Funds on Linked Card
+</code></pre></div>
+SharedWalletDetails 
+  → [Use Funds] 
+  → Select Linked Card 
+  → Enter Amount 
+  → Confirm Transfer 
+  → Success
+```</p>
+<hr />
+<h2 id="design-considerations">🎨 Design Considerations<a class="headerlink" href="#design-considerations" title="Permanent link">&para;</a></h2>
+<h3 id="visual-differentiation-from-splits">Visual Differentiation from Splits:<a class="headerlink" href="#visual-differentiation-from-splits" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Color</strong>: Use different accent color (e.g., blue/purple vs green for splits)</li>
+<li><strong>Icon</strong>: Wallet/Users icon vs Split icon</li>
+<li><strong>Card Style</strong>: Slightly different card design to distinguish</li>
+</ul>
+<h3 id="consistency">Consistency:<a class="headerlink" href="#consistency" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Use same design system (colors, spacing, typography)</li>
+<li>Follow existing patterns from SplitsList</li>
+<li>Use same components (Avatar, Button, Modal, etc.)</li>
+</ul>
+<hr />
+<h2 id="implementation-checklist">📋 Implementation Checklist<a class="headerlink" href="#implementation-checklist" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-navigation-list">Phase 1: Navigation &amp; List<a class="headerlink" href="#phase-1-navigation-list" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Add "Shared Wallets" to NavBar</li>
+<li>[ ] Create SharedWalletsList screen</li>
+<li>[ ] Add route to App.tsx</li>
+<li>[ ] Create empty state component</li>
+<li>[ ] Add filter functionality</li>
+</ul>
+<h3 id="phase-2-creation-flow">Phase 2: Creation Flow<a class="headerlink" href="#phase-2-creation-flow" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Create CreateSharedWallet screen</li>
+<li>[ ] Integrate contact picker</li>
+<li>[ ] Add wallet creation logic</li>
+<li>[ ] Add navigation flow</li>
+</ul>
+<h3 id="phase-3-details-management">Phase 3: Details &amp; Management<a class="headerlink" href="#phase-3-details-management" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Create SharedWalletDetails screen</li>
+<li>[ ] Add member list component</li>
+<li>[ ] Add transaction history</li>
+<li>[ ] Add settings screen</li>
+</ul>
+<h3 id="phase-4-funding">Phase 4: Funding<a class="headerlink" href="#phase-4-funding" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Create SharedWalletFunding screen</li>
+<li>[ ] Integrate in-app wallet funding</li>
+<li>[ ] Integrate external wallet funding</li>
+<li>[ ] Integrate MoonPay funding</li>
+</ul>
+<h3 id="phase-5-invitations">Phase 5: Invitations<a class="headerlink" href="#phase-5-invitations" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Create SharedWalletInvite screen</li>
+<li>[ ] Add invitation service</li>
+<li>[ ] Add notification system</li>
+</ul>
+<h3 id="phase-6-card-integration">Phase 6: Card Integration<a class="headerlink" href="#phase-6-card-integration" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] Add "Use Funds" flow</li>
+<li>[ ] Integrate with LinkedWalletService</li>
+<li>[ ] Add transfer to card functionality</li>
+</ul>
+<hr />
+<h2 id="implementation-status">🚀 Implementation Status<a class="headerlink" href="#implementation-status" title="Permanent link">&para;</a></h2>
+<h3 id="completed">✅ Completed:<a class="headerlink" href="#completed" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>CreateChoiceModal Component</strong> - Created modal for choosing between Split and Shared Wallet</li>
+<li><strong>NavBar Integration</strong> - Center button now opens modal instead of direct navigation</li>
+<li><strong>SplitsListScreen Tabs</strong> - Added top-level tabs (Splits | Shared Wallets)</li>
+<li><strong>Conditional Filters</strong> - Filter tabs only show when "Splits" tab is active</li>
+<li><strong>Shared Wallet Types</strong> - Complete type definitions (<code>src/services/sharedWallet/types.ts</code>)</li>
+<li><strong>SharedWalletCreation Service</strong> - Wallet creation with validation and error handling</li>
+<li><strong>SharedWalletService</strong> - Main orchestrator with lazy loading</li>
+<li><strong>Secure Private Key Storage</strong> - Reuses Degen Split encryption system</li>
+<li><strong>Architecture Documentation</strong> - Comprehensive README with data flow diagrams</li>
+<li><strong>Best Practices</strong> - Separation of concerns, type safety, error handling, logging</li>
+</ol>
+<h3 id="next-steps">🔄 Next Steps:<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Create CreateSharedWallet Screen</strong> - UI screen for creating new shared wallet</li>
+<li><strong>Set up navigation routes</strong> in App.tsx (CreateSharedWallet, SharedWalletDetails, etc.)</li>
+<li><strong>Implement Shared Wallets List</strong> - Replace empty state with actual list rendering</li>
+<li><strong>Add funding flows</strong> - In-app wallet, external wallet, MoonPay integration</li>
+<li><strong>Implement invitation system</strong> - Invite users to shared wallets</li>
+<li><strong>Add withdrawal functionality</strong> - Withdraw to linked cards or personal wallets</li>
+</ol>
+<hr />
+<h2 id="notes">📝 Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Shared wallets are <strong>persistent</strong> (unlike splits which are bill-based)</li>
+<li>Users can be in <strong>multiple shared wallets</strong></li>
+<li>Each wallet has a <strong>shared private key</strong> (like Degen Split, but more secure)</li>
+<li>All members can <strong>view balance</strong> and <strong>add funds</strong></li>
+<li>Only creator can <strong>invite/remove members</strong> (or make it democratic?)</li>
+<li>Funds can be used on <strong>any linked card</strong> of any member</li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 14, 2026 11:39:08 UTC">January 14, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

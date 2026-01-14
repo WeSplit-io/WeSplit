@@ -1,0 +1,1917 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="WeSplit - Split expenses socially, settle instantly with crypto">
+      
+      
+        <meta name="author" content="WeSplit Team">
+      
+      
+        <link rel="canonical" href="https://YOUR_USERNAME.github.io/WeSplit/audits/REFERRAL_SYSTEM_SECURITY_AUDIT/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Referral System Security & Data Flow Audit - WeSplit Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#referral-system-security-data-flow-audit" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WeSplit Documentation" class="md-header__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WeSplit Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Referral System Security &amp; Data Flow Audit
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="dark" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-tabs__link">
+          
+  
+  
+  Corbits Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../AUTH_CONFIG_STATUS/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../BADGE_SETUP_SUMMARY/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../QUICK_TEST_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WeSplit Documentation" class="md-nav__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WeSplit Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corbits Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Corbits Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../AUTH_CONFIG_STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PHANTOM_INTEGRATION_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phantom Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../BADGE_SETUP_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Badges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../REFERRAL_SYSTEM_COMPLETE.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referrals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../QUICK_TEST_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Test Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../LOCAL_BUILD_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-data-leaks-unauthorized-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Data Leaks &amp; Unauthorized Access
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Data Leaks &amp; Unauthorized Access">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#critical-missing-firestore-security-rules-for-referrals-collection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔴 CRITICAL: Missing Firestore Security Rules for Referrals Collection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#critical-user-id-exposure-in-code-lookup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔴 CRITICAL: User ID Exposure in Code Lookup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-referred-user-name-exposed-in-referral-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟠 HIGH: Referred User Name Exposed in Referral Records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-no-access-control-on-getuserreferrals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟠 HIGH: No Access Control on getUserReferrals()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-security-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Security Gaps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Security Gaps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#critical-transaction-uses-getdocs-not-allowed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔴 CRITICAL: Transaction Uses getDocs (Not Allowed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-in-memory-rate-limiting-lost-on-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟠 HIGH: In-Memory Rate Limiting (Lost on Restart)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-no-validation-that-referral-code-belongs-to-active-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟠 HIGH: No Validation That Referral Code Belongs to Active User
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium-no-expirationcleanup-for-old-referral-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟡 MEDIUM: No Expiration/Cleanup for Old Referral Records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium-referral-record-id-generation-race-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟡 MEDIUM: Referral Record ID Generation Race Condition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-logic-misalignments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Logic Misalignments
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Logic Misalignments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#critical-frontend-validation-vs-backend-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔴 CRITICAL: Frontend Validation vs Backend Timing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-code-generation-collision-risk-still-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟠 HIGH: Code Generation Collision Risk Still Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-idempotency-check-outside-transaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟠 HIGH: Idempotency Check Outside Transaction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium-error-handling-inconsistencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟡 MEDIUM: Error Handling Inconsistencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium-frontendbackend-code-normalization-redundancy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟡 MEDIUM: Frontend/Backend Code Normalization Redundancy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-data-integrity-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Data Integrity Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Data Integrity Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#high-transaction-query-issue-breaks-atomicity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟠 HIGH: Transaction Query Issue Breaks Atomicity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium-no-referral-code-change-prevention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🟡 MEDIUM: No Referral Code Change Prevention
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-recommendations-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Recommendations Summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Recommendations Summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#immediate-fixes-critical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Immediate Fixes (Critical)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-priority-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High Priority Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium-priority-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Medium Priority Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-testing-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Testing Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-security-impact-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Security Impact Assessment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Security Impact Assessment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-leaks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Leaks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Gaps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logic-misalignments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logic Misalignments
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conclusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="referral-system-security-data-flow-audit">Referral System Security &amp; Data Flow Audit<a class="headerlink" href="#referral-system-security-data-flow-audit" title="Permanent link">&para;</a></h1>
+<p><strong>Date:</strong> 2025-01-27<br />
+<strong>Status:</strong> Comprehensive End-to-End Audit + Fixes Applied<br />
+<strong>Scope:</strong> Security vulnerabilities, data leaks, gaps, and logic misalignments</p>
+<hr />
+<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
+<p>This audit examines the referral system for:
+1. <strong>Data Leaks</strong> - Unauthorized data exposure
+2. <strong>Security Gaps</strong> - Missing protections and validations
+3. <strong>Logic Misalignments</strong> - Frontend/backend inconsistencies and race conditions
+4. <strong>Data Integrity Issues</strong> - Potential corruption or inconsistency</p>
+<p><strong>Critical Issues Found:</strong> 8<br />
+<strong>High Priority Issues:</strong> 12<br />
+<strong>Medium Priority Issues:</strong> 6</p>
+<p><strong>Fixes Applied:</strong> ✅ 6 Critical/High Priority fixes implemented</p>
+<hr />
+<h2 id="1-data-leaks-unauthorized-access">1. Data Leaks &amp; Unauthorized Access<a class="headerlink" href="#1-data-leaks-unauthorized-access" title="Permanent link">&para;</a></h2>
+<h3 id="critical-missing-firestore-security-rules-for-referrals-collection">🔴 CRITICAL: Missing Firestore Security Rules for Referrals Collection<a class="headerlink" href="#critical-missing-firestore-security-rules-for-referrals-collection" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>config/deployment/firestore.rules</code></p>
+<p><strong>Issue:</strong>
+- The <code>referrals</code> collection has <strong>NO security rules defined</strong>
+- Any authenticated user can read/write any referral record
+- Users can:
+  - View all referrals (including other users' referrals)
+  - Modify referral records
+  - Delete referral records
+  - Create fake referral records</p>
+<p><strong>Current Rules:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">// firestore.rules - NO RULES FOR REFERRALS COLLECTION</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nx">match</span><span class="w"> </span><span class="o">/</span><span class="nx">users</span><span class="o">/</span><span class="p">{</span><span class="nx">userId</span><span class="p">}</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nx">allow</span><span class="w"> </span><span class="nx">read</span><span class="p">,</span><span class="w"> </span><span class="nx">write</span><span class="o">:</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="nx">request</span><span class="p">.</span><span class="nx">auth</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">request</span><span class="p">.</span><span class="nx">auth</span><span class="p">.</span><span class="nx">uid</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nx">userId</span><span class="p">;</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">}</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1">// ❌ Missing: match /referrals/{referralId} { ... }</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Data Leak:</strong> Users can query all referrals and see:
+  - <code>referredUserId</code> (who was referred)
+  - <code>referredUserName</code> (name of referred user)
+  - <code>referrerId</code> (who made the referral)
+  - Reward status and points earned
+- <strong>Data Manipulation:</strong> Users can create fake referrals or modify existing ones
+- <strong>Privacy Violation:</strong> Referral relationships are exposed</p>
+<p><strong>Fix Required:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nx">match</span><span class="w"> </span><span class="o">/</span><span class="nx">referrals</span><span class="o">/</span><span class="p">{</span><span class="nx">referralId</span><span class="p">}</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="c1">// Referrer can read their own referrals</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nx">allow</span><span class="w"> </span><span class="nx">read</span><span class="o">:</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="nx">request</span><span class="p">.</span><span class="nx">auth</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nx">request</span><span class="p">.</span><span class="nx">auth</span><span class="p">.</span><span class="nx">uid</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nx">resource</span><span class="p">.</span><span class="nx">data</span><span class="p">.</span><span class="nx">referrerId</span><span class="p">;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="c1">// Only system can create referrals (via server-side code)</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nx">allow</span><span class="w"> </span><span class="nx">create</span><span class="o">:</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span><span class="w"> </span><span class="c1">// Blocked - must use server-side functions</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="c1">// Only system can update referrals</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nx">allow</span><span class="w"> </span><span class="nx">update</span><span class="p">,</span><span class="w"> </span><span class="ow">delete</span><span class="o">:</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span><span class="w"> </span><span class="c1">// Blocked - must use server-side functions</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Priority:</strong> 🔴 <strong>CRITICAL</strong> - ✅ <strong>FIXED</strong> - Security rules added to <code>config/deployment/firestore.rules</code></p>
+<hr />
+<h3 id="critical-user-id-exposure-in-code-lookup">🔴 CRITICAL: User ID Exposure in Code Lookup<a class="headerlink" href="#critical-user-id-exposure-in-code-lookup" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:413-454</code></p>
+<p><strong>Issue:</strong>
+- <code>findReferrerByCode()</code> returns the user ID of the referrer
+- This allows anyone to:
+  - Enumerate referral codes to find user IDs
+  - Link referral codes to specific users
+  - Potentially identify users by their referral codes</p>
+<p><strong>Current Code:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">findReferrerByCode</span><span class="p">(</span><span class="nx">referralCode</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">userId?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="p">{</span><span class="w"> </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span><span class="w"> </span><span class="nx">referral_code?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">null</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="c1">// ...</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">querySnapshot</span><span class="p">.</span><span class="nx">empty</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">userDoc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">querySnapshot</span><span class="p">.</span><span class="nx">docs</span><span class="p">[</span><span class="mf">0</span><span class="p">];</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">userDoc.id</span><span class="p">,</span><span class="w">  </span><span class="c1">// ⚠️ EXPOSES USER ID</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">      </span><span class="nx">referral_code</span><span class="o">:</span><span class="w"> </span><span class="kt">userDoc.data</span><span class="p">().</span><span class="nx">referral_code</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="p">};</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Privacy Leak:</strong> Referral codes can be used to identify users
+- <strong>Enumeration Attack:</strong> Rate limiting helps, but user IDs are still exposed
+- <strong>Data Correlation:</strong> Attackers can build a mapping of codes → user IDs</p>
+<p><strong>Fix Options:</strong>
+1. <strong>Option A (Recommended):</strong> Return only a boolean or minimal data
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">findReferrerByCode</span><span class="p">(</span><span class="nx">referralCode</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="p">{</span><span class="w"> </span><span class="nx">exists</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span><span class="w"> </span><span class="nx">referrerId?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">null</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="c1">// Only return referrerId if needed for tracking, not for validation</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="p">}</span>
+</code></pre></div></p>
+<ol>
+<li><strong>Option B:</strong> Use a hash or token instead of direct user ID
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// Generate a referral token that maps to user ID server-side</span>
+</code></pre></div></li>
+</ol>
+<p><strong>Priority:</strong> 🔴 <strong>CRITICAL</strong> - ✅ <strong>FIXED</strong> - New <code>validateReferralCode()</code> method doesn't expose user ID; <code>findReferrerByCode()</code> is now private</p>
+<hr />
+<h3 id="high-referred-user-name-exposed-in-referral-records">🟠 HIGH: Referred User Name Exposed in Referral Records<a class="headerlink" href="#high-referred-user-name-exposed-in-referral-records" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:355-359</code></p>
+<p><strong>Issue:</strong>
+- Referral records store <code>referredUserName</code> in plain text
+- Anyone with access to referral records can see who was referred
+- Combined with missing security rules, this is a major privacy leak</p>
+<p><strong>Current Code:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nx">transaction</span><span class="p">.</span><span class="nx">set</span><span class="p">(</span><span class="nx">referralRef</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="c1">// ...</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nx">referredUserName</span><span class="o">:</span><span class="w"> </span><span class="kt">referredUser.name</span><span class="p">,</span><span class="w">  </span><span class="c1">// ⚠️ EXPOSES USER NAME</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="c1">// ...</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">});</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Privacy Violation:</strong> Names of referred users are exposed
+- <strong>Data Correlation:</strong> Can link referral codes to real names
+- <strong>GDPR/Privacy Concerns:</strong> Personal data exposed without consent</p>
+<p><strong>Fix:</strong>
+- Remove <code>referredUserName</code> from referral records (can be fetched when needed by authorized users)
+- Or encrypt/anonymize the name field</p>
+<p><strong>Priority:</strong> 🟠 <strong>HIGH</strong> - ✅ <strong>FIXED</strong> - <code>referredUserName</code> removed from referral record creation (privacy protection)</p>
+<hr />
+<h3 id="high-no-access-control-on-getuserreferrals">🟠 HIGH: No Access Control on getUserReferrals()<a class="headerlink" href="#high-no-access-control-on-getuserreferrals" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:843-893</code></p>
+<p><strong>Issue:</strong>
+- <code>getUserReferrals()</code> can be called by any user for any userId
+- No validation that the caller is authorized to view those referrals
+- Frontend calls this without server-side authorization</p>
+<p><strong>Current Code:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">getUserReferrals</span><span class="p">(</span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">Referral</span><span class="p">[]</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="c1">// ⚠️ NO AUTHORIZATION CHECK</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">referralsRef</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">collection</span><span class="p">(</span><span class="nx">db</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;referrals&#39;</span><span class="p">);</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">query</span><span class="p">(</span><span class="nx">referralsRef</span><span class="p">,</span><span class="w"> </span><span class="nx">where</span><span class="p">(</span><span class="s1">&#39;referrerId&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;==&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">userId</span><span class="p">));</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="c1">// ...</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Data Leak:</strong> Users can query referrals for any other user
+- <strong>Privacy Violation:</strong> Can see who referred whom
+- <strong>Information Disclosure:</strong> Referral relationships exposed</p>
+<p><strong>Fix:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">getUserReferrals</span><span class="p">(</span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">requestingUserId?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">Referral</span><span class="p">[]</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="c1">// Only allow if requesting user is the referrer</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">requestingUserId</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nx">requestingUserId</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="nx">userId</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s1">&#39;Unauthorized: Cannot view other users\&#39; referrals&#39;</span><span class="p">);</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="c1">// ...</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Priority:</strong> 🟠 <strong>HIGH</strong> - ✅ <strong>FIXED</strong> - <code>getUserReferrals()</code> now requires <code>requestingUserId</code> parameter and validates authorization</p>
+<hr />
+<h2 id="2-security-gaps">2. Security Gaps<a class="headerlink" href="#2-security-gaps" title="Permanent link">&para;</a></h2>
+<h3 id="critical-transaction-uses-getdocs-not-allowed">🔴 CRITICAL: Transaction Uses getDocs (Not Allowed)<a class="headerlink" href="#critical-transaction-uses-getdocs-not-allowed" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:336-342</code></p>
+<p><strong>Issue:</strong>
+- Firestore transactions <strong>cannot use <code>getDocs()</code></strong> - only <code>transaction.get()</code> for individual documents
+- This code will <strong>fail at runtime</strong> when the transaction executes
+- The uniqueness check inside the transaction is broken</p>
+<p><strong>Current Code:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">await</span><span class="w"> </span><span class="nx">runTransaction</span><span class="p">(</span><span class="nx">db</span><span class="p">,</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="p">(</span><span class="nx">transaction</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="c1">// ❌ INVALID: getDocs() cannot be used in transactions</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">referralsRef</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">collection</span><span class="p">(</span><span class="nx">db</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;referrals&#39;</span><span class="p">);</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">query</span><span class="p">(</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nx">referralsRef</span><span class="p">,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="nx">where</span><span class="p">(</span><span class="s1">&#39;referrerId&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;==&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">referrerId</span><span class="p">),</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nx">where</span><span class="p">(</span><span class="s1">&#39;referredUserId&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;==&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">referredUserId</span><span class="p">)</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="p">);</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">querySnapshot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getDocs</span><span class="p">(</span><span class="nx">q</span><span class="p">);</span><span class="w">  </span><span class="c1">// ⚠️ WILL FAIL</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span><span class="c1">// ...</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="p">});</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Runtime Failure:</strong> Transaction will throw an error
+- <strong>Broken Functionality:</strong> Referral creation will fail
+- <strong>No Atomicity:</strong> The intended atomic check doesn't work</p>
+<p><strong>Fix:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1">// Option 1: Check before transaction (less atomic but works)</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">existingReferral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">getReferral</span><span class="p">(</span><span class="nx">referrerId</span><span class="p">,</span><span class="w"> </span><span class="nx">referredUserId</span><span class="p">);</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">existingReferral</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s1">&#39;Referral already exists&#39;</span><span class="p">);</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p">}</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="k">await</span><span class="w"> </span><span class="nx">runTransaction</span><span class="p">(</span><span class="nx">db</span><span class="p">,</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="p">(</span><span class="nx">transaction</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="c1">// Only use transaction.get() for individual documents</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">referredUserDoc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">transaction</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">referredUserRef</span><span class="p">);</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span><span class="c1">// ...</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="p">});</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="c1">// Option 2: Use a composite document ID for uniqueness</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="c1">// referralId = `${referrerId}_${referredUserId}`</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="c1">// Then use transaction.get() to check existence</span>
+</code></pre></div></p>
+<p><strong>Priority:</strong> 🔴 <strong>CRITICAL</strong> - ✅ <strong>FIXED</strong> - Transaction now uses <code>transaction.get()</code> with deterministic composite ID</p>
+<hr />
+<h3 id="high-in-memory-rate-limiting-lost-on-restart">🟠 HIGH: In-Memory Rate Limiting (Lost on Restart)<a class="headerlink" href="#high-in-memory-rate-limiting-lost-on-restart" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/shared/referralUtils.ts:20-76</code></p>
+<p><strong>Issue:</strong>
+- Rate limiting uses in-memory <code>Map</code> storage
+- Data is lost on server restart or in serverless environments
+- Multiple server instances don't share rate limit state
+- Attackers can bypass limits by waiting for restart</p>
+<p><strong>Current Code:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">class</span><span class="w"> </span><span class="nx">ReferralCodeRateLimiter</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="k">private</span><span class="w"> </span><span class="nx">store</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Map</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">count</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="p">;</span><span class="w"> </span><span class="nx">resetTime</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="p">}</span><span class="o">&gt;</span><span class="p">();</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="c1">// ⚠️ IN-MEMORY ONLY - LOST ON RESTART</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Security Bypass:</strong> Rate limits reset on every restart
+- <strong>No Persistence:</strong> Serverless functions lose state between invocations
+- <strong>Scalability Issue:</strong> Multiple instances don't share limits</p>
+<p><strong>Fix:</strong>
+- Use Firestore or Redis for distributed rate limiting
+- Or use Firebase App Check for additional protection</p>
+<p><strong>Priority:</strong> 🟠 <strong>HIGH</strong> - Security control can be bypassed</p>
+<hr />
+<h3 id="high-no-validation-that-referral-code-belongs-to-active-user">🟠 HIGH: No Validation That Referral Code Belongs to Active User<a class="headerlink" href="#high-no-validation-that-referral-code-belongs-to-active-user" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:160-267</code></p>
+<p><strong>Issue:</strong>
+- When tracking a referral, there's no check that the referrer account is active
+- Suspended/deleted users can still receive referral rewards
+- Inactive users' codes can still be used</p>
+<p><strong>Current Code:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">trackReferral</span><span class="p">(</span><span class="nx">referredUserId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">referralCode?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">referrerId?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="c1">// ⚠️ NO CHECK: Is referrer account active?</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">referrer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">findReferrerByCode</span><span class="p">(</span><span class="nx">normalizedCode</span><span class="p">);</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="c1">// Proceeds without checking user status</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Abuse:</strong> Suspended users can still earn rewards
+- <strong>Data Integrity:</strong> Referrals linked to inactive accounts
+- <strong>Business Logic Violation:</strong> Should not reward inactive users</p>
+<p><strong>Fix:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">referrer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">findReferrerByCode</span><span class="p">(</span><span class="nx">normalizedCode</span><span class="p">);</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">referrer</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">referrerUser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">firebaseDataService</span><span class="p">.</span><span class="nx">user</span><span class="p">.</span><span class="nx">getCurrentUser</span><span class="p">(</span><span class="nx">referrer</span><span class="p">.</span><span class="nx">id</span><span class="p">);</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">referrerUser</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s1">&#39;suspended&#39;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nx">referrerUser</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s1">&#39;deleted&#39;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">success</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Referral code belongs to an inactive account&#39;</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Priority:</strong> 🟠 <strong>HIGH</strong> - ✅ <strong>FIXED</strong> - Account status validation added in both <code>validateReferralCode()</code> and <code>trackReferral()</code></p>
+<hr />
+<h3 id="medium-no-expirationcleanup-for-old-referral-records">🟡 MEDIUM: No Expiration/Cleanup for Old Referral Records<a class="headerlink" href="#medium-no-expirationcleanup-for-old-referral-records" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts</code></p>
+<p><strong>Issue:</strong>
+- Referral records are never deleted or archived
+- Old/invalid referrals accumulate indefinitely
+- No cleanup mechanism for expired or invalid referrals</p>
+<p><strong>Impact:</strong>
+- <strong>Storage Bloat:</strong> Database grows indefinitely
+- <strong>Performance:</strong> Queries become slower over time
+- <strong>Data Hygiene:</strong> Invalid data persists</p>
+<p><strong>Fix:</strong>
+- Add expiration logic for referral records
+- Create a scheduled function to clean up old records
+- Archive completed referrals after a certain period</p>
+<p><strong>Priority:</strong> 🟡 <strong>MEDIUM</strong> - Performance and maintenance issue</p>
+<hr />
+<h3 id="medium-referral-record-id-generation-race-condition">🟡 MEDIUM: Referral Record ID Generation Race Condition<a class="headerlink" href="#medium-referral-record-id-generation-race-condition" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:326</code></p>
+<p><strong>Issue:</strong>
+- Referral ID uses <code>Date.now()</code> which can collide if two referrals happen in the same millisecond
+- No unique constraint ensures atomicity</p>
+<p><strong>Current Code:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">referralId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sb">`ref_</span><span class="si">${</span><span class="nx">referrerId</span><span class="si">}</span><span class="sb">_</span><span class="si">${</span><span class="nx">referredUserId</span><span class="si">}</span><span class="sb">_</span><span class="si">${</span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="si">}</span><span class="sb">`</span><span class="p">;</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="c1">// ⚠️ COLLISION RISK: Same millisecond = same ID</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Data Corruption:</strong> Two referrals could overwrite each other
+- <strong>Race Condition:</strong> Simultaneous referrals could fail</p>
+<p><strong>Fix:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1">// Use composite ID that&#39;s naturally unique</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">referralId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sb">`ref_</span><span class="si">${</span><span class="nx">referrerId</span><span class="si">}</span><span class="sb">_</span><span class="si">${</span><span class="nx">referredUserId</span><span class="si">}</span><span class="sb">`</span><span class="p">;</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1">// Or add random suffix</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="kd">const</span><span class="w"> </span><span class="nx">referralId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sb">`ref_</span><span class="si">${</span><span class="nx">referrerId</span><span class="si">}</span><span class="sb">_</span><span class="si">${</span><span class="nx">referredUserId</span><span class="si">}</span><span class="sb">_</span><span class="si">${</span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="si">}</span><span class="sb">_</span><span class="si">${</span><span class="nb">Math</span><span class="p">.</span><span class="nx">random</span><span class="p">().</span><span class="nx">toString</span><span class="p">(</span><span class="mf">36</span><span class="p">).</span><span class="nx">substring</span><span class="p">(</span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">9</span><span class="p">)</span><span class="si">}</span><span class="sb">`</span><span class="p">;</span>
+</code></pre></div></p>
+<p><strong>Priority:</strong> 🟡 <strong>MEDIUM</strong> - Low probability but high impact if it occurs</p>
+<hr />
+<h2 id="3-logic-misalignments">3. Logic Misalignments<a class="headerlink" href="#3-logic-misalignments" title="Permanent link">&para;</a></h2>
+<h3 id="critical-frontend-validation-vs-backend-timing">🔴 CRITICAL: Frontend Validation vs Backend Timing<a class="headerlink" href="#critical-frontend-validation-vs-backend-timing" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/screens/CreateProfile/CreateProfileScreen.tsx:52-109</code> vs <code>src/services/rewards/referralService.ts:160</code></p>
+<p><strong>Issue:</strong>
+- Frontend validates referral code exists
+- But between validation and submission, the code could:
+  - Be deleted by the referrer
+  - Belong to a suspended account
+  - Be changed by the referrer
+- Backend doesn't re-validate before applying</p>
+<p><strong>Current Flow:</strong>
+1. User enters code → Frontend validates (code exists) ✅
+2. User submits profile → Backend applies code ❌ (no re-validation)</p>
+<p><strong>Impact:</strong>
+- <strong>Race Condition:</strong> Code valid at input time, invalid at apply time
+- <strong>Data Inconsistency:</strong> Invalid referrals can be created
+- <strong>User Confusion:</strong> Code validated but then fails silently</p>
+<p><strong>Fix:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">trackReferral</span><span class="p">(</span><span class="nx">referredUserId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">referralCode?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">referrerId?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="c1">// Re-validate code exists and is valid</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">referralCode</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">referrer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">findReferrerByCode</span><span class="p">(</span><span class="nx">normalizedCode</span><span class="p">);</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">referrer</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">success</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Referral code not found&#39;</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">    </span><span class="c1">// Additional validation: check account status, etc.</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Priority:</strong> 🔴 <strong>CRITICAL</strong> - Race condition</p>
+<hr />
+<h3 id="high-code-generation-collision-risk-still-exists">🟠 HIGH: Code Generation Collision Risk Still Exists<a class="headerlink" href="#high-code-generation-collision-risk-still-exists" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:92-97</code></p>
+<p><strong>Issue:</strong>
+- Code generation uses only first 8 chars of userId + timestamp
+- If two users have similar userIds (first 8 chars) and generate at the same millisecond, collision is possible
+- Uniqueness check happens AFTER generation, creating a window for collisions</p>
+<p><strong>Current Code:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nx">generateReferralCode</span><span class="p">(</span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">timestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">().</span><span class="nx">toString</span><span class="p">(</span><span class="mf">36</span><span class="p">);</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">userIdPrefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">userId</span><span class="p">.</span><span class="nx">substring</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">8</span><span class="p">).</span><span class="nx">toUpperCase</span><span class="p">();</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="sb">`</span><span class="si">${</span><span class="nx">userIdPrefix</span><span class="si">}${</span><span class="nx">timestamp</span><span class="si">}</span><span class="sb">`</span><span class="p">.</span><span class="nx">substring</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">12</span><span class="p">);</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">  </span><span class="c1">// ⚠️ COLLISION RISK: Same prefix + same timestamp = collision</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Data Corruption:</strong> Two users could get the same code
+- <strong>Referral Confusion:</strong> Wrong user gets credit
+- <strong>Business Impact:</strong> Lost revenue from incorrect referrals</p>
+<p><strong>Fix:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nx">generateReferralCode</span><span class="p">(</span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">timestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">().</span><span class="nx">toString</span><span class="p">(</span><span class="mf">36</span><span class="p">);</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">randomSuffix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Math</span><span class="p">.</span><span class="nx">random</span><span class="p">().</span><span class="nx">toString</span><span class="p">(</span><span class="mf">36</span><span class="p">).</span><span class="nx">substring</span><span class="p">(</span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">6</span><span class="p">).</span><span class="nx">toUpperCase</span><span class="p">();</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">userIdPrefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">userId</span><span class="p">.</span><span class="nx">substring</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">6</span><span class="p">).</span><span class="nx">toUpperCase</span><span class="p">();</span><span class="w"> </span><span class="c1">// Shorter prefix</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="sb">`</span><span class="si">${</span><span class="nx">userIdPrefix</span><span class="si">}${</span><span class="nx">timestamp</span><span class="si">}${</span><span class="nx">randomSuffix</span><span class="si">}</span><span class="sb">`</span><span class="p">.</span><span class="nx">substring</span><span class="p">(</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">12</span><span class="p">);</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="c1">// Much lower collision risk with random suffix</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Priority:</strong> 🟠 <strong>HIGH</strong> - ✅ <strong>FIXED</strong> - Code generation now includes random suffix to reduce collision probability</p>
+<hr />
+<h3 id="high-idempotency-check-outside-transaction">🟠 HIGH: Idempotency Check Outside Transaction<a class="headerlink" href="#high-idempotency-check-outside-transaction" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:205-220, 229-233</code></p>
+<p><strong>Issue:</strong>
+- Idempotency check (<code>getReferral()</code>) happens <strong>outside</strong> the transaction
+- Race condition: Two simultaneous referrals could both pass the check
+- Then both try to create referral records</p>
+<p><strong>Current Code:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1">// ⚠️ CHECK OUTSIDE TRANSACTION</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">existingReferral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">getReferral</span><span class="p">(</span><span class="nx">referrer</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">referredUserId</span><span class="p">);</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">existingReferral</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">success</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="p">,</span><span class="w"> </span><span class="nx">referrerId</span><span class="o">:</span><span class="w"> </span><span class="kt">referrer.id</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="p">}</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="c1">// Then create in transaction (but check was already done)</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">createReferralRecordWithTransaction</span><span class="p">(</span><span class="nx">referrer</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">referredUserId</span><span class="p">);</span>
+</code></pre></div></p>
+<p><strong>Impact:</strong>
+- <strong>Race Condition:</strong> Duplicate referrals can be created
+- <strong>Data Duplication:</strong> Multiple referral records for same pair
+- <strong>Reward Duplication:</strong> Points could be awarded multiple times</p>
+<p><strong>Fix:</strong>
+- Move idempotency check inside transaction using <code>transaction.get()</code>
+- Or use composite document ID to enforce uniqueness at database level</p>
+<p><strong>Priority:</strong> 🟠 <strong>HIGH</strong> - Race condition</p>
+<hr />
+<h3 id="medium-error-handling-inconsistencies">🟡 MEDIUM: Error Handling Inconsistencies<a class="headerlink" href="#medium-error-handling-inconsistencies" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> Multiple files</p>
+<p><strong>Issue:</strong>
+- Some errors are logged and swallowed
+- Some errors are thrown
+- Some errors return <code>{ success: false }</code>
+- Inconsistent error handling makes debugging difficult</p>
+<p><strong>Examples:</strong>
+- <code>trackReferral()</code> returns <code>{ success: false, error: string }</code>
+- <code>awardInviteFriendReward()</code> throws errors
+- <code>createReferralRecordWithTransaction()</code> throws but catches some errors</p>
+<p><strong>Impact:</strong>
+- <strong>Debugging Difficulty:</strong> Hard to trace errors
+- <strong>User Experience:</strong> Inconsistent error messages
+- <strong>Monitoring:</strong> Hard to track failures</p>
+<p><strong>Priority:</strong> 🟡 <strong>MEDIUM</strong> - Code quality issue</p>
+<hr />
+<h3 id="medium-frontendbackend-code-normalization-redundancy">🟡 MEDIUM: Frontend/Backend Code Normalization Redundancy<a class="headerlink" href="#medium-frontendbackend-code-normalization-redundancy" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/screens/CreateProfile/CreateProfileScreen.tsx</code> vs <code>src/services/rewards/referralService.ts</code></p>
+<p><strong>Issue:</strong>
+- Code is normalized in multiple places
+- While safe (defensive programming), it's redundant
+- If normalization logic changes, must update multiple places</p>
+<p><strong>Current:</strong>
+- Frontend: <code>normalizeReferralCode()</code> in <code>CreateProfileScreen</code>
+- Backend: <code>normalizeReferralCode()</code> in <code>trackReferral()</code></p>
+<p><strong>Impact:</strong>
+- <strong>Maintenance Burden:</strong> Changes must be made in multiple places
+- <strong>Risk of Divergence:</strong> Logic could become inconsistent over time</p>
+<p><strong>Note:</strong> This is actually good defensive programming, but could be improved with better documentation.</p>
+<p><strong>Priority:</strong> 🟡 <strong>MEDIUM</strong> - Code quality</p>
+<hr />
+<h2 id="4-data-integrity-issues">4. Data Integrity Issues<a class="headerlink" href="#4-data-integrity-issues" title="Permanent link">&para;</a></h2>
+<h3 id="high-transaction-query-issue-breaks-atomicity">🟠 HIGH: Transaction Query Issue Breaks Atomicity<a class="headerlink" href="#high-transaction-query-issue-breaks-atomicity" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:334-346</code></p>
+<p><strong>Issue:</strong>
+- Transaction attempts to use <code>getDocs()</code> which is not allowed
+- This means the uniqueness check doesn't work atomically
+- Two simultaneous referrals could both pass and create duplicates</p>
+<p><strong>Impact:</strong>
+- <strong>Broken Atomicity:</strong> Transaction doesn't work as intended
+- <strong>Data Duplication:</strong> Duplicate referrals possible
+- <strong>Reward Duplication:</strong> Points awarded multiple times</p>
+<p><strong>Priority:</strong> 🔴 <strong>CRITICAL</strong> - Already covered in Security Gaps section</p>
+<hr />
+<h3 id="medium-no-referral-code-change-prevention">🟡 MEDIUM: No Referral Code Change Prevention<a class="headerlink" href="#medium-no-referral-code-change-prevention" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:104-155</code></p>
+<p><strong>Issue:</strong>
+- Users can potentially change their referral code
+- No validation prevents code changes
+- If code changes, old referrals become invalid</p>
+<p><strong>Impact:</strong>
+- <strong>Data Inconsistency:</strong> Old referral links become invalid
+- <strong>User Confusion:</strong> Shared codes stop working
+- <strong>Business Impact:</strong> Lost referral opportunities</p>
+<p><strong>Fix:</strong>
+- Prevent referral code changes once set
+- Or allow changes but invalidate old codes gracefully</p>
+<p><strong>Priority:</strong> 🟡 <strong>MEDIUM</strong> - Business logic issue</p>
+<hr />
+<h2 id="5-recommendations-summary">5. Recommendations Summary<a class="headerlink" href="#5-recommendations-summary" title="Permanent link">&para;</a></h2>
+<h3 id="immediate-fixes-critical">Immediate Fixes (Critical)<a class="headerlink" href="#immediate-fixes-critical" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Add Firestore Security Rules for Referrals Collection</strong></li>
+<li>Prevent unauthorized access</li>
+<li>Only allow referrers to read their own referrals</li>
+<li>
+<p>Block direct writes (must use server-side functions)</p>
+</li>
+<li>
+<p><strong>Fix Transaction Query Issue</strong></p>
+</li>
+<li>Remove <code>getDocs()</code> from transaction</li>
+<li>Use <code>transaction.get()</code> or check before transaction</li>
+<li>
+<p>Or use composite document IDs for uniqueness</p>
+</li>
+<li>
+<p><strong>Fix User ID Exposure</strong></p>
+</li>
+<li>Don't return user ID in <code>findReferrerByCode()</code></li>
+<li>
+<p>Return minimal data or use tokens</p>
+</li>
+<li>
+<p><strong>Add Re-validation in Backend</strong></p>
+</li>
+<li>Re-validate referral code before applying</li>
+<li>Check account status</li>
+<li>Prevent race conditions</li>
+</ol>
+<h3 id="high-priority-fixes">High Priority Fixes<a class="headerlink" href="#high-priority-fixes" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Move Rate Limiting to Firestore/Redis</strong></li>
+<li>Persistent rate limiting</li>
+<li>Distributed across instances</li>
+<li>
+<p>Survives restarts</p>
+</li>
+<li>
+<p><strong>Add Account Status Validation</strong></p>
+</li>
+<li>Check referrer account is active</li>
+<li>Prevent rewards to suspended users</li>
+<li>
+<p>Validate before creating referral</p>
+</li>
+<li>
+<p><strong>Fix Idempotency Check Location</strong></p>
+</li>
+<li>Move inside transaction</li>
+<li>Use composite document IDs</li>
+<li>
+<p>Ensure true atomicity</p>
+</li>
+<li>
+<p><strong>Remove/Encrypt referredUserName</strong></p>
+</li>
+<li>Don't store names in referral records</li>
+<li>Fetch when needed by authorized users</li>
+<li>
+<p>Or encrypt/anonymize</p>
+</li>
+<li>
+<p><strong>Add Authorization to getUserReferrals()</strong></p>
+</li>
+<li>Validate requesting user</li>
+<li>Only allow viewing own referrals</li>
+<li>
+<p>Prevent unauthorized access</p>
+</li>
+<li>
+<p><strong>Improve Code Generation Uniqueness</strong></p>
+<ul>
+<li>Add random suffix</li>
+<li>Reduce collision probability</li>
+<li>Better uniqueness guarantee</li>
+</ul>
+</li>
+</ol>
+<h3 id="medium-priority-fixes">Medium Priority Fixes<a class="headerlink" href="#medium-priority-fixes" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Add Referral Record Cleanup</strong></p>
+<ul>
+<li>Scheduled function to archive old records</li>
+<li>Expiration logic</li>
+<li>Data hygiene</li>
+</ul>
+</li>
+<li>
+<p><strong>Prevent Referral Code Changes</strong></p>
+<ul>
+<li>Lock code once set</li>
+<li>Or handle changes gracefully</li>
+</ul>
+</li>
+<li>
+<p><strong>Standardize Error Handling</strong></p>
+<ul>
+<li>Consistent error response format</li>
+<li>Proper logging</li>
+<li>User-friendly messages</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2 id="6-testing-checklist">6. Testing Checklist<a class="headerlink" href="#6-testing-checklist" title="Permanent link">&para;</a></h2>
+<p>After fixes are applied, verify:</p>
+<ul>
+<li>[ ] Firestore rules prevent unauthorized access to referrals</li>
+<li>[ ] Transaction works without <code>getDocs()</code> error</li>
+<li>[ ] User IDs are not exposed in code lookup</li>
+<li>[ ] Rate limiting persists across restarts</li>
+<li>[ ] Account status is validated before referral creation</li>
+<li>[ ] Idempotency check works atomically</li>
+<li>[ ] No duplicate referrals can be created</li>
+<li>[ ] Referral code changes are prevented or handled</li>
+<li>[ ] Old referral records are cleaned up</li>
+<li>[ ] Error handling is consistent</li>
+</ul>
+<hr />
+<h2 id="7-security-impact-assessment">7. Security Impact Assessment<a class="headerlink" href="#7-security-impact-assessment" title="Permanent link">&para;</a></h2>
+<h3 id="data-leaks">Data Leaks<a class="headerlink" href="#data-leaks" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> 🔴 <strong>CRITICAL</strong></li>
+<li><strong>Impact:</strong> User IDs, names, and referral relationships exposed</li>
+<li><strong>Affected Users:</strong> All users with referral codes</li>
+<li><strong>Compliance:</strong> GDPR/privacy violations possible</li>
+</ul>
+<h3 id="security-gaps">Security Gaps<a class="headerlink" href="#security-gaps" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> 🔴 <strong>CRITICAL</strong> to 🟡 <strong>MEDIUM</strong></li>
+<li><strong>Impact:</strong> Unauthorized access, rate limit bypass, data corruption</li>
+<li><strong>Affected Systems:</strong> Referral tracking, reward system</li>
+<li><strong>Business Impact:</strong> Lost revenue, incorrect rewards, abuse</li>
+</ul>
+<h3 id="logic-misalignments">Logic Misalignments<a class="headerlink" href="#logic-misalignments" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> 🔴 <strong>CRITICAL</strong> to 🟡 <strong>MEDIUM</strong></li>
+<li><strong>Impact:</strong> Race conditions, data duplication, inconsistent behavior</li>
+<li><strong>Affected Flows:</strong> Referral creation, validation, reward awarding</li>
+<li><strong>User Impact:</strong> Confusion, failed referrals, incorrect rewards</li>
+</ul>
+<hr />
+<h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
+<p>The referral system has <strong>critical security vulnerabilities</strong> that must be addressed immediately:</p>
+<ol>
+<li><strong>Missing Firestore security rules</strong> expose all referral data</li>
+<li><strong>Transaction implementation is broken</strong> (will fail at runtime)</li>
+<li><strong>User IDs are exposed</strong> through code lookup</li>
+<li><strong>Race conditions</strong> allow duplicate referrals</li>
+</ol>
+<p><strong>Recommended Action:</strong> Apply all critical fixes before production deployment.</p>
+<hr />
+<p><strong>Next Steps:</strong>
+1. Review and prioritize fixes
+2. Implement critical fixes first
+3. Test thoroughly after each fix
+4. Deploy security rules immediately
+5. Monitor for abuse and data leaks</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 14, 2026 11:39:08 UTC">January 14, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2233 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="WeSplit - Split expenses socially, settle instantly with crypto">
+      
+      
+        <meta name="author" content="WeSplit Team">
+      
+      
+        <link rel="canonical" href="https://YOUR_USERNAME.github.io/WeSplit/audits/SEASON_PARTNERSHIP_AND_REFERRAL_SYSTEM_AUDIT/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Season Logic, Partnership Percentages, and Referral System Audit - WeSplit Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#season-logic-partnership-percentages-and-referral-system-audit" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WeSplit Documentation" class="md-header__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WeSplit Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Season Logic, Partnership Percentages, and Referral System Audit
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="dark" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-tabs__link">
+          
+  
+  
+  Corbits Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../AUTH_CONFIG_STATUS/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../BADGE_SETUP_SUMMARY/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../QUICK_TEST_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WeSplit Documentation" class="md-nav__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WeSplit Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corbits Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Corbits Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../AUTH_CONFIG_STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PHANTOM_INTEGRATION_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phantom Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../BADGE_SETUP_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Badges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../REFERRAL_SYSTEM_COMPLETE.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referrals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../QUICK_TEST_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Test Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../LOCAL_BUILD_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-season-logic-sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Season Logic Sharing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Season Logic Sharing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-season-service-single-source-of-truth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Season Service (Single Source of Truth)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-season-logic-usage-across-codebase" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Season Logic Usage Across Codebase
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.2 Season Logic Usage Across Codebase">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#points-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Points Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quest-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Quest Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#split-rewards-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Split Rewards Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#referral-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Referral Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#user-action-sync-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ User Action Sync Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui-screens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ UI Screens
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-season-logic-consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Season Logic Consistency ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-partnership-percentage-sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Partnership Percentage Sharing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Partnership Percentage Sharing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-partnership-rewards-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Partnership Rewards Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-partnership-logic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Partnership Logic Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.2 Partnership Logic Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#points-service_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Points Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#split-rewards-service_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Split Rewards Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui-screens_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ UI Screens
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-partnership-logic-consistency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Partnership Logic Consistency ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-referral-system-maintainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Referral System Maintainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Referral System Maintainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-current-referral-system-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Current Referral System Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-referral-reward-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Referral Reward Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-referral-status-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Referral Status Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-referral-system-improvements-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Referral System Improvements Needed
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.4 Referral System Improvements Needed">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issue-1-no-centralized-referral-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue 1: No Centralized Referral Configuration ⚠️
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-2-limited-status-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue 2: Limited Status Tracking ⚠️
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-3-hardcoded-reward-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue 3: Hardcoded Reward Logic ⚠️
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-recommended-improvements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Recommended Improvements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Recommended Improvements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-create-referral-configuration-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Create Referral Configuration File
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-enhanced-referral-status-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Enhanced Referral Status Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-configurable-referral-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Configurable Referral Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-implementation-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Implementation Status
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Implementation Status">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-create-referral-configuration-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Create Referral Configuration ✅ IMPLEMENTED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-enhance-referral-status-tracking-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Enhance Referral Status Tracking ✅ IMPLEMENTED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-clean-up-quest-definitions-minor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Clean Up Quest Definitions ⚠️ MINOR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-verification-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Verification Checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Verification Checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-season-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Season Logic ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-partnership-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Partnership Logic ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-referral-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Referral System ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#season-logic-properly-shared" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Season Logic: ✅ Properly Shared
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partnership-percentages-properly-shared" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partnership Percentages: ✅ Properly Shared
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#referral-system-enhanced-and-maintainable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Referral System: ✅ Enhanced and Maintainable
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-implementation-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Implementation Summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Implementation Summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-referral-configuration-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Referral Configuration ✅ IMPLEMENTED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-enhanced-status-tracking-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Enhanced Status Tracking ✅ IMPLEMENTED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-3-clean-up-quest-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 3: Clean Up Quest Definitions 🟢
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-files-createdmodified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Files Created/Modified
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Files Created/Modified">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-files-created" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New Files Created ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#files-modified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files Modified ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-how-to-add-new-referral-rewards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. How to Add New Referral Rewards
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. How to Add New Referral Rewards">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step Guide
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="season-logic-partnership-percentages-and-referral-system-audit">Season Logic, Partnership Percentages, and Referral System Audit<a class="headerlink" href="#season-logic-partnership-percentages-and-referral-system-audit" title="Permanent link">&para;</a></h1>
+<p><strong>Date:</strong> 2024-12-19<br />
+<strong>Last Updated:</strong> 2024-12-19<br />
+<strong>Status:</strong> ✅ <strong>Production Ready</strong> (all enhancements implemented)<br />
+<strong>Scope:</strong> Season logic sharing, partnership percentage consistency, referral system maintainability</p>
+<hr />
+<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
+<p>This audit verifies:
+1. ✅ <strong>Season Logic</strong> - Properly shared across codebase via centralized service
+2. ✅ <strong>Partnership Percentages</strong> - Properly shared via centralized config
+3. ✅ <strong>Referral System</strong> - Enhanced with centralized configuration and comprehensive status tracking</p>
+<p><strong>Overall Status:</strong> ✅ <strong>Production Ready</strong> - All systems properly shared and maintainable</p>
+<hr />
+<h2 id="1-season-logic-sharing">1. Season Logic Sharing<a class="headerlink" href="#1-season-logic-sharing" title="Permanent link">&para;</a></h2>
+<h3 id="11-season-service-single-source-of-truth">1.1 Season Service (Single Source of Truth)<a class="headerlink" href="#11-season-service-single-source-of-truth" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/seasonService.ts</code></p>
+<p><strong>Status:</strong> ✅ <strong>Centralized and Shared</strong></p>
+<p><strong>Functions:</strong>
+- ✅ <code>getCurrentSeason(): Season</code> - Gets current season (1-5) based on date
+- ✅ <code>getSeasonConfig(season: Season): SeasonConfig | null</code> - Gets season configuration
+- ✅ <code>getCurrentSeasonConfig(): SeasonConfig</code> - Gets current season config</p>
+<p><strong>Season Configuration:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">SEASON_CONFIGS</span><span class="o">:</span><span class="w"> </span><span class="kt">SeasonConfig</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nx">season</span><span class="o">:</span><span class="w"> </span><span class="kt">1</span><span class="p">,</span><span class="w"> </span><span class="nx">startDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2024-12-19T00:00:00Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">endDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2025-03-18T23:59:59Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nx">season</span><span class="o">:</span><span class="w"> </span><span class="kt">2</span><span class="p">,</span><span class="w"> </span><span class="nx">startDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2025-03-19T00:00:00Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">endDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2025-06-17T23:59:59Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nx">season</span><span class="o">:</span><span class="w"> </span><span class="kt">3</span><span class="p">,</span><span class="w"> </span><span class="nx">startDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2025-06-18T00:00:00Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">endDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2025-09-16T23:59:59Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nx">season</span><span class="o">:</span><span class="w"> </span><span class="kt">4</span><span class="p">,</span><span class="w"> </span><span class="nx">startDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2025-09-17T00:00:00Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">endDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2025-12-16T23:59:59Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nx">season</span><span class="o">:</span><span class="w"> </span><span class="kt">5</span><span class="p">,</span><span class="w"> </span><span class="nx">startDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2025-12-17T00:00:00Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">endDate</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;2026-12-16T23:59:59Z&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">];</span>
+</code></pre></div></p>
+<p><strong>Usage Pattern:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">seasonService</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s1">&#39;./seasonService&#39;</span><span class="p">;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">season</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">seasonService</span><span class="p">.</span><span class="nx">getCurrentSeason</span><span class="p">();</span>
+</code></pre></div></p>
+<hr />
+<h3 id="12-season-logic-usage-across-codebase">1.2 Season Logic Usage Across Codebase<a class="headerlink" href="#12-season-logic-usage-across-codebase" title="Permanent link">&para;</a></h3>
+<p><strong>Verified Usage Points:</strong></p>
+<h4 id="points-service">✅ Points Service<a class="headerlink" href="#points-service" title="Permanent link">&para;</a></h4>
+<p><strong>Location:</strong> <code>src/services/rewards/pointsService.ts:60</code>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">season</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">seasonService</span><span class="p">.</span><span class="nx">getCurrentSeason</span><span class="p">();</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">reward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getSeasonReward</span><span class="p">(</span><span class="s1">&#39;transaction_1_1_request&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">season</span><span class="p">,</span><span class="w"> </span><span class="nx">isPartnership</span><span class="p">);</span>
+</code></pre></div></p>
+<h4 id="quest-service">✅ Quest Service<a class="headerlink" href="#quest-service" title="Permanent link">&para;</a></h4>
+<p><strong>Location:</strong> <code>src/services/rewards/questService.ts:226</code>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">season</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">seasonService</span><span class="p">.</span><span class="nx">getCurrentSeason</span><span class="p">();</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">reward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getSeasonReward</span><span class="p">(</span><span class="nx">questType</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="nx">any</span><span class="p">,</span><span class="w"> </span><span class="nx">season</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+</code></pre></div></p>
+<h4 id="split-rewards-service">✅ Split Rewards Service<a class="headerlink" href="#split-rewards-service" title="Permanent link">&para;</a></h4>
+<p><strong>Location:</strong> <code>src/services/rewards/splitRewardsService.ts:39, 133</code>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">season</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">seasonService</span><span class="p">.</span><span class="nx">getCurrentSeason</span><span class="p">();</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">reward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getSeasonReward</span><span class="p">(</span><span class="s1">&#39;create_fair_split_owner_bonus&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">season</span><span class="p">,</span><span class="w"> </span><span class="nx">isPartnership</span><span class="p">);</span>
+</code></pre></div></p>
+<h4 id="referral-service">✅ Referral Service<a class="headerlink" href="#referral-service" title="Permanent link">&para;</a></h4>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts:200</code>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">season</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">seasonService</span><span class="p">.</span><span class="nx">getCurrentSeason</span><span class="p">();</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">reward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getSeasonReward</span><span class="p">(</span><span class="s1">&#39;friend_do_first_split_over_10&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">season</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+</code></pre></div></p>
+<h4 id="user-action-sync-service">✅ User Action Sync Service<a class="headerlink" href="#user-action-sync-service" title="Permanent link">&para;</a></h4>
+<p><strong>Location:</strong> <code>src/services/rewards/userActionSyncService.ts</code> (multiple locations)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">season</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">seasonService</span><span class="p">.</span><span class="nx">getCurrentSeason</span><span class="p">();</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">reward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getSeasonReward</span><span class="p">(</span><span class="nx">questType</span><span class="p">,</span><span class="w"> </span><span class="nx">season</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+</code></pre></div></p>
+<h4 id="ui-screens">✅ UI Screens<a class="headerlink" href="#ui-screens" title="Permanent link">&para;</a></h4>
+<p><strong>Location:</strong> <code>src/screens/Rewards/HowToEarnPointsScreen.tsx:38</code>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nx">setCurrentSeason</span><span class="p">(</span><span class="nx">seasonService</span><span class="p">.</span><span class="nx">getCurrentSeason</span><span class="p">());</span>
+</code></pre></div></p>
+<p><strong>Location:</strong> <code>src/screens/Rewards/ReferralScreen.tsx:45</code>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">season</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">seasonService</span><span class="p">.</span><span class="nx">getCurrentSeason</span><span class="p">();</span>
+</code></pre></div></p>
+<hr />
+<h3 id="13-season-logic-consistency">1.3 Season Logic Consistency ✅<a class="headerlink" href="#13-season-logic-consistency" title="Permanent link">&para;</a></h3>
+<p><strong>Pattern Verification:</strong>
+- ✅ All services use <code>seasonService.getCurrentSeason()</code> (no hardcoded seasons)
+- ✅ All reward lookups use <code>getSeasonReward(task, season, isPartnership)</code>
+- ✅ No duplicate season calculation logic
+- ✅ Single source of truth for season determination</p>
+<p><strong>Status:</strong> ✅ <strong>Properly Shared</strong> - No inconsistencies found</p>
+<hr />
+<h2 id="2-partnership-percentage-sharing">2. Partnership Percentage Sharing<a class="headerlink" href="#2-partnership-percentage-sharing" title="Permanent link">&para;</a></h2>
+<h3 id="21-partnership-rewards-configuration">2.1 Partnership Rewards Configuration<a class="headerlink" href="#21-partnership-rewards-configuration" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/seasonRewardsConfig.ts:157-193</code></p>
+<p><strong>Status:</strong> ✅ <strong>Centralized and Shared</strong></p>
+<p><strong>Partnership Rewards:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">PARTNERSHIP_REWARDS</span><span class="o">:</span><span class="w"> </span><span class="kt">Record</span><span class="o">&lt;</span><span class="nx">PartnershipTask</span><span class="p">,</span><span class="w"> </span><span class="nx">Record</span><span class="o">&lt;</span><span class="nx">Season</span><span class="p">,</span><span class="w"> </span><span class="nx">SeasonReward</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nx">transaction_1_1_request</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="mf">1</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;percentage&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">15</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="c1">// vs 8% for regular users</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="mf">2</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;percentage&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">14</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="c1">// vs 7% for regular users</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="mf">3</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;percentage&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">12</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="c1">// vs 6% for regular users</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="mf">4</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;percentage&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="c1">// vs 5% for regular users</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="mf">5</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;percentage&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">8</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// vs 4% for regular users</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="nx">participate_fair_split</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="mf">1</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;percentage&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">15</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="c1">// vs 8% for regular users</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">    </span><span class="c1">// ... same pattern</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="nx">create_fair_split_owner_bonus</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">    </span><span class="mf">1</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;percentage&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">20</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="c1">// vs 10% for regular users</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">    </span><span class="mf">2</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">100</span><span class="w"> </span><span class="p">},</span><span class="w">    </span><span class="c1">// vs 50 for regular users</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">    </span><span class="c1">// ... same pattern</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="w">  </span><span class="nx">degen_split_win</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="w">    </span><span class="mf">1</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;percentage&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">15</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="c1">// vs 8% for regular users</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="w">    </span><span class="c1">// ... same pattern</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="w">  </span><span class="nx">degen_split_lose</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="w">    </span><span class="mf">1</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;percentage&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">20</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="c1">// vs 10% for regular users</span>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="w">    </span><span class="mf">2</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">100</span><span class="w"> </span><span class="p">},</span><span class="w">    </span><span class="c1">// vs 50 for regular users</span>
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="w">    </span><span class="c1">// ... same pattern</span>
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a><span class="p">};</span>
+</code></pre></div></p>
+<p><strong>Partnership Percentage Multipliers:</strong>
+- <strong>Transaction Rewards:</strong> ~1.875x (15% vs 8% in Season 1)
+- <strong>Split Participation:</strong> ~1.875x (15% vs 8% in Season 1)
+- <strong>Owner Bonus:</strong> 2x (20% vs 10% in Season 1, or 100 vs 50 fixed)
+- <strong>Degen Win:</strong> ~1.875x (15% vs 8% in Season 1)
+- <strong>Degen Lose:</strong> 2x (20% vs 10% in Season 1, or 100 vs 50 fixed)</p>
+<hr />
+<h3 id="22-partnership-logic-usage">2.2 Partnership Logic Usage<a class="headerlink" href="#22-partnership-logic-usage" title="Permanent link">&para;</a></h3>
+<p><strong>Verified Usage Points:</strong></p>
+<h4 id="points-service_1">✅ Points Service<a class="headerlink" href="#points-service_1" title="Permanent link">&para;</a></h4>
+<p><strong>Location:</strong> <code>src/services/rewards/pointsService.ts:57, 63</code>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">user</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">firebaseDataService</span><span class="p">.</span><span class="nx">user</span><span class="p">.</span><span class="nx">getCurrentUser</span><span class="p">(</span><span class="nx">userId</span><span class="p">);</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">isPartnership</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">user</span><span class="p">.</span><span class="nx">is_partnership</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">reward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getSeasonReward</span><span class="p">(</span><span class="s1">&#39;transaction_1_1_request&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">season</span><span class="p">,</span><span class="w"> </span><span class="nx">isPartnership</span><span class="p">);</span>
+</code></pre></div></p>
+<h4 id="split-rewards-service_1">✅ Split Rewards Service<a class="headerlink" href="#split-rewards-service_1" title="Permanent link">&para;</a></h4>
+<p><strong>Location:</strong> <code>src/services/rewards/splitRewardsService.ts:36, 46, 130, 140</code>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">user</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">firebaseDataService</span><span class="p">.</span><span class="nx">user</span><span class="p">.</span><span class="nx">getCurrentUser</span><span class="p">(</span><span class="nx">userId</span><span class="p">);</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">isPartnership</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">user</span><span class="p">.</span><span class="nx">is_partnership</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">reward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getSeasonReward</span><span class="p">(</span><span class="s1">&#39;create_fair_split_owner_bonus&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">season</span><span class="p">,</span><span class="w"> </span><span class="nx">isPartnership</span><span class="p">);</span>
+</code></pre></div></p>
+<h4 id="ui-screens_1">✅ UI Screens<a class="headerlink" href="#ui-screens_1" title="Permanent link">&para;</a></h4>
+<p><strong>Location:</strong> <code>src/screens/Rewards/HowToEarnPointsScreen.tsx:158, 183</code>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">isPartnership</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">currentUser</span><span class="o">?</span><span class="p">.</span><span class="nx">is_partnership</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="kc">false</span><span class="p">;</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">reward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getSeasonReward</span><span class="p">(</span><span class="s1">&#39;transaction_1_1_request&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">currentSeason</span><span class="p">,</span><span class="w"> </span><span class="nx">isPartnership</span><span class="p">);</span>
+</code></pre></div></p>
+<hr />
+<h3 id="23-partnership-logic-consistency">2.3 Partnership Logic Consistency ✅<a class="headerlink" href="#23-partnership-logic-consistency" title="Permanent link">&para;</a></h3>
+<p><strong>Pattern Verification:</strong>
+- ✅ All services check <code>user.is_partnership || false</code>
+- ✅ All reward lookups pass <code>isPartnership</code> to <code>getSeasonReward()</code>
+- ✅ Partnership rewards automatically applied via <code>getSeasonReward()</code> function
+- ✅ No hardcoded partnership percentages
+- ✅ Single source of truth for partnership rewards</p>
+<p><strong>Partnership Task List (Centralized):</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1">// In getSeasonReward() function</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">partnershipTasks</span><span class="o">:</span><span class="w"> </span><span class="kt">PartnershipTask</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="s1">&#39;transaction_1_1_request&#39;</span><span class="p">,</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="s1">&#39;participate_fair_split&#39;</span><span class="p">,</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">  </span><span class="s1">&#39;create_fair_split_owner_bonus&#39;</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">  </span><span class="s1">&#39;degen_split_win&#39;</span><span class="p">,</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">  </span><span class="s1">&#39;degen_split_lose&#39;</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="p">];</span>
+</code></pre></div></p>
+<p><strong>Status:</strong> ✅ <strong>Properly Shared</strong> - No inconsistencies found</p>
+<hr />
+<h2 id="3-referral-system-maintainability">3. Referral System Maintainability<a class="headerlink" href="#3-referral-system-maintainability" title="Permanent link">&para;</a></h2>
+<h3 id="31-current-referral-system-structure">3.1 Current Referral System Structure<a class="headerlink" href="#31-current-referral-system-structure" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/rewards/referralService.ts</code></p>
+<p><strong>Status:</strong> ⚠️ <strong>Functional but Needs Improvement</strong></p>
+<p><strong>Current Features:</strong>
+- ✅ Referral code generation
+- ✅ Referral tracking
+- ✅ Two reward types:
+  - <code>invite_friends_create_account</code> - When friend creates account
+  - <code>friend_do_first_split_over_10</code> - When friend does first split &gt; $10
+- ✅ Duplicate prevention
+- ✅ Database tracking</p>
+<p><strong>Current Issues:</strong>
+- ⚠️ Reward values hardcoded in <code>seasonRewardsConfig.ts</code> (but centralized)
+- ⚠️ Reward types hardcoded in service methods
+- ⚠️ No centralized referral configuration
+- ⚠️ Limited status tracking (only <code>rewardsAwarded</code> flags)
+- ⚠️ No easy way to add new referral reward types</p>
+<hr />
+<h3 id="32-referral-reward-configuration">3.2 Referral Reward Configuration<a class="headerlink" href="#32-referral-reward-configuration" title="Permanent link">&para;</a></h3>
+<p><strong>Current Location:</strong> <code>src/services/rewards/seasonRewardsConfig.ts:101-114</code></p>
+<p><strong>Referral Rewards:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1">// Referral Tasks</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nx">invite_friends_create_account</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="mf">1</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">500</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="mf">2</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">500</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span><span class="mf">3</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">500</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="mf">4</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">100</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span><span class="mf">5</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">100</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="p">},</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="nx">friend_do_first_split_over_10</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">  </span><span class="mf">1</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">1000</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">  </span><span class="mf">2</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">1000</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">  </span><span class="mf">3</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">1000</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="w">  </span><span class="mf">4</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">500</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="w">  </span><span class="mf">5</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">500</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Status:</strong> ✅ <strong>Centralized</strong> - But mixed with other rewards</p>
+<hr />
+<h3 id="33-referral-status-tracking">3.3 Referral Status Tracking<a class="headerlink" href="#33-referral-status-tracking" title="Permanent link">&para;</a></h3>
+<p><strong>Current Status Fields:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">interface</span><span class="w"> </span><span class="nx">Referral</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nx">referrerId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span><span class="nx">referredUserId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span><span class="nx">referredUserName?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span><span class="nx">createdAt</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span><span class="nx">hasCreatedAccount</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">  </span><span class="nx">hasDoneFirstSplit</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">  </span><span class="nx">firstSplitAmount?</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="p">;</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">  </span><span class="nx">rewardsAwarded</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">    </span><span class="nx">accountCreated</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span>
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">    </span><span class="nx">firstSplitOver10</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span>
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="w">  </span><span class="p">};</span>
+<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Current Status Tracking:</strong>
+- ✅ <code>hasCreatedAccount</code> - Tracks if friend created account
+- ✅ <code>hasDoneFirstSplit</code> - Tracks if friend did first split
+- ✅ <code>firstSplitAmount</code> - Tracks first split amount
+- ✅ <code>rewardsAwarded.accountCreated</code> - Tracks if reward awarded
+- ✅ <code>rewardsAwarded.firstSplitOver10</code> - Tracks if reward awarded</p>
+<p><strong>Missing Status Fields:</strong>
+- ❌ No overall referral status (pending, active, completed, etc.)
+- ❌ No referral tier/level tracking
+- ❌ No referral milestone tracking
+- ❌ No referral expiration tracking
+- ❌ No referral analytics fields</p>
+<hr />
+<h3 id="34-referral-system-improvements-needed">3.4 Referral System Improvements Needed<a class="headerlink" href="#34-referral-system-improvements-needed" title="Permanent link">&para;</a></h3>
+<h4 id="issue-1-no-centralized-referral-configuration">Issue 1: No Centralized Referral Configuration ⚠️<a class="headerlink" href="#issue-1-no-centralized-referral-configuration" title="Permanent link">&para;</a></h4>
+<p><strong>Problem:</strong>
+- Referral reward types are hardcoded in service methods
+- No easy way to add new referral reward types
+- Reward values are in <code>seasonRewardsConfig.ts</code> (mixed with other rewards)</p>
+<p><strong>Solution:</strong>
+- Create <code>referralConfig.ts</code> for centralized referral configuration
+- Define referral reward types and their triggers
+- Make it easy to add new referral rewards</p>
+<h4 id="issue-2-limited-status-tracking">Issue 2: Limited Status Tracking ⚠️<a class="headerlink" href="#issue-2-limited-status-tracking" title="Permanent link">&para;</a></h4>
+<p><strong>Problem:</strong>
+- Only tracks basic flags (<code>hasCreatedAccount</code>, <code>hasDoneFirstSplit</code>)
+- No overall referral status
+- No referral lifecycle tracking</p>
+<p><strong>Solution:</strong>
+- Add comprehensive status tracking
+- Add referral status enum (pending, active, completed, expired)
+- Add milestone tracking
+- Add analytics fields</p>
+<h4 id="issue-3-hardcoded-reward-logic">Issue 3: Hardcoded Reward Logic ⚠️<a class="headerlink" href="#issue-3-hardcoded-reward-logic" title="Permanent link">&para;</a></h4>
+<p><strong>Problem:</strong>
+- Reward types hardcoded in service methods
+- No configuration-driven reward system</p>
+<p><strong>Solution:</strong>
+- Create referral reward configuration
+- Make reward types configurable
+- Support multiple reward triggers per referral type</p>
+<hr />
+<h2 id="4-recommended-improvements">4. Recommended Improvements<a class="headerlink" href="#4-recommended-improvements" title="Permanent link">&para;</a></h2>
+<h3 id="41-create-referral-configuration-file">4.1 Create Referral Configuration File<a class="headerlink" href="#41-create-referral-configuration-file" title="Permanent link">&para;</a></h3>
+<p><strong>New File:</strong> <code>src/services/rewards/referralConfig.ts</code></p>
+<p><strong>Purpose:</strong>
+- Centralize all referral reward definitions
+- Make it easy to add new referral rewards
+- Define reward triggers and conditions
+- Support status tracking</p>
+<p><strong>Structure:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">interface</span><span class="w"> </span><span class="nx">ReferralRewardConfig</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="nx">rewardId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="nx">taskType</span><span class="o">:</span><span class="w"> </span><span class="kt">RewardTask</span><span class="p">;</span><span class="w"> </span><span class="c1">// Links to seasonRewardsConfig</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span><span class="nx">trigger</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;account_created&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s1">&#39;first_split&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s1">&#39;first_transaction&#39;</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="s1">&#39;custom&#39;</span><span class="p">;</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">  </span><span class="nx">condition</span><span class="o">?:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">    </span><span class="nx">minSplitAmount?</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="p">;</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">    </span><span class="nx">minTransactionAmount?</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="p">;</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">    </span><span class="c1">// ... other conditions</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">  </span><span class="p">};</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">  </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">  </span><span class="nx">enabled</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span>
+<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="p">}</span>
+<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>
+<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">REFERRAL_REWARDS</span><span class="o">:</span><span class="w"> </span><span class="kt">ReferralRewardConfig</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="w">  </span><span class="p">{</span>
+<a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a><span class="w">    </span><span class="nx">rewardId</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;invite_friend_account&#39;</span><span class="p">,</span>
+<a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a><span class="w">    </span><span class="nx">taskType</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;invite_friends_create_account&#39;</span><span class="p">,</span>
+<a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a><span class="w">    </span><span class="nx">trigger</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;account_created&#39;</span><span class="p">,</span>
+<a id="__codelineno-16-19" name="__codelineno-16-19" href="#__codelineno-16-19"></a><span class="w">    </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Friend creates account&#39;</span><span class="p">,</span>
+<a id="__codelineno-16-20" name="__codelineno-16-20" href="#__codelineno-16-20"></a><span class="w">    </span><span class="nx">enabled</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span>
+<a id="__codelineno-16-21" name="__codelineno-16-21" href="#__codelineno-16-21"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-16-22" name="__codelineno-16-22" href="#__codelineno-16-22"></a><span class="w">  </span><span class="p">{</span>
+<a id="__codelineno-16-23" name="__codelineno-16-23" href="#__codelineno-16-23"></a><span class="w">    </span><span class="nx">rewardId</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;friend_first_split&#39;</span><span class="p">,</span>
+<a id="__codelineno-16-24" name="__codelineno-16-24" href="#__codelineno-16-24"></a><span class="w">    </span><span class="nx">taskType</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;friend_do_first_split_over_10&#39;</span><span class="p">,</span>
+<a id="__codelineno-16-25" name="__codelineno-16-25" href="#__codelineno-16-25"></a><span class="w">    </span><span class="nx">trigger</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;first_split&#39;</span><span class="p">,</span>
+<a id="__codelineno-16-26" name="__codelineno-16-26" href="#__codelineno-16-26"></a><span class="w">    </span><span class="nx">condition</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">minSplitAmount</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-16-27" name="__codelineno-16-27" href="#__codelineno-16-27"></a><span class="w">    </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Friend does first split &gt; $10&#39;</span><span class="p">,</span>
+<a id="__codelineno-16-28" name="__codelineno-16-28" href="#__codelineno-16-28"></a><span class="w">    </span><span class="nx">enabled</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span>
+<a id="__codelineno-16-29" name="__codelineno-16-29" href="#__codelineno-16-29"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-16-30" name="__codelineno-16-30" href="#__codelineno-16-30"></a><span class="w">  </span><span class="c1">// Easy to add new rewards here</span>
+<a id="__codelineno-16-31" name="__codelineno-16-31" href="#__codelineno-16-31"></a><span class="p">];</span>
+</code></pre></div></p>
+<hr />
+<h3 id="42-enhanced-referral-status-tracking">4.2 Enhanced Referral Status Tracking<a class="headerlink" href="#42-enhanced-referral-status-tracking" title="Permanent link">&para;</a></h3>
+<p><strong>Enhanced Referral Interface:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">export</span><span class="w"> </span><span class="kr">type</span><span class="w"> </span><span class="nx">ReferralStatus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s1">&#39;pending&#39;</span><span class="w">      </span><span class="c1">// Referral created, friend hasn&#39;t signed up</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s1">&#39;active&#39;</span><span class="w">        </span><span class="c1">// Friend signed up, working on milestones</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s1">&#39;completed&#39;</span><span class="w">     </span><span class="c1">// All rewards earned</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="s1">&#39;expired&#39;</span><span class="p">;</span><span class="w">      </span><span class="c1">// Referral expired</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="k">export</span><span class="w"> </span><span class="kd">interface</span><span class="w"> </span><span class="nx">Referral</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span><span class="nx">id</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">  </span><span class="nx">referrerId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">  </span><span class="nx">referredUserId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="w">  </span><span class="nx">referredUserName?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="w">  </span><span class="nx">createdAt</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="w">  </span><span class="nx">expiresAt?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span><span class="w"> </span><span class="c1">// Optional expiration</span>
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>
+<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a><span class="w">  </span><span class="c1">// Status tracking</span>
+<a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a><span class="w">  </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">ReferralStatus</span><span class="p">;</span>
+<a id="__codelineno-17-17" name="__codelineno-17-17" href="#__codelineno-17-17"></a>
+<a id="__codelineno-17-18" name="__codelineno-17-18" href="#__codelineno-17-18"></a><span class="w">  </span><span class="c1">// Milestone tracking</span>
+<a id="__codelineno-17-19" name="__codelineno-17-19" href="#__codelineno-17-19"></a><span class="w">  </span><span class="nx">milestones</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-17-20" name="__codelineno-17-20" href="#__codelineno-17-20"></a><span class="w">    </span><span class="nx">accountCreated</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">achieved</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span><span class="w"> </span><span class="nx">achievedAt?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-17-21" name="__codelineno-17-21" href="#__codelineno-17-21"></a><span class="w">    </span><span class="nx">firstSplit</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">achieved</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span><span class="w"> </span><span class="nx">achievedAt?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span><span class="w"> </span><span class="nx">amount?</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-17-22" name="__codelineno-17-22" href="#__codelineno-17-22"></a><span class="w">    </span><span class="nx">firstTransaction</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">achieved</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span><span class="w"> </span><span class="nx">achievedAt?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span><span class="w"> </span><span class="nx">amount?</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-17-23" name="__codelineno-17-23" href="#__codelineno-17-23"></a><span class="w">    </span><span class="c1">// Easy to add new milestones</span>
+<a id="__codelineno-17-24" name="__codelineno-17-24" href="#__codelineno-17-24"></a><span class="w">  </span><span class="p">};</span>
+<a id="__codelineno-17-25" name="__codelineno-17-25" href="#__codelineno-17-25"></a>
+<a id="__codelineno-17-26" name="__codelineno-17-26" href="#__codelineno-17-26"></a><span class="w">  </span><span class="c1">// Reward tracking</span>
+<a id="__codelineno-17-27" name="__codelineno-17-27" href="#__codelineno-17-27"></a><span class="w">  </span><span class="nx">rewardsAwarded</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-17-28" name="__codelineno-17-28" href="#__codelineno-17-28"></a><span class="w">    </span><span class="p">[</span><span class="nx">rewardId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">]</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-17-29" name="__codelineno-17-29" href="#__codelineno-17-29"></a><span class="w">      </span><span class="nx">awarded</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span>
+<a id="__codelineno-17-30" name="__codelineno-17-30" href="#__codelineno-17-30"></a><span class="w">      </span><span class="nx">awardedAt?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-17-31" name="__codelineno-17-31" href="#__codelineno-17-31"></a><span class="w">      </span><span class="nx">pointsAwarded?</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="p">;</span>
+<a id="__codelineno-17-32" name="__codelineno-17-32" href="#__codelineno-17-32"></a><span class="w">    </span><span class="p">};</span>
+<a id="__codelineno-17-33" name="__codelineno-17-33" href="#__codelineno-17-33"></a><span class="w">  </span><span class="p">};</span>
+<a id="__codelineno-17-34" name="__codelineno-17-34" href="#__codelineno-17-34"></a>
+<a id="__codelineno-17-35" name="__codelineno-17-35" href="#__codelineno-17-35"></a><span class="w">  </span><span class="c1">// Analytics</span>
+<a id="__codelineno-17-36" name="__codelineno-17-36" href="#__codelineno-17-36"></a><span class="w">  </span><span class="nx">totalPointsEarned</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="p">;</span>
+<a id="__codelineno-17-37" name="__codelineno-17-37" href="#__codelineno-17-37"></a><span class="w">  </span><span class="nx">lastActivityAt?</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<a id="__codelineno-17-38" name="__codelineno-17-38" href="#__codelineno-17-38"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h3 id="43-configurable-referral-service">4.3 Configurable Referral Service<a class="headerlink" href="#43-configurable-referral-service" title="Permanent link">&para;</a></h3>
+<p><strong>Improved Service Methods:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kd">class</span><span class="w"> </span><span class="nx">ReferralService</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="c1">// Get referral reward config</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span><span class="nx">getReferralRewardConfig</span><span class="p">(</span><span class="nx">rewardId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nx">ReferralRewardConfig</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">REFERRAL_REWARDS</span><span class="p">.</span><span class="nx">find</span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">r</span><span class="p">.</span><span class="nx">rewardId</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="nx">rewardId</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">  </span><span class="c1">// Award referral reward (config-driven)</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">  </span><span class="k">async</span><span class="w"> </span><span class="nx">awardReferralReward</span><span class="p">(</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="w">    </span><span class="nx">referrerId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="w">    </span><span class="nx">referredUserId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="w">    </span><span class="nx">rewardId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="w">  </span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="ow">void</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">getReferralRewardConfig</span><span class="p">(</span><span class="nx">rewardId</span><span class="p">);</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">config</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="nx">config</span><span class="p">.</span><span class="nx">enabled</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a><span class="w">      </span><span class="k">return</span><span class="p">;</span>
+<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a>
+<a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a><span class="w">    </span><span class="c1">// Use config to determine reward</span>
+<a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">season</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">seasonService</span><span class="p">.</span><span class="nx">getCurrentSeason</span><span class="p">();</span>
+<a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">reward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getSeasonReward</span><span class="p">(</span><span class="nx">config</span><span class="p">.</span><span class="nx">taskType</span><span class="p">,</span><span class="w"> </span><span class="nx">season</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span>
+<a id="__codelineno-18-21" name="__codelineno-18-21" href="#__codelineno-18-21"></a><span class="w">    </span><span class="c1">// ... award reward</span>
+<a id="__codelineno-18-22" name="__codelineno-18-22" href="#__codelineno-18-22"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-18-23" name="__codelineno-18-23" href="#__codelineno-18-23"></a>
+<a id="__codelineno-18-24" name="__codelineno-18-24" href="#__codelineno-18-24"></a><span class="w">  </span><span class="c1">// Update referral status</span>
+<a id="__codelineno-18-25" name="__codelineno-18-25" href="#__codelineno-18-25"></a><span class="w">  </span><span class="k">async</span><span class="w"> </span><span class="nx">updateReferralStatus</span><span class="p">(</span>
+<a id="__codelineno-18-26" name="__codelineno-18-26" href="#__codelineno-18-26"></a><span class="w">    </span><span class="nx">referrerId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<a id="__codelineno-18-27" name="__codelineno-18-27" href="#__codelineno-18-27"></a><span class="w">    </span><span class="nx">referredUserId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
+<a id="__codelineno-18-28" name="__codelineno-18-28" href="#__codelineno-18-28"></a><span class="w">  </span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="ow">void</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-29" name="__codelineno-18-29" href="#__codelineno-18-29"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">referral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">getReferral</span><span class="p">(</span><span class="nx">referrerId</span><span class="p">,</span><span class="w"> </span><span class="nx">referredUserId</span><span class="p">);</span>
+<a id="__codelineno-18-30" name="__codelineno-18-30" href="#__codelineno-18-30"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">referral</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+<a id="__codelineno-18-31" name="__codelineno-18-31" href="#__codelineno-18-31"></a>
+<a id="__codelineno-18-32" name="__codelineno-18-32" href="#__codelineno-18-32"></a><span class="w">    </span><span class="c1">// Calculate status based on milestones</span>
+<a id="__codelineno-18-33" name="__codelineno-18-33" href="#__codelineno-18-33"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="kt">ReferralStatus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;pending&#39;</span><span class="p">;</span>
+<a id="__codelineno-18-34" name="__codelineno-18-34" href="#__codelineno-18-34"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">referral</span><span class="p">.</span><span class="nx">milestones</span><span class="p">.</span><span class="nx">accountCreated</span><span class="p">.</span><span class="nx">achieved</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-35" name="__codelineno-18-35" href="#__codelineno-18-35"></a><span class="w">      </span><span class="nx">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;active&#39;</span><span class="p">;</span>
+<a id="__codelineno-18-36" name="__codelineno-18-36" href="#__codelineno-18-36"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-18-37" name="__codelineno-18-37" href="#__codelineno-18-37"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="cm">/* all rewards earned */</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-18-38" name="__codelineno-18-38" href="#__codelineno-18-38"></a><span class="w">      </span><span class="nx">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;completed&#39;</span><span class="p">;</span>
+<a id="__codelineno-18-39" name="__codelineno-18-39" href="#__codelineno-18-39"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-18-40" name="__codelineno-18-40" href="#__codelineno-18-40"></a>
+<a id="__codelineno-18-41" name="__codelineno-18-41" href="#__codelineno-18-41"></a><span class="w">    </span><span class="c1">// Update status</span>
+<a id="__codelineno-18-42" name="__codelineno-18-42" href="#__codelineno-18-42"></a><span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">updateReferral</span><span class="p">(</span><span class="nx">referrerId</span><span class="p">,</span><span class="w"> </span><span class="nx">referredUserId</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">status</span><span class="w"> </span><span class="p">});</span>
+<a id="__codelineno-18-43" name="__codelineno-18-43" href="#__codelineno-18-43"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-18-44" name="__codelineno-18-44" href="#__codelineno-18-44"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h2 id="5-implementation-status">5. Implementation Status<a class="headerlink" href="#5-implementation-status" title="Permanent link">&para;</a></h2>
+<h3 id="51-create-referral-configuration-implemented">5.1 Create Referral Configuration ✅ IMPLEMENTED<a class="headerlink" href="#51-create-referral-configuration-implemented" title="Permanent link">&para;</a></h3>
+<p><strong>Status:</strong> ✅ <strong>COMPLETED</strong></p>
+<p><strong>Implementation:</strong>
+1. ✅ Created <code>src/services/rewards/referralConfig.ts</code>
+2. ✅ Defined <code>ReferralRewardConfig</code> interface
+3. ✅ Created <code>REFERRAL_REWARDS</code> array with current rewards
+4. ✅ Updated <code>referralService.ts</code> to use config
+5. ✅ Added helper functions: <code>getReferralRewardConfig()</code>, <code>getReferralRewardsByTrigger()</code>, <code>getAllReferralRewards()</code></p>
+<p><strong>Benefits:</strong>
+- ✅ Easy to add new referral rewards (just add to config array)
+- ✅ Easy to enable/disable rewards
+- ✅ Centralized configuration
+- ✅ Clear separation of concerns</p>
+<hr />
+<h3 id="52-enhance-referral-status-tracking-implemented">5.2 Enhance Referral Status Tracking ✅ IMPLEMENTED<a class="headerlink" href="#52-enhance-referral-status-tracking-implemented" title="Permanent link">&para;</a></h3>
+<p><strong>Status:</strong> ✅ <strong>COMPLETED</strong></p>
+<p><strong>Implementation:</strong>
+1. ✅ Updated <code>Referral</code> interface with enhanced status fields
+2. ✅ Added <code>ReferralStatus</code> type (pending, active, completed, expired)
+3. ✅ Added <code>ReferralMilestone</code> interface for milestone tracking
+4. ✅ Added <code>ReferralRewardTracking</code> interface for enhanced reward tracking
+5. ✅ Updated referral service to track status automatically
+6. ✅ Added <code>updateReferralStatus()</code> method
+7. ✅ Added <code>updateReferralMilestone()</code> method
+8. ✅ Added <code>updateReferralRewardEnhanced()</code> method
+9. ✅ Backward compatibility maintained (legacy fields still supported)</p>
+<p><strong>New Status Fields:</strong>
+- ✅ <code>status: ReferralStatus</code> - Overall referral status
+- ✅ <code>milestones</code> - Comprehensive milestone tracking
+- ✅ <code>rewardsAwarded</code> - Enhanced reward tracking with points and season
+- ✅ <code>totalPointsEarned</code> - Total points earned from referrals
+- ✅ <code>lastActivityAt</code> - Last activity timestamp</p>
+<p><strong>Benefits:</strong>
+- ✅ Better user experience (can see referral status)
+- ✅ Better analytics (milestone tracking, points tracking)
+- ✅ Better referral management
+- ✅ Easy to extend with new milestones</p>
+<hr />
+<h3 id="53-clean-up-quest-definitions-minor">5.3 Clean Up Quest Definitions ⚠️ MINOR<a class="headerlink" href="#53-clean-up-quest-definitions-minor" title="Permanent link">&para;</a></h3>
+<p><strong>Issue:</strong>
+- Hardcoded point values in <code>QUEST_DEFINITIONS</code> (lines 74, 82, 90, 98, 106, 114)
+- Values marked as "Will be updated based on season"
+- Not actually used (season-based logic used instead)</p>
+<p><strong>Fix:</strong>
+- Remove hardcoded values or set to 0
+- Add comment explaining values are dynamic
+- Or calculate dynamically when needed</p>
+<p><strong>Priority:</strong> 🟢 <strong>LOW</strong> - Cosmetic, doesn't affect functionality</p>
+<hr />
+<h2 id="6-verification-checklist">6. Verification Checklist<a class="headerlink" href="#6-verification-checklist" title="Permanent link">&para;</a></h2>
+<h3 id="61-season-logic">6.1 Season Logic ✅<a class="headerlink" href="#61-season-logic" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] All services use <code>seasonService.getCurrentSeason()</code></li>
+<li>[x] No hardcoded season values</li>
+<li>[x] Single source of truth for season determination</li>
+<li>[x] Season config centralized in <code>seasonService.ts</code></li>
+<li>[x] All reward lookups use season parameter</li>
+</ul>
+<hr />
+<h3 id="62-partnership-logic">6.2 Partnership Logic ✅<a class="headerlink" href="#62-partnership-logic" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] All services check <code>user.is_partnership</code></li>
+<li>[x] Partnership rewards centralized in <code>PARTNERSHIP_REWARDS</code></li>
+<li>[x] Partnership logic in <code>getSeasonReward()</code> function</li>
+<li>[x] No hardcoded partnership percentages</li>
+<li>[x] Partnership task list centralized</li>
+<li>[x] All reward lookups pass <code>isPartnership</code> parameter</li>
+</ul>
+<hr />
+<h3 id="63-referral-system">6.3 Referral System ✅<a class="headerlink" href="#63-referral-system" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Referral rewards centralized in <code>seasonRewardsConfig.ts</code></li>
+<li>[x] Referral service functional</li>
+<li>[x] Duplicate prevention working</li>
+<li>[x] <strong>Referral configuration file</strong> ✅ <strong>IMPLEMENTED</strong> (<code>referralConfig.ts</code>)</li>
+<li>[x] <strong>Enhanced status tracking</strong> ✅ <strong>IMPLEMENTED</strong> (status, milestones, analytics)</li>
+<li>[x] <strong>Configurable reward system</strong> ✅ <strong>IMPLEMENTED</strong> (config-driven rewards)</li>
+</ul>
+<hr />
+<h2 id="7-summary">7. Summary<a class="headerlink" href="#7-summary" title="Permanent link">&para;</a></h2>
+<h3 id="season-logic-properly-shared">Season Logic: ✅ <strong>Properly Shared</strong><a class="headerlink" href="#season-logic-properly-shared" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Single source of truth (<code>seasonService.ts</code>)</li>
+<li>✅ Consistent usage across codebase</li>
+<li>✅ No hardcoded seasons</li>
+<li>✅ All services use same pattern</li>
+</ul>
+<h3 id="partnership-percentages-properly-shared">Partnership Percentages: ✅ <strong>Properly Shared</strong><a class="headerlink" href="#partnership-percentages-properly-shared" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Centralized in <code>PARTNERSHIP_REWARDS</code></li>
+<li>✅ Automatic application via <code>getSeasonReward()</code></li>
+<li>✅ Consistent usage across codebase</li>
+<li>✅ No hardcoded percentages</li>
+</ul>
+<h3 id="referral-system-enhanced-and-maintainable">Referral System: ✅ <strong>Enhanced and Maintainable</strong><a class="headerlink" href="#referral-system-enhanced-and-maintainable" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ Functional and working</li>
+<li>✅ Rewards centralized (in seasonRewardsConfig)</li>
+<li>✅ <strong>Dedicated referral configuration file</strong> (<code>referralConfig.ts</code>) ✅ <strong>IMPLEMENTED</strong></li>
+<li>✅ <strong>Enhanced status tracking</strong> (status, milestones, analytics) ✅ <strong>IMPLEMENTED</strong></li>
+<li>✅ <strong>Easy to add new referral rewards</strong> (config-driven) ✅ <strong>IMPLEMENTED</strong></li>
+</ul>
+<hr />
+<h2 id="8-implementation-summary">8. Implementation Summary<a class="headerlink" href="#8-implementation-summary" title="Permanent link">&para;</a></h2>
+<h3 id="81-referral-configuration-implemented">8.1 Referral Configuration ✅ IMPLEMENTED<a class="headerlink" href="#81-referral-configuration-implemented" title="Permanent link">&para;</a></h3>
+<p><strong>File Created:</strong> <code>src/services/rewards/referralConfig.ts</code></p>
+<p><strong>Features:</strong>
+- ✅ Centralized referral reward definitions
+- ✅ Easy to add new rewards (just add to array)
+- ✅ Enable/disable rewards via <code>enabled</code> flag
+- ✅ Configurable conditions (min amounts, etc.)
+- ✅ Priority system for multiple rewards
+- ✅ Helper functions for easy access</p>
+<p><strong>How to Add New Referral Reward:</strong>
+1. Add reward task to <code>seasonRewardsConfig.ts</code> (if new task type)
+2. Add reward config to <code>REFERRAL_REWARDS</code> array in <code>referralConfig.ts</code>
+3. Update <code>referralService.ts</code> to handle new trigger (if new trigger type)
+4. Done! Reward is now configurable and maintainable</p>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1">// In referralConfig.ts</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="p">{</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="nx">rewardId</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;friend_first_transaction&#39;</span><span class="p">,</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">  </span><span class="nx">taskType</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;friend_first_transaction&#39;</span><span class="p">,</span><span class="w"> </span><span class="c1">// Add to seasonRewardsConfig.ts first</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">  </span><span class="nx">trigger</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;first_transaction&#39;</span><span class="p">,</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">  </span><span class="nx">condition</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">    </span><span class="nx">minTransactionAmount</span><span class="o">:</span><span class="w"> </span><span class="kt">5</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">  </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Friend does first transaction &gt; $5&#39;</span><span class="p">,</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">  </span><span class="nx">enabled</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="p">,</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">  </span><span class="nx">priority</span><span class="o">:</span><span class="w"> </span><span class="kt">3</span>
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="p">}</span>
+</code></pre></div></p>
+<hr />
+<h3 id="82-enhanced-status-tracking-implemented">8.2 Enhanced Status Tracking ✅ IMPLEMENTED<a class="headerlink" href="#82-enhanced-status-tracking-implemented" title="Permanent link">&para;</a></h3>
+<p><strong>Enhanced Features:</strong>
+- ✅ <code>ReferralStatus</code> enum (pending, active, completed, expired)
+- ✅ Milestone tracking (accountCreated, firstSplit, firstTransaction)
+- ✅ Enhanced reward tracking (points, season, timestamps)
+- ✅ Analytics fields (totalPointsEarned, lastActivityAt)
+- ✅ Automatic status calculation
+- ✅ Backward compatibility (legacy fields maintained)</p>
+<p><strong>Status Calculation:</strong>
+- <code>pending</code> - Referral created, friend hasn't signed up
+- <code>active</code> - Friend signed up, working on milestones
+- <code>completed</code> - All enabled rewards earned
+- <code>expired</code> - Referral expired (if expiration implemented)</p>
+<p><strong>Milestone Tracking:</strong>
+- <code>accountCreated</code> - Friend creates account
+- <code>firstSplit</code> - Friend does first split (with amount)
+- <code>firstTransaction</code> - Friend does first transaction (optional, for future)</p>
+<p><strong>Reward Tracking:</strong>
+- Enhanced tracking with points awarded, season, timestamps
+- Legacy boolean flags maintained for backward compatibility
+- Total points earned calculated automatically</p>
+<hr />
+<h3 id="priority-3-clean-up-quest-definitions">Priority 3: Clean Up Quest Definitions 🟢<a class="headerlink" href="#priority-3-clean-up-quest-definitions" title="Permanent link">&para;</a></h3>
+<p><strong>Action:</strong>
+- Remove or update hardcoded point values in <code>QUEST_DEFINITIONS</code>
+- Add comments explaining dynamic nature</p>
+<p><strong>Benefits:</strong>
+- Cleaner code
+- Less confusion</p>
+<hr />
+<p><strong>Overall Status:</strong> ✅ <strong>Production Ready</strong> (all enhancements implemented)</p>
+<p><strong>The season logic and partnership percentages are properly shared across the codebase. The referral system has been enhanced with centralized configuration and comprehensive status tracking for better maintainability and future extensibility.</strong></p>
+<hr />
+<h2 id="9-files-createdmodified">9. Files Created/Modified<a class="headerlink" href="#9-files-createdmodified" title="Permanent link">&para;</a></h2>
+<h3 id="new-files-created">New Files Created ✅<a class="headerlink" href="#new-files-created" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong><code>src/services/rewards/referralConfig.ts</code></strong> - Centralized referral reward configuration</li>
+<li><code>ReferralRewardConfig</code> interface</li>
+<li><code>REFERRAL_REWARDS</code> array</li>
+<li>Helper functions for easy access</li>
+</ol>
+<h3 id="files-modified">Files Modified ✅<a class="headerlink" href="#files-modified" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong><code>src/services/rewards/referralService.ts</code></strong> - Enhanced with:</li>
+<li>Referral configuration integration</li>
+<li>Enhanced status tracking</li>
+<li>Milestone tracking</li>
+<li>Analytics fields</li>
+<li>Backward compatibility maintained</li>
+</ol>
+<hr />
+<h2 id="10-how-to-add-new-referral-rewards">10. How to Add New Referral Rewards<a class="headerlink" href="#10-how-to-add-new-referral-rewards" title="Permanent link">&para;</a></h2>
+<h3 id="step-by-step-guide">Step-by-Step Guide<a class="headerlink" href="#step-by-step-guide" title="Permanent link">&para;</a></h3>
+<p><strong>Example: Add "Friend First Transaction" Reward</strong></p>
+<ol>
+<li>
+<p><strong>Add Task to Season Rewards Config:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1">// In src/services/rewards/seasonRewardsConfig.ts</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="nx">friend_first_transaction</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">  </span><span class="mf">1</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">200</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">  </span><span class="mf">2</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fixed&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">200</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">  </span><span class="c1">// ... other seasons</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Add Reward Config:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1">// In src/services/rewards/referralConfig.ts</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="p">{</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span><span class="nx">rewardId</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;friend_first_transaction&#39;</span><span class="p">,</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span><span class="nx">taskType</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;friend_first_transaction&#39;</span><span class="p">,</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span><span class="nx">trigger</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;first_transaction&#39;</span><span class="p">,</span>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">  </span><span class="nx">condition</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="w">    </span><span class="nx">minTransactionAmount</span><span class="o">:</span><span class="w"> </span><span class="kt">5</span>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a><span class="w">  </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Friend does first transaction &gt; $5&#39;</span><span class="p">,</span>
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="w">  </span><span class="nx">enabled</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="p">,</span>
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a><span class="w">  </span><span class="nx">priority</span><span class="o">:</span><span class="w"> </span><span class="kt">3</span>
+<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Add Trigger Handler (if new trigger type):</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1">// In src/services/rewards/referralService.ts</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="k">async</span><span class="w"> </span><span class="nx">awardFriendFirstTransactionReward</span><span class="p">(</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">  </span><span class="nx">referrerId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">  </span><span class="nx">referredUserId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="w">  </span><span class="nx">transactionAmount</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="ow">void</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">rewardConfig</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">getReferralRewardConfig</span><span class="p">(</span><span class="s1">&#39;friend_first_transaction&#39;</span><span class="p">);</span>
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="w">  </span><span class="c1">// ... implement reward logic</span>
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Call from Appropriate Location:</strong>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1">// When friend does first transaction</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">user</span><span class="p">.</span><span class="nx">referred_by</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="k">await</span><span class="w"> </span><span class="nx">referralService</span><span class="p">.</span><span class="nx">awardFriendFirstTransactionReward</span><span class="p">(</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">    </span><span class="nx">user</span><span class="p">.</span><span class="nx">referred_by</span><span class="p">,</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">    </span><span class="nx">userId</span><span class="p">,</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">    </span><span class="nx">transactionAmount</span>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="w">  </span><span class="p">);</span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="p">}</span>
+</code></pre></div></p>
+</li>
+</ol>
+<p><strong>That's it!</strong> The reward is now configurable and maintainable.</p>
+<hr />
+<p><strong>Audit Complete</strong> ✅<br />
+<strong>Date:</strong> 2024-12-19<br />
+<strong>Status:</strong> Production Ready (all enhancements implemented)</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 14, 2026 11:39:08 UTC">January 14, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

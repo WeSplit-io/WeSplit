@@ -1,0 +1,2001 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="WeSplit - Split expenses socially, settle instantly with crypto">
+      
+      
+        <meta name="author" content="WeSplit Team">
+      
+      
+        <link rel="canonical" href="https://YOUR_USERNAME.github.io/WeSplit/guides/REFERRAL_SYSTEM_TESTING_GUIDE/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Referral System Testing Guide - WeSplit Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#referral-system-testing-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="WeSplit Documentation" class="md-header__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WeSplit Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Referral System Testing Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="dark" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-tabs__link">
+          
+  
+  
+  Corbits Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../AUTH_CONFIG_STATUS/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../BADGE_SETUP_SUMMARY/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../QUICK_TEST_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="WeSplit Documentation" class="md-nav__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WeSplit Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corbits Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Corbits Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CORBITS_X402_INTEGRATION_PLAN.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../AUTH_CONFIG_STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../PHANTOM_INTEGRATION_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phantom Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../BADGE_SETUP_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Badges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../REFERRAL_SYSTEM_COMPLETE.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referrals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../QUICK_TEST_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Test Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../LOCAL_BUILD_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-code-generation-storage-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Code Generation &amp; Storage Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Code Generation &amp; Storage Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-11-new-user-gets-referral-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 1.1: New User Gets Referral Code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-12-existing-user-keeps-same-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 1.2: Existing User Keeps Same Code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-13-code-uniqueness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 1.3: Code Uniqueness
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-deep-link-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Deep Link Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Deep Link Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-21-universal-link-opens-app-not-logged-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 2.1: Universal Link Opens App (Not Logged In)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-22-universal-link-opens-app-already-logged-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 2.2: Universal Link Opens App (Already Logged In)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-23-app-scheme-link" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 2.3: App-Scheme Link
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-code-input-validation-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Code Input &amp; Validation Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Code Input &amp; Validation Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-31-valid-code-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 3.1: Valid Code Entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-32-invalid-code-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 3.2: Invalid Code Entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-33-code-too-short" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 3.3: Code Too Short
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-34-self-referral-prevention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 3.4: Self-Referral Prevention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-35-rate-limiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 3.5: Rate Limiting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-referral-tracking-rewards-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Referral Tracking &amp; Rewards Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Referral Tracking &amp; Rewards Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-41-happy-path-referral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 4.1: Happy Path Referral
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-42-idempotency-duplicate-prevention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 4.2: Idempotency (Duplicate Prevention)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-43-transaction-atomicity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 4.3: Transaction Atomicity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-44-first-split-reward" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 4.4: First Split Reward
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-45-first-split-reward-not-duplicated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 4.5: First Split Reward Not Duplicated
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-sharing-qr-code-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Sharing &amp; QR Code Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Sharing &amp; QR Code Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-51-share-message-contains-deep-link" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 5.1: Share Message Contains Deep Link
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-52-qr-code-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 5.2: QR Code Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-53-qr-code-scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 5.3: QR Code Scanning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-error-handling-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Error Handling Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Error Handling Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-61-network-failure-during-referral-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 6.1: Network Failure During Referral Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-62-invalid-code-during-profile-creation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 6.2: Invalid Code During Profile Creation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-edge-cases-security-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Edge Cases &amp; Security Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Edge Cases &amp; Security Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-71-code-enumeration-prevention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 7.1: Code Enumeration Prevention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-72-case-sensitivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 7.2: Case Sensitivity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-73-special-characters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 7.3: Special Characters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Integration Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Integration Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-81-complete-end-to-end-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 8.1: Complete End-to-End Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-82-multiple-simultaneous-referrals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 8.2: Multiple Simultaneous Referrals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-performance-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Performance Tests
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Performance Tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-91-code-validation-response-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 9.1: Code Validation Response Time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test-92-transaction-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test 9.2: Transaction Performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-manual-testing-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Manual Testing Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-automated-test-script-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Automated Test Script (Optional)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-common-issues-troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Common Issues &amp; Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. Common Issues &amp; Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issue-referral-code-not-applying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue: Referral code not applying
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-rate-limit-errors-during-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue: Rate limit errors during testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-duplicate-referral-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue: Duplicate referral records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-rewards-not-awarded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue: Rewards not awarded
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conclusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="referral-system-testing-guide">Referral System Testing Guide<a class="headerlink" href="#referral-system-testing-guide" title="Permanent link">&para;</a></h1>
+<p><strong>Date:</strong> 2025-01-27<br />
+<strong>Status:</strong> Complete Testing Checklist<br />
+<strong>Purpose:</strong> Comprehensive end-to-end testing for the referral code system</p>
+<hr />
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>This guide provides step-by-step testing procedures to verify all aspects of the referral code system work correctly, including:
+- Code generation and uniqueness
+- Deep link handling
+- Self-referral prevention
+- Rate limiting
+- Transaction atomicity
+- QR code generation
+- Reward awarding</p>
+<hr />
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Test Accounts</strong>: Have at least 2-3 test accounts ready</li>
+<li><strong>Firebase Console Access</strong>: To verify Firestore data</li>
+<li><strong>Device with App Installed</strong>: For deep link testing</li>
+<li><strong>Development Logs</strong>: Enable logging to see detailed flow</li>
+</ol>
+<hr />
+<h2 id="1-code-generation-storage-tests">1. Code Generation &amp; Storage Tests<a class="headerlink" href="#1-code-generation-storage-tests" title="Permanent link">&para;</a></h2>
+<h3 id="test-11-new-user-gets-referral-code">Test 1.1: New User Gets Referral Code<a class="headerlink" href="#test-11-new-user-gets-referral-code" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Create a new user account (phone or email)
+2. Complete onboarding
+3. Navigate to Referral screen</p>
+<p><strong>Expected Results:</strong>
+- ✅ User has a <code>referral_code</code> field in Firestore (<code>users/{userId}</code>)
+- ✅ Code is 8-12 characters, uppercase
+- ✅ Code is displayed in ReferralScreen
+- ✅ Code persists across app restarts</p>
+<p><strong>Verification:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># In Firebase Console or via script</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># Check: users/{userId}.referral_code exists and is valid</span>
+</code></pre></div></p>
+<h3 id="test-12-existing-user-keeps-same-code">Test 1.2: Existing User Keeps Same Code<a class="headerlink" href="#test-12-existing-user-keeps-same-code" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Open ReferralScreen for existing user
+2. Note the referral code
+3. Close and reopen ReferralScreen
+4. Check code again</p>
+<p><strong>Expected Results:</strong>
+- ✅ Same referral code is displayed
+- ✅ No new code generated
+- ✅ No duplicate codes in Firestore</p>
+<p><strong>Verification:</strong>
+- Code should match exactly
+- Check Firestore: only one <code>referral_code</code> value for this user</p>
+<h3 id="test-13-code-uniqueness">Test 1.3: Code Uniqueness<a class="headerlink" href="#test-13-code-uniqueness" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Create 10+ new users rapidly
+2. Check all referral codes in Firestore</p>
+<p><strong>Expected Results:</strong>
+- ✅ All codes are unique (no duplicates)
+- ✅ All codes are valid format (8-12 chars, uppercase)</p>
+<p><strong>Verification:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// Query Firestore</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">users</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">collection</span><span class="p">(</span><span class="s1">&#39;users&#39;</span><span class="p">).</span><span class="nx">get</span><span class="p">();</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">codes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">users</span><span class="p">.</span><span class="nx">docs</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">d</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">d</span><span class="p">.</span><span class="nx">data</span><span class="p">().</span><span class="nx">referral_code</span><span class="p">).</span><span class="nx">filter</span><span class="p">(</span><span class="nb">Boolean</span><span class="p">);</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kd">const</span><span class="w"> </span><span class="nx">uniqueCodes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Set</span><span class="p">(</span><span class="nx">codes</span><span class="p">);</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nx">console</span><span class="p">.</span><span class="nx">assert</span><span class="p">(</span><span class="nx">codes</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="nx">uniqueCodes</span><span class="p">.</span><span class="nx">size</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Duplicate codes found!&#39;</span><span class="p">);</span>
+</code></pre></div></p>
+<hr />
+<h2 id="2-deep-link-tests">2. Deep Link Tests<a class="headerlink" href="#2-deep-link-tests" title="Permanent link">&para;</a></h2>
+<h3 id="test-21-universal-link-opens-app-not-logged-in">Test 2.1: Universal Link Opens App (Not Logged In)<a class="headerlink" href="#test-21-universal-link-opens-app-not-logged-in" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Log out of app (or use fresh install)
+2. Share referral link: <code>https://wesplit-deeplinks.web.app/referral?code=TESTCODE123</code>
+3. Open link on device with app installed</p>
+<p><strong>Expected Results:</strong>
+- ✅ App opens automatically
+- ✅ Navigates to <code>AuthMethods</code> screen
+- ✅ After authentication, <code>CreateProfileScreen</code> shows referral modal
+- ✅ Referral code is pre-filled and validated</p>
+<p><strong>Verification:</strong>
+- Check logs for: "Received referral deep link for unauthenticated user"
+- Verify <code>route.params.referralCode</code> is set</p>
+<h3 id="test-22-universal-link-opens-app-already-logged-in">Test 2.2: Universal Link Opens App (Already Logged In)<a class="headerlink" href="#test-22-universal-link-opens-app-already-logged-in" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Log into app with existing account
+2. Open referral link: <code>https://wesplit-deeplinks.web.app/referral?code=SOMEONEELSESCODE</code>
+3. Observe behavior</p>
+<p><strong>Expected Results:</strong>
+- ✅ App opens
+- ✅ Shows informational alert: "Referral codes are applied when creating a new account..."
+- ✅ No referral is applied to existing account</p>
+<p><strong>Verification:</strong>
+- Check logs for: "Referral deep link opened by already-authenticated user"
+- Verify no <code>referred_by</code> field is changed for existing user</p>
+<h3 id="test-23-app-scheme-link">Test 2.3: App-Scheme Link<a class="headerlink" href="#test-23-app-scheme-link" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Log out of app
+2. Open: <code>wesplit://referral/TESTCODE123</code> (via URL scheme handler or test tool)
+3. Complete onboarding</p>
+<p><strong>Expected Results:</strong>
+- ✅ Same behavior as universal link
+- ✅ Referral code is applied during signup</p>
+<hr />
+<h2 id="3-code-input-validation-tests">3. Code Input &amp; Validation Tests<a class="headerlink" href="#3-code-input-validation-tests" title="Permanent link">&para;</a></h2>
+<h3 id="test-31-valid-code-entry">Test 3.1: Valid Code Entry<a class="headerlink" href="#test-31-valid-code-entry" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Start new account creation
+2. When asked "Do you have a referral code?", select "Yes"
+3. Enter a valid referral code (from another test user)
+4. Wait for validation</p>
+<p><strong>Expected Results:</strong>
+- ✅ Green checkmark appears after validation
+- ✅ "Valid referral code" message shown
+- ✅ Continue button is enabled
+- ✅ Code is normalized (uppercase, no spaces)</p>
+<p><strong>Verification:</strong>
+- Check validation state: <code>isValid === true</code>
+- Check logs: "Referral code validated successfully"</p>
+<h3 id="test-32-invalid-code-entry">Test 3.2: Invalid Code Entry<a class="headerlink" href="#test-32-invalid-code-entry" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Start new account creation
+2. Enter invalid code: <code>INVALID123</code>
+3. Wait for validation</p>
+<p><strong>Expected Results:</strong>
+- ✅ Red X icon appears
+- ✅ Error message: "Referral code not found. Please check and try again."
+- ✅ Continue button is disabled</p>
+<p><strong>Verification:</strong>
+- Check validation state: <code>isValid === false</code>
+- Check logs: "Referral code not found"</p>
+<h3 id="test-33-code-too-short">Test 3.3: Code Too Short<a class="headerlink" href="#test-33-code-too-short" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Enter code with &lt; 8 characters: <code>SHORT</code>
+2. Observe validation</p>
+<p><strong>Expected Results:</strong>
+- ✅ Immediate error: "Referral code must be at least 8 characters"
+- ✅ No API call made (client-side validation)</p>
+<h3 id="test-34-self-referral-prevention">Test 3.4: Self-Referral Prevention<a class="headerlink" href="#test-34-self-referral-prevention" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Get User A's referral code
+2. Start creating account for User A (same user)
+3. Try to enter User A's own referral code</p>
+<p><strong>Expected Results:</strong>
+- ✅ Code validation may pass (code exists)
+- ✅ But during <code>trackReferral()</code>, self-referral is blocked
+- ✅ No referral record created with <code>referrerId === referredUserId</code>
+- ✅ Logs show: "Self-referral attempt blocked"</p>
+<p><strong>Verification:</strong>
+- Check Firestore: No referral document where <code>referrerId === referredUserId</code>
+- Check logs for self-referral warning</p>
+<h3 id="test-35-rate-limiting">Test 3.5: Rate Limiting<a class="headerlink" href="#test-35-rate-limiting" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Rapidly validate 30+ different referral codes (or same code 30+ times)
+2. Observe behavior</p>
+<p><strong>Expected Results:</strong>
+- ✅ First 30 requests succeed
+- ✅ 31st request fails with: "Too many referral code lookups. Please wait X minutes."
+- ✅ After 15 minutes, rate limit resets</p>
+<p><strong>Verification:</strong>
+- Check logs for rate limit warnings
+- Verify rate limit is per-user (if userId provided) or per-session</p>
+<hr />
+<h2 id="4-referral-tracking-rewards-tests">4. Referral Tracking &amp; Rewards Tests<a class="headerlink" href="#4-referral-tracking-rewards-tests" title="Permanent link">&para;</a></h2>
+<h3 id="test-41-happy-path-referral">Test 4.1: Happy Path Referral<a class="headerlink" href="#test-41-happy-path-referral" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. User A has referral code: <code>REFCODE123</code>
+2. User B signs up using <code>REFCODE123</code>
+3. User B completes profile creation</p>
+<p><strong>Expected Results:</strong>
+- ✅ Firestore <code>users/B.referred_by === A.id</code>
+- ✅ Firestore <code>referrals</code> collection has document:
+  - <code>referrerId === A.id</code>
+  - <code>referredUserId === B.id</code>
+  - <code>status === 'active'</code>
+  - <code>milestones.accountCreated.achieved === true</code>
+- ✅ User A receives points (check points balance increased)
+- ✅ Logs show: "Referral tracked successfully"</p>
+<p><strong>Verification:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// In Firebase Console or script</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">referral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">collection</span><span class="p">(</span><span class="s1">&#39;referrals&#39;</span><span class="p">)</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="p">.</span><span class="nx">where</span><span class="p">(</span><span class="s1">&#39;referrerId&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;==&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;userA_id&#39;</span><span class="p">)</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="p">.</span><span class="nx">where</span><span class="p">(</span><span class="s1">&#39;referredUserId&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;==&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;userB_id&#39;</span><span class="p">)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="p">.</span><span class="nx">get</span><span class="p">();</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nx">console</span><span class="p">.</span><span class="nx">assert</span><span class="p">(</span><span class="o">!</span><span class="nx">referral</span><span class="p">.</span><span class="nx">empty</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Referral record should exist&#39;</span><span class="p">);</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="nx">console</span><span class="p">.</span><span class="nx">assert</span><span class="p">(</span><span class="nx">userB</span><span class="p">.</span><span class="nx">referred_by</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s1">&#39;userA_id&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;referred_by should be set&#39;</span><span class="p">);</span>
+</code></pre></div></p>
+<h3 id="test-42-idempotency-duplicate-prevention">Test 4.2: Idempotency (Duplicate Prevention)<a class="headerlink" href="#test-42-idempotency-duplicate-prevention" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. User B signs up with User A's code (creates referral)
+2. Manually call <code>trackReferral(B.id, A_code)</code> again (via script or debug)
+3. Check Firestore</p>
+<p><strong>Expected Results:</strong>
+- ✅ Only ONE referral document exists for (A → B)
+- ✅ No duplicate referral records
+- ✅ <code>referred_by</code> is still set correctly
+- ✅ Points are NOT awarded twice
+- ✅ Logs show: "Referral already exists between users, skipping duplicate creation"</p>
+<p><strong>Verification:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">referrals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">collection</span><span class="p">(</span><span class="s1">&#39;referrals&#39;</span><span class="p">)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p">.</span><span class="nx">where</span><span class="p">(</span><span class="s1">&#39;referrerId&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;==&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;userA_id&#39;</span><span class="p">)</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p">.</span><span class="nx">where</span><span class="p">(</span><span class="s1">&#39;referredUserId&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;==&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;userB_id&#39;</span><span class="p">)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="p">.</span><span class="nx">get</span><span class="p">();</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nx">console</span><span class="p">.</span><span class="nx">assert</span><span class="p">(</span><span class="nx">referrals</span><span class="p">.</span><span class="nx">size</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Should have exactly one referral record&#39;</span><span class="p">);</span>
+</code></pre></div></p>
+<h3 id="test-43-transaction-atomicity">Test 4.3: Transaction Atomicity<a class="headerlink" href="#test-43-transaction-atomicity" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Simulate network failure during referral creation
+2. Check Firestore state</p>
+<p><strong>Expected Results:</strong>
+- ✅ Either BOTH referral record AND <code>referred_by</code> are set, OR NEITHER is set
+- ✅ No partial state where referral exists but <code>referred_by</code> is missing (or vice versa)</p>
+<p><strong>Verification:</strong>
+- This is hard to test manually, but transaction ensures atomicity
+- Check logs for transaction success/failure</p>
+<h3 id="test-44-first-split-reward">Test 4.4: First Split Reward<a class="headerlink" href="#test-44-first-split-reward" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. User B (referred by A) creates a split &gt; $10
+2. User B completes the split (pays their portion)
+3. Check rewards</p>
+<p><strong>Expected Results:</strong>
+- ✅ User A receives first split referral reward points
+- ✅ Firestore referral document updated:
+  - <code>milestones.firstSplit.achieved === true</code>
+  - <code>rewardsAwarded.firstSplitOver10 === true</code>
+  - <code>status === 'completed'</code> (if all rewards awarded)
+- ✅ Logs show: "Friend first split reward awarded"</p>
+<p><strong>Verification:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">referral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getReferral</span><span class="p">(</span><span class="s1">&#39;userA_id&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;userB_id&#39;</span><span class="p">);</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nx">console</span><span class="p">.</span><span class="nx">assert</span><span class="p">(</span><span class="nx">referral</span><span class="p">.</span><span class="nx">milestones</span><span class="p">.</span><span class="nx">firstSplit</span><span class="p">.</span><span class="nx">achieved</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nx">console</span><span class="p">.</span><span class="nx">assert</span><span class="p">(</span><span class="nx">referral</span><span class="p">.</span><span class="nx">rewardsAwarded</span><span class="p">.</span><span class="nx">firstSplitOver10</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span>
+</code></pre></div></p>
+<h3 id="test-45-first-split-reward-not-duplicated">Test 4.5: First Split Reward Not Duplicated<a class="headerlink" href="#test-45-first-split-reward-not-duplicated" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. User B completes first split &gt; $10 (reward awarded to A)
+2. User B completes second split &gt; $10
+3. Check rewards</p>
+<p><strong>Expected Results:</strong>
+- ✅ User A receives reward ONLY for first split
+- ✅ Second split does NOT trigger additional reward
+- ✅ Logs show: "Friend first split reward already awarded"</p>
+<hr />
+<h2 id="5-sharing-qr-code-tests">5. Sharing &amp; QR Code Tests<a class="headerlink" href="#5-sharing-qr-code-tests" title="Permanent link">&para;</a></h2>
+<h3 id="test-51-share-message-contains-deep-link">Test 5.1: Share Message Contains Deep Link<a class="headerlink" href="#test-51-share-message-contains-deep-link" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Open ReferralScreen
+2. Tap "Share" button
+3. Check shared message</p>
+<p><strong>Expected Results:</strong>
+- ✅ Message includes: <code>https://wesplit-deeplinks.web.app/referral?code=...</code>
+- ✅ Message includes Telegram download link
+- ✅ Message includes raw referral code as fallback</p>
+<h3 id="test-52-qr-code-generation">Test 5.2: QR Code Generation<a class="headerlink" href="#test-52-qr-code-generation" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Open ReferralScreen
+2. Tap "QR Code" button
+3. Observe QR modal</p>
+<p><strong>Expected Results:</strong>
+- ✅ Modal opens with QR code displayed
+- ✅ QR code contains: <code>https://wesplit-deeplinks.web.app/referral?code=...</code>
+- ✅ QR code is scannable
+- ✅ Copy/Share buttons work</p>
+<p><strong>Verification:</strong>
+- Scan QR code with another device
+- Should open the referral link</p>
+<h3 id="test-53-qr-code-scanning">Test 5.3: QR Code Scanning<a class="headerlink" href="#test-53-qr-code-scanning" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Generate QR code for User A's referral
+2. Scan with device B (not logged in)
+3. Complete signup</p>
+<p><strong>Expected Results:</strong>
+- ✅ QR code scans correctly
+- ✅ Opens referral link
+- ✅ Referral is applied during signup</p>
+<hr />
+<h2 id="6-error-handling-tests">6. Error Handling Tests<a class="headerlink" href="#6-error-handling-tests" title="Permanent link">&para;</a></h2>
+<h3 id="test-61-network-failure-during-referral-tracking">Test 6.1: Network Failure During Referral Tracking<a class="headerlink" href="#test-61-network-failure-during-referral-tracking" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Start signup with referral code
+2. Simulate network failure (airplane mode) during <code>trackReferral()</code>
+3. Check logs</p>
+<p><strong>Expected Results:</strong>
+- ✅ Error is logged (not swallowed)
+- ✅ User account creation still succeeds (referral is non-blocking)
+- ✅ Logs show: "Error tracking referral" or "Background referral tracking task failed"</p>
+<h3 id="test-62-invalid-code-during-profile-creation">Test 6.2: Invalid Code During Profile Creation<a class="headerlink" href="#test-62-invalid-code-during-profile-creation" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Enter invalid code during signup
+2. Complete profile creation anyway (skip validation)</p>
+<p><strong>Expected Results:</strong>
+- ✅ Profile creation succeeds
+- ✅ Referral tracking fails gracefully
+- ✅ User is not blocked from completing signup
+- ✅ Logs show referral tracking failure</p>
+<hr />
+<h2 id="7-edge-cases-security-tests">7. Edge Cases &amp; Security Tests<a class="headerlink" href="#7-edge-cases-security-tests" title="Permanent link">&para;</a></h2>
+<h3 id="test-71-code-enumeration-prevention">Test 7.1: Code Enumeration Prevention<a class="headerlink" href="#test-71-code-enumeration-prevention" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Try to validate 100+ random codes rapidly
+2. Observe rate limiting</p>
+<p><strong>Expected Results:</strong>
+- ✅ After 30 requests, rate limit kicks in
+- ✅ Error message: "Too many referral code lookups..."
+- ✅ Legitimate users can still validate codes (rate limit is per-user)</p>
+<h3 id="test-72-case-sensitivity">Test 7.2: Case Sensitivity<a class="headerlink" href="#test-72-case-sensitivity" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. User A has code: <code>ABC123XYZ</code>
+2. User B enters: <code>abc123xyz</code> (lowercase)
+3. User B enters: <code>AbC 123 XyZ</code> (mixed case with spaces)</p>
+<p><strong>Expected Results:</strong>
+- ✅ Code is normalized to <code>ABC123XYZ</code>
+- ✅ Code validation succeeds
+- ✅ Referral tracking works correctly</p>
+<h3 id="test-73-special-characters">Test 7.3: Special Characters<a class="headerlink" href="#test-73-special-characters" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Try entering code with special characters: <code>ABC@123!XYZ</code>
+2. Observe behavior</p>
+<p><strong>Expected Results:</strong>
+- ✅ Code is normalized (special chars may remain, but spaces removed, uppercased)
+- ✅ Validation checks if normalized code exists</p>
+<hr />
+<h2 id="8-integration-tests">8. Integration Tests<a class="headerlink" href="#8-integration-tests" title="Permanent link">&para;</a></h2>
+<h3 id="test-81-complete-end-to-end-flow">Test 8.1: Complete End-to-End Flow<a class="headerlink" href="#test-81-complete-end-to-end-flow" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. User A shares referral code via QR/Share
+2. User B scans/clicks link
+3. User B signs up with referral code
+4. User B completes first split &gt; $10
+5. Verify all rewards</p>
+<p><strong>Expected Results:</strong>
+- ✅ All steps complete successfully
+- ✅ User A receives both rewards (account creation + first split)
+- ✅ All Firestore data is consistent
+- ✅ No duplicate records
+- ✅ All logs show success</p>
+<h3 id="test-82-multiple-simultaneous-referrals">Test 8.2: Multiple Simultaneous Referrals<a class="headerlink" href="#test-82-multiple-simultaneous-referrals" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. User A shares code with 5 friends
+2. All 5 sign up simultaneously
+3. Check Firestore</p>
+<p><strong>Expected Results:</strong>
+- ✅ All 5 referral records created
+- ✅ All 5 <code>referred_by</code> fields set correctly
+- ✅ No race conditions or duplicate records
+- ✅ User A receives rewards for all 5 referrals</p>
+<hr />
+<h2 id="9-performance-tests">9. Performance Tests<a class="headerlink" href="#9-performance-tests" title="Permanent link">&para;</a></h2>
+<h3 id="test-91-code-validation-response-time">Test 9.1: Code Validation Response Time<a class="headerlink" href="#test-91-code-validation-response-time" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Measure time for <code>findReferrerByCode()</code> calls
+2. Test with valid and invalid codes</p>
+<p><strong>Expected Results:</strong>
+- ✅ Validation completes in &lt; 1 second
+- ✅ Rate limiting doesn't significantly slow down legitimate requests</p>
+<h3 id="test-92-transaction-performance">Test 9.2: Transaction Performance<a class="headerlink" href="#test-92-transaction-performance" title="Permanent link">&para;</a></h3>
+<p><strong>Steps:</strong>
+1. Measure time for <code>createReferralRecordWithTransaction()</code>
+2. Test under load</p>
+<p><strong>Expected Results:</strong>
+- ✅ Transaction completes in &lt; 2 seconds
+- ✅ No timeout errors under normal load</p>
+<hr />
+<h2 id="10-manual-testing-checklist">10. Manual Testing Checklist<a class="headerlink" href="#10-manual-testing-checklist" title="Permanent link">&para;</a></h2>
+<p>Use this checklist for quick manual verification:</p>
+<ul>
+<li>[ ] New user gets referral code automatically</li>
+<li>[ ] Existing user keeps same code</li>
+<li>[ ] Referral code is 8-12 characters, uppercase</li>
+<li>[ ] Share button includes deep link</li>
+<li>[ ] QR code button opens modal with scannable QR</li>
+<li>[ ] Deep link opens app and routes to auth</li>
+<li>[ ] Referral code pre-fills in CreateProfileScreen</li>
+<li>[ ] Valid code shows green checkmark</li>
+<li>[ ] Invalid code shows error</li>
+<li>[ ] Self-referral is blocked</li>
+<li>[ ] Referral record created in Firestore</li>
+<li>[ ] <code>referred_by</code> field set correctly</li>
+<li>[ ] Referrer receives account creation reward</li>
+<li>[ ] Referrer receives first split reward</li>
+<li>[ ] Rewards not duplicated</li>
+<li>[ ] Rate limiting works (30 requests/15min)</li>
+<li>[ ] Errors are logged (not swallowed)</li>
+<li>[ ] Account creation succeeds even if referral fails</li>
+</ul>
+<hr />
+<h2 id="11-automated-test-script-optional">11. Automated Test Script (Optional)<a class="headerlink" href="#11-automated-test-script-optional" title="Permanent link">&para;</a></h2>
+<p>Create a test script to verify Firestore invariants:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// scripts/test-referral-invariants.js</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">admin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;firebase-admin&#39;</span><span class="p">);</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nx">admin</span><span class="p">.</span><span class="nx">initializeApp</span><span class="p">();</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="kd">const</span><span class="w"> </span><span class="nx">db</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">admin</span><span class="p">.</span><span class="nx">firestore</span><span class="p">();</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">testReferralInvariants</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;Testing referral system invariants...\n&#39;</span><span class="p">);</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="c1">// Test 1: No self-referrals</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">referrals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">collection</span><span class="p">(</span><span class="s1">&#39;referrals&#39;</span><span class="p">).</span><span class="nx">get</span><span class="p">();</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">selfReferrals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">referrals</span><span class="p">.</span><span class="nx">docs</span><span class="p">.</span><span class="nx">filter</span><span class="p">(</span><span class="nx">doc</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">doc</span><span class="p">.</span><span class="nx">data</span><span class="p">();</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">referrerId</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">referredUserId</span><span class="p">;</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">  </span><span class="p">});</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">  </span><span class="nx">console</span><span class="p">.</span><span class="nx">assert</span><span class="p">(</span><span class="nx">selfReferrals</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="sb">`Found </span><span class="si">${</span><span class="nx">selfReferrals</span><span class="p">.</span><span class="nx">length</span><span class="si">}</span><span class="sb"> self-referrals!`</span><span class="p">);</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">  </span><span class="c1">// Test 2: All referrals have referred_by set</span>
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">users</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">collection</span><span class="p">(</span><span class="s1">&#39;users&#39;</span><span class="p">).</span><span class="nx">get</span><span class="p">();</span>
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">usersWithReferrals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">users</span><span class="p">.</span><span class="nx">docs</span><span class="p">.</span><span class="nx">filter</span><span class="p">(</span><span class="nx">doc</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">doc</span><span class="p">.</span><span class="nx">data</span><span class="p">();</span>
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">referred_by</span><span class="p">;</span>
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="w">  </span><span class="p">});</span>
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">const</span><span class="w"> </span><span class="nx">userDoc</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="nx">usersWithReferrals</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">user</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">userDoc</span><span class="p">.</span><span class="nx">data</span><span class="p">();</span>
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">referral</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">db</span><span class="p">.</span><span class="nx">collection</span><span class="p">(</span><span class="s1">&#39;referrals&#39;</span><span class="p">)</span>
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a><span class="w">      </span><span class="p">.</span><span class="nx">where</span><span class="p">(</span><span class="s1">&#39;referredUserId&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;==&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">userDoc</span><span class="p">.</span><span class="nx">id</span><span class="p">)</span>
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a><span class="w">      </span><span class="p">.</span><span class="nx">where</span><span class="p">(</span><span class="s1">&#39;referrerId&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;==&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">user</span><span class="p">.</span><span class="nx">referred_by</span><span class="p">)</span>
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a><span class="w">      </span><span class="p">.</span><span class="nx">get</span><span class="p">();</span>
+<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a><span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">assert</span><span class="p">(</span><span class="o">!</span><span class="nx">referral</span><span class="p">.</span><span class="nx">empty</span><span class="p">,</span><span class="w"> </span><span class="sb">`User </span><span class="si">${</span><span class="nx">userDoc</span><span class="p">.</span><span class="nx">id</span><span class="si">}</span><span class="sb"> has referred_by but no referral record!`</span><span class="p">);</span>
+<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>
+<a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a><span class="w">  </span><span class="c1">// Test 3: No duplicate referrals</span>
+<a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">referralPairs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Set</span><span class="p">();</span>
+<a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">const</span><span class="w"> </span><span class="nx">doc</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="nx">referrals</span><span class="p">.</span><span class="nx">docs</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-36" name="__codelineno-5-36" href="#__codelineno-5-36"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">doc</span><span class="p">.</span><span class="nx">data</span><span class="p">();</span>
+<a id="__codelineno-5-37" name="__codelineno-5-37" href="#__codelineno-5-37"></a><span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">pair</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sb">`</span><span class="si">${</span><span class="nx">data</span><span class="p">.</span><span class="nx">referrerId</span><span class="si">}</span><span class="sb">_</span><span class="si">${</span><span class="nx">data</span><span class="p">.</span><span class="nx">referredUserId</span><span class="si">}</span><span class="sb">`</span><span class="p">;</span>
+<a id="__codelineno-5-38" name="__codelineno-5-38" href="#__codelineno-5-38"></a><span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">assert</span><span class="p">(</span><span class="o">!</span><span class="nx">referralPairs</span><span class="p">.</span><span class="nx">has</span><span class="p">(</span><span class="nx">pair</span><span class="p">),</span><span class="w"> </span><span class="sb">`Duplicate referral: </span><span class="si">${</span><span class="nx">pair</span><span class="si">}</span><span class="sb">`</span><span class="p">);</span>
+<a id="__codelineno-5-39" name="__codelineno-5-39" href="#__codelineno-5-39"></a><span class="w">    </span><span class="nx">referralPairs</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="nx">pair</span><span class="p">);</span>
+<a id="__codelineno-5-40" name="__codelineno-5-40" href="#__codelineno-5-40"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-5-41" name="__codelineno-5-41" href="#__codelineno-5-41"></a>
+<a id="__codelineno-5-42" name="__codelineno-5-42" href="#__codelineno-5-42"></a><span class="w">  </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;✅ All invariants passed!&#39;</span><span class="p">);</span>
+<a id="__codelineno-5-43" name="__codelineno-5-43" href="#__codelineno-5-43"></a><span class="p">}</span>
+<a id="__codelineno-5-44" name="__codelineno-5-44" href="#__codelineno-5-44"></a>
+<a id="__codelineno-5-45" name="__codelineno-5-45" href="#__codelineno-5-45"></a><span class="nx">testReferralInvariants</span><span class="p">().</span><span class="k">catch</span><span class="p">(</span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">);</span>
+</code></pre></div>
+<hr />
+<h2 id="12-common-issues-troubleshooting">12. Common Issues &amp; Troubleshooting<a class="headerlink" href="#12-common-issues-troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="issue-referral-code-not-applying">Issue: Referral code not applying<a class="headerlink" href="#issue-referral-code-not-applying" title="Permanent link">&para;</a></h3>
+<p><strong>Check:</strong>
+1. Is code normalized correctly? (uppercase, no spaces)
+2. Does referrer exist in Firestore?
+3. Check logs for <code>trackReferral()</code> errors
+4. Verify <code>referred_by</code> field is being set</p>
+<h3 id="issue-rate-limit-errors-during-testing">Issue: Rate limit errors during testing<a class="headerlink" href="#issue-rate-limit-errors-during-testing" title="Permanent link">&para;</a></h3>
+<p><strong>Solution:</strong>
+- Wait 15 minutes for rate limit to reset
+- Or use different user IDs for testing
+- Rate limit is per-identifier</p>
+<h3 id="issue-duplicate-referral-records">Issue: Duplicate referral records<a class="headerlink" href="#issue-duplicate-referral-records" title="Permanent link">&para;</a></h3>
+<p><strong>Check:</strong>
+1. Verify idempotency check is working
+2. Check if <code>getReferral()</code> is finding existing referrals
+3. Look for race conditions (should be prevented by transactions)</p>
+<h3 id="issue-rewards-not-awarded">Issue: Rewards not awarded<a class="headerlink" href="#issue-rewards-not-awarded" title="Permanent link">&para;</a></h3>
+<p><strong>Check:</strong>
+1. Verify referral record exists
+2. Check reward configuration in <code>referralConfig.ts</code>
+3. Check quest service logs
+4. Verify season is correct</p>
+<hr />
+<h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
+<p>After completing all tests above, the referral system should be verified as:
+- ✅ Functionally correct
+- ✅ Secure (rate limiting, self-referral prevention)
+- ✅ Robust (transactions, idempotency, error handling)
+- ✅ User-friendly (deep links, QR codes, clear validation)</p>
+<p>If any test fails, refer to the specific section in the audit document for implementation details.</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 14, 2026 11:39:08 UTC">January 14, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

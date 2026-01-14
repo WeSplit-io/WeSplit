@@ -1,0 +1,1715 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="WeSplit - Split expenses socially, settle instantly with crypto">
+      
+      
+        <meta name="author" content="WeSplit Team">
+      
+      
+        <link rel="canonical" href="https://YOUR_USERNAME.github.io/WeSplit/PRIVATE_KEY_HANDLING_AUDIT/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Private Key Handling Audit - Split Wallets & Shared Wallets - WeSplit Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#private-key-handling-audit-split-wallets-shared-wallets" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="WeSplit Documentation" class="md-header__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WeSplit Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Private Key Handling Audit - Split Wallets &amp; Shared Wallets
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="dark" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../CORBITS_X402_INTEGRATION_PLAN.md" class="md-tabs__link">
+          
+  
+  
+  Corbits Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../AUTH_CONFIG_STATUS/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../BADGE_SETUP_SUMMARY/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../QUICK_TEST_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="WeSplit Documentation" class="md-nav__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WeSplit Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corbits Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Corbits Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CORBITS_X402_INTEGRATION_PLAN.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AUTH_CONFIG_STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PHANTOM_INTEGRATION_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phantom Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../BADGE_SETUP_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Badges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../REFERRAL_SYSTEM_COMPLETE.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referrals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICK_TEST_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Test Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LOCAL_BUILD_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#complete-private-key-security-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔐 Complete Private Key Security Audit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#private-key-storage-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Private Key Storage Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Private Key Storage Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#storage-methods-by-wallet-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Methods by Wallet Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-fair-split-wallet-private-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1️⃣ Fair Split Wallet Private Keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1️⃣ Fair Split Wallet Private Keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-degen-split-wallet-private-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2️⃣ Degen Split Wallet Private Keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2️⃣ Degen Split Wallet Private Keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generation_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-shared-wallet-private-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3️⃣ Shared Wallet Private Keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3️⃣ Shared Wallet Private Keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generation_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-participant-access-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4️⃣ Participant Access Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4️⃣ Participant Access Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#degen-split-adding-participants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Degen Split - Adding Participants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-wallet-adding-members" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Wallet - Adding Members
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-wallet-accepting-invitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Wallet - Accepting Invitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-security-measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5️⃣ Security Measures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5️⃣ Security Measures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#encryption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encryption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#access-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caching
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-issues-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6️⃣ Issues Found
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6️⃣ Issues Found">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issue-1-shared-wallet-invitation-no-rollback-on-private-key-access-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue #1: Shared Wallet Invitation - No Rollback on Private Key Access Failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-2-degen-split-participant-addition-private-key-access-verified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue #2: Degen Split Participant Addition - Private Key Access ✅ VERIFIED
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-3-fair-split-no-private-key-access-for-new-participants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue #3: Fair Split - No Private Key Access for New Participants
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-verification-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7️⃣ Verification Checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7️⃣ Verification Checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#private-key-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Private Key Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#private-key-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Private Key Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#private-key-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Private Key Retrieval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#access-control_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#participant-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📝 Summary
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📝 Summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strengths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strengths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#areas-for-improvement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Areas for Improvement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-posture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Posture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="private-key-handling-audit-split-wallets-shared-wallets">Private Key Handling Audit - Split Wallets &amp; Shared Wallets<a class="headerlink" href="#private-key-handling-audit-split-wallets-shared-wallets" title="Permanent link">&para;</a></h1>
+<h2 id="complete-private-key-security-audit">🔐 Complete Private Key Security Audit<a class="headerlink" href="#complete-private-key-security-audit" title="Permanent link">&para;</a></h2>
+<p>This document provides a comprehensive audit of private key handling for all wallet types.</p>
+<hr />
+<h2 id="private-key-storage-architecture">📊 Private Key Storage Architecture<a class="headerlink" href="#private-key-storage-architecture" title="Permanent link">&para;</a></h2>
+<h3 id="storage-methods-by-wallet-type">Storage Methods by Wallet Type<a class="headerlink" href="#storage-methods-by-wallet-type" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Wallet Type</th>
+<th>Storage Location</th>
+<th>Encryption</th>
+<th>Access Control</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Fair Split</strong></td>
+<td>Local SecureStore (iOS Keychain/Android Keystore)</td>
+<td>None (device-level encryption)</td>
+<td>Creator only</td>
+</tr>
+<tr>
+<td><strong>Degen Split</strong></td>
+<td>Firebase (<code>splitWalletPrivateKeys</code> collection)</td>
+<td>AES-256-CBC (encrypted)</td>
+<td>All participants</td>
+</tr>
+<tr>
+<td><strong>Spend Split</strong></td>
+<td>Same as Fair Split (creator only)</td>
+<td>None (device-level encryption)</td>
+<td>Creator only</td>
+</tr>
+<tr>
+<td><strong>Shared Wallet</strong></td>
+<td>Firebase (<code>splitWalletPrivateKeys</code> collection)</td>
+<td>AES-256-CBC (encrypted)</td>
+<td>All members</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-fair-split-wallet-private-keys">1️⃣ Fair Split Wallet Private Keys<a class="headerlink" href="#1-fair-split-wallet-private-keys" title="Permanent link">&para;</a></h2>
+<h3 id="generation">Generation<a class="headerlink" href="#generation" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>src/services/split/SplitWalletCreation.ts:156-287</code></p>
+<p><strong>Process</strong>:
+1. ✅ Generates new Solana wallet: <code>generateWalletFromMnemonic()</code>
+2. ✅ Extracts <code>secretKey</code> from wallet result
+3. ✅ Stores in local SecureStore using <code>storeFairSplitPrivateKey()</code></p>
+<p><strong>Storage</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">// Storage key format: fair_split_private_key_{splitWalletId}_{creatorId}</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1">// Location: iOS Keychain / Android Keystore</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1">// Encryption: Device-level (SecureStore handles encryption)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1">// Access: Creator only</span>
+</code></pre></div></p>
+<p><strong>Retrieval</strong>:
+<strong>Location</strong>: <code>src/services/split/SplitWalletSecurity.ts:462-534</code>
+- ✅ Only creator can retrieve: <code>getFairSplitPrivateKey(splitWalletId, creatorId)</code>
+- ✅ Validates creator ID matches
+- ✅ Returns from SecureStore</p>
+<p><strong>Status</strong>: ✅ <strong>PROPERLY HANDLED</strong>
+- Private key never stored in Firebase
+- Only creator has access
+- Device-level encryption via SecureStore</p>
+<hr />
+<h2 id="2-degen-split-wallet-private-keys">2️⃣ Degen Split Wallet Private Keys<a class="headerlink" href="#2-degen-split-wallet-private-keys" title="Permanent link">&para;</a></h2>
+<h3 id="generation_1">Generation<a class="headerlink" href="#generation_1" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>src/services/split/SplitWalletCreation.ts:293-515</code></p>
+<p><strong>Process</strong>:
+1. ✅ Generates new Solana wallet: <code>generateWalletFromMnemonic()</code>
+2. ✅ Extracts <code>secretKey</code> from wallet result
+3. ✅ Encrypts using AES-256-CBC: <code>encryptPrivateKey(splitWalletId, privateKey)</code>
+4. ✅ Stores encrypted payload in Firebase: <code>splitWalletPrivateKeys</code> collection
+5. ✅ Stores participant list for access control</p>
+<p><strong>Encryption Details</strong>:
+- <strong>Algorithm</strong>: AES-256-CBC
+- <strong>Key Derivation</strong>: HMAC-SHA256 (v2) or PBKDF2 (v1 legacy)
+- <strong>IV</strong>: Random 16 bytes
+- <strong>Salt</strong>: Random 16 bytes
+- <strong>Version</strong>: <code>aes-256-cbc-v2</code></p>
+<p><strong>Storage Structure</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// Firebase: splitWalletPrivateKeys/{splitWalletId}</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="p">{</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nx">splitWalletId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nx">encryptedPrivateKey</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nx">ciphertext</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">(</span><span class="nx">base64</span><span class="p">),</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nx">iv</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">(</span><span class="nx">base64</span><span class="p">),</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nx">salt</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">(</span><span class="nx">base64</span><span class="p">),</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nx">version</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;aes-256-cbc-v2&#39;</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nx">algorithm</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;aes-256-cbc&#39;</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nx">iterations</span><span class="o">:</span><span class="w"> </span><span class="kt">0</span><span class="w"> </span><span class="c1">// Not used for v2</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nx">participants</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="p">...</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="nx">splitType</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;degen&#39;</span><span class="p">,</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">  </span><span class="nx">encryptionVersion</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;aes-256-cbc-v2&#39;</span><span class="p">,</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">  </span><span class="nx">createdAt</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Retrieval</strong>:
+<strong>Location</strong>: <code>src/services/split/SplitWalletSecurity.ts:584-883</code></p>
+<p><strong>Process</strong>:
+1. ✅ Checks in-memory cache (5 min TTL)
+2. ✅ Checks encrypted payload cache (10 min TTL)
+3. ✅ Fetches from Firebase if not cached
+4. ✅ <strong>Verifies user is in participants list</strong> ← <strong>CRITICAL SECURITY CHECK</strong>
+5. ✅ Decrypts using <code>decryptEncryptedPrivateKey()</code>
+6. ✅ Caches decrypted key (5 min TTL)</p>
+<p><strong>Access Control</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// Line 705-714: Participant verification</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">isParticipant</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">participantsList</span><span class="p">.</span><span class="nx">some</span><span class="p">(</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nx">participant</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">participant</span><span class="o">?</span><span class="p">.</span><span class="nx">userId</span><span class="o">?</span><span class="p">.</span><span class="nx">toString</span><span class="p">()</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="nx">requesterId</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">);</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">isParticipant</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nx">success</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;User is not a participant in this Degen Split&#39;</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="p">};</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Status</strong>: ✅ <strong>PROPERLY HANDLED</strong>
+- Encrypted before storage
+- Participant verification before decryption
+- Caching for performance
+- Legacy plaintext migration support</p>
+<hr />
+<h2 id="3-shared-wallet-private-keys">3️⃣ Shared Wallet Private Keys<a class="headerlink" href="#3-shared-wallet-private-keys" title="Permanent link">&para;</a></h2>
+<h3 id="generation_2">Generation<a class="headerlink" href="#generation_2" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>src/services/sharedWallet/SharedWalletCreation.ts:102-291</code></p>
+<p><strong>Process</strong>:
+1. ✅ Generates new Solana wallet: <code>walletService.createWallet()</code>
+2. ✅ Extracts <code>secretKey</code> from wallet result
+3. ✅ Encrypts using AES-256-CBC: <code>encryptPrivateKey(sharedWalletId, privateKey)</code>
+4. ✅ Stores encrypted payload in Firebase: <code>splitWalletPrivateKeys</code> collection (reuses Degen Split system)
+5. ✅ Stores member list for access control</p>
+<p><strong>Storage</strong>:
+- ✅ Uses same encryption system as Degen Split
+- ✅ Stores in <code>splitWalletPrivateKeys</code> collection (by design - shared infrastructure)
+- ✅ Document ID = <code>sharedWalletId</code></p>
+<p><strong>Retrieval</strong>:
+<strong>Location</strong>: <code>src/services/sharedWallet/index.ts:209-232</code></p>
+<p><strong>Process</strong>:
+1. ✅ Delegates to <code>SplitWalletSecurity.getSplitWalletPrivateKey()</code>
+2. ✅ Same participant verification as Degen Split
+3. ✅ Same caching mechanism</p>
+<p><strong>Status</strong>: ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h2 id="4-participant-access-management">4️⃣ Participant Access Management<a class="headerlink" href="#4-participant-access-management" title="Permanent link">&para;</a></h2>
+<h3 id="degen-split-adding-participants">Degen Split - Adding Participants<a class="headerlink" href="#degen-split-adding-participants" title="Permanent link">&para;</a></h3>
+<p><strong>Issue</strong>: ⚠️ <strong>POTENTIAL GAP</strong></p>
+<p>When new participants are added to a Degen Split:
+1. ✅ Participant is added to split wallet document
+2. ✅ Participant is added to split document
+3. ❓ <strong>Private key access</strong>: Need to verify if <code>addParticipantsToSplitWalletPrivateKey()</code> is called</p>
+<p><strong>Location to Check</strong>: Participant invitation flow</p>
+<p><strong>Current Implementation</strong>:
+- <code>addParticipantsToSplitWalletPrivateKey()</code> exists and works correctly
+- Need to verify it's called when participants are invited/added</p>
+<h3 id="shared-wallet-adding-members">Shared Wallet - Adding Members<a class="headerlink" href="#shared-wallet-adding-members" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>src/services/sharedWallet/index.ts:549-739</code></p>
+<p><strong>Process</strong>:
+1. ✅ Adds members to shared wallet document
+2. ✅ <strong>Grants private key access</strong>: <code>addParticipantsToSplitWalletPrivateKey()</code> ← <strong>VERIFIED</strong>
+3. ✅ Logs success/failure
+4. ⚠️ <strong>Issue</strong>: If private key access fails, member is still added (no rollback)</p>
+<p><strong>Code</strong> (Line 688-711):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Grant private key access to new members</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">newMembers</span><span class="p">.</span><span class="nx">length</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">grantAccessResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">SplitWalletSecurity</span><span class="p">.</span><span class="nx">addParticipantsToSplitWalletPrivateKey</span><span class="p">(</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nx">params</span><span class="p">.</span><span class="nx">sharedWalletId</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nx">newMembers</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">m</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">({</span><span class="w"> </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">m.userId</span><span class="p">,</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="kt">m.name</span><span class="w"> </span><span class="p">}))</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="p">);</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">grantAccessResult</span><span class="p">.</span><span class="nx">success</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s1">&#39;Failed to grant private key access to new members&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">      </span><span class="nx">sharedWalletId</span><span class="o">:</span><span class="w"> </span><span class="kt">params.sharedWalletId</span><span class="p">,</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">      </span><span class="nx">newMembersCount</span><span class="o">:</span><span class="w"> </span><span class="kt">newMembers.length</span><span class="p">,</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">      </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="kt">grantAccessResult.error</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="p">},</span><span class="w"> </span><span class="s1">&#39;SharedWalletService&#39;</span><span class="p">);</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">    </span><span class="c1">// ⚠️ ISSUE: This is a critical error - new members won&#39;t be able to withdraw</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">    </span><span class="c1">// Consider rolling back the member additions here</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Status</strong>: ⚠️ <strong>PARTIAL</strong> - Access is granted, but no rollback on failure</p>
+<h3 id="shared-wallet-accepting-invitations">Shared Wallet - Accepting Invitations<a class="headerlink" href="#shared-wallet-accepting-invitations" title="Permanent link">&para;</a></h3>
+<p><strong>Location</strong>: <code>src/services/sharedWallet/index.ts:480-520</code></p>
+<p><strong>Process</strong>:
+1. ✅ Updates member status to 'active'
+2. ✅ <strong>Syncs private key participants</strong>: <code>syncSharedPrivateKeyParticipants()</code> ← <strong>VERIFIED</strong>
+3. ✅ Logs success/failure (non-blocking)</p>
+<p><strong>Code</strong> (Line 500-514):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// The user should already be in the participants list from inviteToSharedWallet,</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">// but we verify and sync to prevent access issues during withdrawal</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">syncResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">SplitWalletSecurity</span><span class="p">.</span><span class="nx">syncSharedPrivateKeyParticipants</span><span class="p">(</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nx">sharedWalletId</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nx">updatedMembers</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">m</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">({</span><span class="w"> </span><span class="nx">userId</span><span class="o">:</span><span class="w"> </span><span class="kt">m.userId</span><span class="p">,</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="kt">m.name</span><span class="w"> </span><span class="p">}))</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">);</span>
+</code></pre></div></p>
+<p><strong>Status</strong>: ✅ <strong>PROPERLY HANDLED</strong> - Syncs participants on acceptance</p>
+<hr />
+<h2 id="5-security-measures">5️⃣ Security Measures<a class="headerlink" href="#5-security-measures" title="Permanent link">&para;</a></h2>
+<h3 id="encryption">Encryption<a class="headerlink" href="#encryption" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ <strong>Algorithm</strong>: AES-256-CBC</li>
+<li>✅ <strong>Key Derivation</strong>: HMAC-SHA256 (v2, fast) or PBKDF2 (v1, legacy)</li>
+<li>✅ <strong>IV</strong>: Random 16 bytes per encryption</li>
+<li>✅ <strong>Salt</strong>: Random 16 bytes per encryption</li>
+<li>✅ <strong>Base Secret</strong>: From unified config (not hardcoded)</li>
+</ul>
+<h3 id="access-control">Access Control<a class="headerlink" href="#access-control" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ <strong>Fair Split</strong>: Creator-only (SecureStore key includes creatorId)</li>
+<li>✅ <strong>Degen Split</strong>: Participant verification before decryption</li>
+<li>✅ <strong>Shared Wallet</strong>: Member verification before decryption</li>
+</ul>
+<h3 id="caching">Caching<a class="headerlink" href="#caching" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ <strong>Decrypted Keys</strong>: 5-minute TTL (in-memory)</li>
+<li>✅ <strong>Encrypted Payloads</strong>: 10-minute TTL (in-memory)</li>
+<li>✅ <strong>Cache Cleanup</strong>: Automatic expiration</li>
+</ul>
+<h3 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h3>
+<ul>
+<li>✅ All operations return success/error results</li>
+<li>✅ Comprehensive logging</li>
+<li>✅ Fallback to legacy formats for backward compatibility</li>
+</ul>
+<hr />
+<h2 id="6-issues-found">6️⃣ Issues Found<a class="headerlink" href="#6-issues-found" title="Permanent link">&para;</a></h2>
+<h3 id="issue-1-shared-wallet-invitation-no-rollback-on-private-key-access-failure">Issue #1: Shared Wallet Invitation - No Rollback on Private Key Access Failure<a class="headerlink" href="#issue-1-shared-wallet-invitation-no-rollback-on-private-key-access-failure" title="Permanent link">&para;</a></h3>
+<p><strong>Severity</strong>: 🟡 <strong>MEDIUM</strong></p>
+<p><strong>Problem</strong>: When inviting members to a shared wallet, if private key access grant fails, the member is still added to the wallet but won't be able to withdraw.</p>
+<p><strong>Location</strong>: <code>src/services/sharedWallet/index.ts:688-711</code></p>
+<p><strong>Current Behavior</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">grantAccessResult</span><span class="p">.</span><span class="nx">success</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nx">logger</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s1">&#39;Failed to grant private key access to new members&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="c1">// ⚠️ Member is still added to wallet - they just can&#39;t access private key</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Impact</strong>: New members can fund the wallet but cannot withdraw (will get "not a participant" error).</p>
+<p><strong>Recommendation</strong>: 
+- Option 1: Rollback member addition if private key access fails
+- Option 2: Retry private key access grant
+- Option 3: Add member but mark as "pending_key_access" and retry later</p>
+<h3 id="issue-2-degen-split-participant-addition-private-key-access-verified">Issue #2: Degen Split Participant Addition - Private Key Access ✅ VERIFIED<a class="headerlink" href="#issue-2-degen-split-participant-addition-private-key-access-verified" title="Permanent link">&para;</a></h3>
+<p><strong>Severity</strong>: ✅ <strong>RESOLVED</strong></p>
+<p><strong>Status</strong>: ✅ <strong>PROPERLY HANDLED</strong></p>
+<p><strong>Verification</strong>:
+1. ✅ When participants are added via <code>updateSplitWalletParticipants()</code>:
+   - Location: <code>src/services/split/SplitWalletManagement.ts:459-483</code>
+   - Calls <code>syncSharedPrivateKeyParticipants()</code> for degen splits
+   - Syncs all participants to private key document</p>
+<ol>
+<li>✅ When users join via <code>joinSplit()</code>:</li>
+<li>Location: <code>src/services/splits/splitInvitationService.ts:303-311</code></li>
+<li>Updates split wallet participants via <code>updateSplitWalletParticipants()</code></li>
+<li>Which in turn calls <code>syncSharedPrivateKeyParticipants()</code></li>
+</ol>
+<p><strong>Conclusion</strong>: Private key access is properly synced when participants are added to degen splits.</p>
+<h3 id="issue-3-fair-split-no-private-key-access-for-new-participants">Issue #3: Fair Split - No Private Key Access for New Participants<a class="headerlink" href="#issue-3-fair-split-no-private-key-access-for-new-participants" title="Permanent link">&para;</a></h3>
+<p><strong>Severity</strong>: ✅ <strong>INTENTIONAL</strong> (Not an issue)</p>
+<p><strong>Status</strong>: Fair splits are creator-only by design. Participants don't need private key access.</p>
+<hr />
+<h2 id="7-verification-checklist">7️⃣ Verification Checklist<a class="headerlink" href="#7-verification-checklist" title="Permanent link">&para;</a></h2>
+<h3 id="private-key-generation">Private Key Generation<a class="headerlink" href="#private-key-generation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Fair Split: ✅ Generated from <code>generateWalletFromMnemonic()</code></li>
+<li>[x] Degen Split: ✅ Generated from <code>generateWalletFromMnemonic()</code></li>
+<li>[x] Shared Wallet: ✅ Generated from <code>walletService.createWallet()</code></li>
+<li>[x] All use cryptographically secure random generation</li>
+</ul>
+<h3 id="private-key-storage">Private Key Storage<a class="headerlink" href="#private-key-storage" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Fair Split: ✅ Local SecureStore (device-encrypted)</li>
+<li>[x] Degen Split: ✅ Firebase (AES-256-CBC encrypted)</li>
+<li>[x] Shared Wallet: ✅ Firebase (AES-256-CBC encrypted)</li>
+<li>[x] No plaintext storage in Firebase</li>
+</ul>
+<h3 id="private-key-retrieval">Private Key Retrieval<a class="headerlink" href="#private-key-retrieval" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Fair Split: ✅ Creator-only access verified</li>
+<li>[x] Degen Split: ✅ Participant verification before decryption</li>
+<li>[x] Shared Wallet: ✅ Member verification before decryption</li>
+<li>[x] Caching implemented for performance</li>
+</ul>
+<h3 id="access-control_1">Access Control<a class="headerlink" href="#access-control_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Fair Split: ✅ Creator ID checked</li>
+<li>[x] Degen Split: ✅ Participant list verified</li>
+<li>[x] Shared Wallet: ✅ Member list verified</li>
+<li>[x] Access denied if not authorized</li>
+</ul>
+<h3 id="participant-management">Participant Management<a class="headerlink" href="#participant-management" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Shared Wallet Invitation: ✅ Grants private key access</li>
+<li>[x] Shared Wallet Acceptance: ✅ Syncs private key participants</li>
+<li>[x] Degen Split Participant Addition: ✅ Syncs private key participants via <code>updateSplitWalletParticipants()</code></li>
+<li>[x] Degen Split Join/Invitation: ✅ Syncs via <code>joinSplit()</code> → <code>updateSplitWalletParticipants()</code></li>
+<li>[x] Fair Split: ✅ N/A (creator-only)</li>
+</ul>
+<h3 id="error-handling_1">Error Handling<a class="headerlink" href="#error-handling_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] All operations return success/error</li>
+<li>[x] Comprehensive logging</li>
+<li>[x] Fallback to legacy formats</li>
+<li>[ ] Shared Wallet: ⚠️ No rollback on private key access failure</li>
+</ul>
+<hr />
+<h2 id="summary">📝 Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<p><strong>Overall Status</strong>: 🟢 <strong>WELL IMPLEMENTED</strong> with minor improvements needed</p>
+<h3 id="strengths">Strengths<a class="headerlink" href="#strengths" title="Permanent link">&para;</a></h3>
+<ol>
+<li>✅ Strong encryption (AES-256-CBC)</li>
+<li>✅ Proper access control (participant/member verification)</li>
+<li>✅ Secure storage (device-level for Fair Split, encrypted Firebase for shared)</li>
+<li>✅ Caching for performance</li>
+<li>✅ Comprehensive error handling</li>
+<li>✅ Legacy format support</li>
+</ol>
+<h3 id="areas-for-improvement">Areas for Improvement<a class="headerlink" href="#areas-for-improvement" title="Permanent link">&para;</a></h3>
+<ol>
+<li>⚠️ <strong>Shared Wallet</strong>: Add rollback or retry mechanism for private key access failures</li>
+<li>✅ <strong>Degen Split</strong>: ✅ Verified - participant invitation properly grants private key access</li>
+<li>✅ Consider adding private key rotation mechanism for long-lived shared wallets</li>
+</ol>
+<h3 id="security-posture">Security Posture<a class="headerlink" href="#security-posture" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Fair Split</strong>: ✅ Excellent (creator-only, device-encrypted)</li>
+<li><strong>Degen Split</strong>: ✅ Excellent (encrypted, participant-verified)</li>
+<li><strong>Shared Wallet</strong>: ✅ Excellent (encrypted, member-verified)</li>
+</ul>
+<p><strong>All private keys are properly handled with strong security measures in place.</strong></p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 14, 2026 11:39:08 UTC">January 14, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

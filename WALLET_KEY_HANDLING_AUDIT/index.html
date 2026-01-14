@@ -1,0 +1,1676 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="WeSplit - Split expenses socially, settle instantly with crypto">
+      
+      
+        <meta name="author" content="WeSplit Team">
+      
+      
+        <link rel="canonical" href="https://YOUR_USERNAME.github.io/WeSplit/WALLET_KEY_HANDLING_AUDIT/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Wallet Creation & Key Handling Audit - Split Wallets & Shared Wallets - WeSplit Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#wallet-creation-key-handling-audit-split-wallets-shared-wallets" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="WeSplit Documentation" class="md-header__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            WeSplit Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Wallet Creation &amp; Key Handling Audit - Split Wallets &amp; Shared Wallets
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="dark" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../CORBITS_X402_INTEGRATION_PLAN.md" class="md-tabs__link">
+          
+  
+  
+  Corbits Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../AUTH_CONFIG_STATUS/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../BADGE_SETUP_SUMMARY/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../QUICK_TEST_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="WeSplit Documentation" class="md-nav__button md-logo" aria-label="WeSplit Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    WeSplit Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/YOUR_USERNAME/WeSplit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    WeSplit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corbits Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Corbits Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CORBITS_X402_INTEGRATION_PLAN.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AUTH_CONFIG_STATUS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PHANTOM_INTEGRATION_PLAN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phantom Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../BADGE_SETUP_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Badges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../REFERRAL_SYSTEM_COMPLETE.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referrals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICK_TEST_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Test Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LOCAL_BUILD_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#complete-wallet-key-management-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔐 Complete Wallet &amp; Key Management Audit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wallet-creation-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Wallet Creation Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Wallet Creation Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-fair-split-wallet-creation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 1. Fair Split Wallet Creation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-degen-split-wallet-creation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 2. Degen Split Wallet Creation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-shared-wallet-creation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 3. Shared Wallet Creation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#public-key-address-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔑 Public Key / Address Storage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔑 Public Key / Address Storage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#address-storage-in-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Address Storage in Database
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#private-key-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔐 Private Key Storage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔐 Private Key Storage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-fair-split-private-key-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 1. Fair Split Private Key Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-degen-split-private-key-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 2. Degen Split Private Key Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-shared-wallet-private-key-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 3. Shared Wallet Private Key Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#address-resolution-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔍 Address Resolution &amp; Retrieval
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔍 Address Resolution &amp; Retrieval">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-split-wallet-address-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 1. Split Wallet Address Resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-shared-wallet-address-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 2. Shared Wallet Address Resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#private-key-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔓 Private Key Retrieval
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔓 Private Key Retrieval">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-fair-split-private-key-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 1. Fair Split Private Key Retrieval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-degen-split-private-key-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 2. Degen Split Private Key Retrieval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-shared-wallet-private-key-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 3. Shared Wallet Private Key Retrieval
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#potential-issues-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Potential Issues &amp; Verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚠️ Potential Issues &amp; Verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-address-format-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 1. Address Format Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-address-vs-id-confusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 2. Address vs ID Confusion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-private-key-format-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 3. Private Key Format Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-private-key-access-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 4. Private Key Access Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-address-derivation-from-private-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ 5. Address Derivation from Private Key
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-handling-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📋 Key Handling Checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📋 Key Handling Checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#wallet-creation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wallet Creation:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#address-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Address Storage:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#address-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Address Retrieval:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#private-key-storage_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Private Key Storage:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#private-key-retrieval_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Private Key Retrieval:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📝 Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="wallet-creation-key-handling-audit-split-wallets-shared-wallets">Wallet Creation &amp; Key Handling Audit - Split Wallets &amp; Shared Wallets<a class="headerlink" href="#wallet-creation-key-handling-audit-split-wallets-shared-wallets" title="Permanent link">&para;</a></h1>
+<h2 id="complete-wallet-key-management-audit">🔐 Complete Wallet &amp; Key Management Audit<a class="headerlink" href="#complete-wallet-key-management-audit" title="Permanent link">&para;</a></h2>
+<p>This document verifies that wallet creation, public key storage, and private key handling are properly implemented for all wallet types.</p>
+<hr />
+<h2 id="wallet-creation-flow">📊 <strong>Wallet Creation Flow</strong><a class="headerlink" href="#wallet-creation-flow" title="Permanent link">&para;</a></h2>
+<h3 id="1-fair-split-wallet-creation">✅ <strong>1. Fair Split Wallet Creation</strong><a class="headerlink" href="#1-fair-split-wallet-creation" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/split/SplitWalletCreation.ts:156-287</code></p>
+<p><strong>Process:</strong>
+1. ✅ Generates new Solana wallet: <code>generateWalletFromMnemonic()</code>
+2. ✅ Extracts wallet data:
+   - <code>address</code> (public key/address)
+   - <code>publicKey</code> (public key)
+   - <code>secretKey</code> (private key - base64 format)
+3. ✅ Creates split wallet document in Firebase:
+   - Stores <code>walletAddress: wallet.address</code> ✅
+   - Stores <code>publicKey: wallet.publicKey</code> ✅
+   - Stores <code>id: splitWalletId</code> (database ID)
+   - <strong>NO private key stored in Firebase</strong> ✅
+4. ✅ Stores private key securely:
+   - Location: Local SecureStore (iOS Keychain/Android Keystore)
+   - Method: <code>SplitWalletSecurity.storeFairSplitPrivateKey()</code>
+   - Key format: <code>fair_split_private_key_{splitWalletId}_{creatorId}</code>
+   - Access: Creator only</p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h3 id="2-degen-split-wallet-creation">✅ <strong>2. Degen Split Wallet Creation</strong><a class="headerlink" href="#2-degen-split-wallet-creation" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/split/SplitWalletCreation.ts:293-515</code></p>
+<p><strong>Process:</strong>
+1. ✅ Generates new Solana wallet: <code>generateWalletFromMnemonic()</code>
+2. ✅ Extracts wallet data:
+   - <code>address</code> (public key/address)
+   - <code>publicKey</code> (public key)
+   - <code>secretKey</code> (private key - base64 format)
+3. ✅ Creates split wallet document in Firebase:
+   - Stores <code>walletAddress: wallet.address</code> ✅
+   - Stores <code>publicKey: wallet.publicKey</code> ✅
+   - Stores <code>id: splitWalletId</code> (database ID)
+   - <strong>NO private key stored in Firebase</strong> ✅
+4. ✅ Stores private key securely for ALL participants:
+   - Location: Firebase (<code>splitWalletPrivateKeys</code> collection)
+   - Method: <code>SplitWalletSecurity.storeSplitWalletPrivateKeyForAllParticipants()</code>
+   - Encryption: AES-256-CBC (encrypted)
+   - Access: All participants (shared access)</p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h3 id="3-shared-wallet-creation">✅ <strong>3. Shared Wallet Creation</strong><a class="headerlink" href="#3-shared-wallet-creation" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/sharedWallet/SharedWalletCreation.ts:102-291</code></p>
+<p><strong>Process:</strong>
+1. ✅ Generates new Solana wallet: <code>generateWalletFromMnemonic()</code>
+2. ✅ Extracts wallet data:
+   - <code>address</code> (public key/address)
+   - <code>publicKey</code> (public key)
+   - <code>secretKey</code> (private key - base64 format)
+3. ✅ Creates shared wallet document in Firebase:
+   - Stores <code>walletAddress: wallet.address</code> ✅
+   - Stores <code>publicKey: wallet.publicKey</code> ✅
+   - Stores <code>id: sharedWalletId</code> (database ID)
+   - <strong>NO private key stored in Firebase document</strong> ✅
+4. ✅ Stores private key securely for ALL members:
+   - Location: Firebase (<code>splitWalletPrivateKeys</code> collection)
+   - Method: <code>SplitWalletSecurity.storeSplitWalletPrivateKeyForAllParticipants()</code>
+   - Encryption: AES-256-CBC (encrypted)
+   - Access: All members (shared access)
+   - <strong>Rollback:</strong> If private key storage fails, wallet document is deleted ✅</p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h2 id="public-key-address-storage">🔑 <strong>Public Key / Address Storage</strong><a class="headerlink" href="#public-key-address-storage" title="Permanent link">&para;</a></h2>
+<h3 id="address-storage-in-database">✅ <strong>Address Storage in Database</strong><a class="headerlink" href="#address-storage-in-database" title="Permanent link">&para;</a></h3>
+<p><strong>All Wallet Types:</strong>
+- ✅ <code>walletAddress</code> stored in Firebase document
+- ✅ <code>publicKey</code> stored in Firebase document
+- ✅ Address is the actual Solana public key (base58 encoded)
+- ✅ Address is validated before storage</p>
+<p><strong>Storage Locations:</strong>
+- Fair Split: <code>splitWallets</code> collection → <code>walletAddress</code> field ✅
+- Degen Split: <code>splitWallets</code> collection → <code>walletAddress</code> field ✅
+- Shared Wallet: <code>sharedWallets</code> collection → <code>walletAddress</code> field ✅</p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY STORED</strong></p>
+<hr />
+<h2 id="private-key-storage">🔐 <strong>Private Key Storage</strong><a class="headerlink" href="#private-key-storage" title="Permanent link">&para;</a></h2>
+<h3 id="1-fair-split-private-key-storage">✅ <strong>1. Fair Split Private Key Storage</strong><a class="headerlink" href="#1-fair-split-private-key-storage" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/split/SplitWalletSecurity.ts:338-375</code></p>
+<p><strong>Storage Method:</strong>
+- <strong>Location:</strong> Local SecureStore (iOS Keychain/Android Keystore)
+- <strong>Key Format:</strong> <code>fair_split_private_key_{splitWalletId}_{creatorId}</code>
+- <strong>Encryption:</strong> Device-level (SecureStore handles encryption)
+- <strong>Access Control:</strong> Creator ID in key ensures only creator can access
+- <strong>No Firebase Storage:</strong> ✅ Private key never stored in Firebase</p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h3 id="2-degen-split-private-key-storage">✅ <strong>2. Degen Split Private Key Storage</strong><a class="headerlink" href="#2-degen-split-private-key-storage" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/split/SplitWalletSecurity.ts:534-700</code></p>
+<p><strong>Storage Method:</strong>
+- <strong>Location:</strong> Firebase (<code>splitWalletPrivateKeys</code> collection)
+- <strong>Encryption:</strong> AES-256-CBC (encrypted)
+- <strong>Key Derivation:</strong> HMAC-SHA256 (v2) or PBKDF2 (v1 for backward compatibility)
+- <strong>Access Control:</strong> Participant verification before decryption
+- <strong>Format:</strong> Encrypted payload with ciphertext, IV, salt, version</p>
+<p><strong>Encryption Details:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nx">ciphertext</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w">  </span><span class="c1">// Base64 encoded encrypted key</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nx">iv</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w">         </span><span class="c1">// Initialization vector</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nx">salt</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w">        </span><span class="c1">// Salt for key derivation</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nx">version</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w">     </span><span class="c1">// Encryption version (&#39;aes-256-cbc-v2&#39;)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nx">algorithm</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w">    </span><span class="c1">// &#39;aes-256-cbc&#39;</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nx">iterations</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w">  </span><span class="c1">// 0 for v2 (HMAC), 100000 for v1 (PBKDF2)</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">}</span>
+</code></pre></div></p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h3 id="3-shared-wallet-private-key-storage">✅ <strong>3. Shared Wallet Private Key Storage</strong><a class="headerlink" href="#3-shared-wallet-private-key-storage" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/sharedWallet/SharedWalletCreation.ts:235-264</code></p>
+<p><strong>Storage Method:</strong>
+- <strong>Location:</strong> Firebase (<code>splitWalletPrivateKeys</code> collection)
+- <strong>Method:</strong> Reuses Degen Split encryption system
+- <strong>Encryption:</strong> AES-256-CBC (encrypted)
+- <strong>Access Control:</strong> Member verification before decryption
+- <strong>Rollback:</strong> If storage fails, wallet document is deleted ✅</p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h2 id="address-resolution-retrieval">🔍 <strong>Address Resolution &amp; Retrieval</strong><a class="headerlink" href="#address-resolution-retrieval" title="Permanent link">&para;</a></h2>
+<h3 id="1-split-wallet-address-resolution">✅ <strong>1. Split Wallet Address Resolution</strong><a class="headerlink" href="#1-split-wallet-address-resolution" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/blockchain/transaction/ConsolidatedTransactionService.ts:755-868</code></p>
+<p><strong>Process:</strong>
+1. ✅ Receives <code>splitWalletId</code> (database ID)
+2. ✅ Fetches split wallet: <code>SplitWalletService.getSplitWallet(splitWalletId)</code>
+3. ✅ Extracts <code>walletAddress</code> from wallet object
+4. ✅ Validates address format (base58 pattern)
+5. ✅ Validates with PublicKey constructor
+6. ✅ Uses validated address for transaction</p>
+<p><strong>Code Flow:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// Get split wallet by ID</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">walletResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">SplitWalletService</span><span class="p">.</span><span class="nx">getSplitWallet</span><span class="p">(</span><span class="nx">splitWalletId</span><span class="p">);</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">splitWalletAddress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">walletResult</span><span class="p">.</span><span class="nx">wallet</span><span class="p">.</span><span class="nx">walletAddress</span><span class="p">;</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1">// Validate address format</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="kd">const</span><span class="w"> </span><span class="nx">base58Pattern</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sr">/^[1-9A-HJ-NP-Za-km-z]{32,44}$/</span><span class="p">;</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">base58Pattern</span><span class="p">.</span><span class="nx">test</span><span class="p">(</span><span class="nx">splitWalletAddress</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">success</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Invalid address format&#39;</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">}</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1">// Validate with PublicKey</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="ow">new</span><span class="w"> </span><span class="nx">PublicKey</span><span class="p">(</span><span class="nx">splitWalletAddress</span><span class="p">);</span><span class="w"> </span><span class="c1">// Throws if invalid</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="c1">// Use address for transaction</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="nx">sendUSDCTransaction</span><span class="p">({</span><span class="w"> </span><span class="nx">to</span><span class="o">:</span><span class="w"> </span><span class="kt">splitWalletAddress</span><span class="w"> </span><span class="p">});</span>
+</code></pre></div></p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h3 id="2-shared-wallet-address-resolution">✅ <strong>2. Shared Wallet Address Resolution</strong><a class="headerlink" href="#2-shared-wallet-address-resolution" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/blockchain/transaction/ConsolidatedTransactionService.ts:1360-1520</code></p>
+<p><strong>Process:</strong>
+1. ✅ Receives <code>sharedWalletId</code> (database ID)
+2. ✅ Fetches shared wallet: <code>SharedWalletService.getSharedWallet(sharedWalletId)</code>
+3. ✅ Extracts <code>walletAddress</code> from wallet object
+4. ✅ For withdrawals: Retrieves private key and derives address from keypair
+5. ✅ Validates address format
+6. ✅ Uses validated address for transaction</p>
+<p><strong>Code Flow (Withdrawal):</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// Get shared wallet by ID</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">walletResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">SharedWalletService</span><span class="p">.</span><span class="nx">getSharedWallet</span><span class="p">(</span><span class="nx">sharedWalletId</span><span class="p">);</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">const</span><span class="w"> </span><span class="nx">sharedWalletAddress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">walletResult</span><span class="p">.</span><span class="nx">wallet</span><span class="p">.</span><span class="nx">walletAddress</span><span class="p">;</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1">// Get private key</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="kd">const</span><span class="w"> </span><span class="nx">privateKeyResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">SharedWalletService</span><span class="p">.</span><span class="nx">getSharedWalletPrivateKey</span><span class="p">(</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nx">sharedWalletId</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nx">userId</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">);</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="c1">// Create keypair from private key to derive actual address</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="kd">const</span><span class="w"> </span><span class="nx">keypairResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">KeypairUtils</span><span class="p">.</span><span class="nx">createKeypairFromSecretKey</span><span class="p">(</span><span class="nx">privateKey</span><span class="p">);</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="kd">const</span><span class="w"> </span><span class="nx">actualAddress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">keypairResult</span><span class="p">.</span><span class="nx">keypair</span><span class="p">.</span><span class="nx">publicKey</span><span class="p">.</span><span class="nx">toBase58</span><span class="p">();</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1">// Use address for transaction</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="nx">sendUSDCTransaction</span><span class="p">({</span><span class="w"> </span><span class="nx">from</span><span class="o">:</span><span class="w"> </span><span class="kt">actualAddress</span><span class="p">,</span><span class="w"> </span><span class="nx">to</span><span class="o">:</span><span class="w"> </span><span class="kt">destinationAddress</span><span class="w"> </span><span class="p">});</span>
+</code></pre></div></p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h2 id="private-key-retrieval">🔓 <strong>Private Key Retrieval</strong><a class="headerlink" href="#private-key-retrieval" title="Permanent link">&para;</a></h2>
+<h3 id="1-fair-split-private-key-retrieval">✅ <strong>1. Fair Split Private Key Retrieval</strong><a class="headerlink" href="#1-fair-split-private-key-retrieval" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/split/SplitWalletSecurity.ts:462-534</code></p>
+<p><strong>Process:</strong>
+1. ✅ Validates creator ID matches
+2. ✅ Retrieves from SecureStore using key: <code>fair_split_private_key_{splitWalletId}_{creatorId}</code>
+3. ✅ Returns decrypted private key
+4. ✅ Caches in memory (5-minute TTL)</p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h3 id="2-degen-split-private-key-retrieval">✅ <strong>2. Degen Split Private Key Retrieval</strong><a class="headerlink" href="#2-degen-split-private-key-retrieval" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/split/SplitWalletSecurity.ts:700-950</code></p>
+<p><strong>Process:</strong>
+1. ✅ Fetches encrypted payload from Firebase
+2. ✅ Verifies requester is in participants list
+3. ✅ Decrypts using AES-256-CBC
+4. ✅ Handles both v1 (PBKDF2) and v2 (HMAC) encryption
+5. ✅ Caches decrypted key in memory (5-minute TTL)
+6. ✅ Returns decrypted private key</p>
+<p><strong>Decryption Process:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// Fetch encrypted payload</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">payload</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getEncryptedPayload</span><span class="p">(</span><span class="nx">splitWalletId</span><span class="p">);</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1">// Verify participant</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">isParticipant</span><span class="p">(</span><span class="nx">payload</span><span class="p">.</span><span class="nx">participants</span><span class="p">,</span><span class="w"> </span><span class="nx">requesterId</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">success</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Not a participant&#39;</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">}</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1">// Decrypt based on version</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">payload</span><span class="p">.</span><span class="nx">version</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s1">&#39;aes-256-cbc-v2&#39;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="c1">// Use HMAC key derivation (fast)</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">derivedKey</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">deriveEncryptionKey</span><span class="p">(</span><span class="nx">splitWalletId</span><span class="p">,</span><span class="w"> </span><span class="nx">salt</span><span class="p">,</span><span class="w"> </span><span class="kc">undefined</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;aes-256-cbc-v2&#39;</span><span class="p">);</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">  </span><span class="c1">// Use PBKDF2 key derivation (backward compatibility)</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">derivedKey</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">deriveEncryptionKey</span><span class="p">(</span><span class="nx">splitWalletId</span><span class="p">,</span><span class="w"> </span><span class="nx">salt</span><span class="p">,</span><span class="w"> </span><span class="nx">iterations</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;aes-256-cbc-v1&#39;</span><span class="p">);</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="p">}</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="c1">// Decrypt</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="kd">const</span><span class="w"> </span><span class="nx">decrypted</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">CryptoJS</span><span class="p">.</span><span class="nx">AES</span><span class="p">.</span><span class="nx">decrypt</span><span class="p">(</span><span class="nx">ciphertext</span><span class="p">,</span><span class="w"> </span><span class="nx">derivedKey</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">iv</span><span class="p">,</span><span class="w"> </span><span class="nx">mode</span><span class="p">,</span><span class="w"> </span><span class="nx">padding</span><span class="w"> </span><span class="p">});</span>
+</code></pre></div></p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h3 id="3-shared-wallet-private-key-retrieval">✅ <strong>3. Shared Wallet Private Key Retrieval</strong><a class="headerlink" href="#3-shared-wallet-private-key-retrieval" title="Permanent link">&para;</a></h3>
+<p><strong>Location:</strong> <code>src/services/sharedWallet/index.ts:209-232</code></p>
+<p><strong>Process:</strong>
+1. ✅ Reuses Degen Split retrieval system
+2. ✅ Calls <code>SplitWalletSecurity.getSplitWalletPrivateKey()</code>
+3. ✅ Verifies requester is a member
+4. ✅ Returns decrypted private key</p>
+<p><strong>Status:</strong> ✅ <strong>PROPERLY HANDLED</strong></p>
+<hr />
+<h2 id="potential-issues-verification">⚠️ <strong>Potential Issues &amp; Verification</strong><a class="headerlink" href="#potential-issues-verification" title="Permanent link">&para;</a></h2>
+<h3 id="1-address-format-validation">✅ <strong>1. Address Format Validation</strong><a class="headerlink" href="#1-address-format-validation" title="Permanent link">&para;</a></h3>
+<p><strong>Status:</strong> ✅ <strong>VERIFIED</strong>
+- All address retrieval validates format before use
+- Base58 pattern validation before PublicKey construction
+- Prevents base58 errors</p>
+<h3 id="2-address-vs-id-confusion">✅ <strong>2. Address vs ID Confusion</strong><a class="headerlink" href="#2-address-vs-id-confusion" title="Permanent link">&para;</a></h3>
+<p><strong>Status:</strong> ✅ <strong>VERIFIED</strong>
+- All transaction handlers fetch wallet object first
+- Extract <code>walletAddress</code> from wallet object
+- Never use database ID as address
+- Fixed in previous audit (base58 error fix)</p>
+<h3 id="3-private-key-format-handling">✅ <strong>3. Private Key Format Handling</strong><a class="headerlink" href="#3-private-key-format-handling" title="Permanent link">&para;</a></h3>
+<p><strong>Status:</strong> ✅ <strong>VERIFIED</strong>
+- Encryption handles base64, JSON array, and hex formats
+- Decryption tries multiple formats (UTF8, Base64)
+- KeypairUtils handles multiple formats
+- Fixed in previous audit (base58 error fix)</p>
+<h3 id="4-private-key-access-control">✅ <strong>4. Private Key Access Control</strong><a class="headerlink" href="#4-private-key-access-control" title="Permanent link">&para;</a></h3>
+<p><strong>Status:</strong> ✅ <strong>VERIFIED</strong>
+- Fair Split: Creator-only access (SecureStore key includes creatorId)
+- Degen Split: Participant verification before decryption
+- Shared Wallet: Member verification before decryption</p>
+<h3 id="5-address-derivation-from-private-key">✅ <strong>5. Address Derivation from Private Key</strong><a class="headerlink" href="#5-address-derivation-from-private-key" title="Permanent link">&para;</a></h3>
+<p><strong>Status:</strong> ✅ <strong>VERIFIED</strong>
+- Shared wallet withdrawal derives address from private key
+- Uses KeypairUtils to create keypair from private key
+- Validates derived address matches stored address</p>
+<hr />
+<h2 id="key-handling-checklist">📋 <strong>Key Handling Checklist</strong><a class="headerlink" href="#key-handling-checklist" title="Permanent link">&para;</a></h2>
+<h3 id="wallet-creation">Wallet Creation:<a class="headerlink" href="#wallet-creation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Fair Split: Generates wallet, stores address, stores private key securely</li>
+<li>[x] Degen Split: Generates wallet, stores address, stores encrypted private key for all participants</li>
+<li>[x] Shared Wallet: Generates wallet, stores address, stores encrypted private key for all members</li>
+</ul>
+<h3 id="address-storage">Address Storage:<a class="headerlink" href="#address-storage" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] All wallets store <code>walletAddress</code> in Firebase</li>
+<li>[x] All wallets store <code>publicKey</code> in Firebase</li>
+<li>[x] Address is validated before storage</li>
+<li>[x] Address is never stored as database ID</li>
+</ul>
+<h3 id="address-retrieval">Address Retrieval:<a class="headerlink" href="#address-retrieval" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] All transaction handlers fetch wallet object first</li>
+<li>[x] Extract <code>walletAddress</code> from wallet object</li>
+<li>[x] Validate address format before use</li>
+<li>[x] Validate with PublicKey constructor</li>
+</ul>
+<h3 id="private-key-storage_1">Private Key Storage:<a class="headerlink" href="#private-key-storage_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Fair Split: SecureStore (device-level encryption)</li>
+<li>[x] Degen Split: Firebase encrypted (AES-256-CBC)</li>
+<li>[x] Shared Wallet: Firebase encrypted (AES-256-CBC)</li>
+<li>[x] No private keys stored in plaintext</li>
+</ul>
+<h3 id="private-key-retrieval_1">Private Key Retrieval:<a class="headerlink" href="#private-key-retrieval_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Fair Split: SecureStore retrieval with creator verification</li>
+<li>[x] Degen Split: Firebase retrieval with participant verification</li>
+<li>[x] Shared Wallet: Firebase retrieval with member verification</li>
+<li>[x] All retrieval includes decryption</li>
+<li>[x] All retrieval includes format handling</li>
+</ul>
+<h3 id="security">Security:<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[x] Access control enforced</li>
+<li>[x] Encryption used for all Firebase-stored keys</li>
+<li>[x] Device-level encryption for SecureStore</li>
+<li>[x] Participant/member verification before decryption</li>
+</ul>
+<hr />
+<h2 id="summary">📝 <strong>Summary</strong><a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<p><strong>Status:</strong> ✅ <strong>ALL WALLET &amp; KEY HANDLING PROPERLY IMPLEMENTED</strong></p>
+<p><strong>Verified:</strong>
+- ✅ Wallet creation generates proper Solana wallets
+- ✅ Public keys/addresses are properly stored in Firebase
+- ✅ Private keys are properly stored (encrypted/secure)
+- ✅ Address resolution works correctly (fetches from database)
+- ✅ Private key retrieval works correctly (with access control)
+- ✅ Address format validation prevents base58 errors
+- ✅ Private key format handling supports multiple formats
+- ✅ Access control is properly enforced</p>
+<p><strong>No Issues Found:</strong>
+- All wallet creation processes are correct
+- All address storage/retrieval is correct
+- All private key storage/retrieval is correct
+- All security measures are in place</p>
+<p><strong>Overall:</strong> Wallet and key handling system is robust, secure, and properly implemented for all wallet types.</p>
+<hr />
+<p><strong>Last Updated:</strong> 2025-01-XX<br />
+<strong>Audit Status:</strong> ✅ <strong>COMPLETE</strong></p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="January 14, 2026 11:39:08 UTC">January 14, 2026</span>
+  </span>
+
+    
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
