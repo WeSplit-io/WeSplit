@@ -87,17 +87,31 @@ const MemberRightsScreen: React.FC = () => {
   // Initialize permissions when member is selected
   useEffect(() => {
     if (selectedMember && wallet) {
-      const currentPermissions = MemberRightsService.getMemberPermissions(selectedMember, wallet);
+      // ✅ FIX: Get permissions directly from member.permissions if they exist, otherwise use defaults
+      // This ensures we show the actual saved permissions, not just role defaults
+      const memberHasCustomPermissions = wallet.settings?.enableCustomPermissions && selectedMember.permissions;
+      const currentPermissions = memberHasCustomPermissions
+        ? {
+            ...MemberRightsService.getMemberPermissions(selectedMember, wallet),
+            ...selectedMember.permissions, // Custom permissions take precedence
+          }
+        : MemberRightsService.getMemberPermissions(selectedMember, wallet);
+      
       setPermissions({
-        canInviteMembers: currentPermissions.canInviteMembers,
-        canWithdraw: currentPermissions.canWithdraw,
-        canManageSettings: currentPermissions.canManageSettings,
-        canRemoveMembers: currentPermissions.canRemoveMembers,
-        canViewTransactions: currentPermissions.canViewTransactions,
-        canFund: currentPermissions.canFund,
+        canInviteMembers: currentPermissions.canInviteMembers ?? false,
+        canWithdraw: currentPermissions.canWithdraw ?? false,
+        canManageSettings: currentPermissions.canManageSettings ?? false,
+        canRemoveMembers: currentPermissions.canRemoveMembers ?? false,
+        canViewTransactions: currentPermissions.canViewTransactions ?? false,
+        canFund: currentPermissions.canFund ?? false,
       });
       setWithdrawalLimit(currentPermissions.withdrawalLimit?.toString() || '');
       setDailyWithdrawalLimit(currentPermissions.dailyWithdrawalLimit?.toString() || '');
+    } else {
+      // Reset when no member is selected
+      setPermissions({});
+      setWithdrawalLimit('');
+      setDailyWithdrawalLimit('');
     }
   }, [selectedMember, wallet]);
 
@@ -134,24 +148,43 @@ const MemberRightsScreen: React.FC = () => {
 
     setIsSaving(true);
     try {
+      // ✅ FIX: Build complete permissions object with all fields explicitly set
+      // This ensures we save all permissions, not just the ones that changed
       const updates: Partial<import('../../services/sharedWallet/types').SharedWalletMemberPermissions> = {
-        ...permissions,
+        // Explicitly set all boolean permissions (use false if undefined to clear previous values)
+        canInviteMembers: permissions.canInviteMembers ?? false,
+        canWithdraw: permissions.canWithdraw ?? false,
+        canManageSettings: permissions.canManageSettings ?? false,
+        canRemoveMembers: permissions.canRemoveMembers ?? false,
+        canViewTransactions: permissions.canViewTransactions ?? false,
+        canFund: permissions.canFund ?? false,
       };
 
-      // Add withdrawal limits if provided
+      // Add withdrawal limits if provided (only include if valid, otherwise omit to keep existing)
       if (withdrawalLimit.trim()) {
         const limit = parseFloat(withdrawalLimit);
         if (!isNaN(limit) && limit > 0) {
           updates.withdrawalLimit = limit;
         }
+        // If invalid, don't include in updates (keeps existing value or clears if needed)
       }
+      // If empty, don't include in updates (keeps existing value)
 
       if (dailyWithdrawalLimit.trim()) {
         const limit = parseFloat(dailyWithdrawalLimit);
         if (!isNaN(limit) && limit > 0) {
           updates.dailyWithdrawalLimit = limit;
         }
+        // If invalid, don't include in updates (keeps existing value or clears if needed)
       }
+      // If empty, don't include in updates (keeps existing value)
+      
+      logger.info('Saving member permissions', {
+        walletId: wallet.id,
+        memberId: selectedMember.userId,
+        permissions: updates,
+        note: 'All permission fields are explicitly set'
+      }, 'MemberRightsScreen');
 
       // Update permissions
       const result = await SharedWalletService.updateMemberPermissions(
@@ -162,10 +195,21 @@ const MemberRightsScreen: React.FC = () => {
       );
 
       if (result.success) {
-        // Reload wallet
+        // Reload wallet to get updated permissions
         const reloadResult = await SharedWalletService.getSharedWallet(wallet.id);
         if (reloadResult.success && reloadResult.wallet) {
           setWallet(reloadResult.wallet);
+          
+          // ✅ FIX: Update selectedMember with the updated member data from the reloaded wallet
+          const updatedMember = reloadResult.wallet.members.find(m => m.userId === selectedMember.userId);
+          if (updatedMember) {
+            setSelectedMember(updatedMember);
+            logger.info('Updated selected member with new permissions', {
+              memberId: updatedMember.userId,
+              hasCustomPermissions: !!updatedMember.permissions,
+              enableCustomPermissions: reloadResult.wallet.settings?.enableCustomPermissions
+            }, 'MemberRightsScreen');
+          }
         }
 
         Alert.alert('Success', 'Member permissions updated successfully', [

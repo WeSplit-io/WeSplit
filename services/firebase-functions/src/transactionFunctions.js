@@ -47,7 +47,11 @@ async function checkRateLimit(transactionBuffer, db) {
     console.warn('Rate limit check timed out - skipping to prevent blockhash expiration', {
       error: timeoutError.message
     });
-    throw timeoutError; // Let caller handle (they'll continue anyway)
+    // ✅ FIX: Throw a special error that callers can catch and ignore
+    // This allows callers to distinguish between timeout (non-critical) and rate limit exceeded (critical)
+    const timeoutErrorObj = new Error('Rate limit check timeout');
+    timeoutErrorObj.isTimeout = true; // Mark as timeout so callers can handle it gracefully
+    throw timeoutErrorObj;
   }
   
   if (rateLimitDoc.exists) {
@@ -268,7 +272,23 @@ exports.signTransaction = functions.runWith({
     await checkTransactionHash(transactionBuffer, db);
     
     // Check rate limit (using transaction hash instead of user ID)
-    await checkRateLimit(transactionBuffer, db);
+    // ✅ FIX: Make rate limit check non-blocking - don't fail transaction if rate limit check times out
+    try {
+      await checkRateLimit(transactionBuffer, db);
+    } catch (rateLimitError) {
+      // If it's a timeout, log warning but continue (rate limiting is non-critical)
+      // If it's rate limit exceeded, re-throw (this should block the transaction)
+      if (rateLimitError.isTimeout || rateLimitError.message.includes('timeout')) {
+        console.warn('Rate limit check timed out - proceeding with transaction', {
+          error: rateLimitError.message,
+          note: 'Rate limiting is non-critical. Transaction will proceed.'
+        });
+        // Don't throw - continue with transaction signing
+      } else {
+        // Rate limit exceeded - this should block the transaction
+        throw rateLimitError;
+      }
+    }
 
     // Validate transaction before signing
     await transactionSigningService.validateTransaction(transactionBuffer);
@@ -373,7 +393,23 @@ exports.submitTransaction = functions.runWith({
     }
 
     // Check rate limit (using transaction hash instead of user ID)
-    await checkRateLimit(transactionBuffer, db);
+    // ✅ FIX: Make rate limit check non-blocking - don't fail transaction if rate limit check times out
+    try {
+      await checkRateLimit(transactionBuffer, db);
+    } catch (rateLimitError) {
+      // If it's a timeout, log warning but continue (rate limiting is non-critical)
+      // If it's rate limit exceeded, re-throw (this should block the transaction)
+      if (rateLimitError.isTimeout || rateLimitError.message.includes('timeout')) {
+        console.warn('Rate limit check timed out - proceeding with transaction', {
+          error: rateLimitError.message,
+          note: 'Rate limiting is non-critical. Transaction will proceed.'
+        });
+        // Don't throw - continue with transaction submission
+      } else {
+        // Rate limit exceeded - this should block the transaction
+        throw rateLimitError;
+      }
+    }
 
     // Note: We skip validateTransaction here because:
     // 1. The transaction is already fully signed (both user and company signatures)
@@ -697,7 +733,23 @@ exports.validateTransaction = functions.runWith({
     }
 
     // Check rate limit (using transaction hash instead of user ID)
-    await checkRateLimit(transactionBuffer, db);
+    // ✅ FIX: Make rate limit check non-blocking - don't fail if rate limit check times out
+    try {
+      await checkRateLimit(transactionBuffer, db);
+    } catch (rateLimitError) {
+      // If it's a timeout, log warning but continue (rate limiting is non-critical)
+      // If it's rate limit exceeded, re-throw (this should block the transaction)
+      if (rateLimitError.isTimeout || rateLimitError.message.includes('timeout')) {
+        console.warn('Rate limit check timed out - proceeding with validation', {
+          error: rateLimitError.message,
+          note: 'Rate limiting is non-critical. Validation will proceed.'
+        });
+        // Don't throw - continue with validation
+      } else {
+        // Rate limit exceeded - this should block the transaction
+        throw rateLimitError;
+      }
+    }
 
     // Validate transaction
     await transactionSigningService.validateTransaction(transactionBuffer);
@@ -748,7 +800,23 @@ exports.getTransactionFeeEstimate = functions.runWith({
     }
 
     // Check rate limit (using transaction hash instead of user ID)
-    await checkRateLimit(transactionBuffer, db);
+    // ✅ FIX: Make rate limit check non-blocking - don't fail if rate limit check times out
+    try {
+      await checkRateLimit(transactionBuffer, db);
+    } catch (rateLimitError) {
+      // If it's a timeout, log warning but continue (rate limiting is non-critical)
+      // If it's rate limit exceeded, re-throw (this should block the transaction)
+      if (rateLimitError.isTimeout || rateLimitError.message.includes('timeout')) {
+        console.warn('Rate limit check timed out - proceeding with fee estimate', {
+          error: rateLimitError.message,
+          note: 'Rate limiting is non-critical. Fee estimate will proceed.'
+        });
+        // Don't throw - continue with fee estimate
+      } else {
+        // Rate limit exceeded - this should block the transaction
+        throw rateLimitError;
+      }
+    }
 
     // Get fee estimate
     const estimate = await transactionSigningService.getTransactionFeeEstimate(transactionBuffer);
@@ -815,7 +883,23 @@ exports.getCompanyWalletBalance = functions.runWith({
     // Create a dummy buffer for rate limiting (balance checks don't have transaction data)
     const dummyBuffer = Buffer.from(Date.now().toString());
     // Check rate limit (using timestamp hash instead of user ID)
-    await checkRateLimit(dummyBuffer, db);
+    // ✅ FIX: Make rate limit check non-blocking - don't fail if rate limit check times out
+    try {
+      await checkRateLimit(dummyBuffer, db);
+    } catch (rateLimitError) {
+      // If it's a timeout, log warning but continue (rate limiting is non-critical)
+      // If it's rate limit exceeded, re-throw (this should block the request)
+      if (rateLimitError.isTimeout || rateLimitError.message.includes('timeout')) {
+        console.warn('Rate limit check timed out - proceeding with balance check', {
+          error: rateLimitError.message,
+          note: 'Rate limiting is non-critical. Balance check will proceed.'
+        });
+        // Don't throw - continue with balance check
+      } else {
+        // Rate limit exceeded - this should block the request
+        throw rateLimitError;
+      }
+    }
 
     const balance = await transactionSigningService.getCompanyWalletBalance();
 

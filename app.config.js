@@ -1,4 +1,56 @@
-require('dotenv/config');
+const path = require('path');
+const fs = require('fs');
+
+// Load environment-specific .env file based on NODE_ENV
+const nodeEnv = process.env.NODE_ENV || 'development';
+const envFile = nodeEnv === 'production' ? '.env.production' : '.env.development';
+
+// Try to load environment-specific file first, fallback to .env
+const envPath = path.join(__dirname, envFile);
+const fallbackEnvPath = path.join(__dirname, '.env');
+
+if (fs.existsSync(envPath)) {
+  require('dotenv').config({ path: envPath });
+  console.log(`✅ Loaded environment from ${envFile}`);
+} else if (fs.existsSync(fallbackEnvPath)) {
+  require('dotenv').config({ path: fallbackEnvPath });
+  console.log(`✅ Loaded environment from .env (fallback)`);
+} else {
+  require('dotenv/config'); // Default dotenv behavior
+  console.log(`ℹ️  Using default dotenv behavior`);
+}
+
+// Helper functions to extract API keys from URLs
+function extractApiKey(value, baseUrl) {
+  if (!value) return '';
+  // If it's already a full URL, extract the key part
+  if (value.startsWith('http')) {
+    // For Alchemy: https://solana-mainnet.g.alchemy.com/v2/KEY
+    if (value.includes('alchemy.com')) {
+      const parts = value.split('/');
+      return parts[parts.length - 1] || value;
+    }
+    // For other URLs, extract the last part after the last slash
+    const parts = value.split('/');
+    return parts[parts.length - 1] || value;
+  }
+  // If it contains the base URL, extract just the key
+  if (value.includes(baseUrl)) {
+    return value.replace(baseUrl, '').replace(/^\//, '').replace(/\/$/, '');
+  }
+  // Otherwise, return as-is (should be just the key)
+  return value;
+}
+
+function extractGetBlockKey(value) {
+  if (!value) return '';
+  if (value.startsWith('http')) {
+    // Extract the API key from URL like https://go.getblock.io/API_KEY
+    const match = value.match(/go\.getblock\.io\/([^\/\s]+)/);
+    return match ? match[1] : (value.split('/').pop() || '');
+  }
+  return value;
+}
 
 // Helper to get environment variable with better error handling for production builds
 function getEnvVar(key, defaultValue = undefined) {
@@ -39,7 +91,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit",
-      buildNumber: "67",
+      buildNumber: "68",
       deploymentTarget: "15.1",
       googleServicesFile: "./GoogleService-Info.plist", // Uncomment when file is added
       infoPlist: {
@@ -71,7 +123,7 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit",
-      versionCode: 11267,
+      versionCode: 11268,
       googleServicesFile: "./google-services.json", // Uncomment when file is added
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
@@ -267,7 +319,26 @@ module.exports = {
           EXPO_PUBLIC_DEV_NETWORK: getEnvVar('EXPO_PUBLIC_DEV_NETWORK', 'devnet'),
         };
       })(),
-      EXPO_PUBLIC_HELIUS_API_KEY: getEnvVar('EXPO_PUBLIC_HELIUS_API_KEY'),
+      // Extract API keys from URLs if provided as full URLs
+      EXPO_PUBLIC_HELIUS_API_KEY: (() => {
+        const value = getEnvVar('EXPO_PUBLIC_HELIUS_API_KEY');
+        // Helius keys are usually just the key, but handle URLs if provided
+        if (value && value.startsWith('http')) {
+          const match = value.match(/helius-rpc\.com\/\?api-key=([^&\s]+)/);
+          return match ? match[1] : value;
+        }
+        return value;
+      })(),
+      EXPO_PUBLIC_ALCHEMY_API_KEY: (() => {
+        const value = getEnvVar('EXPO_PUBLIC_ALCHEMY_API_KEY');
+        // Extract key from URL like https://solana-mainnet.g.alchemy.com/v2/KEY
+        return extractApiKey(value, 'solana-mainnet.g.alchemy.com/v2');
+      })(),
+      EXPO_PUBLIC_GETBLOCK_API_KEY: (() => {
+        const value = getEnvVar('EXPO_PUBLIC_GETBLOCK_API_KEY');
+        // Extract key from URL like https://go.getblock.io/KEY
+        return extractGetBlockKey(value);
+      })(),
       
       // Company Fee Structure
       EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE: getEnvVar('EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE'),

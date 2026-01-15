@@ -35,6 +35,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { SharedWalletService, SharedWallet } from '../../services/sharedWallet';
+import { MemberRightsService } from '../../services/sharedWallet/MemberRightsService';
 import { useApp } from '../../context/AppContext';
 import { logger, LogData } from '../../services/analytics/loggingService';
 import { formatBalance } from '../../utils/ui/format/formatUtils';
@@ -275,6 +276,35 @@ const SharedWalletSettingsScreen: React.FC = () => {
   }
 
   const isCreator = wallet.creatorId === currentUser?.id?.toString();
+  
+  // ✅ FIX: Get current user's member data and permissions
+  const currentUserMember = wallet.members?.find(m => m.userId === currentUser?.id?.toString());
+  const userPermissions = currentUserMember 
+    ? MemberRightsService.getMemberPermissions(currentUserMember, wallet)
+    : null;
+  
+  // Permission checks for UI visibility
+  const canManageSettings = userPermissions?.canManageSettings ?? false;
+  
+  // Only creator or users with canManageSettings permission can access settings
+  if (!isCreator && !canManageSettings) {
+    return (
+      <Container>
+        <Header
+          title="Settings"
+          onBackPress={() => navigation.goBack()}
+          showBackButton={true}
+        />
+        <ErrorScreen
+          title="Access Denied"
+          message="You don't have permission to manage settings for this shared wallet"
+          onRetry={() => navigation.goBack()}
+          retryText="Go Back"
+          showIcon={false}
+        />
+      </Container>
+    );
+  }
   const truncatedAddress = wallet.walletAddress
     ? `${wallet.walletAddress.slice(0, 4)}...${wallet.walletAddress.slice(-4)}`
     : 'Unknown';
@@ -353,6 +383,90 @@ const SharedWalletSettingsScreen: React.FC = () => {
     normalizedDraftLogo,
     hasCustomizationChanges,
   ]);
+
+  const handleDeleteWallet = useCallback(async () => {
+    if (!wallet || !currentUser?.id) {
+      return;
+    }
+
+    // First confirmation
+    Alert.alert(
+      'Delete Shared Wallet',
+      `Are you sure you want to delete "${wallet.name}"? This will permanently delete the wallet and all its data, including transactions. This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            // Second confirmation with balance warning
+            const hasBalance = wallet.totalBalance > 0;
+            const warningMessage = hasBalance
+              ? `⚠️ WARNING: This wallet has ${wallet.totalBalance.toFixed(6)} ${wallet.currency || 'USDC'} in it. Deleting the wallet will NOT recover these funds. They will remain in the blockchain wallet but you will lose access to the wallet management interface.\n\nAre you absolutely sure you want to delete this wallet?`
+              : 'This action cannot be undone. Are you absolutely sure?';
+
+            Alert.alert(
+              'Final Confirmation',
+              warningMessage,
+              [
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                },
+                {
+                  text: 'Yes, Delete',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      logger.info('Deleting shared wallet', {
+                        walletId: wallet.id,
+                        walletName: wallet.name,
+                        balance: wallet.totalBalance
+                      }, 'SharedWalletSettingsScreen');
+
+                      const result = await SharedWalletService.deleteSharedWallet(
+                        wallet.id,
+                        currentUser.id.toString()
+                      );
+
+                      if (result.success) {
+                        Alert.alert(
+                          'Wallet Deleted',
+                          'The shared wallet has been permanently deleted.',
+                          [
+                            {
+                              text: 'OK',
+                              onPress: () => {
+                                // Navigate back to splits list
+                                (navigation as any).navigate('SplitsList', {
+                                  activeTab: 'sharedWallets',
+                                });
+                              },
+                            },
+                          ]
+                        );
+                      } else {
+                        Alert.alert('Error', result.error || 'Failed to delete shared wallet');
+                      }
+                    } catch (error) {
+                      logger.error('Error deleting shared wallet', {
+                        error: error instanceof Error ? error.message : String(error),
+                        walletId: wallet.id
+                      }, 'SharedWalletSettingsScreen');
+                      Alert.alert('Error', 'An unexpected error occurred while deleting the wallet');
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  }, [wallet, currentUser?.id, navigation]);
 
   const handleGoalConfirm = useCallback(async () => {
     if (!wallet || !currentUser?.id) return;
@@ -646,6 +760,29 @@ const SharedWalletSettingsScreen: React.FC = () => {
                 <Text style={styles.optionSubtitle}>Select your wallet main color</Text>
               </View>
               <PhosphorIcon name="PencilSimple" size={18} color={colors.white70} weight="regular" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ✅ FIX: Delete Wallet Section - Only visible to creator */}
+        {isCreator && (
+          <View style={styles.sectionGroup}>
+            <Text style={styles.sectionHeading}>Danger Zone</Text>
+            <TouchableOpacity
+              style={[styles.walletCard, styles.deleteCard]}
+              onPress={handleDeleteWallet}
+              activeOpacity={0.8}
+            >
+              <View style={styles.deleteContent}>
+                <PhosphorIcon name="Trash" size={24} color={colors.red} weight="bold" />
+                <View style={styles.deleteTextBlock}>
+                  <Text style={styles.deleteTitle}>Delete Shared Wallet</Text>
+                  <Text style={styles.deleteSubtitle}>
+                    Permanently delete this wallet and all its data. This action cannot be undone.
+                  </Text>
+                </View>
+              </View>
+              <PhosphorIcon name="CaretRight" size={18} color={colors.red} weight="regular" />
             </TouchableOpacity>
           </View>
         )}
@@ -1157,6 +1294,31 @@ const styles = StyleSheet.create({
     color: colors.green,
     marginTop: spacing.xs,
     fontWeight: typography.fontWeight.medium,
+  },
+  deleteCard: {
+    borderColor: 'rgba(255, 59, 48, 0.4)',
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+  },
+  deleteContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
+  },
+  deleteTextBlock: {
+    flex: 1,
+  },
+  deleteTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#FF3B30',
+    marginBottom: spacing.xs / 2,
+  },
+  deleteSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+    lineHeight: typography.fontSize.sm * 1.4,
   },
 });
 

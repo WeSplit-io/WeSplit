@@ -31,6 +31,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { SharedWalletService, SharedWallet } from '../../services/sharedWallet';
+import { MemberRightsService } from '../../services/sharedWallet/MemberRightsService';
 import SharedWalletHeroCard from '../../components/SharedWalletHeroCard';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
@@ -105,6 +106,22 @@ const SharedWalletDetailsScreen: React.FC = () => {
       setIsLoadingTransactions(false);
     }
   }, [wallet?.id]);
+
+  // ✅ FIX: Redirect to members tab if user can't view transactions
+  useEffect(() => {
+    if (activeTab === 'transactions' && wallet && currentUser?.id) {
+      const currentUserMember = wallet.members?.find(m => m.userId === currentUser?.id?.toString());
+      const userPermissions = currentUserMember 
+        ? MemberRightsService.getMemberPermissions(currentUserMember, wallet)
+        : null;
+      const canViewTransactions = userPermissions?.canViewTransactions ?? false;
+      const isCreator = wallet.creatorId === currentUser?.id?.toString();
+      
+      if (!canViewTransactions && !isCreator) {
+        setActiveTab('members');
+      }
+    }
+  }, [activeTab, wallet, currentUser?.id]);
 
   // Set up real-time listener for wallet updates
   useEffect(() => {
@@ -363,6 +380,20 @@ const SharedWalletDetailsScreen: React.FC = () => {
   }
 
   const isCreator = wallet.creatorId === currentUser?.id?.toString();
+  
+  // ✅ FIX: Get current user's member data and permissions
+  const currentUserMember = wallet.members?.find(m => m.userId === currentUser?.id?.toString());
+  const userPermissions = currentUserMember 
+    ? MemberRightsService.getMemberPermissions(currentUserMember, wallet)
+    : null;
+  
+  // Permission checks for UI visibility
+  const canWithdraw = userPermissions?.canWithdraw ?? false;
+  const canFund = userPermissions?.canFund ?? false;
+  const canInviteMembers = userPermissions?.canInviteMembers ?? false;
+  const canManageSettings = userPermissions?.canManageSettings ?? false;
+  const canViewTransactions = userPermissions?.canViewTransactions ?? false;
+  
   const goalAmount = wallet.settings?.goalAmount;
   const hasGoal = typeof goalAmount === 'number' && goalAmount > 0;
   const goalTargetAmount = goalAmount ?? 0;
@@ -376,16 +407,19 @@ const SharedWalletDetailsScreen: React.FC = () => {
         onBackPress={handleBack}
         showBackButton={true}
         rightElement={
-          <TouchableOpacity
-            onPress={() => (navigation as any).navigate('SharedWalletSettings', {
-              walletId: wallet.id,
-              wallet: wallet,
-            })}
-            activeOpacity={0.7}
-            style={styles.headerIconButton}
-          >
-            <PhosphorIcon name="Gear" size={22} color={colors.white} weight="regular" />
-          </TouchableOpacity>
+          // ✅ FIX: Only show settings button if user can manage settings
+          (canManageSettings || isCreator) ? (
+            <TouchableOpacity
+              onPress={() => (navigation as any).navigate('SharedWalletSettings', {
+                walletId: wallet.id,
+                wallet: wallet,
+              })}
+              activeOpacity={0.7}
+              style={styles.headerIconButton}
+            >
+              <PhosphorIcon name="Gear" size={22} color={colors.white} weight="regular" />
+            </TouchableOpacity>
+          ) : null
         }
       />
 
@@ -400,7 +434,9 @@ const SharedWalletDetailsScreen: React.FC = () => {
         </View>
 
         {/* Action Buttons - Withdraw and Top Up */}
+        {/* ✅ FIX: Only show buttons if user has the required permissions */}
         <View style={styles.actionButtonsContainer}>
+          {canWithdraw && (
           <TouchableOpacity
             style={styles.dashboardActionButton}
             activeOpacity={0.8}
@@ -464,7 +500,9 @@ const SharedWalletDetailsScreen: React.FC = () => {
             <PhosphorIcon name="ArrowLineUp" size={22} color={colors.white} weight="bold" />
             <Text style={styles.dashboardActionButtonLabel}>Withdraw</Text>
           </TouchableOpacity>
+          )}
 
+          {canFund && (
           <TouchableOpacity
             style={styles.dashboardActionButton}
             activeOpacity={0.8}
@@ -536,6 +574,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
             <PhosphorIcon name="ArrowLineDown" size={22} color={colors.white} weight="bold" />
             <Text style={styles.dashboardActionButtonLabel}>Top Up</Text>
           </TouchableOpacity>
+          )}
         </View>
 
         {shouldShowGoalProgress ? (
@@ -548,10 +587,11 @@ const SharedWalletDetailsScreen: React.FC = () => {
         ) : null}
 
         {/* Tabs - Transactions and Members */}
+        {/* ✅ FIX: Only show transactions tab if user can view transactions */}
         <View style={styles.tabsContainer}>
           <TabSecondary
             tabs={[
-              { label: `Transactions (${transactions.length})`, value: 'transactions' },
+              ...(canViewTransactions || isCreator ? [{ label: `Transactions (${transactions.length})`, value: 'transactions' }] : []),
               { label: `Members (${wallet.members?.length || 0})`, value: 'members' }
             ]}
             activeTab={activeTab}
@@ -559,37 +599,49 @@ const SharedWalletDetailsScreen: React.FC = () => {
             fullWidthTabs
           />
         </View>
+        
 
         {/* Tab Content */}
+        {/* ✅ FIX: Only show transactions tab if user can view transactions */}
         {activeTab === 'transactions' && (
           <View style={styles.tabContent}>
-            {isLoadingTransactions ? (
-              <View style={styles.loadingContainer}>
-                <ModernLoader size="medium" text="Loading transactions..." />
+            {!canViewTransactions && !isCreator ? (
+              <View style={styles.noAccessContainer}>
+                <Text style={styles.noAccessText}>You don't have permission to view transactions</Text>
               </View>
-            ) : transactions.length > 0 ? (
-              <TransactionHistory
-                transactions={transactions}
-                isLoading={isLoadingTransactions}
-                variant="sharedWallet"
-                hideChrome
-              />
             ) : (
-              <View style={styles.emptyTransactions}>
-                <View style={styles.emptyTransactionsIcon}>
-                  <PhosphorIcon name="Receipt" size={24} color={colors.white70} weight="regular" />
-                </View>
-                <Text style={styles.emptyTransactionsTitle}>No transactions yet</Text>
-              </View>
+              <>
+                {isLoadingTransactions ? (
+                  <View style={styles.loadingContainer}>
+                    <ModernLoader size="medium" text="Loading transactions..." />
+                  </View>
+                ) : transactions.length > 0 ? (
+                  <TransactionHistory
+                    transactions={transactions}
+                    isLoading={isLoadingTransactions}
+                    variant="sharedWallet"
+                    hideChrome
+                  />
+                ) : (
+                  <View style={styles.emptyTransactions}>
+                    <View style={styles.emptyTransactionsIcon}>
+                      <PhosphorIcon name="Receipt" size={24} color={colors.white70} weight="regular" />
+                    </View>
+                    <Text style={styles.emptyTransactionsTitle}>No transactions yet</Text>
+                  </View>
+                )}
+              </>
             )}
-            </View>
-            )}
+          </View>
+        )}
 
         {activeTab === 'members' && (
           <View style={styles.tabContent}>
-            {/* Add Member Button for Creator */}
-            {isCreator && (
+            {/* ✅ FIX: Show management buttons based on permissions, not just creator role */}
+            {(isCreator || canManageSettings) && (
               <View style={styles.memberManagementContainer}>
+                {/* Only creator can manage rights */}
+                {isCreator && (
                 <TouchableOpacity
                   style={styles.manageRightsButton}
                   onPress={() => {
@@ -603,6 +655,9 @@ const SharedWalletDetailsScreen: React.FC = () => {
                   <PhosphorIcon name="SlidersHorizontal" size={18} color={colors.white} weight="bold" />
                   <Text style={styles.manageRightsLabel}>Manage rights</Text>
                 </TouchableOpacity>
+                )}
+                {/* Show add member button if user can invite */}
+                {(canInviteMembers || isCreator) && (
                 <TouchableOpacity
                   style={styles.addMemberButton}
                   onPress={() => (navigation as any).navigate('SharedWalletMembers', {
@@ -614,6 +669,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
                   <PhosphorIcon name="Plus" size={18} color={colors.white} weight="bold" />
                   <Text style={styles.addMemberLabel}>Add</Text>
                 </TouchableOpacity>
+                )}
                 </View>
             )}
 
@@ -766,6 +822,17 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
+  },
+  noAccessContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    marginTop: spacing.lg,
+  },
+  noAccessText: {
+    fontSize: typography.fontSize.md,
+    color: colors.white70,
+    textAlign: 'center',
   },
   emptyStateContainer: {
     alignItems: 'center',

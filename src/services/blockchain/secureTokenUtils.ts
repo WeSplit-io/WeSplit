@@ -25,19 +25,30 @@ export const createTransferInstruction = originalCreateTransferInstruction;
  * Secure implementation of getAccount
  * Gets token account information using safe parsing to avoid vulnerable bigint-buffer operations
  * Returns the same interface as @solana/spl-token getAccount
+ * 
+ * ✅ FIX: Added retry logic for network failures
  */
 export async function getAccount(
   connection: any,
   address: PublicKey,
-  commitment?: string
+  commitment?: string,
+  retries: number = 3
 ) {
-  try {
-    // Get account info from the network
-    const accountInfo = await connection.getAccountInfo(address, commitment);
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      // Get account info from the network with timeout
+      const accountInfo = await Promise.race([
+        connection.getAccountInfo(address, commitment),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('getAccountInfo timeout after 15s')), 15000)
+        )
+      ]) as any;
 
-    if (!accountInfo) {
-      throw new Error('Token account not found');
-    }
+      if (!accountInfo) {
+        throw new Error('Token account not found');
+      }
 
     // Parse account data safely - matches Solana Token Account layout (165 bytes)
     const data = accountInfo.data;
@@ -84,29 +95,52 @@ export async function getAccount(
     offset += 4;
     const closeAuthority = closeAuthorityOption !== 0 ? new PublicKey(data.slice(offset, offset + 32)) : null;
 
-    // Return object matching @solana/spl-token interface
-    return {
-      address,
-      mint,
-      owner,
-      amount, // BigInt as expected by the interface
-      delegate,
-      delegatedAmount,
-      isInitialized,
-      isFrozen,
-      isNative,
-      rentExemptReserve: null, // Not used in modern token accounts
-      closeAuthority,
-    };
-  } catch (error) {
-    // If account doesn't exist, this is expected behavior - don't log as error
-    // The caller will handle it by creating the account
-    if (error instanceof Error && error.message === 'Token account not found') {
-      // Re-throw without logging - this is expected when checking if account exists
-      throw error;
+      // Return object matching @solana/spl-token interface
+      return {
+        address,
+        mint,
+        owner,
+        amount, // BigInt as expected by the interface
+        delegate,
+        delegatedAmount,
+        isInitialized,
+        isFrozen,
+        isNative,
+        rentExemptReserve: null, // Not used in modern token accounts
+        closeAuthority,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // If account doesn't exist, this is expected behavior - don't retry
+      if (lastError.message === 'Token account not found' || 
+          lastError.message.includes('not found')) {
+        throw lastError;
+      }
+      
+      // For network errors, retry with exponential backoff
+      if (lastError.message.includes('Network request failed') ||
+          lastError.message.includes('timeout') ||
+          lastError.message.includes('fetch failed') ||
+          lastError.message.includes('ECONNREFUSED') ||
+          lastError.message.includes('ENOTFOUND')) {
+        
+        if (attempt < retries - 1) {
+          const delayMs = Math.min(1000 * Math.pow(2, attempt), 5000); // Max 5s delay
+          console.warn(`getAccount network error (attempt ${attempt + 1}/${retries}), retrying in ${delayMs}ms...`, {
+            address: address.toBase58(),
+            error: lastError.message
+          });
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          continue; // Retry
+        }
+      }
+      
+      // If not a network error or out of retries, throw immediately
+      throw lastError;
     }
-    // For other errors, log them
-    console.error('Error in secure getAccount:', error);
-    throw error;
   }
+  
+  // If we exhausted all retries, throw the last error
+  throw lastError || new Error('getAccount failed after all retries');
 }

@@ -937,8 +937,20 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
       const functions = getFirebaseFunctions();
       const wasUsingEmulator = (functions as any)?._emulatorConnected === true;
       
+      // Check if client is on devnet before allowing fallback to production
+      // CRITICAL: Prevent network mismatch - don't fallback to production (mainnet) when client is on devnet
+      const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
+      const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
+      const appEnv = getEnvVar('APP_ENV');
+      const isProduction = buildProfile === 'production' || 
+                          appEnv === 'production' ||
+                          process.env.NODE_ENV === 'production' ||
+                          !__DEV__;
+      const isClientDevnet = !isProduction && networkEnv.toLowerCase() !== 'mainnet' && getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') !== 'true';
+      
       // If emulator was configured but call failed with connection/internal error, try production
-      if (wasUsingEmulator && (isInternalError || isConnectionError) && __DEV__) {
+      // ONLY if NOT on devnet (to prevent network mismatch)
+      if (wasUsingEmulator && (isInternalError || isConnectionError) && __DEV__ && !isClientDevnet) {
         logger.warn('⚠️ Emulator call failed, attempting fallback to production Functions', {
           errorCode,
           errorMessage,
@@ -1024,15 +1036,33 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
           const prodErrorCode = prodError?.code || 'NO_CODE';
           const prodErrorMessage = prodError?.message || 'No error message';
           
+          // Early return if on devnet - should not have reached here, but check for safety
+          if (isClientDevnet) {
+            logger.error('❌ Production Functions fallback attempted on devnet (should not happen)', {
+              errorCode: prodErrorCode,
+              errorMessage: prodErrorMessage,
+              clientNetwork: 'devnet',
+              note: 'This should not happen - fallback to production should be prevented on devnet. Emulator must be running for devnet transactions.'
+            }, 'TransactionSigningService');
+            
+            throw new Error(
+              `Firebase Functions emulator is required for devnet transactions. ` +
+              `The emulator must be running. ` +
+              `Please start the Firebase Functions emulator: ` +
+              `\`firebase emulators:start --only functions\` ` +
+              `\n\nError details: ${prodErrorMessage}`
+            );
+          }
+          
           // Check if error mentions transaction not found (network mismatch issue)
           const isTransactionNotFound = prodErrorMessage.includes('Transaction not found on blockchain') || 
                                         prodErrorMessage.includes('Transaction may have been rejected');
           
-          // Check for network mismatch
-          const networkEnv = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
-          const isClientDevnet = !isProduction && networkEnv.toLowerCase() !== 'mainnet' && getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') !== 'true';
+          // Check for network mismatch (re-check for safety, though isClientDevnet already checked above)
+          const networkEnvCheck = getEnvVar('EXPO_PUBLIC_NETWORK') || getEnvVar('EXPO_PUBLIC_DEV_NETWORK') || '';
+          const isClientDevnetCheck = !isProduction && networkEnvCheck.toLowerCase() !== 'mainnet' && getEnvVar('EXPO_PUBLIC_FORCE_MAINNET') !== 'true';
           
-          if (isTransactionNotFound && isClientDevnet) {
+          if (isTransactionNotFound && isClientDevnetCheck) {
             logger.error('❌ Transaction not found - possible network mismatch', {
               errorCode: prodErrorCode,
               errorMessage: prodErrorMessage,
@@ -1078,6 +1108,27 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
           // Re-throw the original error (not the production error)
           throw firebaseError;
         }
+      } else if (wasUsingEmulator && isClientDevnet && (isInternalError || isConnectionError)) {
+        // Emulator failed on devnet - cannot fallback to production (would cause network mismatch)
+        // Provide clear error message with instructions
+        logger.error('❌ Firebase Functions emulator failed on devnet', {
+          errorCode,
+          errorMessage,
+          clientNetwork: 'devnet',
+          emulatorHost: (functions as any)?._emulatorHost,
+          emulatorPort: (functions as any)?._emulatorPort,
+          isInternalError,
+          isConnectionError,
+          note: 'Emulator must be running for devnet transactions. Production Functions cannot be used on devnet to prevent network mismatch.'
+        }, 'TransactionSigningService');
+        
+        throw new Error(
+          `Firebase Functions emulator is not available or failed. ` +
+          `The emulator must be running for devnet transactions. ` +
+          `Please start the Firebase Functions emulator: ` +
+          `\`firebase emulators:start --only functions\` ` +
+          `\n\nError details: ${errorMessage}`
+        );
       } else {
         // Not an emulator connection issue, or emulator wasn't being used
       logger.error('❌ Firebase Function processUsdcTransfer FAILED', {
@@ -1335,13 +1386,20 @@ export async function getCompanyWalletAddress(): Promise<string> {
       }
       
       // In development, allow fallback to env var for testing
+      const envAddress = getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS');
       logger.warn('Falling back to environment variable in development', {
-        hasEnvVar: !!getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS')
+        hasEnvVar: !!envAddress,
+        envAddress: envAddress ? envAddress.substring(0, 8) + '...' + envAddress.substring(envAddress.length - 8) : 'NOT_SET',
+        envAddressLength: envAddress?.length || 0
       }, 'TransactionSigningService');
       
-      const envAddress = getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS');
       if (envAddress) {
-        cachedCompanyWalletAddress = envAddress.trim();
+        const trimmedAddress = envAddress.trim();
+        logger.info('Using company wallet address from environment variable', {
+          address: trimmedAddress.substring(0, 8) + '...' + trimmedAddress.substring(trimmedAddress.length - 8),
+          addressLength: trimmedAddress.length
+        }, 'TransactionSigningService');
+        cachedCompanyWalletAddress = trimmedAddress;
         return cachedCompanyWalletAddress;
       }
       

@@ -699,12 +699,123 @@ class ExternalTransferService {
       const { VersionedTransaction } = await import('@solana/web3.js');
       let versionedTransaction: VersionedTransaction;
       try {
-        versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+        const compiledMessage = transaction.compileMessage();
+        
+        // ✅ CRITICAL: Verify fee payer is at index 0 before creating VersionedTransaction
+        const feePayerAt0 = compiledMessage.staticAccountKeys[0];
+        if (!feePayerAt0 || feePayerAt0.toBase58() !== feePayerPublicKey.toBase58()) {
+          logger.error('Fee payer is not at index 0 in compiled message', {
+            expected: feePayerPublicKey.toBase58(),
+            got: feePayerAt0?.toBase58(),
+            staticAccountKeys: compiledMessage.staticAccountKeys.map(k => k.toBase58()),
+            note: 'Transaction feePayer property may not be respected. Rebuilding transaction.'
+          }, 'ExternalTransferService');
+          
+          // Rebuild transaction ensuring fee payer is first
+          // The issue is that Solana orders accounts based on instruction order
+          // We need to ensure fee payer is referenced first in a way that makes it index 0
+          const rebuiltTransaction = new Transaction({
+            recentBlockhash: blockhash,
+            feePayer: feePayerPublicKey
+          });
+          
+          // Re-add instructions in order that ensures fee payer stays at index 0
+          if (priorityFee > 0) {
+            rebuiltTransaction.add(
+              ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: priorityFee,
+              })
+            );
+          }
+          
+          if (needsTokenAccountCreation) {
+            rebuiltTransaction.add(
+              createAssociatedTokenAccountInstruction(
+                feePayerPublicKey,
+                toTokenAccount,
+                toPublicKey,
+                usdcMint
+              )
+            );
+          }
+          
+          rebuiltTransaction.add(
+            createTransferInstruction(
+              fromTokenAccount,
+              toTokenAccount,
+              fromPublicKey,
+              transferAmount,
+              [],
+              TOKEN_PROGRAM_ID
+            )
+          );
+          
+          if (companyFee > 0) {
+            const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5);
+            const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, feePayerPublicKey);
+            rebuiltTransaction.add(
+              createTransferInstruction(
+                fromTokenAccount,
+                companyTokenAccount,
+                fromPublicKey,
+                companyFeeAmount,
+                [],
+                TOKEN_PROGRAM_ID
+              )
+            );
+          }
+          
+          if (params.memo) {
+            rebuiltTransaction.add(
+              new TransactionInstruction({
+                keys: [{ pubkey: feePayerPublicKey, isSigner: true, isWritable: true }],
+                data: Buffer.from(params.memo, 'utf8'),
+                programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
+              })
+            );
+          }
+          
+          const rebuiltMessage = rebuiltTransaction.compileMessage();
+          const rebuiltFeePayer = rebuiltMessage.staticAccountKeys[0];
+          
+          if (!rebuiltFeePayer || rebuiltFeePayer.toBase58() !== feePayerPublicKey.toBase58()) {
+            logger.error('Failed to fix fee payer position after rebuild', {
+              expected: feePayerPublicKey.toBase58(),
+              got: rebuiltFeePayer?.toBase58(),
+              staticAccountKeys: rebuiltMessage.staticAccountKeys.map(k => k.toBase58())
+            }, 'ExternalTransferService');
+            return {
+              success: false,
+              error: `Transaction fee payer is not company wallet. Expected: ${feePayerPublicKey.toBase58()}, Got: ${rebuiltFeePayer?.toBase58()}. Please ensure company wallet is configured correctly.`
+            };
+          }
+          
+          versionedTransaction = new VersionedTransaction(rebuiltMessage);
+        } else {
+          versionedTransaction = new VersionedTransaction(compiledMessage);
+        }
+        
         // Sign the versioned transaction with user keypair (only sign once)
         versionedTransaction.sign([userKeypair]);
+        
+        // ✅ CRITICAL: Verify fee payer is still at index 0 after signing
+        const finalFeePayer = versionedTransaction.message.staticAccountKeys[0];
+        if (!finalFeePayer || finalFeePayer.toBase58() !== feePayerPublicKey.toBase58()) {
+          logger.error('Fee payer changed after signing', {
+            expected: feePayerPublicKey.toBase58(),
+            got: finalFeePayer?.toBase58(),
+            staticAccountKeys: versionedTransaction.message.staticAccountKeys.map(k => k.toBase58())
+          }, 'ExternalTransferService');
+          return {
+            success: false,
+            error: `Transaction fee payer is not company wallet. Expected: ${feePayerPublicKey.toBase58()}, Got: ${finalFeePayer?.toBase58()}. Please ensure company wallet is configured correctly.`
+          };
+        }
+        
         logger.info('Transaction converted to VersionedTransaction and signed', {
           userAddress: userKeypair.publicKey.toBase58(),
-          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+          feePayer: finalFeePayer.toBase58(),
+          feePayerVerified: true
         }, 'ExternalTransferService');
       } catch (versionError) {
         logger.error('Failed to convert transaction to VersionedTransaction', {

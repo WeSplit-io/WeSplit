@@ -130,7 +130,13 @@ const SharedWalletMembersScreen: React.FC = () => {
       return;
     }
 
+    // ✅ FIX: Prevent duplicate submissions - check if already submitting
     if (isSubmitting || loadingWallet) {
+      logger.warn('Prevented duplicate submission', {
+        isSubmitting,
+        loadingWallet,
+        isCreatingNewWallet
+      }, 'SharedWalletMembersScreen');
       return;
     }
 

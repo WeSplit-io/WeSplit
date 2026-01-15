@@ -33,7 +33,11 @@ export type NotificationType =
   | 'shared_wallet_funding'
   | 'shared_wallet_withdrawal'
   | 'shared_wallet_goal_reached'
-  | 'shared_wallet_permissions_updated';
+  | 'shared_wallet_permissions_updated'
+  | 'shared_wallet_member_accepted'
+  | 'shared_wallet_member_removed'
+  | 'shared_wallet_settings_updated'
+  | 'shared_wallet_role_changed';
 
 // Unified notification data interface
 export interface NotificationData {
@@ -96,7 +100,9 @@ export function isNotificationType(type: string): type is NotificationType {
     'degen_ready_to_roll', 'roulette_result', 'split_lock_required', 'contact_added', 
     'split_accepted', 'split_declined', 'split_paid', 'split_confirmed',
     'shared_wallet_invite', 'shared_wallet_funding', 'shared_wallet_withdrawal', 
-    'shared_wallet_goal_reached', 'shared_wallet_permissions_updated'
+    'shared_wallet_goal_reached', 'shared_wallet_permissions_updated',
+    'shared_wallet_member_accepted', 'shared_wallet_member_removed',
+    'shared_wallet_settings_updated', 'shared_wallet_role_changed'
   ];
   return validTypes.includes(type as NotificationType);
 }

@@ -126,7 +126,17 @@ class NotificationServiceClass {
       'split_confirmed',      // Split is confirmed
       'contact_added',        // New contact added
       'system_warning',       // Important system warnings
-      'payment_reminder'      // Payment reminders
+      'payment_reminder',     // Payment reminders
+      // Shared wallet notifications
+      'shared_wallet_invite',           // User invited to shared wallet
+      'shared_wallet_funding',          // Shared wallet funded
+      'shared_wallet_withdrawal',       // Shared wallet withdrawal
+      'shared_wallet_goal_reached',     // Shared wallet goal reached
+      'shared_wallet_permissions_updated', // Permissions updated
+      'shared_wallet_member_accepted',  // Member accepted invitation
+      'shared_wallet_member_removed',   // Member removed
+      'shared_wallet_settings_updated',  // Settings updated
+      'shared_wallet_role_changed'      // Member role changed
     ];
     
     return pushNotificationTypes.includes(type);

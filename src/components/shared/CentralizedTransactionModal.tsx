@@ -186,6 +186,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
       setSharedWalletBalance(null);
       setSharedWalletAddress(null);
       setUserAvailableBalance(null);
+      setIsLoadingSharedWalletData(false); // ✅ FIX: Reset loading state for all contexts, not just withdrawal
       return;
     }
 

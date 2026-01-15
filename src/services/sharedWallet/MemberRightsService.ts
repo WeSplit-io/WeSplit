@@ -209,6 +209,16 @@ export class MemberRightsService {
 
       const { wallet, walletDocId } = result;
 
+      // ✅ FIX: Verify user is authenticated
+      const { getAuth } = await import('firebase/auth');
+      const auth = getAuth();
+      if (!auth.currentUser || auth.currentUser.uid !== updaterId) {
+        return {
+          success: false,
+          error: 'User not authenticated or user ID mismatch',
+        };
+      }
+
       // Verify updater has permission
       const updater = wallet.members.find((m) => m.userId === updaterId);
       if (!updater) {
@@ -250,42 +260,113 @@ export class MemberRightsService {
         };
       }
 
-      // Update member permissions
+      // ✅ FIX: Update member permissions - merge provided permissions with existing
+      // This ensures that all fields are preserved, and only updated fields change
       const updatedMembers = wallet.members.map((m) => {
         if (m.userId === memberId) {
+          // Start with existing permissions (if any)
+          const existingPermissions = m.permissions || {};
+          
+          // Merge with new permissions (new permissions override existing)
+          const mergedPermissions: Partial<SharedWalletMemberPermissions> = {
+            ...existingPermissions,
+            ...permissions, // New permissions override existing ones
+          };
+          
+          // Remove undefined values (but keep false values - they're intentional)
+          const cleanedPermissions: Partial<SharedWalletMemberPermissions> = {};
+          Object.keys(mergedPermissions).forEach(key => {
+            const value = mergedPermissions[key as keyof SharedWalletMemberPermissions];
+            if (value !== undefined) {
+              cleanedPermissions[key as keyof SharedWalletMemberPermissions] = value;
+            }
+          });
+          
+          logger.info('Updating member permissions', {
+            walletId,
+            memberId,
+            existingPermissions: Object.keys(existingPermissions),
+            newPermissions: Object.keys(permissions),
+            finalPermissions: Object.keys(cleanedPermissions),
+            permissionValues: cleanedPermissions,
+            note: 'Merging new permissions with existing, keeping all explicitly set fields'
+          }, 'MemberRightsService');
+          
           return {
             ...m,
-            permissions: {
-              ...(m.permissions || {}),
-              ...permissions,
-            },
+            permissions: Object.keys(cleanedPermissions).length > 0 ? cleanedPermissions : undefined,
           };
         }
         return m;
       });
 
+      // ✅ FIX: Enable custom permissions in wallet settings if not already enabled
+      // This ensures that custom permissions are actually used when retrieved
+      const currentSettings = wallet.settings || {};
+      const needsEnableCustomPermissions = !currentSettings.enableCustomPermissions;
+      const updatedSettings = needsEnableCustomPermissions
+        ? { ...currentSettings, enableCustomPermissions: true }
+        : currentSettings;
+
       // ✅ FIX: Use runTransaction for atomic update to ensure consistency and trigger listeners
       const { runTransaction } = await import('firebase/firestore');
-      await runTransaction(db, async (transaction) => {
-        const walletDocRef = doc(db, 'sharedWallets', walletDocId);
-        const walletDoc = await transaction.get(walletDocRef);
+      try {
+        await runTransaction(db, async (transaction) => {
+          const walletDocRef = doc(db, 'sharedWallets', walletDocId);
+          const walletDoc = await transaction.get(walletDocRef);
+          
+          if (!walletDoc.exists()) {
+            throw new Error('Shared wallet not found');
+          }
+          
+          // Update both members and settings if needed
+          const updateData: any = {
+            members: updatedMembers,
+            updatedAt: serverTimestamp(),
+          };
+          
+          // Only update settings if we need to enable custom permissions
+          if (needsEnableCustomPermissions) {
+            updateData.settings = updatedSettings;
+            logger.info('Enabling custom permissions in wallet settings', {
+              walletId,
+              note: 'Custom permissions are now enabled for this wallet'
+            }, 'MemberRightsService');
+          }
+          
+          transaction.update(walletDocRef, updateData);
+        });
         
-        if (!walletDoc.exists()) {
-          throw new Error('Shared wallet not found');
+        logger.info('Member permissions updated', {
+          walletId,
+          memberId,
+          updaterId,
+          permissions: Object.keys(permissions),
+        }, 'MemberRightsService');
+      } catch (updateError) {
+        const errorMessage = updateError instanceof Error ? updateError.message : String(updateError);
+        const isPermissionError = errorMessage.includes('permission') || errorMessage.includes('Permission');
+        
+        logger.error('Failed to update member permissions', {
+          walletId,
+          memberId,
+          updaterId,
+          error: errorMessage,
+          isPermissionError
+        }, 'MemberRightsService');
+        
+        if (isPermissionError) {
+          return {
+            success: false,
+            error: 'Permission denied. Only creator or admin can update member permissions.'
+          };
         }
         
-        transaction.update(walletDocRef, {
-          members: updatedMembers,
-          updatedAt: serverTimestamp(),
-        });
-      });
-
-      logger.info('Member permissions updated', {
-        walletId,
-        memberId,
-        updaterId,
-        permissions: Object.keys(permissions),
-      }, 'MemberRightsService');
+        return {
+          success: false,
+          error: errorMessage || 'Failed to update member permissions'
+        };
+      }
 
       // ✅ FIX: Send notification to the member whose permissions were changed
       try {
@@ -382,6 +463,16 @@ export class MemberRightsService {
 
       const { wallet, walletDocId } = result;
 
+      // ✅ FIX: Verify user is authenticated
+      const { getAuth } = await import('firebase/auth');
+      const auth = getAuth();
+      if (!auth.currentUser || auth.currentUser.uid !== updaterId) {
+        return {
+          success: false,
+          error: 'User not authenticated or user ID mismatch',
+        };
+      }
+
       // Verify updater is creator
       if (wallet.creatorId !== updaterId) {
         return {
@@ -413,17 +504,124 @@ export class MemberRightsService {
         return m;
       });
 
-      await updateDoc(doc(db, 'sharedWallets', walletDocId), {
-        members: updatedMembers,
-        updatedAt: serverTimestamp(),
-      });
+      // ✅ FIX: Use runTransaction for atomic update and better error handling
+      const { runTransaction } = await import('firebase/firestore');
+      try {
+        await runTransaction(db, async (transaction) => {
+          const walletDocRef = doc(db, 'sharedWallets', walletDocId);
+          const walletDoc = await transaction.get(walletDocRef);
+          
+          if (!walletDoc.exists()) {
+            throw new Error('Shared wallet not found');
+          }
+          
+          transaction.update(walletDocRef, {
+            members: updatedMembers,
+            updatedAt: serverTimestamp(),
+          });
+        });
+        
+        logger.info('Member role updated', {
+          walletId,
+          memberId,
+          newRole,
+          updaterId,
+        }, 'MemberRightsService');
+      } catch (updateError) {
+        const errorMessage = updateError instanceof Error ? updateError.message : String(updateError);
+        const isPermissionError = errorMessage.includes('permission') || errorMessage.includes('Permission');
+        
+        logger.error('Failed to update member role', {
+          walletId,
+          memberId,
+          updaterId,
+          error: errorMessage,
+          isPermissionError
+        }, 'MemberRightsService');
+        
+        if (isPermissionError) {
+          return {
+            success: false,
+            error: 'Permission denied. Only the creator can change member roles.'
+          };
+        }
+        
+        return {
+          success: false,
+          error: errorMessage || 'Failed to update member role'
+        };
+      }
 
-      logger.info('Member role updated', {
-        walletId,
-        memberId,
-        newRole,
-        updaterId,
-      }, 'MemberRightsService');
+      // ✅ FIX: Send notifications when member role is changed
+      try {
+        const { notificationService } = await import('../../notifications/notificationService');
+        const { firebaseDataService } = await import('../data/firebaseDataService');
+        const updaterData = await firebaseDataService.user.getCurrentUser(updaterId);
+        const updaterName = updaterData?.name || 'An admin';
+        const memberData = await firebaseDataService.user.getCurrentUser(memberId);
+        const memberName = memberData?.name || 'A member';
+
+        // Notify the member whose role changed
+        try {
+          await notificationService.instance.sendNotification(
+            memberId,
+            'Role Changed in Shared Wallet',
+            `${updaterName} changed your role to ${newRole} in "${wallet.name || 'Shared Wallet'}"`,
+            'shared_wallet_role_changed',
+            {
+              sharedWalletId: walletId,
+              walletName: wallet.name || 'Shared Wallet',
+              updaterId,
+              updaterName,
+              memberId,
+              memberName,
+              newRole,
+            }
+          );
+        } catch (notifError) {
+          logger.warn('Failed to send role change notification to member', {
+            memberId,
+            error: notifError instanceof Error ? notifError.message : String(notifError)
+          }, 'MemberRightsService');
+        }
+
+        // Notify all active members (except the member whose role changed and the updater)
+        const membersToNotify = wallet.members?.filter(m => 
+          m.userId !== memberId && 
+          m.userId !== updaterId && 
+          m.status === 'active'
+        ) || [];
+
+        for (const member of membersToNotify) {
+          try {
+            await notificationService.instance.sendNotification(
+              member.userId,
+              'Member Role Changed in Shared Wallet',
+              `${updaterName} changed ${memberName}'s role to ${newRole} in "${wallet.name || 'Shared Wallet'}"`,
+              'shared_wallet_role_changed',
+              {
+                sharedWalletId: walletId,
+                walletName: wallet.name || 'Shared Wallet',
+                updaterId,
+                updaterName,
+                memberId,
+                memberName,
+                newRole,
+              }
+            );
+          } catch (notifError) {
+            logger.warn('Failed to send role change notification to member', {
+              memberId: member.userId,
+              error: notifError instanceof Error ? notifError.message : String(notifError)
+            }, 'MemberRightsService');
+          }
+        }
+      } catch (notificationError) {
+        logger.warn('Failed to send role change notifications', {
+          error: notificationError instanceof Error ? notificationError.message : String(notificationError)
+        }, 'MemberRightsService');
+        // Don't fail the role update if notifications fail
+      }
 
       return { success: true };
     } catch (error) {

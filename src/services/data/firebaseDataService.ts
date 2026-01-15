@@ -1131,16 +1131,55 @@ export const firebaseDataService = {
 
     // ✅ CRITICAL: Direct query by transaction signature (tx_hash) to prevent duplicates
     // This is more reliable than getUserTransactions which only checks recent transactions
-    getTransactionBySignature: async (signature: string): Promise<Transaction | null> => {
+    getTransactionBySignature: async (signature: string, userId?: string): Promise<Transaction | null> => {
       try {
-        const q = query(
-          collection(db, 'transactions'),
-          where('tx_hash', '==', signature),
-          limit(1)
-        );
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          return firebaseDataTransformers.firestoreToTransaction(querySnapshot.docs[0]);
+        // ✅ FIX: Firestore security rules require filtering by user, so we need to check both from_user and to_user
+        // If userId is provided, query with user filter to satisfy security rules
+        if (userId) {
+          // Try querying as sender first
+          let q = query(
+            collection(db, 'transactions'),
+            where('tx_hash', '==', signature),
+            where('from_user', '==', userId),
+            limit(1)
+          );
+          let querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            return firebaseDataTransformers.firestoreToTransaction(querySnapshot.docs[0]);
+          }
+          
+          // Try querying as recipient
+          q = query(
+            collection(db, 'transactions'),
+            where('tx_hash', '==', signature),
+            where('to_user', '==', userId),
+            limit(1)
+          );
+          querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            return firebaseDataTransformers.firestoreToTransaction(querySnapshot.docs[0]);
+          }
+        } else {
+          // If no userId provided, try query without user filter (may fail due to security rules)
+          // This is a fallback for cases where we don't have the userId
+          try {
+            const q = query(
+              collection(db, 'transactions'),
+              where('tx_hash', '==', signature),
+              limit(1)
+            );
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+              return firebaseDataTransformers.firestoreToTransaction(querySnapshot.docs[0]);
+            }
+          } catch (securityError) {
+            // If security rules block the query, return null (transaction doesn't exist or user can't access it)
+            logger.debug('Transaction query blocked by security rules (expected if user not involved)', {
+              signature: signature.substring(0, 10) + '...',
+              error: securityError instanceof Error ? securityError.message : String(securityError)
+            }, 'FirebaseDataService');
+            return null;
+          }
         }
         return null;
       } catch (error) {

@@ -530,12 +530,14 @@ class TransactionSigningService {
 
       // Log RPC configuration (mask API keys)
       const maskedRpcUrl = rpcUrl ? rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***').replace(/\/v2\/[^\/]+/, '/v2/***') : 'default';
-      console.log('Transaction signing service initialized', {
-        companyAddress: companyWalletAddress,
+      console.log('✅ Transaction signing service initialized', {
+        companyAddress: companyWalletAddress ? companyWalletAddress.substring(0, 8) + '...' + companyWalletAddress.substring(companyWalletAddress.length - 8) : 'MISSING',
         network: actualNetwork,
         rpcUrl: maskedRpcUrl,
         endpointCount: rpcEndpoints.length,
         isMainnet: actualNetwork === 'mainnet',
+        isEmulator: isEmulator,
+        isProduction: isProduction,
         primaryProvider: rpcUrl.includes('alchemy') ? 'Alchemy' : 
                          rpcUrl.includes('getblock') ? 'GetBlock' : 
                          rpcUrl.includes('helius') ? 'Helius' : 
@@ -548,7 +550,8 @@ class TransactionSigningService {
                        process.env.DEV_NETWORK ? 'DEV_NETWORK (legacy)' :
                        isProduction ? 'environment-based default (production=mainnet)' :
                        'environment-based default (development=devnet)',
-        note: 'Backend network must match client network. Use SOLANA_NETWORK env var (matches client EXPO_PUBLIC_NETWORK)'
+        note: 'Backend network must match client network. Use SOLANA_NETWORK env var (matches client EXPO_PUBLIC_NETWORK)',
+        warning: actualNetwork === 'mainnet' && isEmulator ? '⚠️ WARNING: Emulator is using mainnet! Set SOLANA_NETWORK=devnet in .env' : undefined
       });
 
     } catch (error) {
@@ -1000,19 +1003,24 @@ class TransactionSigningService {
       // This prevents network-specific bugs and ensures consistent user experience
       const networkName = isMainnet ? 'mainnet' : 'devnet';
       
-      // Unified timing: Same for both networks
-      const initialWait = 1000; // 1 second initial wait (same for both)
-      const maxVerificationAttempts = 6; // Same number of attempts for both
-      const verificationDelay = 1000; // 1 second between attempts (same for both)
-      const verificationTimeout = 2500; // 2.5 seconds per attempt (same for both)
+      // ✅ FIX: Devnet can be slower, so use longer timeouts for better reliability
+      // Mainnet: Faster verification (RPC is usually more reliable)
+      // Devnet: Longer timeouts (RPC can be slower, more retries needed)
+      // Increased devnet timeouts to account for slower RPC responses and prevent premature timeouts
+      const initialWait = isMainnet ? 1000 : 3000; // 3 seconds for devnet (was 2 seconds)
+      const maxVerificationAttempts = isMainnet ? 6 : 15; // 15 attempts for devnet (was 10)
+      const verificationDelay = isMainnet ? 1000 : 2000; // 2 seconds between attempts for devnet (was 1.5 seconds)
+      const verificationTimeout = isMainnet ? 2500 : 5000; // 5 seconds per attempt for devnet (was 4 seconds)
       
-      console.log('Starting unified transaction verification', {
+      console.log('Starting transaction verification', {
         network: networkName,
         maxAttempts: maxVerificationAttempts,
         initialWait,
         verificationDelay,
         verificationTimeout,
-        note: 'Using same verification logic for both mainnet and devnet'
+        note: isMainnet 
+          ? 'Using optimized timing for mainnet (faster RPC)' 
+          : 'Using extended timing for devnet (slower RPC, more retries)'
       });
       
       await new Promise(resolve => setTimeout(resolve, initialWait));
@@ -1023,17 +1031,43 @@ class TransactionSigningService {
       // UNIFIED VERIFICATION: Try multiple times to find the transaction
       // Same logic for both mainnet and devnet - consistent behavior
       const verifyTimer = performanceMonitor.startOperation('verifyTransaction');
+      
+      // Log retry configuration for debugging
+      console.log('Transaction verification retry configuration', {
+        network: networkName,
+        signature: signature.substring(0, 16) + '...', // First 16 chars for identification
+        maxRetries: maxVerificationAttempts - 1,
+        maxVerificationAttempts,
+        initialDelay: verificationDelay,
+        maxDelay: verificationTimeout,
+        timeoutPerAttempt: verificationTimeout,
+        estimatedMaxTime: (initialWait + (maxVerificationAttempts * verificationDelay) + (maxVerificationAttempts * verificationTimeout)),
+        note: 'Will retry if transaction not found or timeout occurs'
+      });
+      
       try {
         // Use unified retry logic (same for both networks)
+        // retryRpcOperation will log each retry attempt internally
         const status = await retryRpcOperation(
-          () => Promise.race([
-            this.connection.getSignatureStatus(signature, {
-              searchTransactionHistory: true
-            }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Verification timeout')), verificationTimeout)
-            )
-          ]),
+          () => {
+            const attemptStartTime = Date.now();
+            const elapsedSinceStart = attemptStartTime - verificationStartTime;
+            console.log('Attempting to verify transaction signature', {
+              signature: signature.substring(0, 16) + '...',
+              attemptTime: new Date().toISOString(),
+              elapsedSinceStartMs: elapsedSinceStart,
+              elapsedSinceStartSeconds: (elapsedSinceStart / 1000).toFixed(2)
+            });
+            
+            return Promise.race([
+              this.connection.getSignatureStatus(signature, {
+                searchTransactionHistory: true
+              }),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Verification timeout')), verificationTimeout)
+              )
+            ]);
+          },
           {
             maxRetries: maxVerificationAttempts - 1, // Already doing one attempt
             initialDelay: verificationDelay,

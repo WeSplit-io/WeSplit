@@ -161,7 +161,8 @@ export async function saveTransactionAndAwardPoints(
       // This prevents race conditions where multiple calls check before either saves
       let existingTransaction: Transaction | null = null;
       try {
-        existingTransaction = await firebaseDataService.transaction.getTransactionBySignature(params.signature);
+        // ✅ FIX: Pass userId to satisfy Firestore security rules (must filter by user)
+        existingTransaction = await firebaseDataService.transaction.getTransactionBySignature(params.signature, params.userId);
         
         if (existingTransaction) {
           logger.warn('⚠️ Transaction with this signature already exists, skipping duplicate save', {

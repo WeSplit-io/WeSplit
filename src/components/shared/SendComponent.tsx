@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingTop: spacing.md,
     paddingHorizontal: spacing.sm,
-    backgroundColor: colors.black,
+    backgroundColor: colors.blackWhite5, // ✅ FIX: Match modal background instead of darker black
   },
   sendButton: {
     marginTop: 0,

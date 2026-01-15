@@ -257,20 +257,23 @@ function enhanceRpcEndpoints(
   
   if (network === 'mainnet') {
     // Add Helius if API key available
-    const heliusKey = getEnvVar('EXPO_PUBLIC_HELIUS_API_KEY');
-    if (heliusKey && heliusKey !== 'YOUR_HELIUS_API_KEY_HERE') {
+    const heliusKeyRaw = getEnvVar('EXPO_PUBLIC_HELIUS_API_KEY');
+    const heliusKey = extractApiKey(heliusKeyRaw || '', 'mainnet.helius-rpc.com');
+    if (heliusKey && heliusKey !== 'YOUR_HELIUS_API_KEY_HERE' && !heliusKey.startsWith('http')) {
       endpoints.unshift(`https://mainnet.helius-rpc.com/?api-key=${heliusKey}`);
     }
     
     // Add Alchemy if API key available
-    const alchemyKey = getEnvVar('EXPO_PUBLIC_ALCHEMY_API_KEY');
-    if (alchemyKey && alchemyKey !== 'YOUR_ALCHEMY_API_KEY_HERE') {
+    const alchemyKeyRaw = getEnvVar('EXPO_PUBLIC_ALCHEMY_API_KEY');
+    const alchemyKey = extractApiKey(alchemyKeyRaw || '', 'solana-mainnet.g.alchemy.com/v2');
+    if (alchemyKey && alchemyKey !== 'YOUR_ALCHEMY_API_KEY_HERE' && !alchemyKey.startsWith('http')) {
       endpoints.unshift(`https://solana-mainnet.g.alchemy.com/v2/${alchemyKey}`);
     }
     
     // Add GetBlock if API key available
-    const getBlockKey = getEnvVar('EXPO_PUBLIC_GETBLOCK_API_KEY');
-    if (getBlockKey && getBlockKey !== 'YOUR_GETBLOCK_API_KEY_HERE') {
+    const getBlockKeyRaw = getEnvVar('EXPO_PUBLIC_GETBLOCK_API_KEY');
+    const getBlockKey = extractGetBlockKey(getBlockKeyRaw || '');
+    if (getBlockKey && getBlockKey !== 'YOUR_GETBLOCK_API_KEY_HERE' && !getBlockKey.startsWith('http')) {
       endpoints.unshift(`https://sol.getblock.io/mainnet/?api_key=${getBlockKey}`);
     }
     
@@ -288,6 +291,39 @@ function enhanceRpcEndpoints(
   }
   
   return endpoints;
+}
+
+// Helper functions to extract API keys from URLs if provided as full URLs
+function extractApiKey(value: string, baseUrl: string): string {
+  if (!value) return '';
+  // If it's already a full URL, extract the key part
+  if (value.startsWith('http')) {
+    // For Alchemy: https://solana-mainnet.g.alchemy.com/v2/KEY
+    if (value.includes('alchemy.com')) {
+      const parts = value.split('/');
+      return parts[parts.length - 1] || value;
+    }
+    // For Helius: https://mainnet.helius-rpc.com/?api-key=KEY
+    if (value.includes('helius-rpc.com')) {
+      const match = value.match(/helius-rpc\.com\/\?api-key=([^&\s]+)/);
+      return match ? match[1] : value;
+    }
+    // For other URLs, extract the last part after the last slash
+    const parts = value.split('/');
+    return parts[parts.length - 1] || value;
+  }
+  // Otherwise, return as-is (should be just the key)
+  return value;
+}
+
+function extractGetBlockKey(value: string): string {
+  if (!value) return '';
+  if (value.startsWith('http')) {
+    // Extract the API key from URL like https://go.getblock.io/API_KEY
+    const match = value.match(/go\.getblock\.io\/([^\/\s]+)/);
+    return match ? match[1] : (value.split('/').pop() || '');
+  }
+  return value;
 }
 
 /**

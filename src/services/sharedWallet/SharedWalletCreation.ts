@@ -128,6 +128,66 @@ export class SharedWalletCreation {
         currency: params.currency || 'USDC'
       }, 'SharedWalletCreation');
 
+      // ✅ FIX: Check for duplicate wallet with same name and creator (prevent accidental duplicates)
+      try {
+        const { db } = await import('../../config/firebase/firebase');
+        const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
+        
+        const walletsRef = collection(db, 'sharedWallets');
+        const duplicateQuery = query(
+          walletsRef,
+          where('creatorId', '==', params.creatorId),
+          where('name', '==', params.name.trim()),
+          limit(1)
+        );
+        
+        const duplicateSnapshot = await getDocs(duplicateQuery);
+        if (!duplicateSnapshot.empty) {
+          const existingWallet = duplicateSnapshot.docs[0].data();
+          logger.warn('Duplicate wallet detected', {
+            name: params.name,
+            creatorId: params.creatorId,
+            existingWalletId: existingWallet.id,
+            existingWalletFirebaseDocId: duplicateSnapshot.docs[0].id
+          }, 'SharedWalletCreation');
+          
+          // Check if the existing wallet was created very recently (within last 5 seconds)
+          // This might indicate a duplicate submission
+          if (existingWallet.createdAt) {
+            const createdAt = new Date(existingWallet.createdAt).getTime();
+            const now = Date.now();
+            const timeDiff = now - createdAt;
+            
+            if (timeDiff < 5000) { // Created within last 5 seconds
+              logger.error('Duplicate wallet creation detected - likely double submission', {
+                name: params.name,
+                creatorId: params.creatorId,
+                timeDiff,
+                existingWalletId: existingWallet.id
+              }, 'SharedWalletCreation');
+              
+              return {
+                success: false,
+                error: 'A wallet with this name was just created. Please wait a moment and try again, or use a different name.',
+              };
+            }
+          }
+          
+          // If it's an older duplicate, still warn but allow creation (user might want multiple wallets with same name)
+          logger.info('Wallet with same name exists but is older - allowing creation', {
+            name: params.name,
+            creatorId: params.creatorId
+          }, 'SharedWalletCreation');
+        }
+      } catch (duplicateCheckError) {
+        // Don't fail creation if duplicate check fails - just log and continue
+        logger.warn('Failed to check for duplicate wallet', {
+          error: duplicateCheckError instanceof Error ? duplicateCheckError.message : String(duplicateCheckError),
+          name: params.name,
+          creatorId: params.creatorId
+        }, 'SharedWalletCreation');
+      }
+
       // ✅ LIGHTWEIGHT WALLET GEN: avoid heavy wallet/derive import (OOM)
       // Use direct Keypair.generate to keep bundle small for shared wallets
       const { Keypair } = await import('@solana/web3.js');
