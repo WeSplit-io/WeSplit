@@ -6,6 +6,11 @@
 // Import centralized configuration
 import { getConfig } from '../../config/unified';
 import { logger } from '../analytics/loggingService';
+import { isProduction } from '../../config/env';
+
+// USDC Mint Addresses
+const MAINNET_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 
 // RPC Configuration
 export const RPC_CONFIG = {
@@ -26,9 +31,14 @@ export const getUSDC_CONFIG = () => {
       
       // Validate mint address
       if (!mintAddress || typeof mintAddress !== 'string' || mintAddress.length < 32) {
-        // Fallback to devnet USDC
-        const fallbackMint = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
-        console.warn('[walletConstants] Invalid USDC mint address, using devnet fallback', { mintAddress });
+        // ✅ FIX: Use production detection to choose correct fallback
+        const fallbackMint = isProduction ? MAINNET_USDC_MINT : DEVNET_USDC_MINT;
+        console.warn('[walletConstants] Invalid USDC mint address, using fallback', { 
+          mintAddress,
+          fallbackMint,
+          isProduction,
+          network: config?.blockchain?.network
+        });
         _USDC_CONFIG = {
           mintAddress: fallbackMint,
           decimals: 6,
@@ -42,13 +52,18 @@ export const getUSDC_CONFIG = () => {
         };
       }
     } catch (error) {
-      // Ultimate fallback
-      console.error('[walletConstants] Failed to get USDC config, using devnet fallback', error);
+      // ✅ FIX: Ultimate fallback - use production detection
+      const fallbackMint = isProduction ? MAINNET_USDC_MINT : DEVNET_USDC_MINT;
+      console.error('[walletConstants] Failed to get USDC config, using fallback', {
+        error,
+        fallbackMint,
+        isProduction
+      });
       _USDC_CONFIG = {
-        mintAddress: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
-  decimals: 6,
-  symbol: 'USDC',
-};
+        mintAddress: fallbackMint,
+        decimals: 6,
+        symbol: 'USDC',
+      };
     }
   }
   return _USDC_CONFIG;

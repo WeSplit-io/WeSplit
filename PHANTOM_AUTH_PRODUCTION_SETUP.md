@@ -48,7 +48,7 @@ To enable Phantom authentication in production, set the following environment va
 
 ```bash
 # Phantom App Configuration (Required)
-EXPO_PUBLIC_PHANTOM_APP_ID=ab881c51-6335-49b9-8800-0e4ad7d21ca3
+EXPO_PUBLIC_PHANTOM_APP_ID=your-app-id-from-phantom-portal
 EXPO_PUBLIC_PHANTOM_APP_ORIGIN=https://wesplit.io
 EXPO_PUBLIC_PHANTOM_REDIRECT_URI=wesplit://phantom-callback
 ```
@@ -77,7 +77,7 @@ EXPO_PUBLIC_PHANTOM_MULTI_CHAIN=false
 
 ```bash
 # Set required Phantom configuration
-eas secret:create --scope project --name EXPO_PUBLIC_PHANTOM_APP_ID --value "ab881c51-6335-49b9-8800-0e4ad7d21ca3"
+eas env:create --name EXPO_PUBLIC_PHANTOM_APP_ID --value "your-app-id-from-phantom-portal" --scope project --visibility plaintext
 eas secret:create --scope project --name EXPO_PUBLIC_PHANTOM_APP_ORIGIN --value "https://wesplit.io"
 eas secret:create --scope project --name EXPO_PUBLIC_PHANTOM_REDIRECT_URI --value "wesplit://phantom-callback"
 
@@ -91,7 +91,7 @@ eas secret:create --scope project --name EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS --val
 Add to your production environment file (e.g., `.env.production`):
 
 ```bash
-EXPO_PUBLIC_PHANTOM_APP_ID=ab881c51-6335-49b9-8800-0e4ad7d21ca3
+EXPO_PUBLIC_PHANTOM_APP_ID=your-app-id-from-phantom-portal
 EXPO_PUBLIC_PHANTOM_APP_ORIGIN=https://wesplit.io
 EXPO_PUBLIC_PHANTOM_REDIRECT_URI=wesplit://phantom-callback
 EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN=true
@@ -104,13 +104,13 @@ EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS=true
 
 ### Important: App Status
 
-Your Phantom app ID: `ab881c51-6335-49b9-8800-0e4ad7d21ca3`
+Your Phantom app ID: `[Your App ID from Phantom Portal]`
 
 **Before production launch, ensure:**
 
 1. ✅ **App is Public** (not "Private")
    - Visit: https://phantom.app/developers
-   - Find your app with ID: `ab881c51-6335-49b9-8800-0e4ad7d21ca3`
+   - Find your app with your App ID
    - If it shows "Private", contact Phantom support to make it public
    - Private apps only work for team members
 
@@ -161,7 +161,7 @@ Before deploying to production:
 ### Local Testing (Development)
 ```bash
 # Set env vars in .env file
-EXPO_PUBLIC_PHANTOM_APP_ID=ab881c51-6335-49b9-8800-0e4ad7d21ca3
+EXPO_PUBLIC_PHANTOM_APP_ID=your-app-id-from-phantom-portal
 EXPO_PUBLIC_PHANTOM_APP_ORIGIN=https://wesplit.io
 EXPO_PUBLIC_PHANTOM_REDIRECT_URI=wesplit://phantom-callback
 EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN=true

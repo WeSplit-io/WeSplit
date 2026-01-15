@@ -5,9 +5,53 @@
  * It provides environment-specific configuration for the application.
  */
 
-// Environment detection
-export const isDevelopment = __DEV__;
-export const isProduction = !__DEV__;
+import Constants from 'expo-constants';
+
+// Helper to get environment variables (works with Expo's Constants.expoConfig.extra)
+function getEnvVar(key: string): string | undefined {
+  try {
+    // Check Constants.expoConfig.extra first (Expo's way)
+    if (Constants.expoConfig?.extra?.[key]) {
+      return Constants.expoConfig.extra[key] as string;
+    }
+  } catch (e) {
+    // Constants might not be available in all contexts
+  }
+  // Fallback to process.env
+  return process.env[key];
+}
+
+/**
+ * Determine if this is a production build
+ * ✅ CRITICAL: Multiple checks to ensure accurate production detection
+ * This matches the logic in solanaNetworkConfig.ts for consistency
+ */
+function isProductionBuild(): boolean {
+  // ✅ LAYER 1: Check EAS build profile (most reliable)
+  const buildProfile = getEnvVar('EAS_BUILD_PROFILE');
+  if (buildProfile === 'production' || buildProfile === 'testflight' || buildProfile === 'mass-distribution') {
+    return true;
+  }
+  
+  // ✅ LAYER 2: Check APP_ENV
+  const appEnv = getEnvVar('APP_ENV');
+  if (appEnv === 'production') {
+    return true;
+  }
+  
+  // ✅ LAYER 3: Check NODE_ENV
+  const nodeEnv = getEnvVar('NODE_ENV');
+  if (nodeEnv === 'production') {
+    return true;
+  }
+  
+  // ✅ LAYER 4: Check if __DEV__ is false (production bundle)
+  return !__DEV__;
+}
+
+// Environment detection - use consistent production detection
+export const isDevelopment = !isProductionBuild();
+export const isProduction = isProductionBuild();
 
 // Firebase configuration
 export const FIREBASE_CONFIG = {
@@ -220,17 +264,18 @@ export const PRIVY_CONFIG = {
 
 // Phantom configuration
 export const PHANTOM_CONFIG = {
-  appId: process.env.EXPO_PUBLIC_PHANTOM_APP_ID,
-  appOrigin: process.env.EXPO_PUBLIC_PHANTOM_APP_ORIGIN || 'https://wesplit.io',
-  redirectUri: process.env.EXPO_PUBLIC_PHANTOM_REDIRECT_URI || 'wesplit://phantom-callback',
+  appId: getEnvVar('EXPO_PUBLIC_PHANTOM_APP_ID') || process.env.EXPO_PUBLIC_PHANTOM_APP_ID,
+  appOrigin: getEnvVar('EXPO_PUBLIC_PHANTOM_APP_ORIGIN') || process.env.EXPO_PUBLIC_PHANTOM_APP_ORIGIN || 'https://wesplit.io',
+  redirectUri: getEnvVar('EXPO_PUBLIC_PHANTOM_REDIRECT_URI') || process.env.EXPO_PUBLIC_PHANTOM_REDIRECT_URI || 'wesplit://phantom-callback',
   // Feature flags for gradual rollout
   // In production, enable via environment variables (EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN=true, etc.)
   // In development, enabled by default for testing
   features: {
-    socialLogin: __DEV__ ? true : (process.env.EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN === 'true'),
-    splitWallets: __DEV__ ? true : (process.env.EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS === 'true'),
-    autoConfirm: process.env.EXPO_PUBLIC_PHANTOM_AUTO_CONFIRM === 'true',
-    multiChain: process.env.EXPO_PUBLIC_PHANTOM_MULTI_CHAIN === 'true',
+    // ✅ FIX: Use getEnvVar to properly read from Expo config in production builds
+    socialLogin: isDevelopment ? true : (getEnvVar('EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN') === 'true' || process.env.EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN === 'true'),
+    splitWallets: isDevelopment ? true : (getEnvVar('EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS') === 'true' || process.env.EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS === 'true'),
+    autoConfirm: getEnvVar('EXPO_PUBLIC_PHANTOM_AUTO_CONFIRM') === 'true' || process.env.EXPO_PUBLIC_PHANTOM_AUTO_CONFIRM === 'true',
+    multiChain: getEnvVar('EXPO_PUBLIC_PHANTOM_MULTI_CHAIN') === 'true' || process.env.EXPO_PUBLIC_PHANTOM_MULTI_CHAIN === 'true',
   }
 };
 

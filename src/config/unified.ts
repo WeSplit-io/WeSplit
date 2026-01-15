@@ -102,13 +102,41 @@ const getEnvVar = (key: string): string => {
 };
 
 /**
+ * Determine if this is a production build (consistent with env.ts and solanaNetworkConfig.ts)
+ */
+function isProductionBuild(): boolean {
+  const extra = Constants.expoConfig?.extra || {};
+  // ✅ LAYER 1: Check EAS build profile (most reliable)
+  const buildProfile = extra.EAS_BUILD_PROFILE || process.env.EAS_BUILD_PROFILE;
+  if (buildProfile === 'production' || buildProfile === 'testflight' || buildProfile === 'mass-distribution') {
+    return true;
+  }
+  
+  // ✅ LAYER 2: Check APP_ENV
+  const appEnv = extra.APP_ENV || process.env.APP_ENV;
+  if (appEnv === 'production') {
+    return true;
+  }
+  
+  // ✅ LAYER 3: Check NODE_ENV
+  const nodeEnv = process.env.NODE_ENV;
+  if (nodeEnv === 'production') {
+    return true;
+  }
+  
+  // ✅ LAYER 4: Check if __DEV__ is false (production bundle)
+  return !__DEV__;
+}
+
+/**
  * Get unified configuration
  */
 export function getUnifiedConfig(): UnifiedConfig {
   const extra = Constants.expoConfig?.extra || {};
   const environment = (extra.APP_ENV as Environment) || 'development';
-  const isProduction = environment === 'production';
-  const isDevelopment = environment === 'development';
+  // ✅ FIX: Use consistent production detection logic
+  const isProduction = isProductionBuild();
+  const isDevelopment = !isProduction;
   const isStaging = environment === 'staging';
   
   // Helper function to extract API key from URL or return as-is
@@ -279,12 +307,40 @@ export function getUnifiedConfig(): UnifiedConfig {
   
   // Configuration loaded
   
+  // ✅ ENHANCEMENT: Helper function to get RPC provider status
+  const getRpcProviderStatus = () => {
+    return {
+      hasAlchemy: !!alchemyApiKey && alchemyApiKey !== 'YOUR_ALCHEMY_API_KEY_HERE' && !alchemyApiKey.includes('YOUR_'),
+      hasGetBlock: !!getBlockApiKey && getBlockApiKey !== 'YOUR_GETBLOCK_API_KEY_HERE' && !getBlockApiKey.includes('YOUR_'),
+      hasQuickNode: !!quickNodeEndpoint && quickNodeEndpoint !== 'YOUR_QUICKNODE_ENDPOINT_HERE' && !quickNodeEndpoint.includes('YOUR_'),
+      hasChainstack: !!chainstackEndpoint && chainstackEndpoint !== 'YOUR_CHAINSTACK_ENDPOINT_HERE' && !chainstackEndpoint.includes('YOUR_'),
+      hasHelius: !!heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE' && !heliusApiKey.includes('YOUR_'),
+    };
+  };
+
+  const rpcProviderStatus = getRpcProviderStatus();
+  const hasRpcProvider = Object.values(rpcProviderStatus).some(status => status === true);
+
   // Validate production environment - recommend at least one RPC provider with API key
   if (isProduction && network === 'mainnet') {
-    const hasRpcProvider = heliusApiKey || alchemyApiKey || getBlockApiKey || quickNodeEndpoint || chainstackEndpoint;
     if (!hasRpcProvider) {
       logger.warn('No RPC provider API keys configured for mainnet production. Performance may be degraded due to rate limits.', {
-        note: 'Consider adding ALCHEMY_API_KEY, GETBLOCK_API_KEY, QUICKNODE_ENDPOINT, CHAINSTACK_ENDPOINT, or HELIUS_API_KEY'
+        providerStatus: rpcProviderStatus,
+        note: 'Consider adding ALCHEMY_API_KEY, GETBLOCK_API_KEY, QUICKNODE_ENDPOINT, CHAINSTACK_ENDPOINT, or HELIUS_API_KEY',
+        recommendedProviders: [
+          'Alchemy (30M CU/month free tier)',
+          'GetBlock (fastest, 16-21ms latency)',
+          'QuickNode (most reliable, 99.99% uptime)',
+          'Chainstack (enterprise-grade)',
+          'Helius (good performance)'
+        ]
+      }, 'unified');
+    } else {
+      logger.info('RPC provider configuration detected for mainnet production', {
+        providerStatus: rpcProviderStatus,
+        configuredProviders: Object.entries(rpcProviderStatus)
+          .filter(([_, status]) => status)
+          .map(([name, _]) => name.replace('has', ''))
       }, 'unified');
     }
   }

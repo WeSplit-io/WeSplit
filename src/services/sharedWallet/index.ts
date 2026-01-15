@@ -718,6 +718,46 @@ export class SharedWalletService {
         failedCount: failedInvitations.length,
       }, 'SharedWalletService');
 
+      // ✅ FIX: Send notifications to invited users
+      try {
+        const { notificationService } = await import('../notifications/notificationService');
+        const inviterData = await firebaseDataService.user.getCurrentUser(params.inviterId);
+        const inviterName = inviterData?.name || 'Someone';
+        
+        for (const newMember of newMembers) {
+          try {
+            await notificationService.instance.sendNotification(
+              newMember.userId,
+              'Shared Wallet Invitation',
+              `${inviterName} invited you to join the shared wallet "${wallet.name || 'Shared Wallet'}"`,
+              'shared_wallet_invite',
+              {
+                sharedWalletId: params.sharedWalletId,
+                walletName: wallet.name || 'Shared Wallet',
+                inviterId: params.inviterId,
+                inviterName: inviterName,
+                status: 'invited',
+              }
+            );
+            logger.info('Invitation notification sent', {
+              userId: newMember.userId,
+              sharedWalletId: params.sharedWalletId
+            }, 'SharedWalletService');
+          } catch (notifError) {
+            logger.warn('Failed to send invitation notification', {
+              userId: newMember.userId,
+              error: notifError instanceof Error ? notifError.message : String(notifError)
+            }, 'SharedWalletService');
+            // Don't fail the invitation if notification fails
+          }
+        }
+      } catch (notificationError) {
+        logger.warn('Failed to send invitation notifications', {
+          error: notificationError instanceof Error ? notificationError.message : String(notificationError)
+        }, 'SharedWalletService');
+        // Don't fail the invitation if notifications fail
+      }
+
       // Build message based on results
       let message = `Successfully invited ${newMembers.length} member(s) to the shared wallet`;
       if (failedInvitations.length > 0) {
@@ -946,10 +986,16 @@ export class SharedWalletService {
       }
 
       if (params.settings !== undefined) {
+        // ✅ FIX: Handle undefined settings properly to prevent errors
         updates.settings = {
-          ...wallet.settings,
+          ...(wallet.settings || {}), // Use empty object if settings is undefined
           ...params.settings,
         };
+      }
+
+      // ✅ FIX: Ensure updatedAt is always set to trigger real-time listeners
+      if (!updates.updatedAt) {
+        updates.updatedAt = serverTimestamp();
       }
 
       // Update the document

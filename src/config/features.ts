@@ -40,6 +40,21 @@ const getEnvironmentFeatures = (): FeatureFlags => {
   // MoonPay integration is disabled to avoid being classified as an exchange
   const moonpayEnabled = !isProduction && (process.env.EXPO_PUBLIC_MOONPAY_ENABLED === 'true');
   
+  // ✅ DEBUG: Log Phantom configuration for troubleshooting
+  if (__DEV__ || process.env.EXPO_PUBLIC_DEBUG_FEATURES === 'true') {
+    console.log('🔍 Phantom Feature Flags Debug:', {
+      isProduction,
+      isPhantomConfigValid,
+      phantomAppId: PHANTOM_CONFIG.appId ? '✅ Set' : '❌ Missing',
+      phantomAppOrigin: PHANTOM_CONFIG.appOrigin,
+      phantomRedirectUri: PHANTOM_CONFIG.redirectUri,
+      socialLogin: PHANTOM_CONFIG.features.socialLogin,
+      splitWallets: PHANTOM_CONFIG.features.splitWallets,
+      envVarSocialLogin: process.env.EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN,
+      envVarSplitWallets: process.env.EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS,
+    });
+  }
+  
   return {
     PHANTOM_SDK_ENABLED: isPhantomConfigValid,
     PHANTOM_SOCIAL_LOGIN: isPhantomConfigValid && PHANTOM_CONFIG.features.socialLogin,

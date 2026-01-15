@@ -123,11 +123,38 @@ export class MemberRightsService {
     wallet: SharedWallet,
     amount: number
   ): { allowed: boolean; reason?: string } {
+    // Check if member is active first
+    if (member.status !== 'active') {
+      if (member.status === 'invited') {
+        return {
+          allowed: false,
+          reason: 'You need to accept the invitation to this shared wallet before you can withdraw funds. Please check your notifications or the wallet details.',
+        };
+      } else if (member.status === 'removed') {
+        return {
+          allowed: false,
+          reason: 'You have been removed from this shared wallet and can no longer withdraw funds.',
+        };
+      } else {
+        return {
+          allowed: false,
+          reason: `Your account status is "${member.status}". You must be an active member to withdraw funds. Please contact the wallet creator if you believe this is an error.`,
+        };
+      }
+    }
+
     // Check basic permission
     if (!this.canPerformAction(member, wallet, 'withdraw')) {
+      const permissions = this.getMemberPermissions(member, wallet);
+      if (!permissions.canWithdraw) {
+        return {
+          allowed: false,
+          reason: 'You do not have permission to withdraw funds from this shared wallet. The wallet creator or an admin needs to grant you withdrawal permissions. Please contact them to request access.',
+        };
+      }
       return {
         allowed: false,
-        reason: 'You do not have permission to withdraw funds',
+        reason: 'You do not have permission to withdraw funds from this shared wallet.',
       };
     }
 
@@ -237,9 +264,20 @@ export class MemberRightsService {
         return m;
       });
 
-      await updateDoc(doc(db, 'sharedWallets', walletDocId), {
-        members: updatedMembers,
-        updatedAt: serverTimestamp(),
+      // ✅ FIX: Use runTransaction for atomic update to ensure consistency and trigger listeners
+      const { runTransaction } = await import('firebase/firestore');
+      await runTransaction(db, async (transaction) => {
+        const walletDocRef = doc(db, 'sharedWallets', walletDocId);
+        const walletDoc = await transaction.get(walletDocRef);
+        
+        if (!walletDoc.exists()) {
+          throw new Error('Shared wallet not found');
+        }
+        
+        transaction.update(walletDocRef, {
+          members: updatedMembers,
+          updatedAt: serverTimestamp(),
+        });
       });
 
       logger.info('Member permissions updated', {
@@ -248,6 +286,60 @@ export class MemberRightsService {
         updaterId,
         permissions: Object.keys(permissions),
       }, 'MemberRightsService');
+
+      // ✅ FIX: Send notification to the member whose permissions were changed
+      try {
+        const { notificationService } = await import('../../notifications/notificationService');
+        const { firebaseDataService } = await import('../data/firebaseDataService');
+        const updaterData = await firebaseDataService.user.getCurrentUser(updaterId);
+        const updaterName = updaterData?.name || 'An admin';
+        
+        // Build permission change description
+        const permissionChanges: string[] = [];
+        if (permissions.canWithdraw !== undefined) {
+          permissionChanges.push(permissions.canWithdraw ? 'withdraw funds' : 'no longer withdraw funds');
+        }
+        if (permissions.canInviteMembers !== undefined) {
+          permissionChanges.push(permissions.canInviteMembers ? 'invite members' : 'no longer invite members');
+        }
+        if (permissions.canManageSettings !== undefined) {
+          permissionChanges.push(permissions.canManageSettings ? 'manage settings' : 'no longer manage settings');
+        }
+        if (permissions.withdrawalLimit !== undefined) {
+          permissionChanges.push(`withdrawal limit set to ${permissions.withdrawalLimit} ${wallet.currency || 'USDC'}`);
+        }
+        
+        const changeDescription = permissionChanges.length > 0 
+          ? permissionChanges.join(', ')
+          : 'permissions updated';
+        
+        await notificationService.instance.sendNotification(
+          memberId,
+          'Shared Wallet Permissions Updated',
+          `${updaterName} updated your permissions in "${wallet.name || 'Shared Wallet'}". You can now ${changeDescription}.`,
+          'shared_wallet_permissions_updated',
+          {
+            sharedWalletId: walletId,
+            walletName: wallet.name || 'Shared Wallet',
+            updaterId: updaterId,
+            updaterName: updaterName,
+            permissions: permissions,
+            changeDescription: changeDescription,
+          }
+        );
+        
+        logger.info('Permission change notification sent', {
+          memberId,
+          walletId
+        }, 'MemberRightsService');
+      } catch (notificationError) {
+        logger.warn('Failed to send permission change notification', {
+          error: notificationError instanceof Error ? notificationError.message : String(notificationError),
+          memberId,
+          walletId
+        }, 'MemberRightsService');
+        // Don't fail the permission update if notification fails
+      }
 
       return { success: true };
     } catch (error) {

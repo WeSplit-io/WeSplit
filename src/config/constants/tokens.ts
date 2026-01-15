@@ -2,6 +2,7 @@
 
 import { PublicKey } from '@solana/web3.js';
 import { getConfig } from '../unified';
+import { isProduction } from '../env';
 
 export const USDC_DECIMALS = 6;
 export const SOL_DECIMALS = 9;
@@ -18,13 +19,18 @@ export const getUSDC_MINT = (): PublicKey => {
     
     // Validate mint address format
     if (!mintAddress || typeof mintAddress !== 'string' || mintAddress.length < 32) {
-      // Fallback to devnet USDC if config not ready or invalid
-      console.warn('[tokens] Network config not ready or invalid, using devnet USDC fallback', {
+      // ✅ FIX: Use network-aware fallback
+      const network = config?.blockchain?.network || (isProduction ? 'mainnet' : 'devnet');
+      const fallbackMint = network === 'mainnet' ? MAINNET_USDC_MINT : DEVNET_USDC_MINT;
+      console.warn('[tokens] Network config not ready or invalid, using fallback', {
         mintAddress,
         hasConfig: !!config,
         hasBlockchain: !!config?.blockchain,
+        network,
+        fallbackMint,
+        isProduction
       });
-      return new PublicKey(DEVNET_USDC_MINT);
+      return new PublicKey(fallbackMint);
     }
     
     try {
@@ -42,9 +48,16 @@ export const getUSDC_MINT = (): PublicKey => {
       return new PublicKey(fallbackMint);
     }
   } catch (error) {
-    // Fallback to devnet USDC if config fails
-    console.warn('[tokens] Failed to get network config, using devnet USDC fallback', error);
-    return new PublicKey(DEVNET_USDC_MINT);
+    // ✅ FIX: Fallback with network detection
+    const network = isProduction ? 'mainnet' : 'devnet';
+    const fallbackMint = network === 'mainnet' ? MAINNET_USDC_MINT : DEVNET_USDC_MINT;
+    console.warn('[tokens] Failed to get network config, using fallback', {
+      error,
+      network,
+      fallbackMint,
+      isProduction
+    });
+    return new PublicKey(fallbackMint);
   }
 };
 
@@ -56,9 +69,16 @@ const getUSDC_MINT_Lazy = (): PublicKey => {
     try {
       _USDC_MINT = getUSDC_MINT();
     } catch (error) {
-      // Ultimate fallback if everything fails
-      console.error('[tokens] Critical: Failed to initialize USDC_MINT, using hardcoded devnet fallback', error);
-      _USDC_MINT = new PublicKey(DEVNET_USDC_MINT);
+      // ✅ FIX: Ultimate fallback with network detection
+      const network = isProduction ? 'mainnet' : 'devnet';
+      const fallbackMint = network === 'mainnet' ? MAINNET_USDC_MINT : DEVNET_USDC_MINT;
+      console.error('[tokens] Critical: Failed to initialize USDC_MINT, using fallback', {
+        error,
+        network,
+        fallbackMint,
+        isProduction
+      });
+      _USDC_MINT = new PublicKey(fallbackMint);
     }
   }
   return _USDC_MINT;

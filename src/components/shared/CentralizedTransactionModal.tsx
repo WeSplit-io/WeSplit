@@ -86,6 +86,8 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   const [note, setNote] = useState(config.prefilledNote || '');
   const [isProcessing, setIsProcessing] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  // ✅ FIX: Track loading state for shared wallet data to prevent premature button clicks
+  const [isLoadingSharedWalletData, setIsLoadingSharedWalletData] = useState(false);
 
   // ✅ CRITICAL: Prevent multiple transaction executions (debouncing)
   const isExecutingRef = useRef(false);
@@ -174,6 +176,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   // For withdrawals, we need the shared wallet balance, not the user's wallet balance
   const [sharedWalletBalance, setSharedWalletBalance] = useState<number | null>(null);
   const [sharedWalletAddress, setSharedWalletAddress] = useState<string | null>(null);
+  const [userAvailableBalance, setUserAvailableBalance] = useState<number | null>(null); // ✅ FIX: Track user's available balance for withdrawal
   const [fallbackBalance, setFallbackBalance] = useState<number | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   
@@ -182,11 +185,13 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     if (!visible || config.context !== 'shared_wallet_withdrawal') {
       setSharedWalletBalance(null);
       setSharedWalletAddress(null);
+      setUserAvailableBalance(null);
       return;
     }
 
-    if (config.context === 'shared_wallet_withdrawal' && effectiveSharedWalletId) {
+    if (config.context === 'shared_wallet_withdrawal' && effectiveSharedWalletId && currentUser?.id) {
       const loadSharedWalletData = async () => {
+        setIsLoadingSharedWalletData(true);
         try {
           const { SharedWalletService } = await import('../../services/sharedWallet');
           const result = await SharedWalletService.getSharedWallet(effectiveSharedWalletId);
@@ -195,23 +200,49 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             const address = result.wallet.walletAddress || null; // Get on-chain address, not ID
             setSharedWalletBalance(balance);
             setSharedWalletAddress(address);
-            logger.info('Shared wallet data loaded for withdrawal', {
-              sharedWalletId: effectiveSharedWalletId,
-              balance,
-              walletAddress: address
-            }, 'CentralizedTransactionModal');
+            
+            // ✅ FIX: Calculate user's available balance (what they can actually withdraw)
+            const userMember = result.wallet.members?.find(m => m.userId === currentUser.id.toString());
+            if (userMember) {
+              const userContributed = userMember.totalContributed || 0;
+              const userWithdrawn = userMember.totalWithdrawn || 0;
+              const available = Math.max(0, userContributed - userWithdrawn);
+              setUserAvailableBalance(available);
+              
+              logger.info('Shared wallet data loaded for withdrawal', {
+                sharedWalletId: effectiveSharedWalletId,
+                totalBalance: balance,
+                userAvailableBalance: available,
+                userContributed,
+                userWithdrawn,
+                walletAddress: address
+              }, 'CentralizedTransactionModal');
+            } else {
+              setUserAvailableBalance(0);
+              logger.warn('User not found in shared wallet members', {
+                sharedWalletId: effectiveSharedWalletId,
+                userId: currentUser.id
+              }, 'CentralizedTransactionModal');
+            }
           } else {
             logger.error('Failed to get shared wallet', { sharedWalletId: effectiveSharedWalletId }, 'CentralizedTransactionModal');
             setSharedWalletBalance(0);
             setSharedWalletAddress(null);
+            setUserAvailableBalance(0);
           }
         } catch (error) {
           logger.error('Failed to load shared wallet data', { error, sharedWalletId: effectiveSharedWalletId }, 'CentralizedTransactionModal');
           setSharedWalletBalance(0);
           setSharedWalletAddress(null);
+          setUserAvailableBalance(0);
+        } finally {
+          setIsLoadingSharedWalletData(false);
         }
       };
       loadSharedWalletData();
+    } else {
+      setIsLoadingSharedWalletData(false);
+      setUserAvailableBalance(null);
     }
   }, [visible, config.context, effectiveSharedWalletId]);
 
@@ -768,12 +799,15 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   // User must click the "Send" or "Confirm" button to execute the transaction
 
   // Calculate network fee (3%)
+  // ✅ FIX: Shared wallet withdrawals have no fee (company covers fees)
   const numAmount = parseFloat(amount.replace(',', '.')) || 0;
-  const networkFee = numAmount * 0.03; // 3% network fee
+  const isSharedWalletWithdrawal = config.context === 'shared_wallet_withdrawal';
+  const networkFee = isSharedWalletWithdrawal ? 0 : numAmount * 0.03; // 3% network fee for other transactions, 0 for shared wallet withdrawals
   const totalPaid = numAmount + networkFee;
 
   const isAmountValid = amount.length > 0 && numAmount > 0;
-  const canExecute = isAmountValid && !isProcessing && !validationError;
+  // ✅ FIX: Disable button while loading shared wallet data or processing
+  const canExecute = isAmountValid && !isProcessing && !validationError && !isLoadingSharedWalletData;
 
   const handleClose = () => {
     if (config.onClose) {
@@ -843,13 +877,18 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   const walletInfo: WalletInfo = useMemo(() => {
     // For withdrawals, ALWAYS show the shared wallet as the source (sender)
     // This is the wallet we're withdrawing FROM
+    // ✅ FIX: Show user's available balance (what they can withdraw) instead of total wallet balance
     if (config.context === 'shared_wallet_withdrawal' && effectiveSharedWalletId) {
-      // Use shared wallet balance if loaded, otherwise show 0 (will update when loaded)
-      const balance = sharedWalletBalance !== null ? sharedWalletBalance : 0;
+      // Use user's available balance if calculated, otherwise show total balance as fallback
+      const displayBalance = userAvailableBalance !== null ? userAvailableBalance : (sharedWalletBalance !== null ? sharedWalletBalance : 0);
+      const balanceLabel = userAvailableBalance !== null 
+        ? `Your Available: ${formatAmountWithComma(userAvailableBalance)}` 
+        : 'Shared Wallet';
+      
       return {
-        name: 'Shared Wallet',
-        balance: balance,
-        balanceFormatted: formatAmountWithComma(balance),
+        name: balanceLabel,
+        balance: displayBalance,
+        balanceFormatted: formatAmountWithComma(displayBalance),
         icon: 'Wallet' as const,
         iconColor: colors.blue,
         imageUrl: undefined,
@@ -961,11 +1000,17 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             showWalletChange={false}
             networkFee={networkFee}
             totalPaid={totalPaid}
-            showNetworkFee={true}
+            showNetworkFee={!isSharedWalletWithdrawal} // ✅ FIX: Hide fee display for shared wallet withdrawals
             onSendPress={handleExecuteTransaction}
-            sendButtonDisabled={!canExecute || isProcessing}
-            sendButtonLoading={isProcessing}
-            sendButtonTitle={isProcessing ? 'Processing...' : (config.context === 'degen_split_lock' ? 'Lock Funds' : 'Send')}
+            sendButtonDisabled={!canExecute || isProcessing || isLoadingSharedWalletData}
+            sendButtonLoading={isProcessing || isLoadingSharedWalletData}
+            sendButtonTitle={
+              isLoadingSharedWalletData 
+                ? 'Loading...' 
+                : isProcessing 
+                  ? 'Processing...' 
+                  : (config.context === 'degen_split_lock' ? 'Lock Funds' : 'Send')
+            }
             containerStyle={styles.sendComponentContainer}
           />
         )}

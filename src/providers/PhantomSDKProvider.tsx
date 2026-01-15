@@ -77,8 +77,22 @@ export const PhantomSDKProvider: React.FC<PhantomSDKProviderProps> = ({
 
   // Render provider if basic config is present (works in both dev and production)
   // In development, skipPortalCheck allows testing even with unapproved app IDs
+  // ✅ FIX: In production, always render if basic config is present (don't require skipPortalCheck)
   const hasBasicConfig = PHANTOM_CONFIG.appId && PHANTOM_CONFIG.appOrigin && PHANTOM_CONFIG.redirectUri;
   const shouldRenderProvider = hasBasicConfig || (__DEV__ && skipPortalCheck);
+  
+  // ✅ DEBUG: Log provider rendering decision in production for troubleshooting
+  if (!__DEV__ && process.env.EXPO_PUBLIC_DEBUG_FEATURES === 'true') {
+    console.log('🔍 PhantomSDKProvider rendering decision:', {
+      hasBasicConfig,
+      hasAppId: !!PHANTOM_CONFIG.appId,
+      hasAppOrigin: !!PHANTOM_CONFIG.appOrigin,
+      hasRedirectUri: !!PHANTOM_CONFIG.redirectUri,
+      shouldRenderProvider,
+      isDev: __DEV__,
+      skipPortalCheck
+    });
+  }
 
   if (!shouldRenderProvider) {
     if (__DEV__) {
@@ -107,7 +121,7 @@ export const PhantomSDKProvider: React.FC<PhantomSDKProviderProps> = ({
     if (!configValidation.isValid) {
       console.warn('⚠️ Phantom configuration issues detected. If you get "check team status" or "not allowed" errors:');
       console.warn('   1. Visit https://phantom.app/developers');
-      console.warn('   2. Find your app with ID: ab881c51-6335-49b9-8800-0e4ad7d21ca3');
+      console.warn(`   2. Find your app with ID: ${PHANTOM_CONFIG.appId || '[Your App ID]'}`);
       console.warn('   3. If your app shows as "Private", contact Phantom support to make it public');
       console.warn('   4. Or use email/phone authentication for immediate development testing');
     }

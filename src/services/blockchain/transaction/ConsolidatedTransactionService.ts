@@ -671,11 +671,30 @@ class ConsolidatedTransactionService {
    */
   async getUserWalletAddress(userId: string): Promise<string | null> {
     try {
-      // Use the proper WalletService method to get user's wallet address
+      // ✅ FIX: First try to get wallet address directly from user document (faster, more reliable)
+      // This is the most direct way to get the user's in-app wallet address
+      const { firebaseDataService } = await import('../../data/firebaseDataService');
+      const userData = await firebaseDataService.user.getCurrentUser(userId);
+      
+      if (userData?.wallet_address) {
+        logger.info('Retrieved wallet address from user document', {
+          userId,
+          address: userData.wallet_address,
+          walletType: userData.wallet_type || 'app'
+        }, 'ConsolidatedTransactionService');
+        return userData.wallet_address;
+      }
+      
+      // Fallback to wallet service if not in user document
+      logger.info('Wallet address not in user document, trying wallet service', { userId }, 'ConsolidatedTransactionService');
       const { simplifiedWalletService } = await import('../wallet/simplifiedWalletService');
       const walletInfo = await simplifiedWalletService.getWalletInfo(userId);
       
       if (walletInfo) {
+        logger.info('Retrieved wallet address from wallet service', {
+          userId,
+          address: walletInfo.address
+        }, 'ConsolidatedTransactionService');
         return walletInfo.address;
       }
       
@@ -1153,13 +1172,74 @@ class ConsolidatedTransactionService {
       const { GoalService } = await import('../../sharedWallet/GoalService');
       const goalCheck = await GoalService.checkAndMarkGoalReached(sharedWalletId, newBalance);
       
-      if (goalCheck.goalReached && goalCheck.shouldNotify) {
-        // TODO: Send notification to all members
-        logger.info('Goal reached for shared wallet', {
-          sharedWalletId,
-          goalAmount: wallet.settings?.goalAmount,
-          currentBalance: newBalance,
+      // ✅ FIX: Send notifications to all wallet members (except the funder)
+      try {
+        const { notificationService } = await import('../../notifications/notificationService');
+        const funderMember = wallet.members?.find(m => m.userId === userId);
+        const funderName = funderMember?.name || 'A member';
+        
+        // Notify all active members except the funder
+        const membersToNotify = wallet.members?.filter(m => 
+          m.userId !== userId && 
+          m.status === 'active'
+        ) || [];
+        
+        for (const member of membersToNotify) {
+          try {
+            await notificationService.instance.sendNotification(
+              member.userId,
+              'Shared Wallet Funded',
+              `${funderName} added ${amount.toFixed(6)} ${wallet.currency || 'USDC'} to "${wallet.name || 'Shared Wallet'}"`,
+              'shared_wallet_funding',
+              {
+                sharedWalletId: sharedWalletId,
+                walletName: wallet.name || 'Shared Wallet',
+                amount: amount,
+                currency: wallet.currency || 'USDC',
+                funderId: userId,
+                funderName: funderName,
+                newBalance: newBalance,
+                transactionSignature: result.signature,
+              }
+            );
+          } catch (notifError) {
+            logger.warn('Failed to send funding notification to member', {
+              memberId: member.userId,
+              error: notifError instanceof Error ? notifError.message : String(notifError)
+            }, 'ConsolidatedTransactionService');
+          }
+        }
+        
+        // If goal was reached, send special notification
+        if (goalCheck.goalReached && goalCheck.shouldNotify) {
+          for (const member of wallet.members?.filter(m => m.status === 'active') || []) {
+            try {
+              await notificationService.instance.sendNotification(
+                member.userId,
+                '🎉 Goal Reached!',
+                `The shared wallet "${wallet.name || 'Shared Wallet'}" has reached its goal of ${wallet.settings?.goalAmount} ${wallet.currency || 'USDC'}!`,
+                'shared_wallet_goal_reached',
+                {
+                  sharedWalletId: sharedWalletId,
+                  walletName: wallet.name || 'Shared Wallet',
+                  goalAmount: wallet.settings?.goalAmount,
+                  currentBalance: newBalance,
+                  currency: wallet.currency || 'USDC',
+                }
+              );
+            } catch (notifError) {
+              logger.warn('Failed to send goal reached notification', {
+                memberId: member.userId,
+                error: notifError instanceof Error ? notifError.message : String(notifError)
+              }, 'ConsolidatedTransactionService');
+            }
+          }
+        }
+      } catch (notificationError) {
+        logger.warn('Failed to send funding notifications', {
+          error: notificationError instanceof Error ? notificationError.message : String(notificationError)
         }, 'ConsolidatedTransactionService');
+        // Don't fail the transaction if notifications fail
       }
 
         return {
@@ -1238,11 +1318,30 @@ class ConsolidatedTransactionService {
 
       // Verify user is an active member
       const userMember = wallet.members?.find((m) => m.userId === userId);
-      if (!userMember || userMember.status !== 'active') {
+      if (!userMember) {
         return {
           success: false,
-          error: 'You must be an active member to withdraw from this wallet'
+          error: 'You are not a member of this shared wallet. If you were recently invited, please accept the invitation first.'
         };
+      }
+
+      if (userMember.status !== 'active') {
+        if (userMember.status === 'invited') {
+          return {
+            success: false,
+            error: 'You need to accept the invitation to this shared wallet before you can withdraw funds. Please check your notifications or the wallet details page.'
+          };
+        } else if (userMember.status === 'removed') {
+          return {
+            success: false,
+            error: 'You have been removed from this shared wallet and can no longer withdraw funds. Please contact the wallet creator if you believe this is an error.'
+          };
+        } else {
+          return {
+            success: false,
+            error: `Your account status is "${userMember.status}". You must be an active member to withdraw funds. Please contact the wallet creator if you need assistance.`
+          };
+        }
       }
 
       // Check member permissions
@@ -1251,7 +1350,7 @@ class ConsolidatedTransactionService {
       if (!canWithdrawCheck.allowed) {
         return {
           success: false,
-          error: canWithdrawCheck.reason || 'You do not have permission to withdraw funds'
+          error: canWithdrawCheck.reason || 'You do not have permission to withdraw funds from this shared wallet. Please contact the wallet creator to request withdrawal permissions.'
         };
       }
 
@@ -1266,14 +1365,100 @@ class ConsolidatedTransactionService {
       }
 
       // Check user's available balance
-      const userContributed = userMember.totalContributed || 0;
+      // ✅ FIX: Use let instead of const to allow adjustment for recent funding transactions
+      let userContributed = userMember.totalContributed || 0;
       const userWithdrawn = userMember.totalWithdrawn || 0;
-      const userAvailableBalance = userContributed - userWithdrawn;
+      let userAvailableBalance = userContributed - userWithdrawn;
+
+      // ✅ FIX: Check for recent funding transactions if balance seems insufficient
+      // This handles the race condition where funding transaction completed but Firestore update hasn't propagated
+      if (amount > userAvailableBalance) {
+        logger.info('Balance check failed, checking for recent funding transactions', {
+          sharedWalletId,
+          userId,
+          amount,
+          userContributed,
+          userWithdrawn,
+          userAvailableBalance
+        }, 'ConsolidatedTransactionService');
+
+        try {
+          // Check for recent funding transactions by this user (within last 30 seconds)
+          const { db } = await import('../../../config/firebase/firebase');
+          const { collection, query, where, getDocs } = await import('firebase/firestore');
+          
+          // ✅ OPTIMIZATION: Query without orderBy to avoid composite index requirement
+          // We'll filter and sort in memory instead
+          const recentFundingQuery = query(
+            collection(db, 'sharedWalletTransactions'),
+            where('sharedWalletId', '==', sharedWalletId),
+            where('userId', '==', userId),
+            where('type', '==', 'funding'),
+            where('status', '==', 'confirmed')
+          );
+
+          const recentFundingSnapshot = await getDocs(recentFundingQuery);
+          let recentFundingTotal = 0;
+          const thirtySecondsAgo = Date.now() - 30000;
+          
+          // Filter and sort in memory to avoid index requirements
+          const recentTransactions = recentFundingSnapshot.docs
+            .map(doc => {
+              const txData = doc.data();
+              const createdAt = txData.createdAt?.toDate ? txData.createdAt.toDate() : new Date(txData.createdAt);
+              return {
+                amount: txData.amount || 0,
+                createdAt: createdAt.getTime()
+              };
+            })
+            .filter(tx => tx.createdAt > thirtySecondsAgo)
+            .sort((a, b) => b.createdAt - a.createdAt)
+            .slice(0, 5); // Limit to 5 most recent
+          
+          recentFundingTotal = recentTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+          // If we found recent funding, add it to the available balance
+          if (recentFundingTotal > 0) {
+            logger.info('Found recent funding transactions, adjusting available balance', {
+              sharedWalletId,
+              userId,
+              recentFundingTotal,
+              originalBalance: userAvailableBalance,
+              adjustedBalance: userAvailableBalance + recentFundingTotal
+            }, 'ConsolidatedTransactionService');
+
+            userAvailableBalance += recentFundingTotal;
+            userContributed += recentFundingTotal;
+          }
+        } catch (recentTxError) {
+          logger.warn('Failed to check recent funding transactions', {
+            error: recentTxError instanceof Error ? recentTxError.message : String(recentTxError),
+            sharedWalletId,
+            userId
+          }, 'ConsolidatedTransactionService');
+          // Continue with original balance check - don't fail the withdrawal if this check fails
+        }
+      }
 
       if (amount > userAvailableBalance) {
+        // ✅ FIX: Provide more helpful error messages explaining WHY they can't withdraw
+        let errorMessage: string;
+        
+        if (userAvailableBalance <= 0) {
+          if (userContributed === 0 && userWithdrawn === 0) {
+            errorMessage = `You haven't contributed any funds to this shared wallet yet. You can only withdraw funds that you've contributed. The wallet shows ${wallet.totalBalance.toFixed(6)} ${wallet.currency || 'USDC'} total, but this includes contributions from other members. To withdraw funds, you need to contribute first.`;
+          } else if (userContributed > 0 && userWithdrawn >= userContributed) {
+            errorMessage = `You've already withdrawn all of your contributions (${userContributed.toFixed(6)} ${wallet.currency || 'USDC'}). You can only withdraw funds that you've personally contributed to the shared wallet.`;
+          } else {
+            errorMessage = `You don't have any available balance to withdraw. Your contributions: ${userContributed.toFixed(6)} ${wallet.currency || 'USDC'}, Already withdrawn: ${userWithdrawn.toFixed(6)} ${wallet.currency || 'USDC'}.`;
+          }
+        } else {
+          errorMessage = `Insufficient balance. You can withdraw up to ${userAvailableBalance.toFixed(6)} ${wallet.currency || 'USDC'} (your contributions: ${userContributed.toFixed(6)}, already withdrawn: ${userWithdrawn.toFixed(6)}). You're trying to withdraw ${amount.toFixed(6)} ${wallet.currency || 'USDC'}. If you just funded the wallet, please wait a few seconds and try again.`;
+        }
+        
         return {
           success: false,
-          error: `Insufficient balance. You can withdraw up to ${userAvailableBalance} ${wallet.currency || 'USDC'}`
+          error: errorMessage
         };
       }
 
@@ -1805,6 +1990,50 @@ class ConsolidatedTransactionService {
       };
 
       await addDoc(collection(db, 'sharedWalletTransactions'), transactionData);
+
+      // ✅ FIX: Send notifications to all wallet members (except the withdrawer)
+      try {
+        const { notificationService } = await import('../../notifications/notificationService');
+        const withdrawerName = userMember.name || 'A member';
+        
+        // Notify all active members except the withdrawer
+        const membersToNotify = wallet.members?.filter(m => 
+          m.userId !== userId && 
+          m.status === 'active'
+        ) || [];
+        
+        for (const member of membersToNotify) {
+          try {
+            await notificationService.instance.sendNotification(
+              member.userId,
+              'Shared Wallet Withdrawal',
+              `${withdrawerName} withdrew ${amount.toFixed(6)} ${wallet.currency || 'USDC'} from "${wallet.name || 'Shared Wallet'}"`,
+              'shared_wallet_withdrawal',
+              {
+                sharedWalletId: sharedWalletId,
+                walletName: wallet.name || 'Shared Wallet',
+                amount: amount,
+                currency: wallet.currency || 'USDC',
+                withdrawerId: userId,
+                withdrawerName: withdrawerName,
+                newBalance: newBalance,
+                transactionSignature: signature,
+                destination: finalDestinationAddress,
+              }
+            );
+          } catch (notifError) {
+            logger.warn('Failed to send withdrawal notification to member', {
+              memberId: member.userId,
+              error: notifError instanceof Error ? notifError.message : String(notifError)
+            }, 'ConsolidatedTransactionService');
+          }
+        }
+      } catch (notificationError) {
+        logger.warn('Failed to send withdrawal notifications', {
+          error: notificationError instanceof Error ? notificationError.message : String(notificationError)
+        }, 'ConsolidatedTransactionService');
+        // Don't fail the transaction if notifications fail
+      }
 
         return {
           success: true,

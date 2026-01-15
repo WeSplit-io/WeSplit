@@ -1,0 +1,21 @@
+# Commands to Remove Risky Values from EAS
+# Run these commands one by one (select "production" when prompted)
+
+# 1. CRITICAL: Remove Company Wallet Private Key
+eas env:delete production --variable-name EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY --scope project
+
+# 2. Remove Google OAuth Client Secret
+eas env:delete production --variable-name EXPO_PUBLIC_GOOGLE_CLIENT_SECRET --scope project
+
+# 3. Remove Twitter OAuth Client Secret
+eas env:delete production --variable-name EXPO_PUBLIC_TWITTER_CLIENT_SECRET --scope project
+
+# 4. Remove MoonPay Secret Key
+eas env:delete production --variable-name MOONPAY_SECRET_KEY --scope project
+
+# 5. Remove MoonPay Webhook Secret
+eas env:delete production --variable-name MOONPAY_WEBHOOK_SECRET --scope project
+
+# After removing, verify with:
+# eas env:list
+# (Select "production" when prompted)

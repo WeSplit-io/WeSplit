@@ -39,7 +39,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit",
-      buildNumber: "65",
+      buildNumber: "67",
       deploymentTarget: "15.1",
       googleServicesFile: "./GoogleService-Info.plist", // Uncomment when file is added
       infoPlist: {
@@ -71,7 +71,7 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit",
-      versionCode: 11265,
+      versionCode: 11267,
       googleServicesFile: "./google-services.json", // Uncomment when file is added
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
@@ -280,6 +280,20 @@ module.exports = {
       EXPO_PUBLIC_COMPANY_WALLET_ADDRESS: getEnvVar('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS'),
       EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE: getEnvVar('EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE'),
       EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE: getEnvVar('EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE'),
+      
+      // Phantom Wallet Integration
+      EXPO_PUBLIC_PHANTOM_APP_ID: getEnvVar('EXPO_PUBLIC_PHANTOM_APP_ID'),
+      EXPO_PUBLIC_PHANTOM_APP_ORIGIN: getEnvVar('EXPO_PUBLIC_PHANTOM_APP_ORIGIN', 'https://wesplit.io'),
+      EXPO_PUBLIC_PHANTOM_REDIRECT_URI: getEnvVar('EXPO_PUBLIC_PHANTOM_REDIRECT_URI', 'wesplit://phantom-callback'),
+      
+      // Phantom Feature Flags
+      EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN: getEnvVar('EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN', 'false'),
+      EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS: getEnvVar('EXPO_PUBLIC_PHANTOM_SPLIT_WALLETS', 'false'),
+      EXPO_PUBLIC_PHANTOM_AUTO_CONFIRM: getEnvVar('EXPO_PUBLIC_PHANTOM_AUTO_CONFIRM', 'false'),
+      EXPO_PUBLIC_PHANTOM_MULTI_CHAIN: getEnvVar('EXPO_PUBLIC_PHANTOM_MULTI_CHAIN', 'false'),
+      
+      // Debug Features (for troubleshooting)
+      EXPO_PUBLIC_DEBUG_FEATURES: getEnvVar('EXPO_PUBLIC_DEBUG_FEATURES', 'false'),
       
     },
     podfileProperties: {

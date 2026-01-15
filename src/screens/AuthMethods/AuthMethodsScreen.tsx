@@ -15,7 +15,8 @@ import { Container, Header, Button, Input, LoadingScreen, Tabs } from '../../com
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import { AuthPersistenceService } from '../../services/core/authPersistenceService';
-import { isPhantomSocialLoginEnabled, isPhantomEnabled } from '../../config/features';
+import { isPhantomSocialLoginEnabled, isPhantomEnabled, FEATURES } from '../../config/features';
+import { PHANTOM_CONFIG } from '../../config/env';
 import { PhantomAuthButton } from '../../components/auth/PhantomAuthButton';
 import { authService } from '../../services/auth/AuthService';
 import { PhantomAuthService } from '../../services/auth/PhantomAuthService';
@@ -764,7 +765,24 @@ const AuthMethodsScreen: React.FC = () => {
           <View style={styles.contentContainer}>
 
           {/* Phantom Social Login - Show if enabled */}
-          {isPhantomSocialLoginEnabled() ? (
+          {(() => {
+            const isEnabled = isPhantomSocialLoginEnabled();
+            // ✅ DEBUG: Log visibility check for troubleshooting
+            if (__DEV__ || process.env.EXPO_PUBLIC_DEBUG_FEATURES === 'true') {
+              console.log('🔍 Phantom Auth Button Visibility:', {
+                isEnabled,
+                featureFlag: FEATURES.PHANTOM_SOCIAL_LOGIN,
+                isPhantomConfigured: isPhantomEnabled(),
+                phantomConfig: {
+                  appId: PHANTOM_CONFIG.appId ? '✅ Set' : '❌ Missing',
+                  socialLogin: PHANTOM_CONFIG.features.socialLogin,
+                },
+                envVar: process.env.EXPO_PUBLIC_PHANTOM_SOCIAL_LOGIN,
+                isProduction: !__DEV__,
+              });
+            }
+            return isEnabled;
+          })() ? (
             <View style={styles.socialSection}>
               <PhantomAuthButton
                 fullWidth={true}
@@ -795,7 +813,8 @@ const AuthMethodsScreen: React.FC = () => {
                     errorLower.includes('unknown error occurred')
                   ) {
                     errorTitle = 'Phantom App is Private';
-                    errorMessage = 'Your app (ID: ab881c51-6335-49b9-8800-0e4ad7d21ca3) is currently set to "Private" in Phantom Portal.\n\nTo fix:\n1. Visit https://phantom.app/developers\n2. Your app shows as "Private" - this restricts access to team members only\n3. Contact Phantom support to request making your app public\n4. Include your app ID and explain you need public access for production\n\nFor immediate development testing, use email or phone authentication instead.';
+                    const appId = PHANTOM_CONFIG.appId || '[Your App ID]';
+                    errorMessage = `Your app (ID: ${appId}) is currently set to "Private" in Phantom Portal.\n\nTo fix:\n1. Visit https://phantom.app/developers\n2. Your app shows as "Private" - this restricts access to team members only\n3. Contact Phantom support to request making your app public\n4. Include your app ID and explain you need public access for production\n\nFor immediate development testing, use email or phone authentication instead.`;
                   } else if (errorLower.includes('network') || errorLower.includes('connection')) {
                     errorMessage = 'Network connection issue. Please check your internet connection and try again.';
                   }

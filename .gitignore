@@ -216,3 +216,6 @@ pipeline-test-report.json
 # MkDocs build output
 site/
 docs/
+
+*.sh
+*.md
