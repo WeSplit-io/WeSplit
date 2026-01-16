@@ -1209,27 +1209,51 @@ class ConsolidatedTransactionService {
         transactionSignature: result.signature,
         status: 'confirmed',
         memo: memo,
-        createdAt: new Date().toISOString(),
-        confirmedAt: new Date().toISOString(),
         source: 'in-app-wallet',
+        // createdAt and confirmedAt will be set using serverTimestamp() below
       };
 
       // ✅ FIX: Save transaction with error handling for permissions
       try {
-        await addDoc(collection(db, 'sharedWalletTransactions'), transactionData);
+        // Use serverTimestamp for createdAt to ensure proper Firestore Timestamp format
+        const { serverTimestamp } = await import('firebase/firestore');
+        const transactionDataWithTimestamp = {
+          ...transactionData,
+          createdAt: serverTimestamp(), // Use serverTimestamp for proper Firestore Timestamp
+          confirmedAt: serverTimestamp(),
+        };
+        
+        const docRef = await addDoc(collection(db, 'sharedWalletTransactions'), transactionDataWithTimestamp);
         logger.info('Shared wallet funding transaction saved to Firestore', {
           signature: result.signature,
           sharedWalletId,
-          userId
+          userId,
+          firebaseDocId: docRef.id,
+          transactionId: transactionData.id,
+          transactionData: {
+            id: transactionData.id,
+            sharedWalletId: transactionData.sharedWalletId,
+            type: transactionData.type,
+            amount: transactionData.amount,
+            currency: transactionData.currency
+          },
+          note: 'Transaction saved - should appear in query with sharedWalletId=' + sharedWalletId
         }, 'ConsolidatedTransactionService');
       } catch (saveError) {
         // Log error but don't fail the transaction - it already succeeded on blockchain
+        const errorMessage = saveError instanceof Error ? saveError.message : String(saveError);
         logger.error('Failed to save shared wallet funding transaction to Firestore', {
-          error: saveError instanceof Error ? saveError.message : String(saveError),
+          error: errorMessage,
           signature: result.signature,
           sharedWalletId,
           userId,
-          note: 'Transaction succeeded on blockchain but failed to save to Firestore. Balance was updated but transaction record is missing.'
+          transactionData: {
+            id: transactionData.id,
+            type: transactionData.type,
+            amount: transactionData.amount
+          },
+          note: 'Transaction succeeded on blockchain but failed to save to Firestore. Balance was updated but transaction record is missing.',
+          isPermissionError: errorMessage.includes('permission') || errorMessage.includes('Permission')
         }, 'ConsolidatedTransactionService');
         // Don't throw - transaction succeeded, just logging failed
       }
@@ -1370,20 +1394,33 @@ class ConsolidatedTransactionService {
         }, 'ConsolidatedTransactionService');
       }
 
-      // Get shared wallet
+      // ✅ FIX: Get shared wallet with retry to handle race condition after funding
+      // If wallet was just funded, Firestore might have eventual consistency issues
       const { SharedWalletService } = await import('../../sharedWallet');
-      const walletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
+      let walletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
       if (!walletResult.success || !walletResult.wallet) {
-        return {
-          success: false,
-          error: 'Shared wallet not found'
-        };
+        // Retry once after a short delay (Firestore eventual consistency)
+        logger.warn('First wallet fetch failed, retrying after delay', {
+          sharedWalletId,
+          userId,
+          error: walletResult.error
+        }, 'ConsolidatedTransactionService');
+        
+        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+        walletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
+        
+        if (!walletResult.success || !walletResult.wallet) {
+          return {
+            success: false,
+            error: walletResult.error || 'Shared wallet not found'
+          };
+        }
       }
 
-      const wallet = walletResult.wallet;
+      let wallet = walletResult.wallet;
 
       // Verify user is an active member
-      const userMember = wallet.members?.find((m) => m.userId === userId);
+      let userMember = wallet.members?.find((m) => m.userId === userId);
       if (!userMember) {
         return {
           success: false,
@@ -1420,14 +1457,122 @@ class ConsolidatedTransactionService {
         };
       }
 
-      // Check if approval is required
+      // ✅ FIX: Check if approval is required and create withdrawal request
       if (wallet.settings?.requireApprovalForWithdrawals && wallet.creatorId !== userId) {
-        // TODO: Implement approval workflow
-        // For now, return error
-        return {
-          success: false,
-          error: 'Withdrawal requires creator approval. This feature is coming soon.'
-        };
+        logger.info('Withdrawal requires approval - creating withdrawal request', {
+          sharedWalletId,
+          userId,
+          amount,
+          destination: params.destinationAddress
+        }, 'ConsolidatedTransactionService');
+
+        try {
+          const { db } = await import('../../config/firebase/firebase');
+          const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+          const { generateUniqueId } = await import('../../sharedWallet/utils');
+
+          const withdrawalRequestData = {
+            id: generateUniqueId('withdrawal_request'),
+            sharedWalletId: sharedWalletId,
+            userId: userId,
+            userName: userMember.name || 'Unknown',
+            amount: amount,
+            currency: wallet.currency || 'USDC',
+            destinationAddress: params.destinationAddress,
+            memo: params.memo || '',
+            status: 'pending' as const,
+            createdAt: serverTimestamp(),
+            requestedAt: new Date().toISOString(),
+          };
+
+          await addDoc(collection(db, 'sharedWalletWithdrawalRequests'), withdrawalRequestData);
+
+          logger.info('Withdrawal request created successfully', {
+            sharedWalletId,
+            userId,
+            amount,
+            requestId: withdrawalRequestData.id
+          }, 'ConsolidatedTransactionService');
+
+          // Send notification to creator
+          try {
+            const { NotificationService } = await import('../../notifications/notificationService');
+            await NotificationService.sendNotification({
+              userId: wallet.creatorId,
+              type: 'shared_wallet_withdrawal_request',
+              title: 'Withdrawal Request',
+              message: `${userMember.name || 'A member'} requested to withdraw ${amount} ${wallet.currency || 'USDC'} from ${wallet.name}`,
+              data: {
+                sharedWalletId: sharedWalletId,
+                requestId: withdrawalRequestData.id,
+                amount,
+                currency: wallet.currency || 'USDC',
+                requesterId: userId,
+                requesterName: userMember.name || 'Unknown',
+              }
+            });
+          } catch (notifError) {
+            logger.warn('Failed to send withdrawal request notification', {
+              error: notifError instanceof Error ? notifError.message : String(notifError)
+            }, 'ConsolidatedTransactionService');
+          }
+
+          return {
+            success: false,
+            error: 'Withdrawal request submitted. The wallet creator will review and approve your request.',
+            requiresApproval: true,
+            requestId: withdrawalRequestData.id
+          };
+        } catch (requestError) {
+          logger.error('Failed to create withdrawal request', {
+            error: requestError instanceof Error ? requestError.message : String(requestError),
+            sharedWalletId,
+            userId
+          }, 'ConsolidatedTransactionService');
+          
+          return {
+            success: false,
+            error: 'Failed to submit withdrawal request. Please try again or contact the wallet creator.'
+          };
+        }
+      }
+
+      // ✅ FIX: Reload wallet data right before balance check to ensure we have latest data
+      // This handles the race condition where funding just completed but Firestore hasn't propagated yet
+      // Firestore has eventual consistency, so if funding just completed, we might have stale data
+      try {
+        const freshWalletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
+        if (freshWalletResult.success && freshWalletResult.wallet) {
+          const oldUserContributed = userMember.totalContributed || 0;
+          wallet = freshWalletResult.wallet;
+          userMember = wallet.members?.find((m) => m.userId === userId);
+          
+          if (userMember) {
+            const newUserContributed = userMember.totalContributed || 0;
+            if (newUserContributed !== oldUserContributed) {
+              logger.info('Wallet data refreshed before balance check - member contribution updated', {
+                sharedWalletId,
+                userId,
+                oldTotalContributed: oldUserContributed,
+                newTotalContributed: newUserContributed,
+                difference: newUserContributed - oldUserContributed,
+                walletTotalBalance: wallet.totalBalance
+              }, 'ConsolidatedTransactionService');
+            }
+          } else {
+            return {
+              success: false,
+              error: 'User member data not found after reload. Please try again.'
+            };
+          }
+        }
+      } catch (reloadError) {
+        logger.warn('Failed to reload wallet data before balance check, using original data', {
+          error: reloadError instanceof Error ? reloadError.message : String(reloadError),
+          sharedWalletId,
+          userId
+        }, 'ConsolidatedTransactionService');
+        // Continue with original wallet data
       }
 
       // Check user's available balance
@@ -1445,64 +1590,124 @@ class ConsolidatedTransactionService {
           amount,
           userContributed,
           userWithdrawn,
-          userAvailableBalance
+          userAvailableBalance,
+          walletTotalBalance: wallet.totalBalance
         }, 'ConsolidatedTransactionService');
 
-        try {
-          // Check for recent funding transactions by this user (within last 30 seconds)
-          const { db } = await import('../../../config/firebase/firebase');
-          const { collection, query, where, getDocs } = await import('firebase/firestore');
-          
-          // ✅ OPTIMIZATION: Query without orderBy to avoid composite index requirement
-          // We'll filter and sort in memory instead
-          const recentFundingQuery = query(
-            collection(db, 'sharedWalletTransactions'),
-            where('sharedWalletId', '==', sharedWalletId),
-            where('userId', '==', userId),
-            where('type', '==', 'funding'),
-            where('status', '==', 'confirmed')
-          );
-
-          const recentFundingSnapshot = await getDocs(recentFundingQuery);
-          let recentFundingTotal = 0;
-          const thirtySecondsAgo = Date.now() - 30000;
-          
-          // Filter and sort in memory to avoid index requirements
-          const recentTransactions = recentFundingSnapshot.docs
-            .map(doc => {
-              const txData = doc.data();
-              const createdAt = txData.createdAt?.toDate ? txData.createdAt.toDate() : new Date(txData.createdAt);
-              return {
-                amount: txData.amount || 0,
-                createdAt: createdAt.getTime()
-              };
-            })
-            .filter(tx => tx.createdAt > thirtySecondsAgo)
-            .sort((a, b) => b.createdAt - a.createdAt)
-            .slice(0, 5); // Limit to 5 most recent
-          
-          recentFundingTotal = recentTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-
-          // If we found recent funding, add it to the available balance
-          if (recentFundingTotal > 0) {
-            logger.info('Found recent funding transactions, adjusting available balance', {
-              sharedWalletId,
-              userId,
-              recentFundingTotal,
-              originalBalance: userAvailableBalance,
-              adjustedBalance: userAvailableBalance + recentFundingTotal
-            }, 'ConsolidatedTransactionService');
-
-            userAvailableBalance += recentFundingTotal;
-            userContributed += recentFundingTotal;
-          }
-        } catch (recentTxError) {
-          logger.warn('Failed to check recent funding transactions', {
-            error: recentTxError instanceof Error ? recentTxError.message : String(recentTxError),
+        // ✅ FIX: If wallet totalBalance is sufficient but user balance isn't, 
+        // and this is right after funding, wait a moment and retry wallet reload
+        if (wallet.totalBalance >= amount && userAvailableBalance < amount) {
+          logger.info('Wallet has sufficient total balance but user balance is stale - retrying after delay', {
             sharedWalletId,
-            userId
+            userId,
+            amount,
+            walletTotalBalance: wallet.totalBalance,
+            userAvailableBalance,
+            userContributed,
+            userWithdrawn
           }, 'ConsolidatedTransactionService');
-          // Continue with original balance check - don't fail the withdrawal if this check fails
+          
+          // Wait a bit for Firestore to propagate the update
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+          
+          // Reload wallet one more time
+          try {
+            const retryWalletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
+            if (retryWalletResult.success && retryWalletResult.wallet) {
+              wallet = retryWalletResult.wallet;
+              userMember = wallet.members?.find((m) => m.userId === userId);
+              if (userMember) {
+                userContributed = userMember.totalContributed || 0;
+                userAvailableBalance = userContributed - userWithdrawn;
+                
+                logger.info('Wallet reloaded after delay - balance updated', {
+                  sharedWalletId,
+                  userId,
+                  newUserContributed: userContributed,
+                  newUserAvailableBalance: userAvailableBalance,
+                  amount
+                }, 'ConsolidatedTransactionService');
+              }
+            }
+          } catch (retryError) {
+            logger.warn('Retry wallet reload failed', {
+              error: retryError instanceof Error ? retryError.message : String(retryError),
+              sharedWalletId,
+              userId
+            }, 'ConsolidatedTransactionService');
+          }
+        }
+
+        // If still insufficient, check for recent funding transactions in the database
+        if (amount > userAvailableBalance) {
+          try {
+            // Check for recent funding transactions by this user (within last 60 seconds)
+            const { db } = await import('../../../config/firebase/firebase');
+            const { collection, query, where, getDocs } = await import('firebase/firestore');
+            
+            // ✅ OPTIMIZATION: Query without orderBy to avoid composite index requirement
+            // We'll filter and sort in memory instead
+            const recentFundingQuery = query(
+              collection(db, 'sharedWalletTransactions'),
+              where('sharedWalletId', '==', sharedWalletId),
+              where('userId', '==', userId),
+              where('type', '==', 'funding'),
+              where('status', '==', 'confirmed')
+            );
+
+            const recentFundingSnapshot = await getDocs(recentFundingQuery);
+            let recentFundingTotal = 0;
+            const sixtySecondsAgo = Date.now() - 60000; // Extended to 60 seconds
+            
+            // Filter and sort in memory to avoid index requirements
+            const recentTransactions = recentFundingSnapshot.docs
+              .map(doc => {
+                const txData = doc.data();
+                let createdAt: Date;
+                if (txData.createdAt) {
+                  if (txData.createdAt.toDate) {
+                    createdAt = txData.createdAt.toDate();
+                  } else if (typeof txData.createdAt === 'string') {
+                    createdAt = new Date(txData.createdAt);
+                  } else {
+                    createdAt = new Date();
+                  }
+                } else {
+                  createdAt = new Date();
+                }
+                return {
+                  amount: txData.amount || 0,
+                  createdAt: createdAt.getTime()
+                };
+              })
+              .filter(tx => tx.createdAt > sixtySecondsAgo)
+              .sort((a, b) => b.createdAt - a.createdAt)
+              .slice(0, 5); // Limit to 5 most recent
+            
+            recentFundingTotal = recentTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+            // If we found recent funding, add it to the available balance
+            if (recentFundingTotal > 0) {
+              logger.info('Found recent funding transactions, adjusting available balance', {
+                sharedWalletId,
+                userId,
+                recentFundingTotal,
+                originalBalance: userAvailableBalance,
+                adjustedBalance: userAvailableBalance + recentFundingTotal,
+                recentTransactionCount: recentTransactions.length
+              }, 'ConsolidatedTransactionService');
+
+              userAvailableBalance += recentFundingTotal;
+              userContributed += recentFundingTotal;
+            }
+          } catch (recentTxError) {
+            logger.warn('Failed to check recent funding transactions', {
+              error: recentTxError instanceof Error ? recentTxError.message : String(recentTxError),
+              sharedWalletId,
+              userId
+            }, 'ConsolidatedTransactionService');
+            // Continue with original balance check - don't fail the withdrawal if this check fails
+          }
         }
       }
 
@@ -2182,27 +2387,51 @@ class ConsolidatedTransactionService {
         transactionSignature: signature,
         status: 'confirmed',
         memo: memo,
-        createdAt: new Date().toISOString(),
-        confirmedAt: new Date().toISOString(),
         destination: finalDestinationAddress,
+        // createdAt and confirmedAt will be set using serverTimestamp() below
       };
 
       // ✅ FIX: Save transaction with error handling for permissions
       try {
-        await addDoc(collection(db, 'sharedWalletTransactions'), transactionData);
+        // Use serverTimestamp for createdAt to ensure proper Firestore Timestamp format
+        const { serverTimestamp } = await import('firebase/firestore');
+        const transactionDataWithTimestamp = {
+          ...transactionData,
+          createdAt: serverTimestamp(), // Use serverTimestamp for proper Firestore Timestamp
+          confirmedAt: serverTimestamp(),
+        };
+        
+        const docRef = await addDoc(collection(db, 'sharedWalletTransactions'), transactionDataWithTimestamp);
         logger.info('Shared wallet withdrawal transaction saved to Firestore', {
           signature,
           sharedWalletId,
-          userId
+          userId,
+          firebaseDocId: docRef.id,
+          transactionId: transactionData.id,
+          transactionData: {
+            id: transactionData.id,
+            sharedWalletId: transactionData.sharedWalletId,
+            type: transactionData.type,
+            amount: transactionData.amount,
+            currency: transactionData.currency
+          },
+          note: 'Transaction saved - should appear in query with sharedWalletId=' + sharedWalletId
         }, 'ConsolidatedTransactionService');
       } catch (saveError) {
         // Log error but don't fail the transaction - it already succeeded on blockchain
+        const errorMessage = saveError instanceof Error ? saveError.message : String(saveError);
         logger.error('Failed to save shared wallet withdrawal transaction to Firestore', {
-          error: saveError instanceof Error ? saveError.message : String(saveError),
+          error: errorMessage,
           signature,
           sharedWalletId,
           userId,
-          note: 'Transaction succeeded on blockchain but failed to save to Firestore. Balance was updated but transaction record is missing.'
+          transactionData: {
+            id: transactionData.id,
+            type: transactionData.type,
+            amount: transactionData.amount
+          },
+          note: 'Transaction succeeded on blockchain but failed to save to Firestore. Balance was updated but transaction record is missing.',
+          isPermissionError: errorMessage.includes('permission') || errorMessage.includes('Permission')
         }, 'ConsolidatedTransactionService');
         // Don't throw - transaction succeeded, just logging failed
       }

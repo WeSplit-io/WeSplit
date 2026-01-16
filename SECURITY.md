@@ -78,9 +78,17 @@ If a security vulnerability is discovered:
 3. Notify users if user data is affected
 4. Update security documentation
 
+## Security Audit Guide
+
+For security auditors and penetration testers, see **[`SECURITY_AUDIT.md`](./SECURITY_AUDIT.md)** for:
+- Complete list of critical files to review
+- All contract addresses and program IDs
+- Security architecture overview
+- Audit checklist and getting started guide
+
 ## Contact
 
-For security concerns, please email: security@wesplit.com
+For security concerns, please email: vcharles@wesplit.com
 
 ## Security Resolution Summary
 

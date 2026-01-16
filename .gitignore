@@ -215,7 +215,20 @@ pipeline-test-report.json
 
 # MkDocs build output
 site/
-docs/
 
-*.sh
-*.md
+# Archive folders (keep organized, but don't clutter root)
+docs/archive/
+scripts/archive/
+tools/archive/
+
+# Specific temporary/one-off scripts (not all .sh files)
+# Keep important scripts in scripts/ folder tracked
+# Only ignore temporary cleanup scripts
+*_cleanup.sh
+*temp*.sh
+
+# Specific temporary markdown files (not all .md files)
+# Keep README.md, SECURITY.md, and docs/ tracked
+# Only ignore temporary notes
+*temp*.md
+*_notes.md

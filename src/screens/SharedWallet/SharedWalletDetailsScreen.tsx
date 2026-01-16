@@ -68,35 +68,87 @@ const SharedWalletDetailsScreen: React.FC = () => {
 
   // Load transactions
   const loadTransactions = useCallback(async () => {
-    if (!wallet?.id) return;
+    if (!wallet?.id) {
+      logger.warn('Cannot load transactions - wallet ID missing', {
+        walletId: wallet?.id,
+        hasWallet: !!wallet
+      }, 'SharedWalletDetailsScreen');
+      return;
+    }
+
+    logger.info('Loading transactions for shared wallet', {
+      walletId: wallet.id,
+      walletFirebaseDocId: wallet.firebaseDocId
+    }, 'SharedWalletDetailsScreen');
 
     setIsLoadingTransactions(true);
     try {
       const { SharedWalletService } = await import('../../services/sharedWallet');
       const result = await SharedWalletService.getSharedWalletTransactions(wallet.id, 50);
+      
+      logger.info('Transaction load result', {
+        walletId: wallet.id,
+        success: result.success,
+        transactionCount: result.transactions?.length || 0,
+        error: result.error
+      }, 'SharedWalletDetailsScreen');
 
       if (result.success && result.transactions) {
+        logger.info('Transactions loaded from service', {
+          walletId: wallet.id,
+          transactionCount: result.transactions.length
+        }, 'SharedWalletDetailsScreen');
+        
         // Transform transactions to match the UnifiedTransaction interface
-        const unifiedTransactions = result.transactions.map((tx: any) => ({
-          id: tx.id,
-          firebaseDocId: tx.firebaseDocId,
-          type: tx.type as 'funding' | 'withdrawal' | 'transfer' | 'fee' | 'send' | 'receive' | 'deposit' | 'payment' | 'refund',
-          amount: tx.amount,
-          currency: tx.currency || 'USDC',
-          userName: tx.userName,
-          memo: tx.memo,
-          status: tx.status as 'confirmed' | 'pending' | 'failed' | 'completed',
-          createdAt: tx.createdAt,
-          transactionSignature: tx.transactionSignature,
-          sharedWalletId: tx.sharedWalletId,
-          // Additional fields for shared wallet context
-          userId: tx.userId,
-          // For withdrawal transactions, mark as external if destination is different from wallet
-          isExternalWallet: tx.type === 'withdrawal' && tx.destination ? true : false,
-        }));
+        const unifiedTransactions = result.transactions.map((tx: any) => {
+          // ✅ FIX: Handle createdAt field - it might be a Timestamp or ISO string
+          let createdAtValue: string;
+          if (tx.createdAt) {
+            if (tx.createdAt.toDate) {
+              // It's a Firestore Timestamp
+              createdAtValue = tx.createdAt.toDate().toISOString();
+            } else if (typeof tx.createdAt === 'string') {
+              // It's already an ISO string
+              createdAtValue = tx.createdAt;
+            } else {
+              // Fallback
+              createdAtValue = new Date().toISOString();
+            }
+          } else {
+            createdAtValue = new Date().toISOString();
+          }
+          
+          return {
+            id: tx.id,
+            firebaseDocId: tx.firebaseDocId,
+            type: tx.type as 'funding' | 'withdrawal' | 'transfer' | 'fee' | 'send' | 'receive' | 'deposit' | 'payment' | 'refund',
+            amount: tx.amount,
+            currency: tx.currency || 'USDC',
+            userName: tx.userName,
+            memo: tx.memo,
+            status: tx.status as 'confirmed' | 'pending' | 'failed' | 'completed',
+            createdAt: createdAtValue,
+            transactionSignature: tx.transactionSignature,
+            sharedWalletId: tx.sharedWalletId,
+            // Additional fields for shared wallet context
+            userId: tx.userId,
+            // For withdrawal transactions, mark as external if destination is different from wallet
+            isExternalWallet: tx.type === 'withdrawal' && tx.destination ? true : false,
+          };
+        });
+
+        logger.info('Transactions transformed and set', {
+          walletId: wallet.id,
+          transactionCount: unifiedTransactions.length
+        }, 'SharedWalletDetailsScreen');
 
         setTransactions(unifiedTransactions);
       } else {
+        logger.warn('No transactions returned from service', {
+          walletId: wallet.id,
+          success: result.success,
+          error: result.error
+        }, 'SharedWalletDetailsScreen');
         setTransactions([]);
       }
     } catch (error) {
@@ -168,24 +220,82 @@ const SharedWalletDetailsScreen: React.FC = () => {
 
   // Set up real-time listener for transactions
   useEffect(() => {
-    if (!wallet?.id) return;
+    if (!wallet?.id) {
+      logger.warn('Cannot set up transaction listener - wallet ID missing', {
+        walletId: wallet?.id,
+        hasWallet: !!wallet
+      }, 'SharedWalletDetailsScreen');
+      return;
+    }
 
     logger.info('Setting up real-time listener for shared wallet transactions', {
-      walletId: wallet.id
+      walletId: wallet.id,
+      walletFirebaseDocId: wallet.firebaseDocId
     }, 'SharedWalletDetailsScreen');
 
     const transactionsRef = collection(db, 'sharedWalletTransactions');
-    const q = query(
-      transactionsRef,
-      where('sharedWalletId', '==', wallet.id),
-      orderBy('createdAt', 'desc')
-    );
+    
+    // ✅ FIX: Try query with orderBy first, fallback to query without orderBy if index missing
+    // Then sort in memory (createdAt is stored as ISO string, so we can sort by string)
+    let q;
+    try {
+      q = query(
+        transactionsRef,
+        where('sharedWalletId', '==', wallet.id),
+        orderBy('createdAt', 'desc')
+      );
+    } catch (indexError) {
+      // If index doesn't exist, query without orderBy and sort in memory
+      logger.warn('Firestore index missing for transactions query, using fallback', {
+        walletId: wallet.id,
+        error: indexError instanceof Error ? indexError.message : String(indexError)
+      }, 'SharedWalletDetailsScreen');
+      q = query(
+        transactionsRef,
+        where('sharedWalletId', '==', wallet.id)
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const updatedTransactions = querySnapshot.docs.map((doc) => {
+      logger.info('Real-time listener snapshot received', {
+        walletId: wallet.id,
+        docCount: querySnapshot.docs.length,
+        hasPendingWrites: querySnapshot.metadata.hasPendingWrites,
+        isEmpty: querySnapshot.empty,
+        // Log first few transaction IDs for debugging
+        transactionIds: querySnapshot.docs.slice(0, 3).map(doc => ({
+          id: doc.id,
+          data: {
+            sharedWalletId: doc.data().sharedWalletId,
+            type: doc.data().type,
+            amount: doc.data().amount,
+            createdAt: doc.data().createdAt
+          }
+        }))
+      }, 'SharedWalletDetailsScreen');
+
+      let updatedTransactions = querySnapshot.docs.map((doc) => {
         const data = doc.data();
+        
+        // ✅ FIX: Handle createdAt field - it might be a Timestamp or ISO string
+        let createdAtValue: string;
+        if (data.createdAt) {
+          if (data.createdAt.toDate) {
+            // It's a Firestore Timestamp
+            createdAtValue = data.createdAt.toDate().toISOString();
+          } else if (typeof data.createdAt === 'string') {
+            // It's already an ISO string
+            createdAtValue = data.createdAt;
+          } else {
+            // Fallback
+            createdAtValue = new Date().toISOString();
+          }
+        } else {
+          createdAtValue = new Date().toISOString();
+        }
+        
         return {
-          id: data.id,
+          id: data.id || doc.id,
           firebaseDocId: doc.id,
           type: data.type as 'funding' | 'withdrawal' | 'transfer' | 'fee' | 'send' | 'receive' | 'deposit' | 'payment' | 'refund',
           amount: data.amount,
@@ -193,7 +303,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
           userName: data.userName,
           memo: data.memo,
           status: data.status as 'confirmed' | 'pending' | 'failed' | 'completed',
-          createdAt: data.createdAt,
+          createdAt: createdAtValue,
           transactionSignature: data.transactionSignature,
           sharedWalletId: data.sharedWalletId,
           userId: data.userId,
@@ -201,17 +311,86 @@ const SharedWalletDetailsScreen: React.FC = () => {
         } as UnifiedTransaction;
       });
 
-      logger.debug('Real-time transactions update received', {
+      // ✅ FIX: Sort by createdAt in memory if orderBy wasn't used (fallback)
+      // createdAt is stored as ISO string, so we can sort directly
+      updatedTransactions.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA; // Descending order (newest first)
+      });
+
+      logger.info('Real-time transactions update received', {
         walletId: wallet.id,
-        transactionCount: updatedTransactions.length
+        transactionCount: updatedTransactions.length,
+        transactionTypes: updatedTransactions.map(t => t.type),
+        transactionIds: updatedTransactions.map(t => t.id).slice(0, 5) // Log first 5 IDs
       }, 'SharedWalletDetailsScreen');
 
       setTransactions(updatedTransactions);
     }, (error) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Real-time listener error for shared wallet transactions', {
         walletId: wallet.id,
-        error: error instanceof Error ? error.message : String(error)
+        error: errorMessage,
+        errorCode: (error as any)?.code,
+        // Check if it's an index error
+        isIndexError: errorMessage.includes('index') || errorMessage.includes('indexes'),
+        isPermissionError: errorMessage.includes('permission') || errorMessage.includes('Permission')
       }, 'SharedWalletDetailsScreen');
+      
+      // ✅ FIX: If it's an index error, try fallback query without orderBy
+      if (errorMessage.includes('index') || errorMessage.includes('indexes')) {
+        logger.info('Attempting fallback query without orderBy', {
+          walletId: wallet.id
+        }, 'SharedWalletDetailsScreen');
+        
+        const fallbackQ = query(
+          transactionsRef,
+          where('sharedWalletId', '==', wallet.id)
+        );
+        
+        const fallbackUnsubscribe = onSnapshot(fallbackQ, (querySnapshot) => {
+          let updatedTransactions = querySnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              id: data.id,
+              firebaseDocId: doc.id,
+              type: data.type as 'funding' | 'withdrawal' | 'transfer' | 'fee' | 'send' | 'receive' | 'deposit' | 'payment' | 'refund',
+              amount: data.amount,
+              currency: data.currency || 'USDC',
+              userName: data.userName,
+              memo: data.memo,
+              status: data.status as 'confirmed' | 'pending' | 'failed' | 'completed',
+              createdAt: data.createdAt,
+              transactionSignature: data.transactionSignature,
+              sharedWalletId: data.sharedWalletId,
+              userId: data.userId,
+              isExternalWallet: data.type === 'withdrawal' && data.destination ? true : false,
+            } as UnifiedTransaction;
+          });
+
+          // Sort in memory
+          updatedTransactions.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+          });
+
+          setTransactions(updatedTransactions);
+        }, (fallbackError) => {
+          logger.error('Fallback query also failed', {
+            walletId: wallet.id,
+            error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+          }, 'SharedWalletDetailsScreen');
+          setTransactions([]);
+        });
+        
+        return () => {
+          fallbackUnsubscribe();
+        };
+      } else {
+        setTransactions([]);
+      }
     });
 
     return () => {
@@ -621,6 +800,8 @@ const SharedWalletDetailsScreen: React.FC = () => {
                     isLoading={isLoadingTransactions}
                     variant="sharedWallet"
                     hideChrome
+                    onRefresh={loadTransactions}
+                    refreshing={isLoadingTransactions}
                   />
                 ) : (
                   <View style={styles.emptyTransactions}>
@@ -628,6 +809,13 @@ const SharedWalletDetailsScreen: React.FC = () => {
                       <PhosphorIcon name="Receipt" size={24} color={colors.white70} weight="regular" />
                     </View>
                     <Text style={styles.emptyTransactionsTitle}>No transactions yet</Text>
+                    <TouchableOpacity
+                      onPress={loadTransactions}
+                      style={styles.refreshButton}
+                    >
+                      <PhosphorIcon name="ArrowClockwise" size={16} color={colors.white70} weight="regular" />
+                      <Text style={styles.refreshButtonText}>Refresh</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
               </>
@@ -805,6 +993,23 @@ const styles = StyleSheet.create({
   emptyTransactionsTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+    color: colors.white70,
+    marginBottom: spacing.md,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.md,
+    backgroundColor: colors.white5,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    marginTop: spacing.sm,
+  },
+  refreshButtonText: {
+    fontSize: typography.fontSize.sm,
     color: colors.white70,
   },
   manageRightsButton: {

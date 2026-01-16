@@ -1094,18 +1094,135 @@ export class SharedWalletService {
       const { db } = await import('../../config/firebase/firebase');
       const { collection, query, where, orderBy, limit: limitQuery, getDocs } = await import('firebase/firestore');
 
-      const q = query(
-        collection(db, 'sharedWalletTransactions'),
-        where('sharedWalletId', '==', sharedWalletId),
-        orderBy('createdAt', 'desc'),
-        limitQuery(limit)
-      );
-
-      const querySnapshot = await getDocs(q);
-      const transactions = querySnapshot.docs.map(doc => ({
-        ...doc.data(),
-        firebaseDocId: doc.id,
-      }));
+      // ✅ FIX: Try query with orderBy first, fallback to query without orderBy if index missing
+      let q;
+      let transactions: any[] = [];
+      
+      try {
+        q = query(
+          collection(db, 'sharedWalletTransactions'),
+          where('sharedWalletId', '==', sharedWalletId),
+          orderBy('createdAt', 'desc'),
+          limitQuery(limit)
+        );
+        
+        logger.info('Executing transaction query', {
+          sharedWalletId,
+          limit,
+          queryType: 'with orderBy'
+        }, 'SharedWalletService');
+        
+        const querySnapshot = await getDocs(q);
+      
+      logger.info('Query executed successfully', {
+        sharedWalletId,
+        docCount: querySnapshot.docs.length,
+        isEmpty: querySnapshot.empty
+      }, 'SharedWalletService');
+      
+      transactions = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        
+        // ✅ FIX: Handle createdAt field - it might be a Timestamp or ISO string
+        let createdAtValue: string;
+        if (data.createdAt) {
+          if (data.createdAt.toDate) {
+            // It's a Firestore Timestamp
+            createdAtValue = data.createdAt.toDate().toISOString();
+          } else if (typeof data.createdAt === 'string') {
+            // It's already an ISO string
+            createdAtValue = data.createdAt;
+          } else {
+            // Fallback
+            createdAtValue = new Date().toISOString();
+          }
+        } else {
+          createdAtValue = new Date().toISOString();
+        }
+        
+        logger.debug('Processing transaction', {
+          docId: doc.id,
+          transactionId: data.id,
+          sharedWalletId: data.sharedWalletId,
+          type: data.type,
+          amount: data.amount,
+          matchesQuery: data.sharedWalletId === sharedWalletId
+        }, 'SharedWalletService');
+        
+        return {
+          ...data,
+          firebaseDocId: doc.id,
+          createdAt: createdAtValue, // Ensure createdAt is always a string
+        };
+      });
+      
+      logger.info('Transactions processed', {
+        sharedWalletId,
+        transactionCount: transactions.length,
+        transactionTypes: transactions.map(t => t.type)
+      }, 'SharedWalletService');
+      } catch (indexError) {
+        // If index doesn't exist, query without orderBy and sort in memory
+        const errorMessage = indexError instanceof Error ? indexError.message : String(indexError);
+        if (errorMessage.includes('index') || errorMessage.includes('indexes')) {
+          logger.warn('Firestore index missing for transactions query, using fallback', {
+            sharedWalletId,
+            error: errorMessage
+          }, 'SharedWalletService');
+          
+          q = query(
+            collection(db, 'sharedWalletTransactions'),
+            where('sharedWalletId', '==', sharedWalletId),
+            limitQuery(limit * 2) // Get more to account for sorting
+          );
+          
+          logger.info('Executing fallback transaction query (no orderBy)', {
+            sharedWalletId,
+            limit: limit * 2,
+            queryType: 'fallback without orderBy'
+          }, 'SharedWalletService');
+          
+          const querySnapshot = await getDocs(q);
+          transactions = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            
+            // ✅ FIX: Handle createdAt field - it might be a Timestamp or ISO string
+            let createdAtValue: string;
+            if (data.createdAt) {
+              if (data.createdAt.toDate) {
+                // It's a Firestore Timestamp
+                createdAtValue = data.createdAt.toDate().toISOString();
+              } else if (typeof data.createdAt === 'string') {
+                // It's already an ISO string
+                createdAtValue = data.createdAt;
+              } else {
+                // Fallback
+                createdAtValue = new Date().toISOString();
+              }
+            } else {
+              createdAtValue = new Date().toISOString();
+            }
+            
+            return {
+              ...data,
+              firebaseDocId: doc.id,
+              createdAt: createdAtValue, // Ensure createdAt is always a string
+            };
+          });
+          
+          // Sort by createdAt in memory (descending - newest first)
+          transactions.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+          });
+          
+          // Limit after sorting
+          transactions = transactions.slice(0, limit);
+        } else {
+          throw indexError; // Re-throw if it's not an index error
+        }
+      }
 
       return {
         success: true,

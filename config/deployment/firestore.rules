@@ -311,16 +311,35 @@ service cloud.firestore {
       // Note: Firestore rules can't easily check nested arrays, so we allow authenticated users
       // Application code enforces member checks
       allow read: if request.auth != null;
-      
+
       // Users can create transactions where they are the user who performed the transaction
-      allow create: if request.auth != null && 
+      allow create: if request.auth != null &&
         request.resource.data.userId == request.auth.uid;
-      
+
       // Users can update transactions they created (for status updates, etc.)
-      allow update: if request.auth != null && 
+      allow update: if request.auth != null &&
         resource.data.userId == request.auth.uid;
-      
+
       // Deletions should be restricted (or handled by backend)
+      allow delete: if false;
+    }
+
+    // Shared wallet withdrawal requests collection
+    match /sharedWalletWithdrawalRequests/{requestId} {
+      // Users can read requests for wallets they're members of
+      allow read: if request.auth != null;
+
+      // Users can create withdrawal requests where they are the requester
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+
+      // Only the wallet creator can update (approve/reject) withdrawal requests
+      allow update: if request.auth != null &&
+        resource.data.sharedWalletId != null &&
+        exists(/databases/$(database)/documents/sharedWallets/$(resource.data.sharedWalletId)) &&
+        get(/databases/$(database)/documents/sharedWallets/$(resource.data.sharedWalletId)).data.creatorId == request.auth.uid;
+
+      // Deletions should be restricted
       allow delete: if false;
     }
 
