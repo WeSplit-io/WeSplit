@@ -201,9 +201,9 @@ These are NOT smart contracts but server-side functions that handle business log
 
 ---
 
-## 📝 For Hacken Audit Discussion
+## 📝 Audit Discussion Points
 
-**Key Points to Mention:**
+**Key Points for Security Auditors:**
 
 1. **No Custom Smart Contracts:** We use existing Solana programs only
 2. **Client-Side Application:** Security focus is on transaction construction and signing
@@ -214,11 +214,11 @@ These are NOT smart contracts but server-side functions that handle business log
    - Transaction validation
    - Rate limiting and replay attack prevention
 
-**Questions for Hacken:**
+**Audit Considerations:**
 
-- "How do you audit client-side applications that interact with existing Solana programs?"
-- "What's your approach to testing transaction construction and validation?"
-- "How do you audit off-chain backend services (Firebase Functions) in a Web3 context?"
+- Client-side applications that interact with existing Solana programs
+- Transaction construction and validation testing approach
+- Off-chain backend services (Firebase Functions) in a Web3 context
 
 ---
 
@@ -232,4 +232,4 @@ These are NOT smart contracts but server-side functions that handle business log
 ---
 
 **Last Updated:** January 2025  
-**For:** Hacken Security Audit Meeting
+**Purpose:** Security audit preparation

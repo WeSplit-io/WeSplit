@@ -1,6 +1,6 @@
-# 🚀 WeSplit - Project Overview for Hacken
+# 🚀 WeSplit - Project Overview
 
-**Concise overview for 15-minute call**
+**Concise overview for security audit preparation**
 
 ---
 
@@ -115,9 +115,9 @@
 
 ---
 
-## What We Need from Hacken
+## Security Audit Scope
 
-### Audit Scope
+### Areas Requiring Audit
 1. **Mobile App Security** (React Native)
    - Secure storage implementations
    - Biometric authentication flows
@@ -146,13 +146,13 @@
 
 ---
 
-## Key Questions for Hacken
+## Key Audit Considerations
 
-1. **Experience:** Have you audited React Native + Firebase + Solana apps before?
-2. **Timeline:** What's realistic for our scope?
-3. **Cost:** What's the estimate range?
-4. **Support:** What's included in post-audit support?
-5. **Testing:** How would you test our critical security components?
+1. **Experience:** Experience with React Native + Firebase + Solana applications
+2. **Timeline:** Realistic timeline for the audit scope
+3. **Testing:** Approach for testing critical security components
+4. **Deliverables:** Expected audit deliverables and reporting format
+5. **Support:** Post-audit support and remediation guidance
 
 ---
 

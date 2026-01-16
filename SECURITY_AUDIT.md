@@ -61,7 +61,7 @@
 |--------|---------|---------|
 | **SPEND Treasury** | Mainnet | `2nkTRv3qxk7n2eYYjFAndReVXaV7sTF3Z9pNimvp5jcp` |
 
-**Complete address list:** See [`docs/meetings/hacken/ADDRESSES_SUMMARY.md`](./docs/meetings/hacken/ADDRESSES_SUMMARY.md)
+**Complete address list:** See [`docs/meetings/security-audit/CONTRACTS_AND_PROGRAMS.md`](./docs/meetings/security-audit/CONTRACTS_AND_PROGRAMS.md)
 
 ---
 
@@ -118,7 +118,7 @@
 - [`src/services/split/handlers/TransferHandlers.ts`](./src/services/split/handlers/TransferHandlers.ts)
 - [`src/services/split/handlers/ParticipantPaymentHandlers.ts`](./src/services/split/handlers/ParticipantPaymentHandlers.ts)
 
-**Complete file list:** See [`docs/meetings/hacken/CONTRACT_FILES_SYNTHESIZED.md`](./docs/meetings/hacken/CONTRACT_FILES_SYNTHESIZED.md)
+**Complete file list:** See [`docs/meetings/security-audit/CONTRACT_FILES_SYNTHESIZED.md`](./docs/meetings/security-audit/CONTRACT_FILES_SYNTHESIZED.md)
 
 ---
 
@@ -219,9 +219,9 @@
 ## 📚 Additional Documentation
 
 ### Detailed Contract Information
-- **Complete Contracts List**: [`docs/meetings/hacken/CONTRACTS_AND_PROGRAMS.md`](./docs/meetings/hacken/CONTRACTS_AND_PROGRAMS.md)
-- **Addresses Summary**: [`docs/meetings/hacken/ADDRESSES_SUMMARY.md`](./docs/meetings/hacken/ADDRESSES_SUMMARY.md)
-- **All Contract Files**: [`docs/meetings/hacken/CONTRACT_FILES_SYNTHESIZED.md`](./docs/meetings/hacken/CONTRACT_FILES_SYNTHESIZED.md)
+- **Complete Contracts List**: [`docs/meetings/security-audit/CONTRACTS_AND_PROGRAMS.md`](./docs/meetings/security-audit/CONTRACTS_AND_PROGRAMS.md)
+- **All Contract Files**: [`docs/meetings/security-audit/CONTRACT_FILES_SYNTHESIZED.md`](./docs/meetings/security-audit/CONTRACT_FILES_SYNTHESIZED.md)
+- **Complete File Audit**: [`docs/meetings/security-audit/COMPLETE_CONTRACT_FILES_AUDIT.md`](./docs/meetings/security-audit/COMPLETE_CONTRACT_FILES_AUDIT.md)
 
 ### Security Documentation
 - **Security Overview**: [`SECURITY.md`](./SECURITY.md)
@@ -229,7 +229,7 @@
 
 ### Project Information
 - **Project Overview**: [`README.md`](./README.md)
-- **Meeting Prep**: [`docs/meetings/hacken/`](./docs/meetings/hacken/)
+- **Audit Preparation**: [`docs/meetings/security-audit/`](./docs/meetings/security-audit/)
 
 ---
 

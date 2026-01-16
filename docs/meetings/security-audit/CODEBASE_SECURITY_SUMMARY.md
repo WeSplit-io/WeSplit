@@ -1,6 +1,6 @@
 # 🔐 WeSplit Codebase Security Summary
 
-**Technical details for Hacken audit discussion**
+**Technical security details for audit preparation**
 
 ---
 
