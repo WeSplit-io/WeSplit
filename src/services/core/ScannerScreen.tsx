@@ -200,7 +200,7 @@ const ScannerScreen: React.FC<ScannerScreenProps> = ({
             }
           }}
         >
-          <Text style={styles.buttonText}>Grant Permission</Text>
+          <Text style={styles.buttonText}>Continue</Text>
         </TouchableOpacity>
       </View>
     );

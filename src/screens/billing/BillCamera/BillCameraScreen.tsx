@@ -153,23 +153,9 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>Camera access is required to capture bills</Text>
           <Button
-            title="Grant Permission"
+            title="Continue"
             onPress={handleRequestPermission}
             variant="primary"
-            fullWidth={true}
-            style={{ marginTop: spacing.md }}
-          />
-          <Button
-            title="Go to Splits"
-            onPress={() => {
-              try {
-                navigation.navigate('SplitsList');
-              } catch (error) {
-                logger.error('Error navigating to SplitsList', { error }, 'BillCameraScreen');
-                navigation.goBack();
-              }
-            }}
-            variant="secondary"
             fullWidth={true}
             style={{ marginTop: spacing.md }}
           />

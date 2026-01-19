@@ -205,6 +205,9 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: colors.green,
   },
+  toggleButtonDisabled: {
+    opacity: 0.5,
+  },
   toggleUnderline: {
     height: 3,
     backgroundColor: colors.green,

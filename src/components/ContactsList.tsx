@@ -878,12 +878,22 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Toggle Contact List / Scan QR Code (design simple, surlignage vert) */}
+      {/* Toggle Contact List / Scan QR Code - Disable toggle when permission not granted in QR mode */}
       {!hideToggleBar && (
         <View style={styles.containerToggle}>
           <TouchableOpacity
-            style={styles.toggleButton}
-            onPress={() => setMode('list')}
+            style={[
+              styles.toggleButton,
+              mode === 'qr' && (!permission || !permission.granted) && styles.toggleButtonDisabled
+            ]}
+            onPress={() => {
+              // Prevent switching away from QR mode if permission is not granted
+              if (mode === 'qr' && (!permission || !permission.granted)) {
+                return; // Don't allow switching away - user must grant permission
+              }
+              setMode('list');
+            }}
+            disabled={mode === 'qr' && (!permission || !permission.granted)}
           >
             <Text style={[styles.toggleText, mode === 'list' && styles.toggleTextActive]}>Contact List</Text>
           </TouchableOpacity>
@@ -1197,7 +1207,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                   }
                 }}
               >
-                <Text style={styles.permissionButtonText}>Grant Permission</Text>
+                <Text style={styles.permissionButtonText}>Continue</Text>
               </TouchableOpacity>
             </View>
                       ) : (

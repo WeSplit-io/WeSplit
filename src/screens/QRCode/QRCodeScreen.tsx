@@ -349,7 +349,7 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
                       }
                     }}
                   >
-                    <Text style={styles.permissionButtonText}>Grant Permission</Text>
+                    <Text style={styles.permissionButtonText}>Continue</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -413,7 +413,8 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
     <Container style={{ backgroundColor: colors.black }}>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
 
-      {renderHeader()}
+      {/* Only show Header if permission is granted OR if we're on myCode tab */}
+      {hasPermission || activeTab === 'myCode' ? renderHeader() : null}
 
       {activeTab === 'myCode' ? renderMyCodeTab() : renderScanTab()}
 
