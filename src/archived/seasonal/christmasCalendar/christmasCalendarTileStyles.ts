@@ -12,7 +12,7 @@
  * - position: 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
  */
 
-import { colors } from "@/theme";
+import { colors } from "../../../theme";
 
 export type ImageResizeMode = 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
 export type ImagePosition = 

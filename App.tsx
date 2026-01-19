@@ -38,8 +38,9 @@ import HowToEarnPointsScreen from './src/screens/Rewards/HowToEarnPointsScreen';
 import HowItWorksScreen from './src/screens/Rewards/HowItWorks';
 import ReferralScreen from './src/screens/Rewards/ReferralScreen';
 import PointsHistoryScreen from './src/screens/Rewards/PointsHistoryScreen';
-import ChristmasCalendarScreen from './src/screens/Rewards/ChristmasCalendarScreen';
-import ChristmasCalendarHistoryScreen from './src/screens/Rewards/ChristmasCalendarHistoryScreen';
+// Archived: Christmas Calendar screens moved to src/archived/seasonal/christmasCalendar/
+// import ChristmasCalendarScreen from './src/archived/seasonal/christmasCalendar/ChristmasCalendarScreen';
+// import ChristmasCalendarHistoryScreen from './src/archived/seasonal/christmasCalendar/ChristmasCalendarHistoryScreen';
 import SendScreen from './src/screens/Send/SendScreen';
 import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
 import CentralizedTransactionScreen from './src/screens/Transaction/CentralizedTransactionScreen';
@@ -195,8 +196,9 @@ export default function App() {
                     <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
                     <Stack.Screen name="Referral" component={ReferralScreen} />
                     <Stack.Screen name="PointsHistory" component={PointsHistoryScreen} />
-                    <Stack.Screen name="ChristmasCalendar" component={ChristmasCalendarScreen} />
-                    <Stack.Screen name="ChristmasCalendarHistory" component={ChristmasCalendarHistoryScreen} />
+                    {/* Archived: Christmas Calendar screens - moved to src/archived/seasonal/christmasCalendar/ */}
+                    {/* <Stack.Screen name="ChristmasCalendar" component={ChristmasCalendarScreen} /> */}
+                    {/* <Stack.Screen name="ChristmasCalendarHistory" component={ChristmasCalendarHistoryScreen} /> */}
                     <Stack.Screen name="DegenLock" component={DegenLockScreen} />
                     <Stack.Screen name="DegenSpin" component={DegenSpinScreen} />
                     <Stack.Screen name="DegenResult" component={DegenResultScreen} />

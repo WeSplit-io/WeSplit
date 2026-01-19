@@ -7,12 +7,13 @@ export interface Quest {
   id: string;
   type: 'profile_image' | 'first_transaction' | 'refer_friend' | 'complete_onboarding' | 'add_first_contact' | 'create_first_split' 
     | 'export_seed_phrase' | 'setup_account_pp' | 'first_split_with_friends' | 'first_external_wallet_linked'
-    | 'invite_friends_create_account' | 'friend_do_first_split_over_10';
+    | 'invite_friends_create_account' | 'friend_do_first_split_over_10' | 'follow_x' | 'join_telegram';
   title: string;
   description: string;
   points: number;
   completed: boolean;
   completed_at?: string;
+  url?: string; // Optional URL for social quests
 }
 
 export interface PointsTransaction {

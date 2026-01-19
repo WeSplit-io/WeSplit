@@ -235,7 +235,6 @@ module.exports = {
       favicon: "./assets/favicon.png"
     },
     plugins: [
-      "./queries.js",
       "./plugins/android-fix-orientation.js", // Plugin to remove screenOrientation restrictions
       "expo-secure-store",
       "expo-router",

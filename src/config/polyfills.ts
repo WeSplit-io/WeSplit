@@ -4,13 +4,13 @@
  */
 
 // Import minimal error handler first
-import './src/config/minimalErrorHandler';
+import './minimalErrorHandler';
 
 // Import runtime error handler early to intercept console.error and suppress WebSocket errors
-import './src/config/runtimeErrorHandler';
+import './runtimeErrorHandler';
 
 // Import safe polyfill initialization
-import './src/config/safePolyfills';
+import './safePolyfills';
 
 // Note: All polyfills are now handled by the safe polyfill system
 // This prevents conflicts between global polyfills and Metro module aliases

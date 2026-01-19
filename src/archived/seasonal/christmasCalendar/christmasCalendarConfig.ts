@@ -11,8 +11,8 @@
  * - asset: Awards an asset (profile image or wallet background)
  */
 
-import { ChristmasCalendarGift } from '../../types/rewards';
-import { getAssetInfo } from './assetConfig';
+import { ChristmasCalendarGift } from '../../../types/rewards';
+import { getAssetInfo } from '../../../services/rewards/assetConfig';
 
 const getAssetPreviewUrl = (assetId: string): string | undefined => {
   return getAssetInfo(assetId)?.url || undefined;

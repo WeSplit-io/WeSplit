@@ -286,29 +286,6 @@ const RewardsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-         {/* Christmas Calendar Button */}
-        <TouchableOpacity
-          style={styles.christmasCalendarButton}
-          onPress={() => rewardNav.goToChristmasCalendar()}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.christmasButtonGradient}
-          >
-            <PhosphorIcon name="Gift" size={24} color={colors.black} weight="fill" />
-            <View style={styles.christmasButtonContent}>
-              <Text style={styles.christmasButtonTitle}>Christmas Calendar</Text>
-              <Text style={styles.christmasButtonSubtitle}>
-                Claim daily gifts and earn rewards.
-              </Text>
-            </View>
-            <PhosphorIcon name="CaretRight" size={20} color={colors.black} weight="regular" />
-          </LinearGradient>
-        </TouchableOpacity>
-
         </View>
 
        
@@ -537,31 +514,6 @@ const styles = StyleSheet.create({
   emptyHistoryText: {
     fontSize: typography.fontSize.sm,
     color: colors.white70,
-  },
-  christmasCalendarButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: spacing.xl,
-  },
-  christmasButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  christmasButtonContent: {
-    flex: 1,
-  },
-  christmasButtonTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.black,
-    marginBottom: spacing.xs / 2,
-  },
-  christmasButtonSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.black,
-    opacity: 0.8,
   },
 });
 

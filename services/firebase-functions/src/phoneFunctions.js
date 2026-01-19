@@ -319,7 +319,7 @@ exports.startPhoneAuthentication = functions.runWith({
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + (5 * 60 * 1000)), // 5 minutes
       attempts: 0,
-      maxAttempts: 3
+      maxAttempts: 5
     });
 
     console.log('✅ Phone auth session created', { sessionId });
@@ -723,7 +723,7 @@ exports.startPhoneLinking = functions.https.onCall(async (data, context) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + (5 * 60 * 1000)), // 5 minutes
       attempts: 0,
-      maxAttempts: 3
+      maxAttempts: 5
     });
 
     console.log('✅ Phone linking session created', { sessionId, userId });

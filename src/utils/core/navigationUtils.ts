@@ -72,8 +72,9 @@ export const NAVIGATION_ROUTES = {
   HOW_TO_EARN_POINTS: 'HowToEarnPoints',
   REFERRAL: 'Referral',
   POINTS_HISTORY: 'PointsHistory',
-  CHRISTMAS_CALENDAR: 'ChristmasCalendar',
-  CHRISTMAS_CALENDAR_HISTORY: 'ChristmasCalendarHistory',
+  // Archived: Christmas Calendar routes - screens moved to src/archived/seasonal/christmasCalendar/
+  // CHRISTMAS_CALENDAR: 'ChristmasCalendar',
+  // CHRISTMAS_CALENDAR_HISTORY: 'ChristmasCalendarHistory',
   HOW_IT_WORKS: 'HowItWorks'
 } as const;
 
@@ -237,19 +238,20 @@ export class RewardNavigationHelper {
       // Navigation error handled silently
     }
   }
-  goToChristmasCalendar() {
-    try {
-      this.navigation.navigate(NAVIGATION_ROUTES.CHRISTMAS_CALENDAR);
-    } catch (error) {
-      // Navigation error handled silently
-    }
-  }
+  // Archived: Christmas Calendar navigation - screens moved to src/archived/seasonal/christmasCalendar/
+  // goToChristmasCalendar() {
+  //   try {
+  //     this.navigation.navigate(NAVIGATION_ROUTES.CHRISTMAS_CALENDAR);
+  //   } catch (error) {
+  //     // Navigation error handled silently
+  //   }
+  // }
 
-  goToChristmasCalendarHistory() {
-    try {
-      this.navigation.navigate(NAVIGATION_ROUTES.CHRISTMAS_CALENDAR_HISTORY);
-    } catch (error) {
-      // Navigation error handled silently
-    }
-  }
+  // goToChristmasCalendarHistory() {
+  //   try {
+  //     this.navigation.navigate(NAVIGATION_ROUTES.CHRISTMAS_CALENDAR_HISTORY);
+  //   } catch (error) {
+  //     // Navigation error handled silently
+  //   }
+  // }
 }

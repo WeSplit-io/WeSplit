@@ -164,7 +164,8 @@ class RewardSystemVerification {
     const { badgeService } = await import('./badgeService');
     const { referralService } = await import('./referralService');
     const { splitRewardsService } = await import('./splitRewardsService');
-    const { christmasCalendarService } = await import('./christmasCalendarService');
+    // Archived: Christmas Calendar service moved to src/archived/seasonal/christmasCalendar/
+    // const { christmasCalendarService } = await import('../../archived/seasonal/christmasCalendar/christmasCalendarService');
     
     // Check all services are available
     const services = {
@@ -173,7 +174,7 @@ class RewardSystemVerification {
       badgeService: typeof badgeService !== 'undefined',
       referralService: typeof referralService !== 'undefined',
       splitRewardsService: typeof splitRewardsService !== 'undefined',
-      christmasCalendarService: typeof christmasCalendarService !== 'undefined'
+      // christmasCalendarService: typeof christmasCalendarService !== 'undefined' // Archived
     };
 
     const allServicesAvailable = Object.values(services).every(v => v === true);
@@ -198,7 +199,7 @@ class RewardSystemVerification {
       awardInviteFriendReward: typeof referralService?.awardInviteFriendReward === 'function',
       awardFairSplitParticipation: typeof splitRewardsService?.awardFairSplitParticipation === 'function',
       awardDegenSplitParticipation: typeof splitRewardsService?.awardDegenSplitParticipation === 'function',
-      claimGift: typeof christmasCalendarService?.claimGift === 'function'
+      // claimGift: typeof christmasCalendarService?.claimGift === 'function' // Archived
     };
 
     const allMethodsAvailable = Object.values(keyMethods).every(v => v === true);

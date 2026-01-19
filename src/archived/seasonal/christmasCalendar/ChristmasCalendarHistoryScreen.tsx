@@ -12,17 +12,17 @@ import {
   RefreshControl,
 } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
-import { colors, spacing } from '../../theme';
-import { typography } from '../../theme/typography';
-import { Container, Header } from '../../components/shared';
-import PhosphorIcon from '../../components/shared/PhosphorIcon';
-import UserAvatar from '../../components/UserAvatar';
-import { useApp } from '../../context/AppContext';
-import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
-import { christmasCalendarService } from '../../services/rewards/christmasCalendarService';
-import { getGiftForDay } from '../../services/rewards/christmasCalendarConfig';
-import { resolveStorageUrl } from '../../services/shared/storageUrlService';
-import { Gift, PointsGift, BadgeGift, AssetGift } from '../../types/rewards';
+import { colors, spacing } from '../../../theme';
+import { typography } from '../../../theme/typography';
+import { Container, Header } from '../../../components/shared';
+import PhosphorIcon from '../../../components/shared/PhosphorIcon';
+import UserAvatar from '../../../components/UserAvatar';
+import { useApp } from '../../../context/AppContext';
+import { RewardNavigationHelper } from '../../../utils/core/navigationUtils';
+import { christmasCalendarService } from './christmasCalendarService';
+import { getGiftForDay } from './christmasCalendarConfig';
+import { resolveStorageUrl } from '../../../services/shared/storageUrlService';
+import { Gift, PointsGift, BadgeGift, AssetGift } from '../../../types/rewards';
 import { Image } from 'react-native';
 
 const POINTS_ICON_URL =

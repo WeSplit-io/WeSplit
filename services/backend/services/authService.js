@@ -114,7 +114,7 @@ class AuthService {
       return { success: false, error: 'Verification code expired' };
     }
 
-    if (storedData.attempts >= 3) {
+    if (storedData.attempts >= 5) {
       verificationCodes.delete(email);
       return { success: false, error: 'Too many attempts. Please request a new code.' };
     }

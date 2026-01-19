@@ -119,6 +119,25 @@ export const QUEST_DEFINITIONS: Record<string, Quest> = {
     description: 'A friend you referred does their first split over $10',
     points: 0, // Placeholder - actual points calculated dynamically from seasonRewardsConfig
     completed: false
+  },
+  // Social quests - fixed points, simple redirection
+  follow_x: {
+    id: 'follow_x',
+    type: 'follow_x',
+    title: 'Follow us on X',
+    description: 'Follow our X account for the latest updates.',
+    points: 100,
+    completed: false,
+    url: 'https://x.com/wesplit_io'
+  },
+  join_telegram: {
+    id: 'join_telegram',
+    type: 'join_telegram',
+    title: 'Join our Telegram',
+    description: 'Join our Telegram channel for community discussions and exclusive info.',
+    points: 100,
+    completed: false,
+    url: 'https://t.me/+v-e8orBns-llNThk'
   }
 };
 
@@ -212,7 +231,8 @@ class QuestService {
         description: questDef.description,
         points: questDef.points,
         completed: true,
-        completed_at: serverTimestamp()
+        completed_at: serverTimestamp(),
+        url: questDef.url // Save URL if present
       }, { merge: true });
 
       // Check if this is a season-based quest
@@ -328,14 +348,19 @@ class QuestService {
         const data = doc.data();
         // Ensure completed is explicitly boolean - handle Firestore boolean and undefined
         const completed = data.completed === true;
+        const questId = data.id || doc.id;
+        // Merge with quest definition to include URL and other fields
+        const questDef = QUEST_DEFINITIONS[questId] || {};
         quests.push({
-          id: data.id || doc.id,
-          type: data.type,
-          title: data.title,
-          description: data.description,
-          points: data.points,
+          ...questDef,
+          id: questId,
+          type: data.type || questDef.type,
+          title: data.title || questDef.title,
+          description: data.description || questDef.description,
+          points: data.points !== undefined ? data.points : questDef.points,
           completed, // Explicitly set to boolean
-          completed_at: data.completed_at?.toDate?.()?.toISOString()
+          completed_at: data.completed_at?.toDate?.()?.toISOString(),
+          url: questDef.url // Include URL from definition
         });
       });
 
@@ -375,20 +400,24 @@ class QuestService {
       const questRef = doc(db, 'users', userId, 'quests', questType);
       const questDoc = await getDoc(questRef);
 
+      const questDef = QUEST_DEFINITIONS[questType] || null;
       if (!questDoc.exists()) {
         // Return default quest definition if not started
-        return QUEST_DEFINITIONS[questType] || null;
+        return questDef;
       }
 
       const data = questDoc.data();
+      // Merge with quest definition to include URL and other fields
       return {
+        ...questDef,
         id: data.id || questDoc.id,
-        type: data.type,
-        title: data.title,
-        description: data.description,
-        points: data.points,
+        type: data.type || questDef?.type,
+        title: data.title || questDef?.title,
+        description: data.description || questDef?.description,
+        points: data.points !== undefined ? data.points : questDef?.points,
         completed: data.completed || false,
-        completed_at: data.completed_at?.toDate?.()?.toISOString()
+        completed_at: data.completed_at?.toDate?.()?.toISOString(),
+        url: questDef?.url // Include URL from definition
       };
     } catch (error) {
       logger.error('Failed to get user quest', error, 'QuestService');

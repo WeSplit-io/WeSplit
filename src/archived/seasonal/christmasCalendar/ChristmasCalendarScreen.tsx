@@ -6,12 +6,12 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { Container, Header } from '../../components/shared';
-import PhosphorIcon from '../../components/shared/PhosphorIcon';
-import ChristmasCalendar from '../../components/rewards/ChristmasCalendar';
-import { useApp } from '../../context/AppContext';
-import { colors, spacing } from '../../theme';
-import { RewardNavigationHelper } from '../../utils/core/navigationUtils';
+import { Container, Header } from '../../../components/shared';
+import PhosphorIcon from '../../../components/shared/PhosphorIcon';
+import ChristmasCalendar from './ChristmasCalendar';
+import { useApp } from '../../../context/AppContext';
+import { colors, spacing } from '../../../theme';
+import { RewardNavigationHelper } from '../../../utils/core/navigationUtils';
 import { useMemo } from 'react';
 
 const ChristmasCalendarScreen: React.FC = () => {

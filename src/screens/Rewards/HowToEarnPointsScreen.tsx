@@ -11,6 +11,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Linking,
 } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -71,6 +72,9 @@ const HowToEarnPointsScreen: React.FC = () => {
     loadQuests();
   }, [loadQuests]);
 
+  // Refresh data when screen comes into focus (e.g., when returning from social media link)
+  // Removed to prevent infinite loop - data will refresh naturally via useEffect and loadQuests
+
   const loadBadges = useCallback(async () => {
     if (!currentUser?.id) {
       return;
@@ -100,6 +104,8 @@ const HowToEarnPointsScreen: React.FC = () => {
     'friend_do_first_split_over_10': 'Handshake',
     'profile_image': 'Image',
     'first_transaction': 'CurrencyCircleDollar',
+    'follow_x': 'XLogo',
+    'join_telegram': 'TelegramLogo',
   }), []);
 
   const getQuestIcon = useCallback((questType: string) => {
@@ -131,18 +137,92 @@ const HowToEarnPointsScreen: React.FC = () => {
     return questDef?.points || 0;
   }, [userQuests, seasonBasedQuests, currentSeason]);
 
+  const handleQuestPress = useCallback(async (quest: Quest) => {
+    if (!currentUser?.id) return;
+    
+    // If quest has a URL and is not completed, open URL and complete quest
+    if (quest.url && !quest.completed) {
+      try {
+        // Complete the quest first to award points (before opening URL)
+        const result = await questService.completeQuest(currentUser.id, quest.id);
+        
+        if (result.success) {
+          logger.info('Quest completed successfully', {
+            questId: quest.id,
+            pointsAwarded: result.pointsAwarded,
+            totalPoints: result.totalPoints
+          }, 'HowToEarnPointsScreen');
+          
+          // Refresh quests and user points
+          await loadQuests();
+          
+          // Refresh user points with a small delay to ensure database is updated
+          setTimeout(async () => {
+            try {
+              const updatedPoints = await pointsService.getUserPoints(currentUser.id);
+              const freshUser = await firebaseDataService.user.getCurrentUser(currentUser.id);
+              updateUser({ 
+                points: freshUser.points || updatedPoints, 
+                total_points_earned: freshUser.total_points_earned 
+              });
+              logger.info('User points refreshed after quest completion', {
+                updatedPoints,
+                freshUserPoints: freshUser.points
+              }, 'HowToEarnPointsScreen');
+            } catch (pointsError) {
+              logger.error('Failed to refresh user points after quest completion', { error: pointsError }, 'HowToEarnPointsScreen');
+            }
+          }, 500);
+          
+          // Open the URL after quest completion
+          await Linking.openURL(quest.url!);
+          
+          // Show success message
+          Alert.alert(
+            'Quest Completed!',
+            `You earned ${result.pointsAwarded} points!`,
+            [{ text: 'OK' }]
+          );
+        } else {
+          logger.warn('Quest completion failed', { 
+            questId: quest.id, 
+            error: result.error,
+            pointsAwarded: result.pointsAwarded,
+            totalPoints: result.totalPoints
+          }, 'HowToEarnPointsScreen');
+          Alert.alert('Error', result.error || 'Failed to complete quest. Please try again.');
+        }
+      } catch (error) {
+        logger.error('Failed to complete quest or open URL', { 
+          error, 
+          questId: quest.id,
+          errorMessage: error instanceof Error ? error.message : String(error)
+        }, 'HowToEarnPointsScreen');
+        Alert.alert('Error', 'Failed to complete quest. Please try again.');
+      }
+    }
+  }, [currentUser?.id, loadQuests, updateUser]);
+
   const renderQuestCard = (quest: Quest) => {
     const isCompleted = quest.completed === true;
     const iconName = getQuestIcon(quest.type || quest.id);
     const points = getQuestPoints(quest.type || quest.id);
+    const hasUrl = !!quest.url && !isCompleted;
+
+    const CardWrapper = hasUrl ? TouchableOpacity : View;
+    const cardProps = hasUrl ? {
+      onPress: () => handleQuestPress(quest),
+      activeOpacity: 0.7,
+    } : {};
 
     return (
-      <View
+      <CardWrapper
         key={quest.id}
         style={[
           styles.questCard,
           isCompleted && styles.questCardCompleted
         ]}
+        {...cardProps}
       >
         <View style={styles.questIconContainer}>
           {isCompleted ? (
@@ -189,7 +269,7 @@ const HowToEarnPointsScreen: React.FC = () => {
             )}
           </LinearGradient>
         </View>
-      </View>
+      </CardWrapper>
     );
   };
 
@@ -428,6 +508,8 @@ const HowToEarnPointsScreen: React.FC = () => {
     'first_external_wallet_linked',
     'invite_friends_create_account',
     'friend_do_first_split_over_10',
+    'follow_x',
+    'join_telegram',
   ];
 
   const orderedQuests = questOrder

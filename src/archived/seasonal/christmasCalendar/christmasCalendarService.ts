@@ -4,7 +4,7 @@
  * Handles gift claiming, validation, and distribution
  */
 
-import { db } from '../../config/firebase/firebase';
+import { db } from '../../../config/firebase/firebase';
 import { 
   doc, 
   getDoc, 
@@ -17,10 +17,10 @@ import {
   runTransaction,
   Timestamp
 } from 'firebase/firestore';
-import { logger } from '../analytics/loggingService';
-import { pointsService } from './pointsService';
-import { seasonService } from './seasonService';
-import { firebaseDataService } from '../data/firebaseDataService';
+import { logger } from '../../../services/analytics/loggingService';
+import { pointsService } from '../../../services/rewards/pointsService';
+import { seasonService } from '../../../services/rewards/seasonService';
+import { firebaseDataService } from '../../../services/data/firebaseDataService';
 import {
   ChristmasCalendarDay,
   ChristmasCalendarStatus,

@@ -13,32 +13,33 @@ import {
   ScrollView,
   Image
 } from 'react-native';
-import { colors, spacing } from '../../theme';
-import { typography } from '../../theme/typography';
-import PhosphorIcon from '../shared/PhosphorIcon';
-import Modal from '../shared/Modal';
-import ModernLoader from '../shared/ModernLoader';
-import ErrorScreen from '../shared/ErrorScreen';
-import Button from '../shared/Button';
-import { christmasCalendarService } from '../../services/rewards/christmasCalendarService';
-import { getGiftForDay } from '../../services/rewards/christmasCalendarConfig';
-import { resolveStorageUrl } from '../../services/shared/storageUrlService';
-import { getAssetInfo } from '../../services/rewards/assetConfig';
-import UserAvatar from '../UserAvatar';
-import { useApp } from '../../context/AppContext';
-import { AssetPreview } from './AssetPreview';
+import { colors, spacing } from '../../../theme';
+import { typography } from '../../../theme/typography';
+import PhosphorIcon from '../../../components/shared/PhosphorIcon';
+import Modal from '../../../components/shared/Modal';
+import ModernLoader from '../../../components/shared/ModernLoader';
+import ErrorScreen from '../../../components/shared/ErrorScreen';
+import Button from '../../../components/shared/Button';
+import { christmasCalendarService } from './christmasCalendarService';
+import { getGiftForDay } from './christmasCalendarConfig';
+import { resolveStorageUrl } from '../../../services/shared/storageUrlService';
+import { getAssetInfo } from '../../../services/rewards/assetConfig';
+import UserAvatar from '../../../components/UserAvatar';
+import { useApp } from '../../../context/AppContext';
+import { logger } from '../../../services/analytics/loggingService';
+import { AssetPreview } from '../../../components/rewards/AssetPreview';
 import {
   getTileBackgroundStyle,
   getDefaultTileBackgroundStyle,
   type ImageResizeMode,
   type ImagePosition,
-} from '../../services/rewards/christmasCalendarTileStyles';
+} from './christmasCalendarTileStyles';
 import {
   ChristmasCalendarStatus,
   Gift,
   PointsGift,
   AssetGift
-} from '../../types/rewards';
+} from '../../../types/rewards';
 
 // Note: DayTilePattern and related constants removed as all days now use centered style
 const DEFAULT_PATTERN = { background: '#1C2B23', accent: '#F5F0DC' };
