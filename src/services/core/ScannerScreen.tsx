@@ -20,6 +20,7 @@ import { colors } from '../../theme';
 import { parseUri, extractRecipientAddress, isSolanaPayUri } from './solanaPay';
 import { logger } from '../../services/analytics/loggingService';
 import { isValidSolanaAddress } from '../../utils/validation';
+import { parseWeSplitDeepLink } from './deepLinkHandler';
 import Header from '../../components/shared/Header';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -130,6 +131,85 @@ const ScannerScreen: React.FC<ScannerScreenProps> = ({
           } as never);
         }
         return;
+      }
+      
+      // Check if it's a WeSplit deep link (app-scheme or universal link)
+      const isWeSplitLink = data.startsWith('wesplit://') || 
+                           data.startsWith('https://wesplit.io/') || 
+                           data.startsWith('https://www.wesplit.io/') ||
+                           data.startsWith('https://wesplit-deeplinks.web.app/');
+      
+      if (isWeSplitLink) {
+        const linkData = parseWeSplitDeepLink(data);
+        if (!linkData) {
+          Alert.alert(
+            'Invalid WeSplit Link',
+            'This QR code appears to be a WeSplit link but is malformed or missing required information.',
+            [
+              { text: 'OK', onPress: () => resetScanner() }
+            ]
+          );
+          return;
+        }
+
+        // Handle different deep link actions
+        switch (linkData.action) {
+            case 'join-split':
+              // Navigate to SplitDetails screen with invitation data
+              navigation.navigate('SplitDetails' as never, {
+                shareableLink: data,
+                splitInvitationData: linkData.splitInvitationData
+              } as never);
+              return;
+              
+            case 'profile':
+              // Navigate to contacts or show add contact option
+              navigation.navigate('Contacts' as never, {
+                addContactFromQR: linkData
+              } as never);
+              return;
+              
+            case 'send':
+              // Navigate to Send screen with recipient
+              navigation.navigate('Send' as never, {
+                recipientWalletAddress: linkData.recipientWalletAddress,
+                recipientName: linkData.userName,
+                recipientEmail: linkData.userEmail
+              } as never);
+              return;
+              
+            case 'transfer':
+              // Navigate to CryptoTransfer screen
+              navigation.navigate('CryptoTransfer' as never, {
+                targetWallet: {
+                  address: linkData.recipientWalletAddress,
+                  name: linkData.userName || 'App Wallet',
+                  type: 'personal'
+                },
+                prefillAmount: linkData.transferAmount ? parseFloat(linkData.transferAmount) : undefined
+              } as never);
+              return;
+              
+            default:
+              Alert.alert(
+                'Unsupported QR Code',
+                'This WeSplit QR code type is not supported.',
+                [
+                  { text: 'OK', onPress: () => resetScanner() }
+                ]
+              );
+              return;
+          }
+        } else {
+          Alert.alert(
+            'Invalid QR Code',
+            'This QR code is not a valid WeSplit link.',
+            [
+              { text: 'OK', onPress: () => resetScanner() }
+            ]
+          );
+          return;
+        }
       }
       
       // Unsupported QR code

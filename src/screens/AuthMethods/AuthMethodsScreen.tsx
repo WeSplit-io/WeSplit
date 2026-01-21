@@ -9,7 +9,7 @@ import {
   Platform,
   Linking
 } from 'react-native';
-import { useNavigation, useRoute, NavigationProp, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
 import { Container, Header, Button, Input, LoadingScreen, Tabs } from '../../components/shared';
 import { useApp } from '../../context/AppContext';
@@ -176,12 +176,14 @@ const AuthMethodsScreen: React.FC = () => {
             // User doesn't have a name - needs to create profile
             logger.info('Phantom user needs to create profile (no name), navigating to CreateProfile', {
               userId: appUser.id,
-              email: appUser.email
+              email: appUser.email,
+              hasReferralCode: !!referralCode
             }, 'AuthMethodsScreen');
             navigation.reset({
               index: 0,
               routes: [{ name: 'CreateProfile', params: {
-                email: appUser.email
+                email: appUser.email,
+                referralCode: referralCode
               } }],
             });
           } else if (hasCompletedOnboarding) {
@@ -321,12 +323,14 @@ const AuthMethodsScreen: React.FC = () => {
       // User doesn't have a name - needs to create profile
       logger.info('Phantom user needs to create profile (no name), navigating to CreateProfile', {
         userId: appUser.id,
-        email: appUser.email
+        email: appUser.email,
+        hasReferralCode: !!referralCode
       }, 'AuthMethodsScreen');
       navigation.reset({
         index: 0,
         routes: [{ name: 'CreateProfile', params: {
-          email: appUser.email
+          email: appUser.email,
+          referralCode: referralCode
         } }],
       });
     } else if (hasCompletedOnboarding) {

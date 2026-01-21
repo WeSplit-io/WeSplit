@@ -582,7 +582,13 @@ const ContactsList: React.FC<ContactsListProps> = ({
       const linkData = deepLinkHandler.parseWeSplitDeepLink(data);
       
       if (!linkData) {
-        Alert.alert('Invalid QR Code', 'This QR code is not recognized by WeSplit.');
+        const looksLikeWeSplit = data.includes('wesplit://') || data.includes('wesplit.io');
+        Alert.alert(
+          looksLikeWeSplit ? 'Invalid WeSplit Link' : 'Invalid QR Code',
+          looksLikeWeSplit
+            ? 'This QR code appears to be a WeSplit link but is malformed or missing required information.'
+            : 'This QR code is not recognized by WeSplit.'
+        );
         return;
       }
       

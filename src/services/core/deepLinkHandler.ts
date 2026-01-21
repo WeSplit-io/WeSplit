@@ -128,12 +128,16 @@ export interface DeepLinkData {
   orderId?: string; // Spend order ID
   status?: 'success' | 'error' | 'cancelled'; // Callback status
   message?: string; // Optional message for callback
-  // Phantom callback-specific
+  // Phantom callback-specific (legacy format)
   response_type?: 'success' | 'error'; // Phantom callback response type
   wallet_id?: string; // Phantom wallet identifier
   authUserId?: string; // Phantom auth user ID
   provider?: string; // Social provider (google, apple)
   error?: string; // Error message from Phantom callback
+  // Phantom callback-specific (OAuth format)
+  oauthCode?: string; // OAuth authorization code
+  oauthState?: string; // OAuth state parameter
+  errorDescription?: string; // OAuth error description
 }
 
 /**
@@ -155,6 +159,32 @@ export function isWeSplitDeepLink(url: string): boolean {
     return false;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Decode base64url string to JSON string
+ * base64url uses - and _ instead of + and /, and omits padding
+ * 
+ * @param base64url - The base64url encoded string
+ * @returns Decoded string
+ * @throws Error if decoding fails
+ */
+function decodeBase64Url(base64url: string): string {
+  try {
+    // Convert base64url to base64
+    let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    
+    // Add padding if needed
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    
+    // Decode base64 to string
+    const decoded = atob(base64);
+    return decoded;
+  } catch (error) {
+    throw new Error(`Failed to decode base64url: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -292,11 +322,41 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
         // Handle split invitation deep links
         // Format (app-scheme): wesplit://join-split?data=<encoded_invitation_data>
         // Format (universal): https://wesplit.io/join-split?data=<encoded_invitation_data>
-        const dataParam = urlObj.searchParams.get('data');
+        // Also supports: invite parameter (base64url) and legacy id parameter
+        // Priority: data > invite > id/splitId
+        
+        // Priority 1: data parameter (JSON encoded, URL encoded)
+        let dataParam = urlObj.searchParams.get('data');
+        
+        // Priority 2: invite parameter (base64url encoded JSON)
+        if (!dataParam) {
+          const inviteParam = urlObj.searchParams.get('invite');
+          if (inviteParam) {
+            try {
+              const decoded = decodeBase64Url(inviteParam);
+              dataParam = decodeURIComponent(decoded);
+            } catch (error) {
+              logger.error('Failed to decode invite parameter', { error }, 'deepLinkHandler');
+              if (__DEV__) {
+                console.warn('🔥 Join-split invite parameter decode failed:', error);
+              }
+              return null;
+            }
+          }
+        }
+        
+        // Priority 3: Legacy id/splitId parameter
+        if (!dataParam) {
+          const splitId = urlObj.searchParams.get('splitId') || urlObj.searchParams.get('id');
+          if (splitId) {
+            // Convert to data format: JSON string with splitId
+            dataParam = encodeURIComponent(JSON.stringify({ splitId }));
+          }
+        }
 
         if (!dataParam) {
           if (__DEV__) {
-            console.warn('🔥 Join-split action missing data parameter');
+            console.warn('🔥 Join-split action missing data, invite, or id parameter');
           }
           return null;
         }
@@ -317,12 +377,13 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
         // Handle viewing a split from external source (e.g., "spend" integration)
         // Format (app-scheme): wesplit://view-split?splitId=xxx&userId=xxx
         // Format (universal): https://wesplit.io/view-split?splitId=xxx&userId=xxx
-        const splitId = urlObj.searchParams.get('splitId');
+        // Also supports legacy id parameter (treated as splitId)
+        const splitId = urlObj.searchParams.get('splitId') || urlObj.searchParams.get('id');
         const userId = urlObj.searchParams.get('userId');
 
         if (!splitId) {
           if (__DEV__) {
-            console.warn('🔥 View-split action missing splitId parameter');
+            console.warn('🔥 View-split action missing splitId or id parameter');
           }
           return null;
         }
@@ -452,30 +513,65 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
 
       case 'phantom-callback': {
         // Phantom auth callback deep link
+        // Supports two formats:
+        // 1. OAuth format (from website): code, state, error, error_description
+        // 2. Legacy format (from app): response_type, wallet_id, authUserId, provider, error
         // Format (app-scheme): wesplit://phantom-callback?response_type=success&wallet_id=xxx&authUserId=xxx&provider=google
-        // Format (universal): https://wesplit-deeplinks.web.app/phantom-callback?response_type=success&wallet_id=xxx
+        // Format (universal): https://wesplit-deeplinks.web.app/phantom-callback?code=xxx&state=xxx
+        
+        // Check for OAuth format (from website)
+        const code = urlObj.searchParams.get('code');
+        const state = urlObj.searchParams.get('state');
+        const error = urlObj.searchParams.get('error');
+        const error_description = urlObj.searchParams.get('error_description');
+        
+        // Check for legacy format (from app)
         const response_type = urlObj.searchParams.get('response_type') as 'success' | 'error' | null;
         const wallet_id = urlObj.searchParams.get('wallet_id');
         const authUserId = urlObj.searchParams.get('authUserId');
         const provider = urlObj.searchParams.get('provider');
-        const error = urlObj.searchParams.get('error');
-
-        logger.debug('Parsed phantom-callback deep link', {
-          response_type,
-          hasWalletId: !!wallet_id,
-          hasAuthUserId: !!authUserId,
-          provider,
-          hasError: !!error
-        }, 'deepLinkHandler');
-
-        return {
-          action: 'phantom-callback',
-          response_type: response_type || undefined,
-          wallet_id: wallet_id || undefined,
-          authUserId: authUserId || undefined,
-          provider: provider || undefined,
-          error: error ? decodeURIComponent(error) : undefined
-        };
+        
+        // If OAuth format detected, return OAuth fields
+        if (code || state || error) {
+          logger.debug('Parsed phantom-callback deep link (OAuth format)', {
+            hasCode: !!code,
+            hasState: !!state,
+            hasError: !!error,
+            hasErrorDescription: !!error_description
+          }, 'deepLinkHandler');
+          
+          return {
+            action: 'phantom-callback',
+            oauthCode: code || undefined,
+            oauthState: state || undefined,
+            error: error ? decodeURIComponent(error) : undefined,
+            errorDescription: error_description ? decodeURIComponent(error_description) : undefined
+          };
+        }
+        
+        // Legacy format
+        if (response_type || wallet_id) {
+          logger.debug('Parsed phantom-callback deep link (legacy format)', {
+            response_type,
+            hasWalletId: !!wallet_id,
+            hasAuthUserId: !!authUserId,
+            provider,
+            hasError: !!error
+          }, 'deepLinkHandler');
+          
+          return {
+            action: 'phantom-callback',
+            response_type: response_type || undefined,
+            wallet_id: wallet_id || undefined,
+            authUserId: authUserId || undefined,
+            provider: provider || undefined,
+            error: error ? decodeURIComponent(error) : undefined
+          };
+        }
+        
+        // No valid parameters
+        logger.warn('Phantom callback missing required parameters', null, 'deepLinkHandler');
+        return null;
       }
       
       default:
@@ -759,11 +855,57 @@ export function setupDeepLinkListeners(
       case 'phantom-callback': {
         logger.info('Phantom auth callback received', {
           linkData,
+          hasOAuthCode: !!linkData.oauthCode,
+          hasOAuthState: !!linkData.oauthState,
           responseType: linkData.response_type,
           hasWalletId: !!linkData.wallet_id,
           hasError: !!linkData.error
         }, 'deepLinkHandler');
 
+        // Handle OAuth format (from website)
+        if (linkData.oauthCode && linkData.oauthState) {
+          try {
+            const { PhantomAuthService } = await import('../auth/PhantomAuthService');
+            const phantomAuth = PhantomAuthService.getInstance();
+            
+            const result = await phantomAuth.handleSocialAuthCallback(
+              linkData.oauthCode,
+              linkData.oauthState
+            );
+            
+            if (result.success) {
+              logger.info('Phantom OAuth authentication successful', {
+                hasUser: !!result.user,
+                hasWallet: !!result.wallet
+              }, 'deepLinkHandler');
+              // Navigation will be handled by auth state change
+            } else {
+              logger.error('Phantom OAuth authentication failed', {
+                error: result.error
+              }, 'deepLinkHandler');
+              Alert.alert('Authentication Failed', result.error || 'Phantom authentication failed.');
+            }
+          } catch (error) {
+            logger.error('Error processing Phantom OAuth callback', { error }, 'deepLinkHandler');
+            Alert.alert('Error', 'Failed to process Phantom authentication. Please try again.');
+          }
+          break;
+        }
+        
+        // Handle OAuth error format
+        if (linkData.error && (linkData.oauthCode || linkData.oauthState || linkData.errorDescription)) {
+          logger.error('Phantom OAuth callback error', {
+            error: linkData.error,
+            errorDescription: linkData.errorDescription
+          }, 'deepLinkHandler');
+          Alert.alert(
+            'Authentication Error',
+            linkData.errorDescription || linkData.error || 'Phantom authentication failed.'
+          );
+          break;
+        }
+
+        // Handle legacy format (existing code)
         // The Phantom SDK will handle the authentication result internally
         // The usePhantom hook in AuthMethodsScreen will detect the state change
         // and process the authenticated user. We just log here for debugging.

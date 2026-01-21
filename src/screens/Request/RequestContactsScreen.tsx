@@ -1,30 +1,26 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text } from 'react-native';
 import { Header } from '../../components/shared';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'react-native';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
-import { useWallet } from '../../context/WalletContext';
-import { useContactActions } from '../../hooks';
-import QrCodeView from '../../services/core/QrCodeView';
 import { styles } from './styles';
-import { colors } from '../../theme/colors';
 import { User } from '../../types';
-import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Tabs } from '../../components/shared';
+import QrCodeView from '../../services/core/QrCodeView';
+import { createUsdcRequestUri } from '../../services/core/solanaPay';
+import { useWallet } from '../../context/WalletContext';
+import { colors } from '../../theme/colors';
 
 const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params || {};
   const { state } = useApp();
-  const { address } = useWallet();
   const { currentUser } = state;
-  const { addContact } = useContactActions();
+  const { address } = useWallet();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'Contacts' | 'Show QR code'>('Contacts');
   const [contactsActiveTab, setContactsActiveTab] = useState<'All' | 'Favorite' | 'Search'>('All');
+  const [requestActiveTab, setRequestActiveTab] = useState<'Contacts' | 'Show QR code'>('Contacts');
 
   // Handle contact selection
   const handleSelectContact = (contact: any) => {
@@ -43,11 +39,6 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
     // No need to call addContact here - ContactsList already did it
   };
 
-  // Tab change handler
-  const handleTabChange = (tab: 'Contacts' | 'Show QR code') => {
-    setActiveTab(tab);
-  };
-
   // Contacts list tab change handler
   const handleContactsTabChange = (tab: 'All' | 'Favorite' | 'Search') => {
     setContactsActiveTab(tab);
@@ -56,15 +47,10 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
     }
   };
 
-  // Generate Solana Pay URI for receiving money
-  const sendQRCode = createUsdcRequestUri({
-    recipient: currentUser?.wallet_address || '',
-    label: 'WeSplit Payment',
-    message: `Send USDC to ${currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}`
-  });
-  const userName = currentUser?.name || currentUser?.email?.split('@')[0] || 'User';
-
-
+  // Request tab change handler
+  const handleRequestTabChange = (tab: 'Contacts' | 'Show QR code') => {
+    setRequestActiveTab(tab);
+  };
 
   return (
     <Container>
@@ -74,37 +60,40 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
         onBackPress={() => navigation.goBack()}
       />
 
-      {/* Tabs - Hidden */}
-      {/* <View style={styles.requestTabsContainer}>
-        <TouchableOpacity
-          style={[
-            styles.requestTab,
-            activeTab === 'Contacts' && styles.requestTabActive
-          ]}
-          onPress={() => handleTabChange('Contacts')}
-        >
-          <Text style={[
-            styles.requestTabText,
-            activeTab === 'Contacts' && styles.requestTabTextActive
-          ]}>Contacts</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.requestTab,
-            activeTab === 'Show QR code' && styles.requestTabActive
-          ]}
-          onPress={() => handleTabChange('Show QR code')}
-        >
-          <Text style={[
-            styles.requestTabText,
-            activeTab === 'Show QR code' && styles.requestTabTextActive
-          ]}>Show QR code</Text>
-        </TouchableOpacity>
-      </View> */}
+      {/* Request Mode Tabs */}
+      <Tabs
+        tabs={[
+          { label: 'Contacts', value: 'Contacts' },
+          { label: 'Show QR code', value: 'Show QR code' }
+        ]}
+        activeTab={requestActiveTab}
+        onTabChange={(tab) => handleRequestTabChange(tab as 'Contacts' | 'Show QR code')}
+      />
 
-      {/* Tab Content */}
-      {activeTab === 'Contacts' ? (
-        <View style={styles.content}>
+      {/* Contacts List or QR Code */}
+      <View style={styles.content}>
+        {requestActiveTab === 'Show QR code' ? (
+          <View style={styles.content}>
+            {address ? (
+              <QrCodeView
+                value={createUsdcRequestUri({ 
+                  recipient: address, 
+                  label: currentUser?.name || 'User' 
+                })}
+                size={300}
+              />
+            ) : (
+              <View style={styles.content}>
+                <Text style={{ color: colors.white, textAlign: 'center', marginBottom: 10 }}>
+                  No wallet address available
+                </Text>
+                <Text style={{ color: colors.white70, textAlign: 'center' }}>
+                  Please connect a wallet to generate QR code
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : (
           <ContactsList
             groupId={groupId}
             onContactSelect={handleSelectContact}
@@ -117,55 +106,10 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
             placeholder="Search contacts"
-            hideToggleBar={true} // HIDE TOGGLE BAR ONLY ON THIS PAGE
+            hideToggleBar={true}
           />
-        </View>
-      ) : (
-                  <View style={styles.requestQRContainer}>
-            <Text style={styles.requestQRTitle}>Show this QR code to your friend</Text>
-
-            <View style={styles.requestQRCodeContent}>
-              <View style={styles.requestQRCodeContainerWrapper}>
-                <View style={styles.requestQRCodeContainer}>
-                  {currentUser?.wallet_address ? (
-                    <QrCodeView
-                      value={currentUser?.wallet_address || ''}
-                      address={currentUser?.wallet_address || ''}
-                      useSolanaPay={true}
-                      size={160}
-                      backgroundColor={colors.white}
-                      color={colors.black}
-                      label="WeSplit Payment"
-                      message={`Send USDC to ${userName}`}
-                      showAddress={false}
-                      showButtons={false}
-                    />
-                  ) : (
-                    <View style={styles.requestQRCodePlaceholder}>
-                      <Text style={styles.requestQRCodePlaceholderText}>No wallet address</Text>
-                    </View>
-                  )}
-                </View>
-
-              </View>
-              <View style={styles.requestQRUserInfo}>
-                <Text style={styles.requestQRUserName}>{userName}</Text>
-                <Text style={styles.requestQRUserWallet}>{currentUser?.wallet_address ? `${currentUser.wallet_address.substring(0, 6)}...${currentUser.wallet_address.substring(currentUser.wallet_address.length - 6)}` : 'No wallet connected'}</Text>
-
-              </View>
-
-            </View>
-
-
-          <TouchableOpacity style={styles.requestDoneButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.requestDoneButtonText}>Done</Text>
-          </TouchableOpacity>
-
-
-        </View>
-
-
-      )}
+        )}
+      </View>
     </Container>
   );
 };

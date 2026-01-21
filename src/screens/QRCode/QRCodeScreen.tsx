@@ -79,203 +79,186 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
 
   const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
     const now = Date.now();
-    
+
     // Throttle scans to prevent double navigation
     if (now - lastScanTime.current < scanThrottleMs) {
       return;
     }
-    
+
     lastScanTime.current = now;
-    
+
     if (scanned || !isScanning) {
       return;
     }
-    
+
     setScanned(true);
     setIsScanning(false);
-    
+
     logger.info('QR Code scanned', { data }, 'QRCodeScreen');
-    
+
     try {
       // Check if it's a WeSplit deep link (app-scheme or universal link)
-      // Supports both:
-      // - wesplit://join-split?data=...
-      // - https://wesplit.io/join-split?data=...
-      const isWeSplitLink = data.startsWith('wesplit://') || 
-                           data.startsWith('https://wesplit.io/') || 
-                           data.startsWith('https://www.wesplit.io/');
-      
+      const isWeSplitLink =
+        data.startsWith('wesplit://') ||
+        data.startsWith('https://wesplit.io/') ||
+        data.startsWith('https://www.wesplit.io/') ||
+        data.startsWith('https://wesplit-deeplinks.web.app/');
+
       if (isWeSplitLink) {
         const linkData = parseWeSplitDeepLink(data);
-        if (linkData) {
-          logger.debug('Parsed QR code deep link', { 
-            action: linkData.action, 
-            hasData: !!linkData.splitInvitationData 
-          }, 'QRCodeScreen');
-          
-          switch (linkData.action) {
-            case 'join-split':
-              // Navigate to SplitDetails screen with the invitation data
-              if (navigation) {
-                logger.info('Navigating to SplitDetails from QR code', { 
-                  hasInvitationData: !!linkData.splitInvitationData 
-                }, 'QRCodeScreen');
-                
-                navigation.navigate('SplitDetails', {
-                  shareableLink: data,
-                  splitInvitationData: linkData.splitInvitationData
-                });
-              } else {
-                Alert.alert(
-                  'Split Invitation Found',
-                  'Join this split to participate in the bill sharing.',
-                  [
-                    { text: 'OK', onPress: () => resetScanner() }
-                  ]
-                );
-              }
-              return;
-              
-            case 'profile':
-              // Navigate to contacts or show add contact option
-              if (navigation) {
-                navigation.navigate('Contacts', {
-                  addContactFromQR: linkData
-                });
-              } else {
-                Alert.alert(
-                  'Profile QR Code',
-                  `Add ${linkData.userName} as a contact?`,
-                  [
-                    { text: 'Cancel', onPress: () => resetScanner() },
-                    { text: 'Add Contact', onPress: () => resetScanner() }
-                  ]
-                );
-              }
-              return;
-              
-            case 'send':
-              // Navigate to Send screen with recipient
-              if (navigation) {
-                navigation.navigate('Send', {
-                  recipientWalletAddress: linkData.recipientWalletAddress,
-                  recipientName: linkData.userName,
-                  recipientEmail: linkData.userEmail
-                });
-              } else {
-                Alert.alert(
-                  'Send Money QR Code',
-                  `Send money to ${linkData.userName}?`,
-                  [
-                    { text: 'Cancel', onPress: () => resetScanner() },
-                    { text: 'Send', onPress: () => resetScanner() }
-                  ]
-                );
-              }
-              return;
-              
-            case 'transfer':
-              // Navigate to CryptoTransfer screen
-              if (navigation) {
-                navigation.navigate('CryptoTransfer', {
-                  targetWallet: {
-                    address: linkData.recipientWalletAddress,
-                    name: linkData.userName || 'App Wallet',
-                    type: 'personal'
-                  },
-                  prefillAmount: linkData.transferAmount ? parseFloat(linkData.transferAmount) : undefined
-                });
-              } else {
-                Alert.alert(
-                  'Transfer QR Code',
-                  `Transfer to ${linkData.userName}?`,
-                  [
-                    { text: 'Cancel', onPress: () => resetScanner() },
-                    { text: 'Transfer', onPress: () => resetScanner() }
-                  ]
-                );
-              }
-              return;
-              
-            default:
-              Alert.alert(
-                'Unsupported QR Code',
-                'This WeSplit QR code is not supported in this version.',
-                [
-                  { text: 'OK', onPress: () => resetScanner() }
-                ]
-              );
-              return;
-          }
-        } else {
+
+        if (!linkData) {
           Alert.alert(
-            'Invalid QR Code',
-            'This QR code is not a valid WeSplit link.',
-            [
-              { text: 'OK', onPress: () => resetScanner() }
-            ]
+            'Invalid WeSplit Link',
+            'This QR code appears to be a WeSplit link but is malformed or missing required information.',
+            [{ text: 'OK', onPress: () => resetScanner() }]
           );
           return;
         }
+
+        logger.debug(
+          'Parsed QR code deep link',
+          {
+            action: linkData.action,
+            hasData: !!linkData.splitInvitationData,
+          },
+          'QRCodeScreen'
+        );
+
+        switch (linkData.action) {
+          case 'join-split':
+            if (navigation) {
+              logger.info(
+                'Navigating to SplitDetails from QR code',
+                { hasInvitationData: !!linkData.splitInvitationData },
+                'QRCodeScreen'
+              );
+
+              navigation.navigate('SplitDetails', {
+                shareableLink: data,
+                splitInvitationData: linkData.splitInvitationData,
+              });
+            } else {
+              Alert.alert(
+                'Split Invitation Found',
+                'Join this split to participate in the bill sharing.',
+                [{ text: 'OK', onPress: () => resetScanner() }]
+              );
+            }
+            return;
+
+          case 'profile':
+            if (navigation) {
+              navigation.navigate('Contacts', {
+                addContactFromQR: linkData,
+              });
+            } else {
+              Alert.alert(
+                'Profile QR Code',
+                `Add ${linkData.userName} as a contact?`,
+                [
+                  { text: 'Cancel', onPress: () => resetScanner() },
+                  { text: 'Add Contact', onPress: () => resetScanner() },
+                ]
+              );
+            }
+            return;
+
+          case 'send':
+            if (navigation) {
+              navigation.navigate('Send', {
+                recipientWalletAddress: linkData.recipientWalletAddress,
+                recipientName: linkData.userName,
+                recipientEmail: linkData.userEmail,
+              });
+            } else {
+              Alert.alert(
+                'Send Money QR Code',
+                `Send money to ${linkData.userName}?`,
+                [
+                  { text: 'Cancel', onPress: () => resetScanner() },
+                  { text: 'Send', onPress: () => resetScanner() },
+                ]
+              );
+            }
+            return;
+
+          case 'transfer':
+            if (navigation) {
+              navigation.navigate('CryptoTransfer', {
+                targetWallet: {
+                  address: linkData.recipientWalletAddress,
+                  name: linkData.userName || 'App Wallet',
+                  type: 'personal',
+                },
+                prefillAmount: linkData.transferAmount
+                  ? parseFloat(linkData.transferAmount)
+                  : undefined,
+              });
+            } else {
+              Alert.alert(
+                'Transfer QR Code',
+                `Transfer to ${linkData.userName}?`,
+                [
+                  { text: 'Cancel', onPress: () => resetScanner() },
+                  { text: 'Transfer', onPress: () => resetScanner() },
+                ]
+              );
+            }
+            return;
+
+          default:
+            Alert.alert(
+              'Unsupported QR Code',
+              'This WeSplit QR code is not supported in this version.',
+              [{ text: 'OK', onPress: () => resetScanner() }]
+            );
+            return;
+        }
       }
-      
+
       // Check if it's a Solana Pay URI
       if (isSolanaPayUri(data)) {
         const parsed = parseUri(data);
-        
+
         if (parsed.isValid) {
-          // Valid Solana Pay USDC request
           Alert.alert(
             'QR Code Scanned',
             `Recipient: ${parsed.recipient}\nAmount: ${parsed.amount} USDC`,
-            [
-              { text: 'OK', onPress: () => resetScanner() }
-            ]
+            [{ text: 'OK', onPress: () => resetScanner() }]
           );
           return;
         } else {
-          // Invalid Solana Pay URI
           Alert.alert(
             'Invalid QR Code',
             parsed.error || 'This QR code is not a valid USDC payment request',
-            [
-              { text: 'OK', onPress: () => resetScanner() }
-            ]
+            [{ text: 'OK', onPress: () => resetScanner() }]
           );
           return;
         }
       }
-      
+
       // Check if it's a raw Solana address
       const recipient = extractRecipientAddress(data);
       if (recipient && isValidSolanaAddress(recipient)) {
-        Alert.alert(
-          'QR Code Scanned',
-          `Solana Address: ${recipient}`,
-          [
-            { text: 'OK', onPress: () => resetScanner() }
-          ]
-        );
+        Alert.alert('QR Code Scanned', `Solana Address: ${recipient}`, [
+          { text: 'OK', onPress: () => resetScanner() },
+        ]);
         return;
       }
-      
+
       // Unsupported QR code
       Alert.alert(
         'Unsupported QR Code',
         'This QR code is not a valid Solana address, USDC payment request, or split invitation',
-        [
-          { text: 'OK', onPress: () => resetScanner() }
-        ]
+        [{ text: 'OK', onPress: () => resetScanner() }]
       );
-      
     } catch (error) {
       console.error('Error processing QR code:', error);
       Alert.alert(
         'Error',
         'Failed to process QR code. Please try again.',
-        [
-          { text: 'OK', onPress: () => resetScanner() }
-        ]
+        [{ text: 'OK', onPress: () => resetScanner() }]
       );
     }
   };

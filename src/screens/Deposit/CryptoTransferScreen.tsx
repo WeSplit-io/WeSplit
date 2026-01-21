@@ -11,6 +11,7 @@ import { colors } from '../../theme';
 import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { logger } from '../../services/analytics/loggingService';
 import { Container, Button } from '../../components/shared';
+import { generateTransferLink } from '../../services/core/deepLinkHandler';
 
 interface CryptoTransferParams {
   targetWallet?: {
@@ -59,6 +60,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
   // Transfer state
   const [transferAmount, setTransferAmount] = useState(params.prefillAmount?.toString() || '');
   const [isTransferring, setIsTransferring] = useState(false);
+  const [qrMode, setQrMode] = useState<'solana' | 'wesplit'>('solana');
 
   const handleExternalWalletConnectionSuccess = (result: any) => {
     logger.info('External wallet connected successfully', { result }, 'CryptoTransferScreen');
@@ -355,20 +357,55 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
             </Text>*/}
             
             {depositAddress ? (
-              <View style={styles.qrContainer}>
-                <QrCodeView
-                  value={depositAddress}
-                  address={depositAddress}
-                  useSolanaPay={true}
-                  amount={transferAmount ? parseFloat(transferAmount) : undefined}
-                  label="WeSplit Deposit"
-                  message={`Deposit to ${currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}`}
-                  size={250}
-                  color="#000"
-                  caption="Scan to deposit USDC"
-                  showButtons={true}
-                />
-              </View>
+              <>
+                <View style={styles.actionButtonsContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      qrMode === 'solana' && !styles.disabledButton,
+                    ]}
+                    onPress={() => setQrMode('solana')}
+                  >
+                    <Text style={styles.actionButtonText}>Solana Pay QR</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      qrMode === 'wesplit' && !styles.disabledButton,
+                    ]}
+                    onPress={() => setQrMode('wesplit')}
+                  >
+                    <Text style={styles.actionButtonText}>WeSplit Link QR</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.qrContainer}>
+                  <QrCodeView
+                    value={
+                      qrMode === 'solana'
+                        ? depositAddress
+                        : generateTransferLink(
+                            depositAddress,
+                            walletName,
+                            currentUser?.email,
+                            transferAmount || undefined
+                          )
+                    }
+                    address={depositAddress}
+                    useSolanaPay={qrMode === 'solana'}
+                    amount={transferAmount ? parseFloat(transferAmount) : undefined}
+                    label="WeSplit Deposit"
+                    message={`Deposit to ${currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}`}
+                    size={250}
+                    color="#000"
+                    caption={
+                      qrMode === 'solana'
+                        ? 'Scan to deposit USDC'
+                        : 'Scan to open WeSplit transfer link'
+                    }
+                    showButtons={true}
+                  />
+                </View>
+              </>
             ) : (
               <View style={{ alignItems: 'center' }}>
                 <Text style={styles.errorText}>No wallet address found.</Text>

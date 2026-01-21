@@ -1277,7 +1277,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     } else {
       // Set a fallback QR code data if no split ID is available
       // Use universal link format for fallback too
-      setQrCodeData('https://wesplit.io/join-split?data=' + encodeURIComponent(JSON.stringify({
+      setQrCodeData('https://wesplit-deeplinks.web.app/join-split?data=' + encodeURIComponent(JSON.stringify({
         type: 'split_invitation',
         message: 'Join this split'
       })));
@@ -1312,19 +1312,67 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const handleSplitInvitation = async () => {
-    if (!splitInvitationData) {return;}
+    if (!splitInvitationData || !currentUser) {return;}
 
     try {
       const invitationData = JSON.parse(splitInvitationData);
-      if (invitationData.splitId) {
-        // Navigate to join the split
+      if (!invitationData.splitId) {
+        logger.warn('Split invitation data missing splitId', { invitationData }, 'SplitDetailsScreen');
+        Alert.alert('Invalid Invitation', 'This split invitation is missing required information.');
+        return;
+      }
+
+      // Actually join the split using the invitation data
+      setIsJoiningSplit(true);
+      logger.info('Joining split from invitation QR code', {
+        splitId: invitationData.splitId,
+        billName: invitationData.billName
+      }, 'SplitDetailsScreen');
+
+      const result = await SplitInvitationService.joinSplit({
+        type: 'split_invitation',
+        splitId: invitationData.splitId,
+        billName: invitationData.billName || 'Split',
+        totalAmount: invitationData.totalAmount || 0,
+        currency: invitationData.currency || 'USDC',
+        creatorId: invitationData.creatorId || '',
+        creatorName: invitationData.creatorName || '',
+        timestamp: invitationData.timestamp || new Date().toISOString()
+      }, currentUser.id);
+
+      if (result.success) {
+        logger.info('Successfully joined split from invitation', {
+          splitId: invitationData.splitId
+        }, 'SplitDetailsScreen');
+        
+        setHasJustJoinedSplit(true);
+        
+        // Navigate to SplitDetails with the splitId to show the joined split
         navigation.navigate('SplitDetails', {
           splitId: invitationData.splitId,
           isFromNotification: true
         });
+        
+        // Reload split data to ensure user sees they're joined
+        // Note: This will be called when the screen loads with the new splitId
+      } else {
+        logger.error('Failed to join split from invitation', {
+          splitId: invitationData.splitId,
+          error: result.error
+        }, 'SplitDetailsScreen');
+        Alert.alert(
+          'Failed to Join Split',
+          result.error || 'Unable to join this split. Please try again.'
+        );
       }
     } catch (error) {
       logger.error('Error handling split invitation', error as Record<string, unknown>, 'SplitDetailsScreen');
+      Alert.alert(
+        'Error',
+        'An error occurred while processing the split invitation. Please try again.'
+      );
+    } finally {
+      setIsJoiningSplit(false);
     }
   };
 

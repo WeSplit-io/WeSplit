@@ -15,7 +15,7 @@ import { logger } from '../analytics/loggingService';
 
 // Base URL for universal links - this should be your web domain
 // The web page at this URL should handle redirects to app stores or deep links
-const UNIVERSAL_LINK_BASE_URL = 'https://wesplit.io';
+const UNIVERSAL_LINK_BASE_URL = 'https://wesplit-deeplinks.web.app';
 
 export interface SplitInvitationData {
   type: 'split_invitation';

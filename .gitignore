@@ -220,6 +220,7 @@ site/
 docs/archive/
 scripts/archive/
 tools/archive/
+/docs/
 
 # Specific temporary/one-off scripts (not all .sh files)
 # Keep important scripts in scripts/ folder tracked

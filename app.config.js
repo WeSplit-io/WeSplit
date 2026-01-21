@@ -91,7 +91,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit",
-      buildNumber: "68",
+      buildNumber: "70",
       deploymentTarget: "15.1",
       googleServicesFile: "./GoogleService-Info.plist", // Uncomment when file is added
       infoPlist: {
@@ -123,7 +123,7 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit",
-      versionCode: 11268,
+      versionCode: 11270,
       googleServicesFile: "./google-services.json", // Uncomment when file is added
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
