@@ -84,7 +84,11 @@ const SharedWalletDetailsScreen: React.FC = () => {
     setIsLoadingTransactions(true);
     try {
       const { SharedWalletService } = await import('../../services/sharedWallet');
-      const result = await SharedWalletService.getSharedWalletTransactions(wallet.id, 50);
+      const result = await SharedWalletService.getSharedWalletTransactions(
+        wallet.id, 
+        currentUser?.id?.toString(), // ✅ FIX: Pass userId for permission check
+        50
+      );
       
       logger.info('Transaction load result', {
         walletId: wallet.id,

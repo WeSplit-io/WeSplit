@@ -1079,17 +1079,57 @@ export class SharedWalletService {
 
   /**
    * Get transaction history for a shared wallet
+   * ✅ FIX: Added permission check to ensure only authorized users can view transactions
    *
    * @param sharedWalletId - The shared wallet ID
+   * @param userId - The user ID requesting transactions (required for permission check)
    * @param limit - Maximum number of transactions to return (default: 50)
    * @returns Array of transactions or error
    */
   static async getSharedWalletTransactions(
     sharedWalletId: string,
+    userId?: string,
     limit: number = 50
   ): Promise<GetSharedWalletTransactionsResult> {
     try {
       await loadModules();
+
+      // ✅ FIX: Check permissions if userId is provided
+      if (userId) {
+        const { getSharedWalletDocById } = await import('./utils');
+        const walletResult = await getSharedWalletDocById(sharedWalletId);
+        
+        if (!walletResult || !walletResult.wallet) {
+          return {
+            success: false,
+            error: 'Shared wallet not found',
+          };
+        }
+
+        const wallet = walletResult.wallet;
+        const userMember = wallet.members?.find(m => m.userId === userId);
+        const isCreator = wallet.creatorId === userId;
+
+        // Check if user is creator or has canViewTransactions permission
+        if (!isCreator) {
+          if (!userMember || userMember.status !== 'active') {
+            return {
+              success: false,
+              error: 'You must be an active member to view transactions',
+            };
+          }
+
+          const { MemberRightsService } = await import('./MemberRightsService');
+          const canView = MemberRightsService.canPerformAction(userMember, wallet, 'viewTransactions');
+          
+          if (!canView) {
+            return {
+              success: false,
+              error: 'You do not have permission to view transactions for this shared wallet',
+            };
+          }
+        }
+      }
 
       const { db } = await import('../../config/firebase/firebase');
       const { collection, query, where, orderBy, limit: limitQuery, getDocs } = await import('firebase/firestore');
@@ -1389,12 +1429,29 @@ export class SharedWalletService {
         };
       }
       
-      // Verify user is the creator (only creator can update settings)
-      if (wallet.creatorId !== params.userId) {
-        return {
-          success: false,
-          error: 'Only the wallet creator can update settings',
-        };
+      // ✅ FIX: Check if user has permission to manage settings
+      // Creator always has permission, but admins with canManageSettings can also update
+      const isCreator = wallet.creatorId === params.userId;
+      const updaterMember = wallet.members?.find(m => m.userId === params.userId);
+      
+      if (!isCreator) {
+        if (!updaterMember || updaterMember.status !== 'active') {
+          return {
+            success: false,
+            error: 'You must be an active member to update wallet settings',
+          };
+        }
+        
+        // Check if admin has canManageSettings permission
+        const { MemberRightsService } = await import('./MemberRightsService');
+        const canManage = MemberRightsService.canPerformAction(updaterMember, wallet, 'manageSettings');
+        
+        if (!canManage) {
+          return {
+            success: false,
+            error: 'You do not have permission to manage settings for this shared wallet. Only the creator or admins with settings management permissions can update settings.',
+          };
+        }
       }
 
       // Build update object - only include fields that are provided

@@ -104,7 +104,11 @@ export const useSharedWalletData = (
     try {
       setIsLoadingTransactions(true);
 
-      const result = await SharedWalletService.getSharedWalletTransactions(walletId, 50);
+      const result = await SharedWalletService.getSharedWalletTransactions(
+        walletId, 
+        currentUserId, // ✅ FIX: Pass userId for permission check
+        50
+      );
 
       if (result.success && result.transactions) {
         setTransactions(result.transactions);
