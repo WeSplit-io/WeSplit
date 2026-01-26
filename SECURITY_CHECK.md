@@ -67,6 +67,8 @@
 
 ## 📁 Critical Files for Audit
 
+> **💡 Tip:** For a quick-start guide with direct file links, see [`audit/blockchain-audit/CRITICAL_FILES_INDEX.md`](./audit/blockchain-audit/CRITICAL_FILES_INDEX.md)
+
 ### 🔴 Maximum Criticality (5/5) - Start Here
 
 **Core Contract Definitions:**
@@ -257,6 +259,57 @@
 2. Secret management
 3. Authentication and authorization
 4. Rate limiting and CORS
+
+---
+
+## 🔍 Blockchain Audit - Core Functions
+
+> **📁 Quick Access:** For organized audit files, see [`audit/blockchain-audit/`](./audit/blockchain-audit/)
+> - [`CRITICAL_FILES_INDEX.md`](./audit/blockchain-audit/CRITICAL_FILES_INDEX.md) - Direct links to all critical files
+> - [`README.md`](./audit/blockchain-audit/README.md) - Audit preparation guide
+
+### Smart Contracts / Programs
+**No custom smart contracts deployed.** Uses Solana native programs:
+- System Program: `11111111111111111111111111111112`
+- SPL Token Program: `TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`
+- Associated Token Program: `ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL`
+- Memo Program: `MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr`
+- Compute Budget Program: `ComputeBudget111111111111111111111111111111`
+
+### Core Functions for Audit (~3,617 lines)
+
+**Transaction Processing:**
+1. [`TransactionProcessor.sendUSDCTransaction()`](./src/services/blockchain/transaction/TransactionProcessor.ts#L70-L945) - ~875 lines
+   - Transaction construction, token account creation, blockhash management, signing, verification
+
+2. [`ConsolidatedTransactionService.sendUSDCTransaction()`](./src/services/blockchain/transaction/ConsolidatedTransactionService.ts#L110-L469) - ~360 lines
+   - Transaction orchestration, deduplication, wallet loading, post-processing
+
+3. [`ConsolidatedTransactionService.executeTransactionByContext()`](./src/services/blockchain/transaction/ConsolidatedTransactionService.ts#L788-L843) - ~55 lines
+   - Context-based routing (send_1to1, fair_split, degen_split, shared_wallet)
+
+**Token Operations:**
+4. [`secureTokenUtils.ts`](./src/services/blockchain/secureTokenUtils.ts) - ~147 lines
+   - `getAccount()`, `TOKEN_PROGRAM_ID`, `ASSOCIATED_TOKEN_PROGRAM_ID` exports
+
+**Backend Signing:**
+5. [`transactionSigningService.js`](./services/firebase-functions/src/transactionSigningService.js) - Key functions (~600 lines)
+   - `initialize()` - Lines 82-561
+   - `addCompanySignature()` - Lines 567-616
+   - `submitTransaction()` - Lines 688-1316
+
+**Client Signing:**
+6. [`transactionSigningService.ts`](./src/services/blockchain/transaction/transactionSigningService.ts) - ~712 lines
+   - `signTransaction()` - Firebase Function integration
+
+**Transaction Handlers:**
+7. [`FairSplitHandler.handleFairSplitContribution()`](./src/services/blockchain/transaction/handlers/FairSplitHandler.ts) - ~242 lines
+8. [`DegenSplitHandler.handleDegenSplitLock()`](./src/services/blockchain/transaction/handlers/DegenSplitHandler.ts) - ~226 lines
+9. [`FairSplitWithdrawalHandler.handleFairSplitWithdrawal()`](./src/services/blockchain/transaction/handlers/FairSplitWithdrawalHandler.ts#L90-L491) - ~401 lines
+
+**Total: ~3,617 lines** (focused on critical blockchain interaction functions)
+
+> **📋 Detailed File Index:** See [`audit/blockchain-audit/CRITICAL_FILES_INDEX.md`](./audit/blockchain-audit/CRITICAL_FILES_INDEX.md) for complete file listing with direct links
 
 ---
 
