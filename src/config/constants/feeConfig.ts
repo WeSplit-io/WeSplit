@@ -29,9 +29,9 @@ export type TransactionType =
 
 // Individual fee configurations for each transaction type
 export const TRANSACTION_FEE_CONFIGS = {
-  // 1:1 Transfers - Very low fee (0.01%)
+  // 1:1 Transfers - 0.1% fee for sending funds to another user
   send: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SEND_PERCENTAGE') || '0.01'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SEND_PERCENTAGE') || '0.1'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SEND_MIN') || '0.001'),
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SEND_MAX') || '0.10'),
     currency: 'USDC',
@@ -42,9 +42,9 @@ export const TRANSACTION_FEE_CONFIGS = {
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_RECEIVE_MAX') || '0.0'),
     currency: 'USDC',
   },
-  // Group Split Payments - 1.5% fee for funding splits
+  // Group Split Payments - 0.1% fee for funding splits
   split_payment: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_PERCENTAGE') || '1.5'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_PERCENTAGE') || '0.1'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_MIN') || '0.001'),
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_MAX') || '5.00'),
     currency: 'USDC',
@@ -70,16 +70,16 @@ export const TRANSACTION_FEE_CONFIGS = {
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_DEPOSIT_MAX') || '0.0'),
     currency: 'USDC',
   },
-  // Payment Requests - 0.01% fee (same as 1:1 transfers)
+  // Payment Requests - 0.1% fee (same as 1:1 transfers)
   payment_request: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PAYMENT_REQUEST_PERCENTAGE') || '0.01'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PAYMENT_REQUEST_PERCENTAGE') || '0.1'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PAYMENT_REQUEST_MIN') || '0.001'),
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PAYMENT_REQUEST_MAX') || '0.10'),
     currency: 'USDC',
   },
-  // Group Payments - 1.5% fee (same as split payments)
+  // Group Payments - 0.1% fee (same as split payments)
   group_payment: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_GROUP_PAYMENT_PERCENTAGE') || '1.5'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_GROUP_PAYMENT_PERCENTAGE') || '0.1'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_GROUP_PAYMENT_MIN') || '0.001'),
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_GROUP_PAYMENT_MAX') || '5.00'),
     currency: 'USDC',
@@ -105,9 +105,9 @@ export const TRANSACTION_FEE_CONFIGS = {
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_EXTERNAL_PAYMENT_MAX') || '10.00'),
     currency: 'USDC',
   },
-  // Default fallback - 0.01% (same as 1:1 transfers)
+  // Default fallback - 0.1% (same as 1:1 transfers)
   default: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE') || '0.01'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE') || '0.1'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_FEE') || '0.001'),
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MAX_FEE') || '0.10'),
     currency: 'USDC',

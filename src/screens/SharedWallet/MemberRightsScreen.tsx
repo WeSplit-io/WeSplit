@@ -48,15 +48,9 @@ const MemberRightsScreen: React.FC = () => {
   const [withdrawalLimit, setWithdrawalLimit] = useState('');
   const [dailyWithdrawalLimit, setDailyWithdrawalLimit] = useState('');
 
-  // Load wallet
+  // Load wallet - always reload to ensure fresh data (even if routeWallet is provided)
   useEffect(() => {
     const loadWallet = async () => {
-      if (routeWallet) {
-        setWallet(routeWallet);
-        setIsLoading(false);
-        return;
-      }
-
       if (!walletId) {
         Alert.alert('Error', 'Wallet ID is required');
         navigation.goBack();
@@ -68,6 +62,14 @@ const MemberRightsScreen: React.FC = () => {
         const result = await SharedWalletService.getSharedWallet(walletId);
         if (result.success && result.wallet) {
           setWallet(result.wallet);
+          
+          // If a member was selected from route params, update it with fresh data
+          if (selectedMember) {
+            const freshMember = result.wallet.members.find(m => m.userId === selectedMember.userId);
+            if (freshMember) {
+              setSelectedMember(freshMember);
+            }
+          }
         } else {
           Alert.alert('Error', result.error || 'Failed to load shared wallet');
           navigation.goBack();
@@ -82,20 +84,13 @@ const MemberRightsScreen: React.FC = () => {
     };
 
     loadWallet();
-  }, [walletId, routeWallet, navigation]);
+  }, [walletId, navigation]); // Removed routeWallet dependency - always reload
 
   // Initialize permissions when member is selected
   useEffect(() => {
     if (selectedMember && wallet) {
-      // ✅ FIX: Get permissions directly from member.permissions if they exist, otherwise use defaults
-      // This ensures we show the actual saved permissions, not just role defaults
-      const memberHasCustomPermissions = wallet.settings?.enableCustomPermissions && selectedMember.permissions;
-      const currentPermissions = memberHasCustomPermissions
-        ? {
-            ...MemberRightsService.getMemberPermissions(selectedMember, wallet),
-            ...selectedMember.permissions, // Custom permissions take precedence
-          }
-        : MemberRightsService.getMemberPermissions(selectedMember, wallet);
+      // Get effective permissions - getMemberPermissions() already handles custom permissions correctly
+      const currentPermissions = MemberRightsService.getMemberPermissions(selectedMember, wallet);
       
       setPermissions({
         canInviteMembers: currentPermissions.canInviteMembers ?? false,

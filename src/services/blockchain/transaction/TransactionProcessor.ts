@@ -292,6 +292,62 @@ export class TransactionProcessor {
         throw new Error('Transaction missing recent blockhash');
       }
 
+      // ✅ FIX: Simulate transaction before submission to catch errors early
+      // This provides faster feedback and prevents unnecessary network calls
+      try {
+        const simulationResult = await connection.simulateTransaction(transaction);
+        if (simulationResult.value.err) {
+          const errorMessage = JSON.stringify(simulationResult.value.err);
+          logger.error('Transaction simulation failed', {
+            error: errorMessage,
+            logs: simulationResult.value.logs || [],
+            signerPublicKey: keypair.publicKey.toBase58(),
+            feePayer: transaction.feePayer?.toBase58()
+          }, 'TransactionProcessor');
+          
+          // Provide user-friendly error messages for common failures
+          if (errorMessage.includes('InsufficientFundsForFee')) {
+            return {
+              success: false,
+              error: 'Insufficient SOL for transaction fees. Please ensure you have at least 0.001 SOL in your wallet.',
+              signature: '',
+              txId: ''
+            };
+          }
+          
+          if (errorMessage.includes('AccountNotFound') || errorMessage.includes('InvalidAccountData')) {
+            return {
+              success: false,
+              error: 'Transaction validation failed: One or more accounts are invalid or not found. Please try again or contact support.',
+              signature: '',
+              txId: ''
+            };
+          }
+          
+          // Return generic error for other simulation failures
+          return {
+            success: false,
+            error: `Transaction validation failed: ${errorMessage}`,
+            signature: '',
+            txId: ''
+          };
+        }
+        
+        logger.debug('Transaction simulation passed', {
+          signerPublicKey: keypair.publicKey.toBase58(),
+          computeUnitsConsumed: simulationResult.value.unitsConsumed
+        }, 'TransactionProcessor');
+      } catch (simulationError) {
+        // Simulation is not always reliable (network issues, RPC problems)
+        // Log warning but continue with transaction submission
+        logger.warn('Transaction simulation failed (non-critical, continuing)', {
+          error: simulationError instanceof Error ? simulationError.message : String(simulationError),
+          signerPublicKey: keypair.publicKey.toBase58(),
+          note: 'Simulation failures are not always accurate. Proceeding with transaction submission.'
+        }, 'TransactionProcessor');
+        // Continue with transaction submission - simulation is not always reliable
+      }
+
       // Convert Transaction to VersionedTransaction for Firebase Functions
       // Firebase Functions expect VersionedTransaction format
       // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly

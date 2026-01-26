@@ -112,11 +112,11 @@ module.exports = {
       //   'com.apple.developer.devicecheck': true  // Removed - causing provisioning profile issues
       // },
       // Associated domains for iOS Universal Links
-      // This allows https://wesplit.io and https://wesplit-deeplinks.web.app links to open directly in the app
+      // This allows https://wesplit.io and https://deeplinks.wesplit.io links to open directly in the app
       associatedDomains: [
         "applinks:wesplit.io",
         "applinks:www.wesplit.io",
-        "applinks:wesplit-deeplinks.web.app"
+        "applinks:deeplinks.wesplit.io"
       ]
     },
     scheme: "wesplit",
@@ -165,7 +165,7 @@ module.exports = {
           category: ["BROWSABLE", "DEFAULT"]
         },
         // Android App Links for universal links
-        // This allows https://wesplit.io and https://wesplit-deeplinks.web.app links to open directly in the app
+        // This allows https://wesplit.io and https://deeplinks.wesplit.io links to open directly in the app
         {
           action: "VIEW",
           autoVerify: true,
@@ -202,18 +202,28 @@ module.exports = {
             },
             {
               scheme: "https",
-              host: "wesplit-deeplinks.web.app",
+              host: "deeplinks.wesplit.io",
               pathPrefix: "/join-split"
             },
             {
               scheme: "https",
-              host: "wesplit-deeplinks.web.app",
+              host: "deeplinks.wesplit.io",
               pathPrefix: "/view-split"
             },
             {
               scheme: "https",
-              host: "wesplit-deeplinks.web.app",
+              host: "deeplinks.wesplit.io",
               pathPrefix: "/spend-callback"
+            },
+            {
+              scheme: "https",
+              host: "deeplinks.wesplit.io",
+              pathPrefix: "/referral"
+            },
+            {
+              scheme: "https",
+              host: "deeplinks.wesplit.io",
+              pathPrefix: "/phantom-callback"
             }
           ],
           category: ["BROWSABLE", "DEFAULT"]

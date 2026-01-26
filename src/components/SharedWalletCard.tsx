@@ -35,6 +35,8 @@ const SharedWalletCard: React.FC<SharedWalletCardProps> = ({
   
   const userContribution = useMemo(() => userMember?.totalContributed || 0, [userMember?.totalContributed]);
   const userWithdrawn = useMemo(() => userMember?.totalWithdrawn || 0, [userMember?.totalWithdrawn]);
+  // NOTE: userBalance is informational only - shows user's net contribution (contributed - withdrawn)
+  // For actual withdrawal validation, use MemberRightsService.getAvailableBalance() which uses pool-based approach
   const userBalance = useMemo(() => userContribution - userWithdrawn, [userContribution, userWithdrawn]);
 
   // Memoize formatter function to prevent recreation on every render

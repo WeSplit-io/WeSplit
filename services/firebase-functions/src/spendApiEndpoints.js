@@ -957,7 +957,7 @@ exports.searchKnownUsers = functions.https.onRequest(async (req, res) => {
  *       {
  *         "email": "user2@example.com",
  *         "inviteCode": "INV_abc123",
- *         "inviteLink": "https://wesplit-deeplinks.web.app/join-split?invite=INV_abc123"
+ *         "inviteLink": "https://deeplinks.wesplit.io/join-split?invite=INV_abc123"
  *       }
  *     ]
  *   },
@@ -1155,7 +1155,7 @@ function generateInviteLinkSync(email, splitId, splitData = null, inviterId = nu
   const encoded = Buffer.from(JSON.stringify(inviteData)).toString('base64url');
   // Use deep link domain for universal links (works for all users)
   // Also include email as query parameter for easy access
-  return `https://wesplit-deeplinks.web.app/join-split?invite=${encoded}&email=${encodeURIComponent(email || '')}`;
+  return `https://deeplinks.wesplit.io/join-split?invite=${encoded}&email=${encodeURIComponent(email || '')}`;
 }
 
 /**

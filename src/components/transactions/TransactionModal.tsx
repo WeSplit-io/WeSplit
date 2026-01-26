@@ -172,11 +172,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const isGroupTransaction = safeTransaction.id && safeTransaction.id.startsWith('group_');
   const groupId = isGroupTransaction ? safeTransaction.id.replace('group_', '') : null;
 
-  // Navigate to group details
+  // Navigate to split details (groups are now handled as splits)
   const navigateToGroup = () => {
     if (navigation && groupId) {
       onClose(); // Close modal first
-      navigation.navigate('GroupDetails', { groupId });
+      navigation.navigate('SplitDetails', { splitId: groupId });
     }
   };
 

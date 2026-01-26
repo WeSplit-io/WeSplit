@@ -137,7 +137,7 @@ const ScannerScreen: React.FC<ScannerScreenProps> = ({
       const isWeSplitLink = data.startsWith('wesplit://') || 
                            data.startsWith('https://wesplit.io/') || 
                            data.startsWith('https://www.wesplit.io/') ||
-                           data.startsWith('https://wesplit-deeplinks.web.app/');
+                           data.startsWith('https://deeplinks.wesplit.io/');
       
       if (isWeSplitLink) {
         const linkData = parseWeSplitDeepLink(data);

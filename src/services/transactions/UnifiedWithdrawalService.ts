@@ -259,19 +259,18 @@ export class UnifiedWithdrawalService {
           };
         }
 
-        // Calculate user's available balance
-        const userContributed = userMember.totalContributed || 0;
-        const userWithdrawn = userMember.totalWithdrawn || 0;
-        availableBalance = userContributed - userWithdrawn;
-
-        // Also check total wallet balance
-        if (params.amount > wallet.totalBalance) {
+        // Use standardized balance calculation (pool-based approach)
+        const { MemberRightsService } = await import('../sharedWallet/MemberRightsService');
+        const balanceResult = MemberRightsService.getAvailableBalance(userMember, wallet);
+        
+        if (balanceResult.error) {
           return {
             canWithdraw: false,
-            error: 'Insufficient balance in shared wallet',
-            availableBalance: wallet.totalBalance
+            error: balanceResult.error
           };
         }
+        
+        availableBalance = balanceResult.availableBalance;
       }
 
       if (params.amount > availableBalance) {

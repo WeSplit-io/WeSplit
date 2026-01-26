@@ -636,8 +636,9 @@ const SharedWalletDetailsScreen: React.FC = () => {
                 prefilledAmount: (() => {
                   const currentUserMember = wallet.members?.find(m => m.userId === currentUser?.id);
                   if (currentUserMember) {
-                    const availableBalance = (currentUserMember.totalContributed || 0) - (currentUserMember.totalWithdrawn || 0);
-                    return Math.max(0, availableBalance);
+                    // Use standardized balance calculation (pool-based approach)
+                    const balanceResult = MemberRightsService.getAvailableBalance(currentUserMember, wallet);
+                    return balanceResult.error ? 0 : balanceResult.availableBalance;
                   }
                   return 0;
                 })(),
@@ -697,9 +698,12 @@ const SharedWalletDetailsScreen: React.FC = () => {
                 allowExternalDestinations: false,
                 allowFriendDestinations: false,
                 context: 'shared_wallet_funding',
+                sharedWalletId: wallet.id, // ✅ FIX: Explicitly set sharedWalletId
                 customRecipientInfo: {
                   name: wallet.name || 'Shared Wallet',
-                  address: wallet.id,
+                  // ✅ FIX: Use actual wallet address instead of document ID
+                  // The modal will also resolve from sharedWalletId, but this ensures proper display
+                  address: wallet.walletAddress || '',
                   type: 'shared_wallet'
                 },
                 onSuccess: async (result) => {

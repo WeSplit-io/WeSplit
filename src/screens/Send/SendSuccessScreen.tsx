@@ -50,8 +50,8 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
 
   const handleBackHome = () => {
     if (isSettlement && groupId) {
-      // Navigate back to group details for settlement payments
-      navigation.navigate('GroupDetails', { groupId });
+      // Navigate back to split details for settlement payments (groups are now handled as splits)
+      navigation.navigate('SplitDetails', { splitId: groupId });
     } else {
       // Navigate back to the dashboard/home screen with refresh flag
       navigation.navigate('Dashboard', { 

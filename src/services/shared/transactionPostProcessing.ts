@@ -87,6 +87,8 @@ export async function saveTransactionAndAwardPoints(
       
       // ✅ OPTIMIZATION: For split flows, skip recipient lookup (split wallets aren't user wallets)
       // This prevents memory-intensive queries and OOM crashes
+      // NOTE: 'deposit' transactions (e.g., shared wallet funding) are NOT split flows
+      // and will go through normal processing without triggering split wallet imports
       const isSplitFlow =
         params.transactionType === 'split_payment' ||
         params.transactionType === 'split_wallet_withdrawal';

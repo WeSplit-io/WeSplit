@@ -58,12 +58,21 @@ Examples:
 - `wesplit://referral/ABC123`
 
 ### Universal Links
-Format: `https://wesplit.io/action?params` or `https://wesplit-deeplinks.web.app/action?params`
+**Domain:** `https://deeplinks.wesplit.io` (primary domain for Universal Links)
+
+**Configured Universal Link Routes:**
+- `https://deeplinks.wesplit.io/join-split` - Join a split invitation
+- `https://deeplinks.wesplit.io/view-split` - View an existing split
+- `https://deeplinks.wesplit.io/spend-callback` - Return to Spend app after payment
+- `https://deeplinks.wesplit.io/referral` - Apply referral code
+- `https://deeplinks.wesplit.io/phantom-callback` - Phantom authentication callback
+
+**Note:** Only these 5 routes are configured as Universal Links. Other routes (like `/join/{inviteId}`, `/profile/...`, `/send/...`) are only available as app-scheme links (`wesplit://`).
 
 Examples:
-- `https://wesplit.io/join/invite_123`
-- `https://wesplit-deeplinks.web.app/referral?code=ABC123`
-- `https://wesplit.io/join-split?data=<encoded_data>`
+- `https://deeplinks.wesplit.io/join-split?data=<encoded_data>`
+- `https://deeplinks.wesplit.io/referral?code=ABC123`
+- `https://deeplinks.wesplit.io/view-split?splitId=123&userId=456`
 
 ## Testing on iOS
 
@@ -78,10 +87,13 @@ xcrun simctl openurl booted "wesplit://join/invite_test_123"
 3. Tap Go
 
 ### Universal Links
-Just open the URL in Safari, Messages, Notes, etc.:
+Open the URL in Safari, Messages, Notes, etc.:
 ```
-https://wesplit.io/join/invite_test_123
+https://deeplinks.wesplit.io/join-split?data=<encoded_data>
+https://deeplinks.wesplit.io/referral?code=ABC123
 ```
+
+**Note:** Only the 5 configured routes work as Universal Links. Other routes must use app-scheme format.
 
 ## Testing on Android
 
@@ -98,39 +110,46 @@ adb shell am start -a android.intent.action.VIEW -d "wesplit://join/invite_test_
 ### Universal Links
 Open the URL in Chrome or any browser:
 ```
-https://wesplit.io/join/invite_test_123
+https://deeplinks.wesplit.io/join-split?data=<encoded_data>
+https://deeplinks.wesplit.io/referral?code=ABC123
 ```
+
+**Note:** Only the 5 configured routes work as Universal Links. Other routes must use app-scheme format.
 
 ## Common Deeplink Actions
 
-### Join Group
+### Join Group (App-Scheme Only)
 - App-scheme: `wesplit://join/{inviteId}`
-- Universal: `https://wesplit.io/join/{inviteId}`
+- **Note:** Not available as Universal Link. Use `/join-split` for split invitations instead.
 
-### Profile (Add Contact)
+### Profile (Add Contact) - App-Scheme Only
 - App-scheme: `wesplit://profile/{userId}/{userName}/{userEmail}/{walletAddress}`
-- Universal: `https://wesplit.io/profile/{userId}/{userName}/{userEmail}/{walletAddress}`
+- **Note:** Not available as Universal Link. Only works via app-scheme.
 
-### Send Money
+### Send Money - App-Scheme Only
 - App-scheme: `wesplit://send/{walletAddress}/{userName}/{userEmail}`
-- Universal: `https://wesplit.io/send/{walletAddress}/{userName}/{userEmail}`
+- **Note:** Not available as Universal Link. Only works via app-scheme.
 
 ### Join Split
 - App-scheme: `wesplit://join-split?data={encoded_data}`
-- Universal: `https://wesplit.io/join-split?data={encoded_data}`
+- Universal: `https://deeplinks.wesplit.io/join-split?data={encoded_data}`
 - Also supports: `?splitId={id}` or `?invite={base64url}`
 
 ### View Split
 - App-scheme: `wesplit://view-split?splitId={id}&userId={userId}`
-- Universal: `https://wesplit.io/view-split?splitId={id}&userId={userId}`
+- Universal: `https://deeplinks.wesplit.io/view-split?splitId={id}&userId={userId}`
 
 ### Referral
-- App-scheme: `wesplit://referral/{code}`
-- Universal: `https://wesplit-deeplinks.web.app/referral?code={code}`
+- App-scheme: `wesplit://referral?code={code}` or `wesplit://referral/{code}`
+- Universal: `https://deeplinks.wesplit.io/referral?code={code}`
 
 ### Spend Callback
 - App-scheme: `wesplit://spend-callback?callbackUrl={url}&orderId={id}&status={status}`
-- Universal: `https://wesplit-deeplinks.web.app/spend-callback?callbackUrl={url}&orderId={id}&status={status}`
+- Universal: `https://deeplinks.wesplit.io/spend-callback?callbackUrl={url}&orderId={id}&status={status}`
+
+### Phantom Callback
+- App-scheme: `wesplit://phantom-callback?response_type={type}&wallet_id={id}`
+- Universal: `https://deeplinks.wesplit.io/phantom-callback?response_type={type}&wallet_id={id}`
 
 ## Troubleshooting
 
@@ -143,10 +162,16 @@ https://wesplit.io/join/invite_test_123
 
 ### Universal Links Not Working
 
-1. **Deploy assetlinks.json** - Must be accessible at `https://wesplit.io/.well-known/assetlinks.json`
-2. **Deploy apple-app-site-association** - Must be accessible at `https://wesplit.io/.well-known/apple-app-site-association`
+1. **Deploy assetlinks.json** - Must be accessible at `https://deeplinks.wesplit.io/.well-known/assetlinks.json`
+2. **Deploy apple-app-site-association** - Must be accessible at `https://deeplinks.wesplit.io/.well-known/apple-app-site-association`
 3. **Verify headers** - Must have `Content-Type: application/json` header
 4. **Check domain verification** - Android verifies App Links automatically
+5. **Verify route is configured** - Only these 5 routes work as Universal Links:
+   - `/join-split`
+   - `/view-split`
+   - `/spend-callback`
+   - `/referral`
+   - `/phantom-callback`
 
 ### App-Scheme Links Not Working
 
@@ -160,6 +185,25 @@ https://wesplit.io/join/invite_test_123
 - `npm run test:formats` - Test link format generation
 - `npm run test:links` - Test invitation link generation
 - `npm run test:flow` - Test invitation flow
+
+## Universal Link Configuration
+
+**Domain:** `https://deeplinks.wesplit.io`
+
+**Configured Routes (Universal Links):**
+1. `/join-split` - Join a split invitation
+2. `/view-split` - View an existing split
+3. `/spend-callback` - Return to Spend app after payment
+4. `/referral` - Apply referral code
+5. `/phantom-callback` - Phantom authentication callback
+
+**App-Scheme Only Routes:**
+- `/join/{inviteId}` - Join group (legacy, use `/join-split` for splits)
+- `/profile/{userId}/...` - Add contact from profile QR
+- `/send/{walletAddress}/...` - Send money to wallet address
+- `/transfer/{walletAddress}/...` - Transfer to external wallet
+
+**Note:** The website serves landing pages at `deeplinks.wesplit.io` that redirect to app-scheme links. Universal Links only work for the 5 configured routes listed above.
 
 ## Additional Resources
 

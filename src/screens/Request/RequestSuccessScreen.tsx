@@ -21,7 +21,7 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const handleBackHome = () => {
     // Navigate back to the appropriate screen
     if (groupId) {
-      navigation.navigate('GroupDetails', { groupId });
+      navigation.navigate('SplitDetails', { splitId: groupId });
     } else {
       navigation.navigate('Dashboard');
     }

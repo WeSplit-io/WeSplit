@@ -202,20 +202,19 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             setSharedWalletBalance(balance);
             setSharedWalletAddress(address);
             
-            // ✅ FIX: Calculate user's available balance (what they can actually withdraw)
+            // ✅ FIX: Use standardized balance calculation (pool-based approach)
             const userMember = result.wallet.members?.find(m => m.userId === currentUser.id.toString());
             if (userMember) {
-              const userContributed = userMember.totalContributed || 0;
-              const userWithdrawn = userMember.totalWithdrawn || 0;
-              const available = Math.max(0, userContributed - userWithdrawn);
+              const { MemberRightsService } = await import('../../services/sharedWallet/MemberRightsService');
+              const balanceResult = MemberRightsService.getAvailableBalance(userMember, result.wallet);
+              
+              const available = balanceResult.error ? 0 : balanceResult.availableBalance;
               setUserAvailableBalance(available);
               
               logger.info('Shared wallet data loaded for withdrawal', {
                 sharedWalletId: effectiveSharedWalletId,
                 totalBalance: balance,
                 userAvailableBalance: available,
-                userContributed,
-                userWithdrawn,
                 walletAddress: address
               }, 'CentralizedTransactionModal');
             } else {

@@ -281,21 +281,25 @@ class ConsolidatedTransactionService {
       
       // Save transaction and award points using centralized helper
       if (result.success && result.signature) {
-        // ✅ CRITICAL: For split payments, completely skip post-processing to prevent OOM crashes
+        // ✅ CRITICAL: For split payments and shared wallet funding, completely skip post-processing to prevent OOM crashes
         // The participant status update in FairSplitHandler is more critical and must complete first
-        // DO NOT import transactionPostProcessing for split flows - the import itself loads 675 modules!
-        const isSplitPayment = params.transactionType === 'split_payment' || 
-                               params.transactionType === 'split_wallet_withdrawal';
+        // DO NOT import transactionPostProcessing for split flows or shared wallet funding - the import itself loads 675 modules!
+        const shouldSkipPostProcessing = params.transactionType === 'split_payment' || 
+                                         params.transactionType === 'split_wallet_withdrawal' ||
+                                         (params.transactionType === 'send' && params.context === 'shared_wallet_funding'); // ✅ Skip for shared wallet funding (uses 'send' type now)
         
-        if (isSplitPayment) {
-          // ✅ MEMORY OPTIMIZATION: Skip post-processing entirely for split flows
+        if (shouldSkipPostProcessing) {
+          // ✅ MEMORY OPTIMIZATION: Skip post-processing entirely for split flows and shared wallet funding
           // The import of transactionPostProcessing loads 675 modules which causes OOM
+          // Shared wallets are not user wallets, so recipient lookup is unnecessary
           // On-chain transaction is authoritative, database updates happen via handlers
-          logger.info('Skipping post-processing for split flow (prevents OOM)', {
+          logger.info('Skipping post-processing to prevent OOM', {
             transactionType: params.transactionType,
             signature: result.signature,
             userId: params.userId,
-            note: 'On-chain transaction is authoritative. Database updates handled by split handlers. No heavy imports triggered.'
+            note: (params.transactionType === 'send' && params.context === 'shared_wallet_funding')
+              ? 'On-chain transaction is authoritative. Database updates handled by shared wallet handlers. No heavy imports triggered.'
+              : 'On-chain transaction is authoritative. Database updates handled by split handlers. No heavy imports triggered.'
           }, 'ConsolidatedTransactionService');
           
           // ✅ MEMORY OPTIMIZATION: Variables will go out of scope naturally after function completes
@@ -667,6 +671,75 @@ class ConsolidatedTransactionService {
   }
 
   /**
+   * Check if an address is an internal WeSplit app wallet
+   * Internal wallets include: user wallets, shared wallets, and split wallets
+   * 
+   * @param address - The wallet address to check
+   * @param userId - Optional userId to check if address matches user's wallet (faster check)
+   */
+  async isInternalWeSplitWallet(address: string, userId?: string): Promise<boolean> {
+    try {
+      if (!address) return false;
+
+      // ✅ OPTIMIZATION: First check if it matches the user's own wallet (fastest check)
+      if (userId) {
+        const userWalletAddress = await this.getUserWalletAddress(userId);
+        if (userWalletAddress === address) {
+          logger.debug('Address matches user wallet - internal wallet confirmed', {
+            address,
+            userId
+          }, 'ConsolidatedTransactionService');
+          return true;
+        }
+      }
+
+      // Check if it's a user's in-app wallet using firebaseDataService (more reliable than direct Firestore import)
+      try {
+        const { firebaseDataService } = await import('../../data/firebaseDataService');
+        // Try to find user by wallet address
+        const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
+        const { db } = await import('../../config/firebase/firebase');
+        
+        // Check users collection (limit to 1 for performance)
+        const usersRef = collection(db, 'users');
+        const usersQuery = query(usersRef, where('wallet_address', '==', address), limit(1));
+        const usersSnapshot = await getDocs(usersQuery);
+        if (!usersSnapshot.empty) {
+          return true;
+        }
+
+        // Check shared wallets
+        const sharedWalletsRef = collection(db, 'sharedWallets');
+        const sharedWalletsQuery = query(sharedWalletsRef, where('walletAddress', '==', address), limit(1));
+        const sharedWalletsSnapshot = await getDocs(sharedWalletsQuery);
+        if (!sharedWalletsSnapshot.empty) {
+          return true;
+        }
+
+        // Check split wallets
+        const splitWalletsRef = collection(db, 'splitWallets');
+        const splitWalletsQuery = query(splitWalletsRef, where('walletAddress', '==', address), limit(1));
+        const splitWalletsSnapshot = await getDocs(splitWalletsQuery);
+        if (!splitWalletsSnapshot.empty) {
+          return true;
+        }
+      } catch (firestoreError) {
+        // If Firestore query fails, log but don't throw - we'll return false
+        logger.warn('Firestore query failed for internal wallet check, assuming external', {
+          address,
+          error: firestoreError instanceof Error ? firestoreError.message : String(firestoreError)
+        }, 'ConsolidatedTransactionService');
+      }
+
+      return false;
+    } catch (error) {
+      logger.error('Error checking if address is internal wallet', { address, userId, error }, 'ConsolidatedTransactionService');
+      // On error, assume it's external to be safe (will charge fee)
+      return false;
+    }
+  }
+
+  /**
    * Get user wallet address by userId
    */
   async getUserWalletAddress(userId: string): Promise<string | null> {
@@ -935,7 +1008,8 @@ class ConsolidatedTransactionService {
         };
       }
 
-      // Get shared wallet
+      // ✅ MEMORY OPTIMIZATION: Lazy load heavy modules only when needed
+      // SharedWalletService and MemberRightsService are large modules - load them just-in-time
       const { SharedWalletService } = await import('../../sharedWallet');
       const walletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
       if (!walletResult.success || !walletResult.wallet) {
@@ -956,7 +1030,8 @@ class ConsolidatedTransactionService {
         };
       }
 
-      // Check member permissions
+      // ✅ MEMORY OPTIMIZATION: Lazy load MemberRightsService only when needed
+      // This module is large (614 modules) - defer loading until we actually need it
       const { MemberRightsService } = await import('../../sharedWallet/MemberRightsService');
       if (!MemberRightsService.canPerformAction(userMember, wallet, 'fund')) {
         return {
@@ -964,6 +1039,9 @@ class ConsolidatedTransactionService {
           error: 'You do not have permission to add funds to this wallet'
         };
       }
+
+      // Note: Company wallet pays SOL fees for all transactions (configured via FeeService.getFeePayerPublicKey)
+      // No need to check user SOL balance - company wallet balance is validated by TransactionProcessor
 
       // Execute blockchain transaction using unified sendUSDCTransaction (same as fair split/degen split)
       logger.info('Shared wallet funding transaction', {
@@ -974,7 +1052,7 @@ class ConsolidatedTransactionService {
       }, 'ConsolidatedTransactionService');
 
       // Use sendUSDCTransaction for consistency with fair split/degen split funding
-      // transactionType: 'deposit' ensures no fees are charged for shared wallet funding
+      // transactionType: 'send' applies 0.1% fee for shared wallet funding
       const result = await this.sendUSDCTransaction({
         to: wallet.walletAddress, // Send to shared wallet address
         amount: amount,
@@ -982,7 +1060,7 @@ class ConsolidatedTransactionService {
         memo: memo || `Shared wallet funding`,
         userId: userId,
         priority: 'medium',
-        transactionType: 'deposit' // Use deposit type for funding (no fees)
+        transactionType: 'send' // Use send type for funding (0.1% fee)
       });
 
       logger.info('External transfer result', {
@@ -1216,7 +1294,7 @@ class ConsolidatedTransactionService {
       // ✅ FIX: Save transaction with error handling for permissions
       try {
         // Use serverTimestamp for createdAt to ensure proper Firestore Timestamp format
-        const { serverTimestamp } = await import('firebase/firestore');
+        // Note: serverTimestamp is already imported above at line 1098
         const transactionDataWithTimestamp = {
           ...transactionData,
           createdAt: serverTimestamp(), // Use serverTimestamp for proper Firestore Timestamp
@@ -1257,89 +1335,116 @@ class ConsolidatedTransactionService {
         }, 'ConsolidatedTransactionService');
         // Don't throw - transaction succeeded, just logging failed
       }
-
-      // Check if goal was reached
-      const { GoalService } = await import('../../sharedWallet/GoalService');
-      const goalCheck = await GoalService.checkAndMarkGoalReached(sharedWalletId, newBalance);
       
-      // ✅ FIX: Send notifications to all wallet members (except the funder)
-      try {
-        const { notificationService } = await import('../../notifications/notificationService');
-        const funderMember = wallet.members?.find(m => m.userId === userId);
-        const funderName = funderMember?.name || 'A member';
-        
-        // Notify all active members except the funder
-        const membersToNotify = wallet.members?.filter(m => 
-          m.userId !== userId && 
-          m.status === 'active'
-        ) || [];
-        
-        for (const member of membersToNotify) {
+      // ✅ MEMORY OPTIMIZATION: Defer notification sending and goal checking to prevent memory issues
+      // Send notifications asynchronously after transaction completes to avoid blocking
+      // and prevent loading heavy notification service and GoalService (549 modules) during critical transaction path
+      // Use longer delay (200ms) to ensure transaction completes and memory is freed before loading heavy modules
+      // Store only minimal wallet data in closure to avoid holding references to heavy objects
+      const walletDataForNotifications = {
+        sharedWalletId,
+        walletName: wallet.name || 'Shared Wallet',
+        currency: wallet.currency || 'USDC',
+        members: wallet.members?.map(m => ({ userId: m.userId, name: m.name, status: m.status })) || [],
+        settings: wallet.settings ? { goalAmount: wallet.settings.goalAmount } : undefined
+      };
+      const funderName = userMember.name || 'A member';
+      const signature = result.signature;
+      
+      // ✅ MEMORY OPTIMIZATION: setTimeout already uses walletDataForNotifications (minimal data)
+      // The full wallet object will go out of scope after this function returns
+      // Using 200ms delay to allow GC before loading heavy notification modules
+      setTimeout(async () => {
+        try {
+          // ✅ MEMORY OPTIMIZATION: Check goal status asynchronously to prevent memory issues
+          // GoalService is a large module (549 modules) - defer loading to prevent crash
+          let goalCheck = { goalReached: false, shouldNotify: false };
           try {
-            await notificationService.instance.sendNotification(
-              member.userId,
-              'Shared Wallet Funded',
-              `${funderName} added ${amount.toFixed(6)} ${wallet.currency || 'USDC'} to "${wallet.name || 'Shared Wallet'}"`,
-              'shared_wallet_funding',
-              {
-                sharedWalletId: sharedWalletId,
-                walletName: wallet.name || 'Shared Wallet',
-                amount: amount,
-                currency: wallet.currency || 'USDC',
-                funderId: userId,
-                funderName: funderName,
-                newBalance: newBalance,
-                transactionSignature: result.signature,
-              }
-            );
-          } catch (notifError) {
-            logger.warn('Failed to send funding notification to member', {
-              memberId: member.userId,
-              error: notifError instanceof Error ? notifError.message : String(notifError)
+            const { GoalService } = await import('../../sharedWallet/GoalService');
+            goalCheck = await GoalService.checkAndMarkGoalReached(sharedWalletId, newBalance);
+          } catch (goalError) {
+            logger.warn('Failed to check goal status (non-critical, deferred)', {
+              error: goalError instanceof Error ? goalError.message : String(goalError),
+              sharedWalletId
             }, 'ConsolidatedTransactionService');
+            // Continue - goal checking is not critical for transaction success
           }
-        }
-        
-        // If goal was reached, send special notification
-        if (goalCheck.goalReached && goalCheck.shouldNotify) {
-          for (const member of wallet.members?.filter(m => m.status === 'active') || []) {
+          
+          // ✅ MEMORY OPTIMIZATION: Use lightweight wallet data from closure instead of full wallet object
+          const { notificationService } = await import('../../notifications/notificationService');
+          
+          // Notify all active members except the funder
+          const membersToNotify = walletDataForNotifications.members.filter(m => 
+            m.userId !== userId && 
+            m.status === 'active'
+          );
+          
+          for (const member of membersToNotify) {
             try {
-              await notificationService.instance.sendNotification(
-                member.userId,
-                '🎉 Goal Reached!',
-                `The shared wallet "${wallet.name || 'Shared Wallet'}" has reached its goal of ${wallet.settings?.goalAmount} ${wallet.currency || 'USDC'}!`,
-                'shared_wallet_goal_reached',
-                {
-                  sharedWalletId: sharedWalletId,
-                  walletName: wallet.name || 'Shared Wallet',
-                  goalAmount: wallet.settings?.goalAmount,
-                  currentBalance: newBalance,
-                  currency: wallet.currency || 'USDC',
-                }
-              );
+                await notificationService.instance.sendNotification(
+                  member.userId,
+                  'Shared Wallet Funded',
+                  `${funderName} added ${amount.toFixed(6)} ${walletDataForNotifications.currency} to "${walletDataForNotifications.walletName}"`,
+                  'shared_wallet_funding',
+                  {
+                    sharedWalletId: walletDataForNotifications.sharedWalletId,
+                    walletName: walletDataForNotifications.walletName,
+                    amount: amount,
+                    currency: walletDataForNotifications.currency,
+                    funderId: userId,
+                    funderName: funderName,
+                    newBalance: newBalance,
+                    transactionSignature: signature,
+                  }
+                );
             } catch (notifError) {
-              logger.warn('Failed to send goal reached notification', {
+              logger.warn('Failed to send funding notification to member', {
                 memberId: member.userId,
                 error: notifError instanceof Error ? notifError.message : String(notifError)
               }, 'ConsolidatedTransactionService');
             }
           }
+          
+          // If goal was reached, send special notification
+          if (goalCheck.goalReached && goalCheck.shouldNotify) {
+            for (const member of walletDataForNotifications.members.filter(m => m.status === 'active')) {
+              try {
+                await notificationService.instance.sendNotification(
+                  member.userId,
+                  '🎉 Goal Reached!',
+                  `The shared wallet "${walletDataForNotifications.walletName}" has reached its goal of ${walletDataForNotifications.settings?.goalAmount} ${walletDataForNotifications.currency}!`,
+                  'shared_wallet_goal_reached',
+                  {
+                    sharedWalletId: walletDataForNotifications.sharedWalletId,
+                    walletName: walletDataForNotifications.walletName,
+                    goalAmount: walletDataForNotifications.settings?.goalAmount,
+                    currentBalance: newBalance,
+                    currency: walletDataForNotifications.currency,
+                  }
+                );
+              } catch (notifError) {
+                logger.warn('Failed to send goal reached notification', {
+                  memberId: member.userId,
+                  error: notifError instanceof Error ? notifError.message : String(notifError)
+                }, 'ConsolidatedTransactionService');
+              }
+            }
+          }
+        } catch (notificationError) {
+          logger.warn('Failed to send funding notifications (deferred)', {
+            error: notificationError instanceof Error ? notificationError.message : String(notificationError)
+          }, 'ConsolidatedTransactionService');
+          // Don't fail the transaction if notifications fail
         }
-      } catch (notificationError) {
-        logger.warn('Failed to send funding notifications', {
-          error: notificationError instanceof Error ? notificationError.message : String(notificationError)
-        }, 'ConsolidatedTransactionService');
-        // Don't fail the transaction if notifications fail
-      }
+      }, 200); // ✅ MEMORY OPTIMIZATION: Use 200ms delay to allow memory cleanup before loading heavy modules
 
         return {
           success: true,
           transactionSignature: result.signature,
           transactionId: result.txId,
           txId: result.txId,
-          message: goalCheck.goalReached 
-            ? `🎉 Goal reached! Successfully funded shared wallet with ${amount.toFixed(6)} USDC`
-            : `Successfully funded shared wallet with ${amount.toFixed(6)} USDC`
+          message: `Successfully funded shared wallet with ${amount.toFixed(6)} USDC`
+          // Note: Goal reached message will be sent via notification if applicable
         };
     } catch (error) {
       logger.error('Shared wallet funding failed', error, 'ConsolidatedTransactionService');
@@ -1397,6 +1502,8 @@ class ConsolidatedTransactionService {
       // ✅ FIX: Get shared wallet with retry to handle race condition after funding
       // If wallet was just funded, Firestore might have eventual consistency issues
       const { SharedWalletService } = await import('../../sharedWallet');
+      const { MemberRightsService } = await import('../../sharedWallet/MemberRightsService');
+      const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
       let walletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
       if (!walletResult.success || !walletResult.wallet) {
         // Retry once after a short delay (Firestore eventual consistency)
@@ -1448,7 +1555,6 @@ class ConsolidatedTransactionService {
       }
 
       // Check member permissions
-      const { MemberRightsService } = await import('../../sharedWallet/MemberRightsService');
       const canWithdrawCheck = MemberRightsService.canWithdrawAmount(userMember, wallet, amount);
       if (!canWithdrawCheck.allowed) {
         return {
@@ -1543,6 +1649,9 @@ class ConsolidatedTransactionService {
       try {
         const freshWalletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
         if (freshWalletResult.success && freshWalletResult.wallet) {
+          // NOTE: These contribution tracking variables are for debugging/logging purposes only
+          // They are NOT used for balance validation - we use pool-based balance calculation (MemberRightsService.getAvailableBalance)
+          // This logging helps track Firestore eventual consistency issues
           const oldUserContributed = userMember.totalContributed || 0;
           wallet = freshWalletResult.wallet;
           userMember = wallet.members?.find((m) => m.userId === userId);
@@ -1575,169 +1684,58 @@ class ConsolidatedTransactionService {
         // Continue with original wallet data
       }
 
-      // Check user's available balance
-      // ✅ FIX: Use let instead of const to allow adjustment for recent funding transactions
-      let userContributed = userMember.totalContributed || 0;
-      const userWithdrawn = userMember.totalWithdrawn || 0;
-      let userAvailableBalance = userContributed - userWithdrawn;
-
-      // ✅ FIX: Check for recent funding transactions if balance seems insufficient
-      // This handles the race condition where funding transaction completed but Firestore update hasn't propagated
-      if (amount > userAvailableBalance) {
-        logger.info('Balance check failed, checking for recent funding transactions', {
-          sharedWalletId,
-          userId,
-          amount,
-          userContributed,
-          userWithdrawn,
-          userAvailableBalance,
-          walletTotalBalance: wallet.totalBalance
-        }, 'ConsolidatedTransactionService');
-
-        // ✅ FIX: If wallet totalBalance is sufficient but user balance isn't, 
-        // and this is right after funding, wait a moment and retry wallet reload
-        if (wallet.totalBalance >= amount && userAvailableBalance < amount) {
-          logger.info('Wallet has sufficient total balance but user balance is stale - retrying after delay', {
-            sharedWalletId,
-            userId,
-            amount,
-            walletTotalBalance: wallet.totalBalance,
-            userAvailableBalance,
-            userContributed,
-            userWithdrawn
-          }, 'ConsolidatedTransactionService');
-          
-          // Wait a bit for Firestore to propagate the update
-          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
-          
-          // Reload wallet one more time
-          try {
-            const retryWalletResult = await SharedWalletService.getSharedWallet(sharedWalletId);
-            if (retryWalletResult.success && retryWalletResult.wallet) {
-              wallet = retryWalletResult.wallet;
-              userMember = wallet.members?.find((m) => m.userId === userId);
-              if (userMember) {
-                userContributed = userMember.totalContributed || 0;
-                userAvailableBalance = userContributed - userWithdrawn;
-                
-                logger.info('Wallet reloaded after delay - balance updated', {
-                  sharedWalletId,
-                  userId,
-                  newUserContributed: userContributed,
-                  newUserAvailableBalance: userAvailableBalance,
-                  amount
-                }, 'ConsolidatedTransactionService');
-              }
-            }
-          } catch (retryError) {
-            logger.warn('Retry wallet reload failed', {
-              error: retryError instanceof Error ? retryError.message : String(retryError),
-              sharedWalletId,
-              userId
-            }, 'ConsolidatedTransactionService');
-          }
-        }
-
-        // If still insufficient, check for recent funding transactions in the database
-        if (amount > userAvailableBalance) {
-          try {
-            // Check for recent funding transactions by this user (within last 60 seconds)
-            const { db } = await import('../../../config/firebase/firebase');
-            const { collection, query, where, getDocs } = await import('firebase/firestore');
-            
-            // ✅ OPTIMIZATION: Query without orderBy to avoid composite index requirement
-            // We'll filter and sort in memory instead
-            const recentFundingQuery = query(
-              collection(db, 'sharedWalletTransactions'),
-              where('sharedWalletId', '==', sharedWalletId),
-              where('userId', '==', userId),
-              where('type', '==', 'funding'),
-              where('status', '==', 'confirmed')
-            );
-
-            const recentFundingSnapshot = await getDocs(recentFundingQuery);
-            let recentFundingTotal = 0;
-            const sixtySecondsAgo = Date.now() - 60000; // Extended to 60 seconds
-            
-            // Filter and sort in memory to avoid index requirements
-            const recentTransactions = recentFundingSnapshot.docs
-              .map(doc => {
-                const txData = doc.data();
-                let createdAt: Date;
-                if (txData.createdAt) {
-                  if (txData.createdAt.toDate) {
-                    createdAt = txData.createdAt.toDate();
-                  } else if (typeof txData.createdAt === 'string') {
-                    createdAt = new Date(txData.createdAt);
-                  } else {
-                    createdAt = new Date();
-                  }
-                } else {
-                  createdAt = new Date();
-                }
-                return {
-                  amount: txData.amount || 0,
-                  createdAt: createdAt.getTime()
-                };
-              })
-              .filter(tx => tx.createdAt > sixtySecondsAgo)
-              .sort((a, b) => b.createdAt - a.createdAt)
-              .slice(0, 5); // Limit to 5 most recent
-            
-            recentFundingTotal = recentTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-
-            // If we found recent funding, add it to the available balance
-            if (recentFundingTotal > 0) {
-              logger.info('Found recent funding transactions, adjusting available balance', {
-                sharedWalletId,
-                userId,
-                recentFundingTotal,
-                originalBalance: userAvailableBalance,
-                adjustedBalance: userAvailableBalance + recentFundingTotal,
-                recentTransactionCount: recentTransactions.length
-              }, 'ConsolidatedTransactionService');
-
-              userAvailableBalance += recentFundingTotal;
-              userContributed += recentFundingTotal;
-            }
-          } catch (recentTxError) {
-            logger.warn('Failed to check recent funding transactions', {
-              error: recentTxError instanceof Error ? recentTxError.message : String(recentTxError),
-              sharedWalletId,
-              userId
-            }, 'ConsolidatedTransactionService');
-            // Continue with original balance check - don't fail the withdrawal if this check fails
-          }
-        }
-      }
-
-      if (amount > userAvailableBalance) {
-        // ✅ FIX: Provide more helpful error messages explaining WHY they can't withdraw
-        let errorMessage: string;
-        
-        if (userAvailableBalance <= 0) {
-          if (userContributed === 0 && userWithdrawn === 0) {
-            errorMessage = `You haven't contributed any funds to this shared wallet yet. You can only withdraw funds that you've contributed. The wallet shows ${wallet.totalBalance.toFixed(6)} ${wallet.currency || 'USDC'} total, but this includes contributions from other members. To withdraw funds, you need to contribute first.`;
-          } else if (userContributed > 0 && userWithdrawn >= userContributed) {
-            errorMessage = `You've already withdrawn all of your contributions (${userContributed.toFixed(6)} ${wallet.currency || 'USDC'}). You can only withdraw funds that you've personally contributed to the shared wallet.`;
-          } else {
-            errorMessage = `You don't have any available balance to withdraw. Your contributions: ${userContributed.toFixed(6)} ${wallet.currency || 'USDC'}, Already withdrawn: ${userWithdrawn.toFixed(6)} ${wallet.currency || 'USDC'}.`;
-          }
-        } else {
-          errorMessage = `Insufficient balance. You can withdraw up to ${userAvailableBalance.toFixed(6)} ${wallet.currency || 'USDC'} (your contributions: ${userContributed.toFixed(6)}, already withdrawn: ${userWithdrawn.toFixed(6)}). You're trying to withdraw ${amount.toFixed(6)} ${wallet.currency || 'USDC'}. If you just funded the wallet, please wait a few seconds and try again.`;
-        }
-        
+      // ✅ FIX: Use standardized balance calculation (pool-based approach)
+      const balanceResult = MemberRightsService.getAvailableBalance(userMember, wallet);
+      
+      if (balanceResult.error) {
         return {
           success: false,
-          error: errorMessage
+          error: balanceResult.error
         };
       }
+      
+      const availableBalance = balanceResult.availableBalance;
 
-      // Check shared wallet has enough balance
-      if (amount > wallet.totalBalance) {
+      // ✅ FIX: Check if destination is internal WeSplit wallet (0% fee) or external (2% fee)
+      // Pass userId for optimized check (checks user's own wallet first)
+      const { FeeService } = await import('../../../config/constants/feeConfig');
+      const isInternalWallet = await this.isInternalWeSplitWallet(finalDestinationAddress, userId);
+      
+      let feeCalculation;
+      let companyFee;
+      let totalRequired;
+      
+      if (isInternalWallet) {
+        // No fee for withdrawals to internal WeSplit wallets
+        feeCalculation = FeeService.calculateCompanyFee(amount, 'settlement'); // 0% fee
+        companyFee = 0;
+        totalRequired = amount;
+        logger.info('Withdrawal to internal WeSplit wallet - no fees applied', {
+          destinationAddress: finalDestinationAddress,
+          amount,
+          sharedWalletId,
+          userId
+        }, 'ConsolidatedTransactionService');
+      } else {
+        // 2% fee for withdrawals to external wallets
+        feeCalculation = FeeService.calculateCompanyFee(amount, 'withdraw');
+        companyFee = feeCalculation.fee;
+        totalRequired = feeCalculation.totalAmount; // amount + fee
+        logger.info('Withdrawal to external wallet - 2% fee applied', {
+          destinationAddress: finalDestinationAddress,
+          amount,
+          companyFee,
+          totalRequired,
+          sharedWalletId,
+          userId
+        }, 'ConsolidatedTransactionService');
+      }
+
+      // Check if withdrawal amount + fee exceeds available balance
+      if (totalRequired > availableBalance) {
         return {
           success: false,
-          error: 'Insufficient balance in shared wallet'
+          error: `Insufficient balance in shared wallet. Available: ${availableBalance.toFixed(6)} ${wallet.currency || 'USDC'}, Required: ${totalRequired.toFixed(6)} ${wallet.currency || 'USDC'} (${amount.toFixed(6)}${companyFee > 0 ? ` + ${companyFee.toFixed(6)} fee` : ''})`
         };
       }
 
@@ -1806,7 +1804,7 @@ class ConsolidatedTransactionService {
       const connectionInstance = await getConnectionWithFallback();
 
       const { PublicKey, Transaction } = await import('@solana/web3.js');
-      const { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction, getAccount } = await import('../secureTokenUtils');
+      const { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction, getAccount, TOKEN_PROGRAM_ID } = await import('../secureTokenUtils');
       const { USDC_CONFIG } = await import('../../shared/walletConstants');
 
       // CRITICAL: Create keypair FIRST to get the actual shared wallet address
@@ -2001,11 +1999,20 @@ class ConsolidatedTransactionService {
         }
       }
 
-      // Check if source has sufficient balance
-      if (sourceBalance < amount) {
+      // ✅ FIX: Recalculate fee for on-chain balance check (use same logic as above - internal vs external)
+      // Use the same fee calculation logic to ensure consistency
+      const onChainFeeCalculation = isInternalWallet 
+        ? FeeService.calculateCompanyFee(amount, 'settlement') // 0% fee for internal
+        : FeeService.calculateCompanyFee(amount, 'withdraw'); // 2% fee for external
+      const onChainTotalRequired = onChainFeeCalculation.totalAmount;
+
+      // Check if source has sufficient balance (amount + fee)
+      if (sourceBalance < onChainTotalRequired) {
         logger.error('Insufficient balance in shared wallet', {
           sharedWalletAddress: actualSharedWalletAddress,
           requestedAmount: amount,
+          companyFee: onChainFeeCalculation.fee,
+          totalRequired: onChainTotalRequired,
           availableBalance: sourceBalance,
           firestoreBalance,
           onChainCheckFailed: balanceCheckFailed,
@@ -2014,7 +2021,7 @@ class ConsolidatedTransactionService {
         }, 'ConsolidatedTransactionService');
         return {
           success: false,
-          error: `Insufficient balance. Available: ${sourceBalance.toFixed(6)} USDC, Requested: ${amount.toFixed(6)} USDC`
+          error: `Insufficient balance. Available: ${sourceBalance.toFixed(6)} USDC, Required: ${onChainTotalRequired.toFixed(6)} USDC (${amount.toFixed(6)} + ${onChainFeeCalculation.fee.toFixed(6)} fee)`
         };
       }
 
@@ -2034,7 +2041,6 @@ class ConsolidatedTransactionService {
           recipient: finalDestinationAddress,
           note: 'This is expected for new recipients - account will be created automatically'
         }, 'ConsolidatedTransactionService');
-        const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
         const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
         const companyPublicKey = new PublicKey(companyWalletAddress);
 
@@ -2048,10 +2054,90 @@ class ConsolidatedTransactionService {
         );
       }
 
-      // Calculate amount (USDC has 6 decimals)
-      const transferAmount = Math.floor(amount * Math.pow(10, 6));
+      // ✅ FIX: Reuse fee calculation from earlier (already calculated for balance validation)
+      // Use the feeCalculation that was already computed above to avoid duplicate calculation
+      // For internal wallets, recipientAmount = amount (no fee deducted)
+      // For external wallets, recipientAmount = amount (fee is additional, not deducted)
+      const recipientAmount = feeCalculation.recipientAmount;
+      
+      // Calculate transfer amounts (USDC has 6 decimals)
+      const recipientAmountRaw = Math.floor(recipientAmount * Math.pow(10, 6));
+      const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5);
 
-      // Add transfer instruction
+      // Get company wallet address and public key (needed for fee transfer)
+      const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+      const companyPublicKey = new PublicKey(companyWalletAddress);
+
+      // ✅ FIX: Add company fee transfer instruction (if fee > 0)
+      if (companyFee > 0) {
+        const companyTokenAccount = await getAssociatedTokenAddress(
+          mintPublicKey,
+          companyPublicKey
+        );
+        
+        // Check if company token account exists, create if needed
+        try {
+          await getAccount(connectionInstance, companyTokenAccount);
+          logger.debug('Company USDC token account exists', {
+            companyTokenAccount: companyTokenAccount.toBase58()
+          }, 'ConsolidatedTransactionService');
+        } catch {
+          // Create associated token account if it doesn't exist
+          logger.debug('Company USDC token account does not exist, will create it', {
+            companyTokenAccount: companyTokenAccount.toBase58(),
+            note: 'This is expected if company wallet has never received USDC fees'
+          }, 'ConsolidatedTransactionService');
+          
+          transaction.add(
+            createAssociatedTokenAccountInstruction(
+              companyPublicKey,
+              companyTokenAccount,
+              companyPublicKey,
+              mintPublicKey
+            )
+          );
+        }
+        
+        // Add company fee transfer instruction
+        transaction.add(
+          createTransferInstruction(
+            fromTokenAccount,
+            companyTokenAccount,
+            fromPublicKey,
+            companyFeeAmount,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+        
+        logger.info('Added company fee transfer instruction for shared wallet withdrawal', {
+          companyFee,
+          companyFeeAmount,
+          recipientAmount,
+          totalAmount: amount,
+          totalDebited: amount + companyFee,
+          sharedWalletId,
+          userId,
+          note: 'Recipient gets full amount, company gets fee as separate transfer'
+        }, 'ConsolidatedTransactionService');
+      } else {
+        // Log info (not warning) if fee is 0 - this is expected for internal wallet withdrawals
+        logger.info('No fee for shared wallet withdrawal to internal wallet', {
+          amount,
+          feeCalculation: feeCalculation,
+          companyFee,
+          sharedWalletId,
+          userId,
+          destinationAddress: finalDestinationAddress,
+          note: 'Withdrawal to internal WeSplit wallet has 0% fee (as expected)'
+        }, 'ConsolidatedTransactionService');
+      }
+
+      // ✅ FIX: Use recipient amount (full amount) for the main transfer
+      // According to FeeService design: recipient gets full amount, fee is additional
+      const transferAmount = recipientAmountRaw;
+
+      // Add main transfer instruction (recipient gets full amount, fee is separate transfer)
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,
@@ -2067,10 +2153,7 @@ class ConsolidatedTransactionService {
 
       // CRITICAL: Company wallet must be the fee payer, not the shared wallet
       // The shared wallet might not have SOL to pay for transaction fees
-      const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
-      const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
-      const companyPublicKey = new PublicKey(companyWalletAddress);
-      
+      // ✅ FIX: companyPublicKey is already set above for fee transfer, reuse it
       transaction.feePayer = companyPublicKey;
       const latestBlockhash = await connectionInstance.getLatestBlockhash();
       transaction.recentBlockhash = latestBlockhash.blockhash;
@@ -2314,13 +2397,25 @@ class ConsolidatedTransactionService {
             throw new Error('Insufficient balance in shared wallet');
           }
 
-          // Update member withdrawal amount
+          // Update member withdrawal amount and daily tracking
           const currentMembers = currentWallet.members || [];
+          const todayDateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format (UTC)
+          
           const updatedMembers = currentMembers.map((m: any) => {
             if (m.userId === userId) {
+              // Check if last withdrawal was today
+              const lastWithdrawalDateStr = m.lastWithdrawalDate ? m.lastWithdrawalDate.split('T')[0] : null;
+              const isSameDay = lastWithdrawalDateStr === todayDateStr;
+              
+              // Calculate new daily withdrawn amount
+              const currentDailyAmount = isSameDay ? (m.dailyWithdrawnAmount || 0) : 0;
+              const newDailyAmount = currentDailyAmount + amount;
+              
               return {
                 ...m,
                 totalWithdrawn: (m.totalWithdrawn || 0) + amount,
+                lastWithdrawalDate: new Date().toISOString(), // Update to today
+                dailyWithdrawnAmount: newDailyAmount, // Increment or set to amount if new day
               };
             }
             return m;
@@ -2394,7 +2489,7 @@ class ConsolidatedTransactionService {
       // ✅ FIX: Save transaction with error handling for permissions
       try {
         // Use serverTimestamp for createdAt to ensure proper Firestore Timestamp format
-        const { serverTimestamp } = await import('firebase/firestore');
+        // Note: serverTimestamp is already imported above at line 2134
         const transactionDataWithTimestamp = {
           ...transactionData,
           createdAt: serverTimestamp(), // Use serverTimestamp for proper Firestore Timestamp
@@ -2436,48 +2531,56 @@ class ConsolidatedTransactionService {
         // Don't throw - transaction succeeded, just logging failed
       }
 
-      // ✅ FIX: Send notifications to all wallet members (except the withdrawer)
-      try {
-        const { notificationService } = await import('../../notifications/notificationService');
-        const withdrawerName = userMember.name || 'A member';
-        
-        // Notify all active members except the withdrawer
-        const membersToNotify = wallet.members?.filter(m => 
-          m.userId !== userId && 
-          m.status === 'active'
-        ) || [];
-        
-        for (const member of membersToNotify) {
+      // ✅ FIX: Send notifications to all wallet members (except the withdrawer) - NON-BLOCKING to prevent OOM
+      // Fire and forget - don't await to prevent loading heavy notification service modules synchronously
+      // This prevents OOM crashes when notification service loads heavy dependencies
+      const withdrawerName = userMember.name || 'A member';
+      const membersToNotify = wallet.members?.filter(m => 
+        m.userId !== userId && 
+        m.status === 'active'
+      ) || [];
+      
+      // Send notifications asynchronously (fire and forget) to prevent OOM
+      if (membersToNotify.length > 0) {
+        // Use setTimeout to defer notification sending to next event loop tick
+        // This prevents blocking and allows transaction to complete first
+        setTimeout(async () => {
           try {
-            await notificationService.instance.sendNotification(
-              member.userId,
-              'Shared Wallet Withdrawal',
-              `${withdrawerName} withdrew ${amount.toFixed(6)} ${wallet.currency || 'USDC'} from "${wallet.name || 'Shared Wallet'}"`,
-              'shared_wallet_withdrawal',
-              {
-                sharedWalletId: sharedWalletId,
-                walletName: wallet.name || 'Shared Wallet',
-                amount: amount,
-                currency: wallet.currency || 'USDC',
-                withdrawerId: userId,
-                withdrawerName: withdrawerName,
-                newBalance: newBalance,
-                transactionSignature: signature,
-                destination: finalDestinationAddress,
+            const { notificationService } = await import('../../notifications/notificationService');
+            
+            for (const member of membersToNotify) {
+              try {
+                await notificationService.instance.sendNotification(
+                  member.userId,
+                  'Shared Wallet Withdrawal',
+                  `${withdrawerName} withdrew ${amount.toFixed(6)} ${wallet.currency || 'USDC'} from "${wallet.name || 'Shared Wallet'}"`,
+                  'shared_wallet_withdrawal',
+                  {
+                    sharedWalletId: sharedWalletId,
+                    walletName: wallet.name || 'Shared Wallet',
+                    amount: amount,
+                    currency: wallet.currency || 'USDC',
+                    withdrawerId: userId,
+                    withdrawerName: withdrawerName,
+                    newBalance: newBalance,
+                    transactionSignature: signature,
+                    destination: finalDestinationAddress,
+                  }
+                );
+              } catch (notifError) {
+                logger.warn('Failed to send withdrawal notification to member', {
+                  memberId: member.userId,
+                  error: notifError instanceof Error ? notifError.message : String(notifError)
+                }, 'ConsolidatedTransactionService');
               }
-            );
-          } catch (notifError) {
-            logger.warn('Failed to send withdrawal notification to member', {
-              memberId: member.userId,
-              error: notifError instanceof Error ? notifError.message : String(notifError)
+            }
+          } catch (notificationError) {
+            logger.warn('Failed to send withdrawal notifications (non-blocking)', {
+              error: notificationError instanceof Error ? notificationError.message : String(notificationError),
+              note: 'Notifications are non-critical and sent asynchronously to prevent OOM'
             }, 'ConsolidatedTransactionService');
           }
-        }
-      } catch (notificationError) {
-        logger.warn('Failed to send withdrawal notifications', {
-          error: notificationError instanceof Error ? notificationError.message : String(notificationError)
-        }, 'ConsolidatedTransactionService');
-        // Don't fail the transaction if notifications fail
+        }, 100); // ✅ MEMORY OPTIMIZATION: Use 100ms delay to allow memory cleanup before loading heavy modules
       }
 
         return {

@@ -81,7 +81,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authenticationError, setAuthenticationError] = useState<string | null>(null);
 
-  // Phone prompt modal state - FORCE DISPLAY
+  // Phone prompt modal state
   const [showPhonePrompt, setShowPhonePrompt] = useState(false);
   const [needsPhoneReminder, setNeedsPhoneReminder] = useState(false);
 
@@ -276,7 +276,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     checkPendingInvitation();
   }, [isAuthenticating, isAuthenticated, currentUser?.id, navigation]);
 
-  // Check phone prompt status - FORCED DISPLAY
+  // Check phone prompt status
   useEffect(() => {
     const checkPhonePromptStatus = async () => {
       if (!currentUser?.id || !isAuthenticated) {
@@ -288,37 +288,28 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         const hasEmail = !!currentUser.email;
         const hasPhone = !!currentUser.phone;
 
-        // FORCE DISPLAY: Always show modal if user has email but no phone (ignores AsyncStorage)
         if (hasEmail && !hasPhone) {
-          // Always show prompt - removed AsyncStorage check to force display every time
-          setShowPhonePrompt(true);
-          logger.info('Forcing phone prompt modal display', { 
-            userId: currentUser.id,
-            hasEmail,
-            hasPhone 
-          }, 'DashboardScreen');
-        } else if (!hasPhone) {
-          // Even if no email, show if no phone (for testing)
-          setShowPhonePrompt(true);
+          // Check if user has seen the prompt before
+          const promptShownKey = `phone_prompt_shown_${currentUser.id}`;
+          const promptShown = await AsyncStorage.getItem(promptShownKey);
+
+          if (!promptShown) {
+            // Show prompt on first login after integration
+            setShowPhonePrompt(true);
+          } else {
+            // User has seen prompt but skipped - show reminder badge
+            setNeedsPhoneReminder(true);
+          }
         } else {
           setShowPhonePrompt(false);
           setNeedsPhoneReminder(false);
         }
       } catch (error) {
         logger.error('Failed to check phone prompt status', error, 'DashboardScreen');
-        // On error, still try to show if user has email but no phone
-        if (currentUser?.email && !currentUser?.phone) {
-          setShowPhonePrompt(true);
-        }
       }
     };
 
-    // Small delay to ensure user is fully loaded
-    const timer = setTimeout(() => {
-      checkPhonePromptStatus();
-    }, 500);
-
-    return () => clearTimeout(timer);
+    checkPhonePromptStatus();
   }, [currentUser?.id, currentUser?.email, currentUser?.phone, isAuthenticated]);
 
   useEffect(() => {

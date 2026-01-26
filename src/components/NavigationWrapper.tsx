@@ -64,15 +64,27 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
           if (__DEV__) {
             logger.info('App opened with URL', { initialURL }, 'NavigationWrapper');
           }
-          // The deep link handler will process this URL
+          // Process the initial URL through the deep link handler
+          // Wait for navigation to be ready and user to be available
+          if (navigationRef.current && currentUser) {
+            deepLinkHandler.processDeepLink(initialURL, navigationRef.current, currentUser).catch((error) => {
+              logger.error('Error processing initial URL', { error, initialURL }, 'NavigationWrapper');
+            });
+          } else {
+            // Store the URL to process later when navigation and user are ready
+            // The deep link listeners will handle it once setup is complete
+            if (__DEV__) {
+              logger.debug('Navigation or user not ready, initial URL will be handled by listeners', { initialURL }, 'NavigationWrapper');
+            }
+          }
         }
       } catch (error) {
-        console.error('🔥 Error getting initial URL:', error);
+        logger.error('Error getting initial URL', { error }, 'NavigationWrapper');
       }
     };
 
     handleInitialURL();
-  }, []);
+  }, [currentUser]);
 
   return (
     <NavigationContainer 

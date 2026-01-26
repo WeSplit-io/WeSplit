@@ -6,6 +6,87 @@
 import { logger } from '../../../analytics/loggingService';
 import type { CentralizedTransactionResult } from '../../../transactions/types';
 
+/**
+ * Check if an address is an internal WeSplit app wallet
+ * Internal wallets include: user wallets, shared wallets, and split wallets
+ * 
+ * @param address - The wallet address to check
+ * @param getUserWalletAddress - Function to get user's wallet address (for fast check)
+ */
+async function checkIfInternalWeSplitWallet(
+  address: string,
+  getUserWalletAddress?: (userId: string) => Promise<string | null>,
+  userId?: string
+): Promise<boolean> {
+  try {
+    if (!address) return false;
+
+    // ✅ OPTIMIZATION: First check if it matches the user's own wallet (fastest check)
+    if (userId && getUserWalletAddress) {
+      try {
+        const userWalletAddress = await getUserWalletAddress(userId);
+        if (userWalletAddress === address) {
+          logger.debug('Address matches user wallet - internal wallet confirmed', {
+            address,
+            userId
+          }, 'FairSplitWithdrawalHandler');
+          return true;
+        }
+      } catch (error) {
+        // If getUserWalletAddress fails, continue with Firestore check
+        logger.debug('getUserWalletAddress check failed, falling back to Firestore', {
+          address,
+          userId,
+          error: error instanceof Error ? error.message : String(error)
+        }, 'FairSplitWithdrawalHandler');
+      }
+    }
+
+    // Check if it's a user's in-app wallet using Firestore
+    try {
+      const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
+      const { db } = await import('../../../config/firebase/firebase');
+      
+      // Check users collection (limit to 1 for performance)
+      const usersRef = collection(db, 'users');
+      const usersQuery = query(usersRef, where('wallet_address', '==', address), limit(1));
+      const usersSnapshot = await getDocs(usersQuery);
+      if (!usersSnapshot.empty) {
+        return true;
+      }
+
+      // Check shared wallets
+      const sharedWalletsRef = collection(db, 'sharedWallets');
+      const sharedWalletsQuery = query(sharedWalletsRef, where('walletAddress', '==', address), limit(1));
+      const sharedWalletsSnapshot = await getDocs(sharedWalletsQuery);
+      if (!sharedWalletsSnapshot.empty) {
+        return true;
+      }
+
+      // Check split wallets
+      const splitWalletsRef = collection(db, 'splitWallets');
+      const splitWalletsQuery = query(splitWalletsRef, where('walletAddress', '==', address), limit(1));
+      const splitWalletsSnapshot = await getDocs(splitWalletsQuery);
+      if (!splitWalletsSnapshot.empty) {
+        return true;
+      }
+    } catch (firestoreError) {
+      // If Firestore query fails, log but don't throw - we'll return false
+      logger.warn('Firestore query failed for internal wallet check, assuming external', {
+        address,
+        userId,
+        error: firestoreError instanceof Error ? firestoreError.message : String(firestoreError)
+      }, 'FairSplitWithdrawalHandler');
+    }
+
+    return false;
+  } catch (error) {
+    logger.error('Error checking if address is internal wallet', { address, userId, error }, 'FairSplitWithdrawalHandler');
+    // On error, assume it's external to be safe (will charge fee)
+    return false;
+  }
+}
+
 export async function handleFairSplitWithdrawal(
   params: any,
   getUserWalletAddress: (userId: string) => Promise<string | null>
@@ -82,10 +163,45 @@ export async function handleFairSplitWithdrawal(
     
     const availableBalance = balanceResult.balance || 0;
     
-    if (amount > availableBalance) {
+    // ✅ FIX: Check if destination is internal WeSplit wallet (0% fee) or external (2% fee)
+    // Pass userId and getUserWalletAddress for optimized check
+    const isInternalWallet = await checkIfInternalWeSplitWallet(finalDestinationAddress, getUserWalletAddress, userId);
+    const { FeeService } = await import('../../../../config/constants/feeConfig');
+    
+    let feeCalculation;
+    let companyFee;
+    let totalRequired;
+    
+    if (isInternalWallet) {
+      // No fee for withdrawals to internal WeSplit wallets
+      feeCalculation = FeeService.calculateCompanyFee(amount, 'settlement'); // 0% fee
+      companyFee = 0;
+      totalRequired = amount;
+      logger.info('Split withdrawal to internal WeSplit wallet - no fees applied', {
+        destinationAddress: finalDestinationAddress,
+        amount,
+        splitWalletId,
+        userId
+      }, 'FairSplitWithdrawalHandler');
+    } else {
+      // 2% fee for withdrawals to external wallets
+      feeCalculation = FeeService.calculateCompanyFee(amount, 'withdraw');
+      companyFee = feeCalculation.fee;
+      totalRequired = feeCalculation.totalAmount; // amount + fee
+      logger.info('Split withdrawal to external wallet - 2% fee applied', {
+        destinationAddress: finalDestinationAddress,
+        amount,
+        companyFee,
+        totalRequired,
+        splitWalletId,
+        userId
+      }, 'FairSplitWithdrawalHandler');
+    }
+    
+    if (totalRequired > availableBalance) {
       return {
         success: false,
-        error: `Insufficient balance in split wallet. Available: ${availableBalance.toFixed(6)} USDC, Requested: ${amount.toFixed(6)} USDC`
+        error: `Insufficient balance in split wallet. Available: ${availableBalance.toFixed(6)} USDC, Required: ${totalRequired.toFixed(6)} USDC (${amount.toFixed(6)}${companyFee > 0 ? ` + ${companyFee.toFixed(6)} fee` : ''})`
       };
     }
 
@@ -166,10 +282,16 @@ export async function handleFairSplitWithdrawal(
       throw sourceAccountError;
     }
 
-    if (sourceBalance < amount) {
+    // Recalculate fee for on-chain balance check (use same logic as above)
+    const onChainFeeCalculation = isInternalWallet 
+      ? FeeService.calculateCompanyFee(amount, 'settlement') // 0% fee for internal
+      : FeeService.calculateCompanyFee(amount, 'withdraw'); // 2% fee for external
+    const onChainTotalRequired = onChainFeeCalculation.totalAmount;
+    
+    if (sourceBalance < onChainTotalRequired) {
       return {
         success: false,
-        error: `Insufficient balance. Available: ${sourceBalance.toFixed(6)} USDC, Requested: ${amount.toFixed(6)} USDC`
+        error: `Insufficient balance. Available: ${sourceBalance.toFixed(6)} USDC, Required: ${onChainTotalRequired.toFixed(6)} USDC (${amount.toFixed(6)}${onChainFeeCalculation.fee > 0 ? ` + ${onChainFeeCalculation.fee.toFixed(6)} fee` : ''})`
       };
     }
 
@@ -195,27 +317,81 @@ export async function handleFairSplitWithdrawal(
       );
     }
 
-    // Calculate amount (USDC has 6 decimals)
-    const transferAmount = Math.floor(amount * Math.pow(10, 6));
+    // ✅ FIX: Calculate transfer amounts (USDC has 6 decimals)
+    // Recipient gets full amount (fee is additional, not deducted)
+    const recipientAmount = feeCalculation.recipientAmount;
+    const recipientAmountRaw = Math.floor(recipientAmount * Math.pow(10, 6));
+    const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5);
 
-    // Add transfer instruction
+    // Get company wallet address and public key (needed for fee transfer)
+    const { COMPANY_WALLET_CONFIG } = await import('../../../../config/constants/feeConfig');
+    const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
+    const companyPublicKey = new PublicKey(companyWalletAddress);
+
+    // ✅ FIX: Add company fee transfer instruction (if fee > 0)
+    if (companyFee > 0) {
+      const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, companyPublicKey);
+      
+      // Check if company token account exists, create if needed
+      try {
+        await getAccount(connectionInstance, companyTokenAccount);
+        logger.debug('Company USDC token account exists', {
+          companyTokenAccount: companyTokenAccount.toBase58()
+        }, 'FairSplitWithdrawalHandler');
+      } catch {
+        // Create associated token account if it doesn't exist
+        logger.debug('Company USDC token account does not exist, will create it', {
+          companyTokenAccount: companyTokenAccount.toBase58(),
+          note: 'This is expected if company wallet has never received USDC fees'
+        }, 'FairSplitWithdrawalHandler');
+        
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            companyPublicKey,
+            companyTokenAccount,
+            companyPublicKey,
+            usdcMint
+          )
+        );
+      }
+      
+      // Add company fee transfer instruction
+      const { TOKEN_PROGRAM_ID } = await import('@solana/spl-token');
+      transaction.add(
+        createTransferInstruction(
+          fromTokenAccount,
+          companyTokenAccount,
+          fromPublicKey,
+          companyFeeAmount,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+      
+      logger.info('Added company fee transfer instruction for split withdrawal', {
+        companyFee,
+        companyFeeAmount,
+        recipientAmount,
+        totalAmount: amount,
+        splitWalletId,
+        userId
+      }, 'FairSplitWithdrawalHandler');
+    }
+
+    // Add main transfer instruction (recipient gets full amount, fee is separate transfer)
     transaction.add(
       createTransferInstruction(
         fromTokenAccount,
         toTokenAccount,
         fromPublicKey,
-        transferAmount
+        recipientAmountRaw
       )
     );
 
     // Sign and send transaction
     const fromKeypair = keypairResult.keypair;
 
-    // Company wallet must be the fee payer
-    const { COMPANY_WALLET_CONFIG } = await import('../../../../config/constants/feeConfig');
-    const companyWalletAddress = await COMPANY_WALLET_CONFIG.getAddress();
-    const companyPublicKey = new PublicKey(companyWalletAddress);
-    
+    // Company wallet must be the fee payer (already set above for fee transfer)
     transaction.feePayer = companyPublicKey;
     const latestBlockhash = await connectionInstance.getLatestBlockhash();
     transaction.recentBlockhash = latestBlockhash.blockhash;
@@ -296,10 +472,10 @@ export async function handleFairSplitWithdrawal(
       transactionSignature: signature,
       transactionId: signature,
       txId: signature,
-      fee: 0,
-      netAmount: amount,
+      fee: companyFee,
+      netAmount: recipientAmount,
       blockchainFee: 0,
-      message: `Successfully withdrew ${amount.toFixed(6)} USDC from fair split`
+      message: `Successfully withdrew ${amount.toFixed(6)} USDC from fair split${companyFee > 0 ? ` (${companyFee.toFixed(6)} USDC fee applied)` : ''}`
     };
   } catch (error) {
     logger.error('Fair split withdrawal error', {

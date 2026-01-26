@@ -3,7 +3,7 @@
  * Handles split invitations, QR codes, NFC sharing, and link generation
  * 
  * IMPORTANT: Link formats
- * - Universal links (HTTPS): https://wesplit.io/join-split?data=... (works for all users)
+ * - Universal links (HTTPS): https://deeplinks.wesplit.io/join-split?data=... (works for all users)
  * - App-scheme links: wesplit://join-split?data=... (only works if app is installed)
  * 
  * For sharing, we use universal links so users without the app can:
@@ -13,9 +13,9 @@
 
 import { logger } from '../analytics/loggingService';
 
-// Base URL for universal links - this should be your web domain
+// Base URL for universal links - using deeplinks subdomain
 // The web page at this URL should handle redirects to app stores or deep links
-const UNIVERSAL_LINK_BASE_URL = 'https://wesplit-deeplinks.web.app';
+const UNIVERSAL_LINK_BASE_URL = 'https://deeplinks.wesplit.io';
 
 export interface SplitInvitationData {
   type: 'split_invitation';
@@ -601,7 +601,7 @@ export class SplitInvitationService {
 
   /**
    * Validate invitation URL
-   * Supports both app-scheme (wesplit://) and universal links (https://wesplit.io)
+   * Supports both app-scheme (wesplit://) and universal links (https://wesplit.io, https://deeplinks.wesplit.io)
    */
   static validateInvitationURL(url: string): SplitInvitationData | null {
     try {
@@ -610,7 +610,9 @@ export class SplitInvitationService {
       // Support both app-scheme and universal links
       const isAppScheme = urlObj.protocol === 'wesplit:';
       const isUniversalLink = urlObj.protocol === 'https:' && 
-                              (urlObj.hostname === 'wesplit.io' || urlObj.hostname === 'www.wesplit.io');
+                              (urlObj.hostname === 'deeplinks.wesplit.io' ||
+                               urlObj.hostname === 'wesplit.io' || 
+                               urlObj.hostname === 'www.wesplit.io');
       
       if (!isAppScheme && !isUniversalLink) {
         logger.debug('URL is not a valid WeSplit invitation URL', { url, protocol: urlObj.protocol, hostname: urlObj.hostname }, 'SplitInvitationService');
@@ -651,8 +653,10 @@ export class SplitInvitationService {
       
       // Check universal link
       if (urlObj.protocol === 'https:' && 
-          (urlObj.hostname === 'wesplit.io' || urlObj.hostname === 'www.wesplit.io') &&
-          urlObj.pathname.replace(/^\//, '') === 'join-split') {
+          (urlObj.hostname === 'deeplinks.wesplit.io' ||
+           urlObj.hostname === 'wesplit.io' || 
+           urlObj.hostname === 'www.wesplit.io') &&
+          urlObj.pathname.startsWith('/join-split')) {
         return true;
       }
       

@@ -2,7 +2,7 @@
  * Deep Link Handler for WeSplit App
  * Handles both:
  * - App-scheme links: wesplit://action/params
- * - Universal links: https://wesplit.io/action?params
+ * - Universal links: https://deeplinks.wesplit.io/action?params (primary) or https://wesplit.io/action?params (fallback)
  * 
  * Universal links allow the app to be opened from web links, supporting:
  * - Users with the app installed (opens directly in app)
@@ -17,10 +17,10 @@ import { pendingInvitationService, PendingInvitation } from './pendingInvitation
 import { firebaseDataService } from '../data/firebaseDataService';
 
 // Universal link domains that we recognize
-// Primary: wesplit-deeplinks.web.app (Firebase hosting for deep links)
+// Primary: deeplinks.wesplit.io (subdomain for deep links)
 // Fallback: wesplit.io (main website domain)
 const UNIVERSAL_LINK_DOMAINS = [
-  'wesplit-deeplinks.web.app',  // Primary deep links website
+  'deeplinks.wesplit.io',       // Primary deep links subdomain
   'wesplit.io',                  // Main website (fallback)
   'www.wesplit.io'               // Main website with www (fallback)
 ];
@@ -113,7 +113,6 @@ export interface DeepLinkData {
   transferAmount?: string;
   transactionId?: string;
   oauthProvider?: 'google' | 'twitter' | 'apple';
-  oauthCode?: string;
   oauthError?: string;
   splitInvitationData?: string; // JSON string for split invitation data
   splitId?: string; // Split ID for view-split action
@@ -135,7 +134,7 @@ export interface DeepLinkData {
   provider?: string; // Social provider (google, apple)
   error?: string; // Error message from Phantom callback
   // Phantom callback-specific (OAuth format)
-  oauthCode?: string; // OAuth authorization code
+  oauthCode?: string; // OAuth authorization code (used for both general OAuth and Phantom OAuth)
   oauthState?: string; // OAuth state parameter
   errorDescription?: string; // OAuth error description
 }
@@ -190,7 +189,16 @@ function decodeBase64Url(base64url: string): string {
 
 /**
  * Parse a WeSplit deep link URL
- * Supports both app-scheme (wesplit://) and universal links (https://wesplit.io)
+ * Supports both app-scheme (wesplit://) and universal links (https://deeplinks.wesplit.io)
+ * 
+ * Universal Links are only configured for these routes:
+ * - /join-split
+ * - /view-split
+ * - /spend-callback
+ * - /referral
+ * - /phantom-callback
+ * 
+ * Other routes (join, profile, send, transfer, etc.) only work as app-scheme links.
  * 
  * @param url - The URL to parse
  * @returns Parsed deep link data or null if invalid
@@ -218,7 +226,7 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       action = urlParts[0];
       params = urlParts.slice(1);
     } else {
-      // Universal link: https://wesplit.io/action?params
+      // Universal link: https://deeplinks.wesplit.io/action?params
       // Check if it's a valid universal link domain
       if (!UNIVERSAL_LINK_DOMAINS.includes(urlObj.hostname)) {
         logger.debug('URL is not a WeSplit universal link', { hostname: urlObj.hostname }, 'deepLinkHandler');
@@ -321,7 +329,7 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       case 'join-split': {
         // Handle split invitation deep links
         // Format (app-scheme): wesplit://join-split?data=<encoded_invitation_data>
-        // Format (universal): https://wesplit.io/join-split?data=<encoded_invitation_data>
+        // Format (universal): https://deeplinks.wesplit.io/join-split?data=<encoded_invitation_data>
         // Also supports: invite parameter (base64url) and legacy id parameter
         // Priority: data > invite > id/splitId
         
@@ -376,7 +384,7 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       case 'view-split': {
         // Handle viewing a split from external source (e.g., "spend" integration)
         // Format (app-scheme): wesplit://view-split?splitId=xxx&userId=xxx
-        // Format (universal): https://wesplit.io/view-split?splitId=xxx&userId=xxx
+        // Format (universal): https://deeplinks.wesplit.io/view-split?splitId=xxx&userId=xxx
         // Also supports legacy id parameter (treated as splitId)
         const splitId = urlObj.searchParams.get('splitId') || urlObj.searchParams.get('id');
         const userId = urlObj.searchParams.get('userId');
@@ -400,7 +408,7 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       case 'wallet-linked':
         // Handle successful wallet linking callback
         // Format (app-scheme): wesplit://wallet-linked?provider=phantom&address=xxx&signature=xxx
-        // Format (universal): https://wesplit.io/wallet-linked?provider=phantom&address=xxx&signature=xxx
+        // Note: Not available as Universal Link - app-scheme only
         {
           const provider = urlObj.searchParams.get('provider');
           const address = urlObj.searchParams.get('address');
@@ -426,7 +434,7 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       case 'wallet-error':
         // Handle wallet linking error callback
         // Format (app-scheme): wesplit://wallet-error?provider=phantom&error=xxx
-        // Format (universal): https://wesplit.io/wallet-error?provider=phantom&error=xxx
+        // Note: Not available as Universal Link - app-scheme only
         {
           const provider = urlObj.searchParams.get('provider');
           const error = urlObj.searchParams.get('error');
@@ -442,7 +450,7 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       case 'referral': {
         // Referral deep link
         // App-scheme: wesplit://referral/CODE or wesplit://referral?code=CODE
-        // Universal:  https://wesplit-deeplinks.web.app/referral?code=CODE
+        // Universal:  https://deeplinks.wesplit.io/referral?code=CODE
         let code = urlObj.searchParams.get('code');
 
         if (!code && params[0]) {
@@ -467,7 +475,7 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       case 'spend-callback': {
         // Spend callback deep link - return to Spend app after payment/action
         // Format (app-scheme): wesplit://spend-callback?callbackUrl=xxx&orderId=xxx&status=success
-        // Format (universal): https://wesplit-deeplinks.web.app/spend-callback?callbackUrl=xxx&orderId=xxx&status=success
+        // Format (universal): https://deeplinks.wesplit.io/spend-callback?callbackUrl=xxx&orderId=xxx&status=success
         const callbackUrl = urlObj.searchParams.get('callbackUrl');
         const orderId = urlObj.searchParams.get('orderId');
         const status = urlObj.searchParams.get('status') as 'success' | 'error' | 'cancelled' | null;
@@ -517,7 +525,7 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
         // 1. OAuth format (from website): code, state, error, error_description
         // 2. Legacy format (from app): response_type, wallet_id, authUserId, provider, error
         // Format (app-scheme): wesplit://phantom-callback?response_type=success&wallet_id=xxx&authUserId=xxx&provider=google
-        // Format (universal): https://wesplit-deeplinks.web.app/phantom-callback?code=xxx&state=xxx
+        // Format (universal): https://deeplinks.wesplit.io/phantom-callback?code=xxx&state=xxx
         
         // Check for OAuth format (from website)
         const code = urlObj.searchParams.get('code');
@@ -698,21 +706,38 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
 }
 
 /**
- * Set up deep link listeners
+ * Process a deep link URL
+ * This function can be called to handle a deep link URL, either from initial app launch or while app is running
  */
-export function setupDeepLinkListeners(
+export async function processDeepLink(
+  url: string,
   navigation: NavigationContainerRef<ParamListBase> | { navigate: (route: string, params?: Record<string, unknown>) => void },
   currentUser: User | null
-) {
-  const handleDeepLink = async (url: string) => {
-    logger.info('Received deep link', { url }, 'deepLinkHandler');
+): Promise<void> {
+  logger.info('Processing deep link', { url }, 'deepLinkHandler');
+  
+  // Helper function to safely navigate with error handling
+  const safeNavigate = (route: string, params?: Record<string, unknown>) => {
+    try {
+      navigation.navigate(route as never, params as never);
+    } catch (error) {
+      logger.error('Navigation error', { error, route, params }, 'deepLinkHandler');
+      Alert.alert(
+        'Navigation Error',
+        `Failed to navigate to ${route}. Please try again or use the app menu.`
+      );
+    }
+  };
     
     const linkData = parseWeSplitDeepLink(url);
     if (!linkData) {
       if (__DEV__) {
         console.warn('🔥 Invalid deep link format:', url);
       }
-      Alert.alert('Invalid Link', 'This invitation link is not valid.');
+      Alert.alert(
+        'Invalid Link',
+        'This link is not a valid WeSplit link. Please check the link and try again, or contact support if the problem persists.'
+      );
       return;
     }
 
@@ -726,7 +751,7 @@ export function setupDeepLinkListeners(
           }
           Alert.alert('Authentication Required', 'Please log in to join the group.');
           // Navigate to login if needed
-          navigation.navigate('AuthMethods');
+          safeNavigate('AuthMethods');
           return;
         }
 
@@ -734,11 +759,11 @@ export function setupDeepLinkListeners(
         const joinResult = await handleJoinGroupDeepLink(linkData.inviteId!, currentUser.id);
 
         if (joinResult.success) {
-          logger.info('Successfully joined group, navigating to GroupDetails', null, 'deepLinkHandler');
+          logger.info('Successfully joined group, navigating to SplitDetails', null, 'deepLinkHandler');
           Alert.alert('Success', `Successfully joined ${joinResult.groupName}!`);
-          // Navigate to the group details
-          navigation.navigate('GroupDetails', {
-            groupId: joinResult.groupId
+          // Navigate to the split details (groups are now handled as splits)
+          safeNavigate('SplitDetails', {
+            splitId: joinResult.groupId
           });
         } else {
           // Show error message
@@ -756,7 +781,7 @@ export function setupDeepLinkListeners(
             console.warn('🔥 User not authenticated, cannot add contact');
           }
           Alert.alert('Authentication Required', 'Please log in to add contacts.');
-          navigation.navigate('AuthMethods');
+          safeNavigate('AuthMethods');
           return;
         }
 
@@ -767,7 +792,7 @@ export function setupDeepLinkListeners(
           logger.info('Successfully added contact, navigating to Contacts', null, 'deepLinkHandler');
           Alert.alert('Contact Added', `Successfully added ${addContactResult.contactName} to your contacts!`);
           // Navigate to contacts screen
-          navigation.navigate('Contacts');
+          safeNavigate('Contacts');
         } else {
           if (__DEV__) {
             console.error('🔥 Failed to add contact:', addContactResult.error);
@@ -783,14 +808,14 @@ export function setupDeepLinkListeners(
             console.warn('🔥 User not authenticated, cannot send money');
           }
           Alert.alert('Authentication Required', 'Please log in to send money.');
-          navigation.navigate('AuthMethods');
+          safeNavigate('AuthMethods');
           return;
         }
 
         logger.info('Attempting to navigate to Send screen with recipient', { recipientWalletAddress: linkData.recipientWalletAddress }, 'deepLinkHandler');
 
         // Navigate to Send screen with recipient wallet address
-        navigation.navigate('Send', {
+        safeNavigate('Send', {
           recipientWalletAddress: linkData.recipientWalletAddress,
           recipientName: linkData.userName,
           recipientEmail: linkData.userEmail
@@ -804,14 +829,14 @@ export function setupDeepLinkListeners(
             console.warn('🔥 User not authenticated, cannot initiate transfer');
           }
           Alert.alert('Authentication Required', 'Please log in to initiate transfers.');
-          navigation.navigate('AuthMethods');
+          safeNavigate('AuthMethods');
           return;
         }
 
         logger.info('Attempting to initiate external wallet transfer to', { recipientWalletAddress: linkData.recipientWalletAddress }, 'deepLinkHandler');
 
         // Navigate to CryptoTransfer screen with recipient wallet address
-        navigation.navigate('CryptoTransfer', {
+        safeNavigate('CryptoTransfer', {
           targetWallet: {
             address: linkData.recipientWalletAddress,
             name: linkData.userName || 'App Wallet',
@@ -824,12 +849,12 @@ export function setupDeepLinkListeners(
       
       case 'moonpay-success':
         logger.info('MoonPay success, navigating to Dashboard', null, 'deepLinkHandler');
-        navigation.navigate('Dashboard');
+        safeNavigate('Dashboard');
         break;
       
       case 'moonpay-failure':
         logger.info('MoonPay failure, navigating to Dashboard', null, 'deepLinkHandler');
-        navigation.navigate('Dashboard');
+        safeNavigate('Dashboard');
         break;
       
       case 'oauth-callback': {
@@ -931,7 +956,10 @@ export function setupDeepLinkListeners(
           if (__DEV__) {
             console.warn('🔥 Missing split invitation data');
           }
-          Alert.alert('Invalid Link', 'This split invitation link is not valid.');
+          Alert.alert(
+            'Invalid Split Invitation',
+            'This split invitation link is missing required information. Please ask the person who sent you this link to send a new invitation.'
+          );
           return;
         }
 
@@ -964,7 +992,7 @@ export function setupDeepLinkListeners(
               [
                 {
                   text: 'Sign In',
-                  onPress: () => navigation.navigate('AuthMethods', {
+                  onPress: () => safeNavigate('AuthMethods', {
                     prefilledEmail: prefilledEmail || undefined,
                     email: prefilledEmail || undefined,
                   }),
@@ -977,7 +1005,7 @@ export function setupDeepLinkListeners(
           logger.info('Attempting to join split with invitation data', { splitInvitationData: linkData.splitInvitationData }, 'deepLinkHandler');
           
           // Navigate to SplitDetails screen with validated invitation data
-          navigation.navigate('SplitDetails', {
+          safeNavigate('SplitDetails', {
             shareableLink: url, // Pass the original URL
             splitInvitationData: linkData.splitInvitationData,
             splitId: invitationData.splitId,
@@ -992,7 +1020,10 @@ export function setupDeepLinkListeners(
           if (__DEV__) {
             console.error('🔥 Error processing split invitation:', error);
           }
-          Alert.alert('Invalid Link', 'This split invitation link is corrupted or invalid.');
+          Alert.alert(
+            'Invalid Split Invitation',
+            'This split invitation link appears to be corrupted or invalid. Please ask the person who sent you this link to send a new invitation.'
+          );
         }
         break;
       
@@ -1002,7 +1033,10 @@ export function setupDeepLinkListeners(
           if (__DEV__) {
             console.warn('🔥 Missing splitId for view-split action');
           }
-          Alert.alert('Invalid Link', 'This split link is not valid.');
+          Alert.alert(
+            'Invalid Split Link',
+            'This split link is missing the split ID. Please check the link and try again.'
+          );
           return;
         }
 
@@ -1012,7 +1046,7 @@ export function setupDeepLinkListeners(
         }, 'deepLinkHandler');
 
         // Navigate to SplitDetails screen
-        navigation.navigate('SplitDetails', {
+        safeNavigate('SplitDetails', {
           splitId: linkData.splitId,
           isFromDeepLink: true,
           isFromExternalSource: true
@@ -1045,7 +1079,7 @@ export function setupDeepLinkListeners(
               text: 'OK',
               onPress: () => {
                 // Navigate to wallet settings or wherever wallet management happens
-                navigation.navigate('Settings'); // Adjust route as needed
+                safeNavigate('Settings'); // Adjust route as needed
               }
             }
           ]
@@ -1072,7 +1106,10 @@ export function setupDeepLinkListeners(
           if (__DEV__) {
             console.warn('🔥 Referral deep link missing referralCode');
           }
-          Alert.alert('Invalid Link', 'This referral link is not valid.');
+          Alert.alert(
+            'Invalid Referral Link',
+            'This referral link is missing the referral code. Please check the link and try again.'
+          );
           return;
         }
 
@@ -1082,7 +1119,7 @@ export function setupDeepLinkListeners(
             referralCode: linkData.referralCode
           }, 'deepLinkHandler');
 
-          navigation.navigate('AuthMethods', {
+          safeNavigate('AuthMethods', {
             referralCode: linkData.referralCode
           } as any);
           return;
@@ -1164,28 +1201,31 @@ export function setupDeepLinkListeners(
         }
         Alert.alert('Unknown Action', 'This link is not supported.');
     }
-  };
+}
 
+/**
+ * Set up deep link listeners
+ */
+export function setupDeepLinkListeners(
+  navigation: NavigationContainerRef<ParamListBase> | { navigate: (route: string, params?: Record<string, unknown>) => void },
+  currentUser: User | null
+) {
   // Listen for incoming links when app is already running
   const subscription = Linking.addEventListener('url', (event) => {
     logger.info('Deep link event received', { url: event.url }, 'deepLinkHandler');
-    handleDeepLink(event.url);
+    processDeepLink(event.url, navigation, currentUser);
   });
-
-  // Handle links that opened the app (only once)
-  // Note: This is now handled in NavigationWrapper to avoid duplicate calls
-  // Linking.getInitialURL().then((url) => {
-  //   if (url) {
-  //     logger.info('Initial URL found', { url }, 'deepLinkHandler');
-  //     handleDeepLink(url);
-  //   }
-  // });
 
   return subscription;
 }
 
 /**
- * Generate a shareable invite link
+ * Generate a shareable invite link (app-scheme only)
+ * Note: This is for legacy group invitations. For splits, use SplitInvitationService.generateShareableLink()
+ * 
+ * @param inviteId - The group invitation ID
+ * @param groupName - Optional group name to include in the link
+ * @returns App-scheme link (wesplit://join/{inviteId})
  */
 export function generateShareableLink(inviteId: string, groupName?: string): string {
   const baseUrl = `wesplit://join/${inviteId}`;
@@ -1198,7 +1238,14 @@ export function generateShareableLink(inviteId: string, groupName?: string): str
 }
 
 /**
- * Generate a shareable profile QR code link
+ * Generate a shareable profile QR code link (app-scheme only)
+ * Note: Profile links are not available as Universal Links - app-scheme only
+ * 
+ * @param userId - The user ID
+ * @param userName - The user's name
+ * @param userEmail - Optional user email
+ * @param userWalletAddress - Optional wallet address
+ * @returns App-scheme link (wesplit://profile/...)
  */
 export function generateProfileLink(userId: string, userName: string, userEmail?: string, userWalletAddress?: string): string {
   const baseUrl = `wesplit://profile/${userId}/${encodeURIComponent(userName)}`;
@@ -1219,7 +1266,13 @@ export function generateProfileLink(userId: string, userName: string, userEmail?
 }
 
 /**
- * Generate a send money QR code link
+ * Generate a send money QR code link (app-scheme only)
+ * Note: Send links are not available as Universal Links - app-scheme only
+ * 
+ * @param walletAddress - The recipient wallet address
+ * @param userName - Optional recipient name
+ * @param userEmail - Optional recipient email
+ * @returns App-scheme link (wesplit://send/...)
  */
 export function generateSendLink(walletAddress: string, userName?: string, userEmail?: string): string {
   const baseUrl = `wesplit://send/${encodeURIComponent(walletAddress)}`;
@@ -1238,7 +1291,14 @@ export function generateSendLink(walletAddress: string, userName?: string, userE
 }
 
 /**
- * Generate a transfer link for external wallet transfers
+ * Generate a transfer link for external wallet transfers (app-scheme only)
+ * Note: Transfer links are not available as Universal Links - app-scheme only
+ * 
+ * @param walletAddress - The recipient wallet address
+ * @param userName - Optional recipient name
+ * @param userEmail - Optional recipient email
+ * @param amount - Optional transfer amount
+ * @returns App-scheme link (wesplit://transfer/...)
  */
 export function generateTransferLink(walletAddress: string, userName?: string, userEmail?: string, amount?: string): string {
   const baseUrl = `wesplit://transfer/${encodeURIComponent(walletAddress)}`;
@@ -1261,7 +1321,13 @@ export function generateTransferLink(walletAddress: string, userName?: string, u
 }
 
 /**
- * Generate a wallet linking success callback link
+ * Generate a wallet linking success callback link (app-scheme only)
+ * Note: Wallet-linked links are not available as Universal Links - app-scheme only
+ * 
+ * @param provider - The wallet provider (e.g., 'phantom')
+ * @param address - The wallet address
+ * @param signature - Optional signature
+ * @returns App-scheme link (wesplit://wallet-linked?...)
  */
 export function generateWalletLinkedLink(provider: string, address: string, signature?: string): string {
   const baseUrl = 'wesplit://wallet-linked';
@@ -1278,7 +1344,12 @@ export function generateWalletLinkedLink(provider: string, address: string, sign
 }
 
 /**
- * Generate a wallet linking error callback link
+ * Generate a wallet linking error callback link (app-scheme only)
+ * Note: Wallet-error links are not available as Universal Links - app-scheme only
+ * 
+ * @param provider - Optional wallet provider
+ * @param error - Optional error message
+ * @returns App-scheme link (wesplit://wallet-error?...)
  */
 export function generateWalletErrorLink(provider?: string, error?: string): string {
   const baseUrl = 'wesplit://wallet-error';
@@ -1296,12 +1367,15 @@ export function generateWalletErrorLink(provider?: string, error?: string): stri
 }
 
 /**
- * Generate a referral deep link (universal link) that can be used in shares/QRs.
- * Currently targets the deeplinks hosting site: wesplit-deeplinks.web.app
+ * Generate a referral deep link (universal link)
+ * Uses the configured Universal Link domain: deeplinks.wesplit.io
+ * 
+ * @param referralCode - The referral code
+ * @returns Universal link URL (https://deeplinks.wesplit.io/referral?code=...)
  */
 export function generateReferralLink(referralCode: string): string {
   const normalizedCode = referralCode.trim().toUpperCase();
-  const baseUrl = 'https://wesplit-deeplinks.web.app/referral';
+  const baseUrl = 'https://deeplinks.wesplit.io/referral';
   const params = new URLSearchParams({ code: normalizedCode });
   return `${baseUrl}?${params.toString()}`;
 }
@@ -1349,14 +1423,14 @@ export function generateSpendCallbackLink(
 }
 
 /**
- * Generate a universal link for Spend callback (for web fallback)
- * Uses the deep links website: wesplit-deeplinks.web.app
+ * Generate a Spend callback universal link to return to Spend app after payment/action
+ * Uses the configured Universal Link domain: deeplinks.wesplit.io
  * 
  * @param callbackUrl - The URL to redirect back to Spend app
  * @param orderId - Optional Spend order ID
  * @param status - Callback status
  * @param message - Optional message
- * @returns Universal link URL (https://wesplit-deeplinks.web.app/spend-callback?...)
+ * @returns Universal link URL (https://deeplinks.wesplit.io/spend-callback?...)
  */
 export function generateSpendCallbackUniversalLink(
   callbackUrl: string,
@@ -1364,8 +1438,8 @@ export function generateSpendCallbackUniversalLink(
   status: 'success' | 'error' | 'cancelled' = 'success',
   message?: string
 ): string {
-  // Use the deep links website for universal links
-  const baseUrl = 'https://wesplit-deeplinks.web.app/spend-callback';
+  // Use the deep links subdomain for universal links
+  const baseUrl = 'https://deeplinks.wesplit.io/spend-callback';
   const params = new URLSearchParams({
     callbackUrl: encodeURIComponent(callbackUrl),
     status
@@ -1436,6 +1510,7 @@ export function testDeepLinkFlow() {
 // Export the deepLinkHandler object
 export const deepLinkHandler = {
   parseWeSplitDeepLink,
+  processDeepLink,
   handleJoinGroupDeepLink,
   handleAddContactFromProfile,
   setupDeepLinkListeners,

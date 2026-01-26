@@ -129,85 +129,25 @@ export class CentralizedTransactionHandler {
               };
             }
 
-            // Calculate user's available balance in shared wallet
-            let userContributed = userMember.totalContributed || 0;
-            const userWithdrawn = userMember.totalWithdrawn || 0;
-            let userAvailableBalance = userContributed - userWithdrawn;
-
-            // ✅ FIX: Check for recent funding transactions if balance seems insufficient
-            // This handles the race condition where funding transaction completed but Firestore update hasn't propagated
-            if (amount > userAvailableBalance && userAvailableBalance >= 0) {
-              try {
-                const { db } = await import('../../config/firebase/firebase');
-                const { collection, query, where, getDocs } = await import('firebase/firestore');
-                
-                const recentFundingQuery = query(
-                  collection(db, 'sharedWalletTransactions'),
-                  where('sharedWalletId', '==', sharedWalletId),
-                  where('userId', '==', userId),
-                  where('type', '==', 'funding'),
-                  where('status', '==', 'confirmed')
-                );
-
-                const recentFundingSnapshot = await getDocs(recentFundingQuery);
-                const thirtySecondsAgo = Date.now() - 30000;
-                
-                const recentTransactions = recentFundingSnapshot.docs
-                  .map(doc => {
-                    const txData = doc.data();
-                    const createdAt = txData.createdAt?.toDate ? txData.createdAt.toDate() : new Date(txData.createdAt);
-                    return {
-                      amount: txData.amount || 0,
-                      createdAt: createdAt.getTime()
-                    };
-                  })
-                  .filter(tx => tx.createdAt > thirtySecondsAgo)
-                  .sort((a, b) => b.createdAt - a.createdAt)
-                  .slice(0, 5);
-                
-                const recentFundingTotal = recentTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-                
-                if (recentFundingTotal > 0) {
-                  userAvailableBalance += recentFundingTotal;
-                  userContributed += recentFundingTotal;
-                }
-              } catch (recentTxError) {
-                // Continue with original balance - don't fail validation if this check fails
-                logger.debug('Could not check recent funding transactions during validation', {
-                  error: recentTxError instanceof Error ? recentTxError.message : String(recentTxError)
-                }, 'CentralizedTransactionHandler');
-              }
-            }
-
-            // ✅ FIX: Provide more helpful error messages
-            if (amount > userAvailableBalance) {
-              // Build a more informative error message
-              let errorMessage: string;
-              
-              if (userAvailableBalance <= 0) {
-                if (userContributed === 0 && userWithdrawn === 0) {
-                  errorMessage = `You haven't contributed any funds to this shared wallet yet. You can only withdraw funds that you've contributed. The wallet shows ${wallet.totalBalance.toFixed(6)} ${wallet.currency || 'USDC'} total, but this includes contributions from other members.`;
-                } else if (userContributed > 0 && userWithdrawn >= userContributed) {
-                  errorMessage = `You've already withdrawn all of your contributions (${userContributed.toFixed(6)} ${wallet.currency || 'USDC'}). You can only withdraw funds that you've personally contributed to the shared wallet.`;
-                } else {
-                  errorMessage = `You don't have any available balance to withdraw. Your contributions: ${userContributed.toFixed(6)} ${wallet.currency || 'USDC'}, Already withdrawn: ${userWithdrawn.toFixed(6)} ${wallet.currency || 'USDC'}.`;
-                }
-              } else {
-                errorMessage = `Insufficient balance. You can withdraw up to ${userAvailableBalance.toFixed(6)} ${wallet.currency || 'USDC'} (your contributions: ${userContributed.toFixed(6)}, already withdrawn: ${userWithdrawn.toFixed(6)}). You're trying to withdraw ${amount.toFixed(6)} ${wallet.currency || 'USDC'}.`;
-              }
-              
+            // Use standardized balance calculation (pool-based approach)
+            const { MemberRightsService } = await import('../sharedWallet/MemberRightsService');
+            const balanceResult = MemberRightsService.getAvailableBalance(userMember, wallet);
+            
+            if (balanceResult.error) {
               return {
                 canExecute: false,
-                error: errorMessage,
-                availableBalance: userAvailableBalance
+                error: balanceResult.error
               };
             }
+            
+            const userAvailableBalance = balanceResult.availableBalance;
 
             // Check if shared wallet has enough total balance
-            if (amount > wallet.totalBalance) {
+            if (amount > userAvailableBalance) {
               return {
                 canExecute: false,
-                error: 'Insufficient balance in shared wallet'
+                error: `Insufficient balance in shared wallet. Available: ${userAvailableBalance.toFixed(6)} ${wallet.currency || 'USDC'}, Requested: ${amount.toFixed(6)} ${wallet.currency || 'USDC'}`,
+                availableBalance: userAvailableBalance
               };
             }
 
@@ -215,6 +155,7 @@ export class CentralizedTransactionHandler {
             // But the main amount comes from the shared wallet
             const feeCalculation = FeeService.calculateCompanyFee(amount, 'withdraw');
             requiredBalance = feeCalculation.fee; // Only fees come from personal wallet
+            availableBalance = userAvailableBalance;
           } catch (error) {
             return {
               canExecute: false,
@@ -291,7 +232,7 @@ export class CentralizedTransactionHandler {
           transactionType = 'split_payment'; // 1.5% fee for split contributions
           break;
         case 'shared_wallet_funding':
-          transactionType = 'send'; // 0.01% fee for shared wallet funding
+          transactionType = 'send'; // 0.1% fee for shared wallet funding
           break;
         case 'fair_split_withdrawal':
         case 'shared_wallet_withdrawal':

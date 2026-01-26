@@ -29,7 +29,7 @@ describe('Deep Link Handler - Phantom Callback', () => {
     });
 
     it('should recognize universal links from wesplit domains', () => {
-      expect(isWeSplitDeepLink('https://wesplit-deeplinks.web.app/phantom-callback')).toBe(true);
+      expect(isWeSplitDeepLink('https://deeplinks.wesplit.io/phantom-callback')).toBe(true);
       expect(isWeSplitDeepLink('https://wesplit.io/phantom-callback')).toBe(true);
     });
 
@@ -96,7 +96,7 @@ describe('Deep Link Handler - Phantom Callback', () => {
 
     describe('Universal Link Format', () => {
       it('should parse universal phantom-callback link', () => {
-        const url = 'https://wesplit-deeplinks.web.app/phantom-callback?' +
+        const url = 'https://deeplinks.wesplit.io/phantom-callback?' +
           'response_type=success&' +
           'wallet_id=wallet-123';
 

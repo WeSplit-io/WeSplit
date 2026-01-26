@@ -3,7 +3,7 @@
  * Tests all endpoints: searchKnownUsers, batchInviteParticipants, email sending, etc.
  * 
  * Updated: 2025-01-27
- * - Uses new deep link domain: wesplit-deeplinks.web.app
+ * - Uses new deep link domain: deeplinks.wesplit.io
  * - Tests production logic and URL validation
  * 
  * Usage:
@@ -15,7 +15,7 @@
  *   - USE_EMULATOR: Set to 'true' to use emulator (default: false)
  *   - EMULATOR_HOST: Emulator host (default: localhost)
  *   - EMULATOR_PORT: Emulator port (default: 5001)
- *   - DEEP_LINK_DOMAIN: Deep link domain (default: wesplit-deeplinks.web.app)
+ *   - DEEP_LINK_DOMAIN: Deep link domain (default: deeplinks.wesplit.io)
  */
 
 const https = require('https');
@@ -27,7 +27,7 @@ const BASE_URL = process.env.BASE_URL || 'https://us-central1-wesplit-35186.clou
 const USE_EMULATOR = process.env.USE_EMULATOR === 'true';
 const EMULATOR_HOST = process.env.EMULATOR_HOST || 'localhost';
 const EMULATOR_PORT = parseInt(process.env.EMULATOR_PORT || '5001');
-const DEEP_LINK_DOMAIN = process.env.DEEP_LINK_DOMAIN || 'wesplit-deeplinks.web.app';
+const DEEP_LINK_DOMAIN = process.env.DEEP_LINK_DOMAIN || 'deeplinks.wesplit.io';
 // Use production endpoints (not test/mock endpoints) to match SPEND team testing
 const USE_PRODUCTION_ENDPOINTS = process.env.USE_PRODUCTION_ENDPOINTS !== 'false'; // Default: true
 
@@ -482,7 +482,7 @@ async function testDeepLinkURLValidation() {
     const deepLinkUrl = `https://${DEEP_LINK_DOMAIN}/view-split?splitId=test123`;
     tests.push({
       name: 'Deep link domain configuration',
-      passed: DEEP_LINK_DOMAIN === 'wesplit-deeplinks.web.app',
+      passed: DEEP_LINK_DOMAIN === 'deeplinks.wesplit.io',
       details: {
         status: 'info',
         message: `Using deep link domain: ${DEEP_LINK_DOMAIN}`,

@@ -1004,13 +1004,13 @@ class TransactionSigningService {
       const networkName = isMainnet ? 'mainnet' : 'devnet';
       
       // ✅ FIX: Devnet can be slower, so use longer timeouts for better reliability
-      // Mainnet: Faster verification (RPC is usually more reliable)
+      // Mainnet: Increased timeout to allow proper transaction propagation (2-5 seconds typical)
       // Devnet: Longer timeouts (RPC can be slower, more retries needed)
-      // Increased devnet timeouts to account for slower RPC responses and prevent premature timeouts
-      const initialWait = isMainnet ? 1000 : 3000; // 3 seconds for devnet (was 2 seconds)
-      const maxVerificationAttempts = isMainnet ? 6 : 15; // 15 attempts for devnet (was 10)
-      const verificationDelay = isMainnet ? 1000 : 2000; // 2 seconds between attempts for devnet (was 1.5 seconds)
-      const verificationTimeout = isMainnet ? 2500 : 5000; // 5 seconds per attempt for devnet (was 4 seconds)
+      // Increased mainnet timeouts to prevent false failures when transactions actually succeed
+      const initialWait = isMainnet ? 1500 : 3000; // Increase initial wait for mainnet to allow propagation
+      const maxVerificationAttempts = isMainnet ? 12 : 15; // Increase from 6 to 12 for mainnet (was 6)
+      const verificationDelay = isMainnet ? 1500 : 2000; // Increase from 1000ms to 1500ms for mainnet
+      const verificationTimeout = isMainnet ? 3000 : 5000; // Increase from 2500ms to 3000ms for mainnet
       
       console.log('Starting transaction verification', {
         network: networkName,
@@ -1164,22 +1164,74 @@ class TransactionSigningService {
           }
           
           if (!foundOnAlternateRpc) {
-            console.error('❌ Transaction not found on blockchain after verification attempts', {
+            // ✅ FIX: Try to get more specific error information before throwing generic error
+            let specificError = null;
+            let userFriendlyMessage = null;
+            
+            try {
+              // Try to get transaction status one more time to see if there's an error
+              const finalStatus = await this.connection.getSignatureStatus(signature, {
+                searchTransactionHistory: true
+              });
+              
+              if (finalStatus.value && finalStatus.value.err) {
+                specificError = JSON.stringify(finalStatus.value.err);
+                
+                // Check for common error types and provide user-friendly messages
+                if (specificError.includes('InsufficientFundsForFee')) {
+                  userFriendlyMessage = 'Transaction failed: Insufficient SOL for transaction fees. Please ensure you have at least 0.001 SOL in your wallet.';
+                } else if (specificError.includes('AccountNotFound') || specificError.includes('InvalidAccountData')) {
+                  userFriendlyMessage = 'Transaction failed: One or more accounts are invalid or not found. Please try again or contact support.';
+                } else if (specificError.includes('BlockhashNotFound')) {
+                  userFriendlyMessage = 'Transaction failed: Blockhash expired. Please try again.';
+                } else if (specificError.includes('ProgramError')) {
+                  userFriendlyMessage = 'Transaction failed: Program execution error. Please check your transaction details and try again.';
+                }
+                
+                if (userFriendlyMessage) {
+                  console.error('❌ Transaction failed with specific error', {
+                    signature,
+                    error: specificError,
+                    userFriendlyMessage,
+                    verificationTimeMs: verificationTime
+                  });
+                  
+                  throw handleError(
+                    new Error(userFriendlyMessage),
+                    { signature, operation: 'verifyTransaction', verificationTimeMs: verificationTime, network: isMainnet ? 'mainnet' : 'devnet', specificError }
+                  );
+                }
+              }
+            } catch (statusError) {
+              // Ignore status check errors - we'll use the generic error below
+              console.debug('Could not get specific error status', {
+                error: statusError.message,
+                signature: signature.substring(0, 16) + '...'
+              });
+            }
+            
+            // ✅ FIX: If we have a signature, the transaction WAS submitted successfully
+            // Verification timeout doesn't mean the transaction failed - it just means RPC is slow
+            // Return the signature and let client handle async confirmation
+            console.warn('⚠️ Transaction verification timed out - but signature was returned (transaction was submitted)', {
               signature,
               verificationTimeMs: verificationTime,
               maxAttempts: maxVerificationAttempts,
               isMainnet,
               network: isMainnet ? 'mainnet' : 'devnet',
               rpcUrl: this.rpcUrl ? this.rpcUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@').replace(/api-key=[^&]+/, 'api-key=***') : 'unknown',
-              note: 'Transaction was submitted (signature returned) but not found on blockchain. This likely indicates the transaction was rejected, failed, or there is a network/RPC mismatch.'
+              specificError: specificError || 'none',
+              note: 'Transaction was submitted (signature returned). Verification timed out but transaction may still be processing. Client will confirm asynchronously. Check transaction on Solana Explorer if needed.'
             });
             
-            // Throw error instead of returning signature
-            // This ensures we don't show success for transactions that don't exist
-            throw handleError(
-              new Error(`Transaction not found on blockchain after ${verificationTime}ms and ${maxVerificationAttempts} attempts. Transaction may have been rejected or there may be a network/RPC mismatch. Network: ${isMainnet ? 'mainnet' : 'devnet'}. Signature: ${signature}. Check transaction on Solana Explorer: https://solscan.io/tx/${signature}?cluster=${isMainnet ? 'mainnet' : 'devnet'}`),
-              { signature, operation: 'verifyTransaction', verificationTimeMs: verificationTime, network: isMainnet ? 'mainnet' : 'devnet' }
-            );
+            // Return signature even if verification timed out
+            // The transaction WAS submitted (we have a signature), verification is just slow
+            // Client will handle async confirmation
+            return {
+              signature,
+              confirmation: null, // Client will confirm asynchronously
+              note: 'Transaction submitted but verification timed out. Transaction may still be processing on-chain.'
+            };
           }
         }
       } catch (verifyError) {
@@ -1200,34 +1252,46 @@ class TransactionSigningService {
           // If we get here, all retries failed
           const verificationTime = Date.now() - verificationStartTime;
           
-          // CRITICAL: Don't return signature if verification fails
-          // Even on devnet, if we can't verify the transaction exists, it likely failed
-          console.error('❌ Transaction verification failed after all retries', {
+          // ✅ FIX: If we have a signature, the transaction WAS submitted successfully
+          // Verification errors don't mean the transaction failed - RPC might be slow/unavailable
+          // Only throw if we detect an actual transaction failure (not just verification timeout)
+          const isVerificationTimeout = verifyError.message && (
+            verifyError.message.includes('timeout') ||
+            verifyError.message.includes('Verification timeout') ||
+            verifyError.message.includes('not found on blockchain')
+          );
+          
+          if (isVerificationTimeout) {
+            // Verification timed out but we have a signature - transaction was submitted
+            console.warn('⚠️ Transaction verification timed out - but signature was returned (transaction was submitted)', {
+              signature,
+              verificationTimeMs: verificationTime,
+              error: verifyError.message,
+              isMainnet,
+              network: isMainnet ? 'mainnet' : 'devnet',
+              note: 'Transaction was submitted (signature returned). Verification timed out but transaction may still be processing. Client will confirm asynchronously.'
+            });
+            
+            // Return signature even if verification timed out
+            return {
+              signature,
+              confirmation: null, // Client will confirm asynchronously
+              note: 'Transaction submitted but verification timed out. Transaction may still be processing on-chain.'
+            };
+          }
+          
+          // For other errors (not timeouts), still throw - these might be actual failures
+          console.error('❌ Transaction verification failed (non-timeout error)', {
             signature,
             verificationTimeMs: verificationTime,
             error: verifyError.message,
             isMainnet,
-            note: 'Transaction verification failed. Transaction may have been rejected or RPC is unavailable.'
+            note: 'Transaction verification failed with non-timeout error. This might indicate an actual transaction failure.'
           });
           
-          // Throw error instead of returning signature
-          // This ensures we don't show success for transactions that can't be verified
           throw handleError(
-            new Error(`Transaction verification failed: ${verifyError.message}. Signature: ${signature}`),
+            new Error(`Transaction verification failed: ${verifyError.message}. Signature: ${signature}. Check transaction on Solana Explorer: https://solscan.io/tx/${signature}?cluster=${isMainnet ? 'mainnet' : 'devnet'}`),
             { signature, operation: 'verifyTransaction', verificationTimeMs: verificationTime, originalError: verifyError }
-          );
-          
-          // On mainnet, be stricter
-          console.error('Transaction verification failed after all retries', {
-            signature,
-            verificationTimeMs: verificationTime,
-            error: verifyError.message,
-            note: 'Transaction was likely rejected by Solana network.'
-          });
-          
-          throw handleError(
-            new Error('Transaction was rejected by Solana network. The transaction signature was returned but the transaction was not accepted.'),
-            { signature, operation: 'verifyTransaction', originalError: verifyError }
           );
         }
 

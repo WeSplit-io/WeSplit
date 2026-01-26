@@ -1277,7 +1277,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     } else {
       // Set a fallback QR code data if no split ID is available
       // Use universal link format for fallback too
-      setQrCodeData('https://wesplit-deeplinks.web.app/join-split?data=' + encodeURIComponent(JSON.stringify({
+      setQrCodeData('https://deeplinks.wesplit.io/join-split?data=' + encodeURIComponent(JSON.stringify({
         type: 'split_invitation',
         message: 'Join this split'
       })));

@@ -59,6 +59,8 @@ export interface SharedWalletMember {
   status: 'active' | 'invited' | 'left';
   linkedCards?: string[]; // IDs of linked cards this member can use
   permissions?: SharedWalletMemberPermissions; // Custom permissions (overrides role defaults)
+  lastWithdrawalDate?: string; // ISO date string of last withdrawal (UTC) - used for daily limit tracking
+  dailyWithdrawnAmount?: number; // Amount withdrawn today (resets at midnight UTC)
 }
 
 /**

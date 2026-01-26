@@ -45,6 +45,95 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
 
 export class MemberRightsService {
   /**
+   * Retry Firestore transaction with exponential backoff
+   * Handles transaction conflicts and permission errors
+   */
+  private static async retryTransaction<T>(
+    transactionFn: () => Promise<T>,
+    maxRetries: number = 3,
+    operationName: string = 'transaction'
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await transactionFn();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const errorMessage = lastError.message;
+        
+        // Check if it's a transaction conflict (can retry)
+        const isTransactionConflict = 
+          errorMessage.includes('transaction') ||
+          errorMessage.includes('concurrent') ||
+          errorMessage.includes('aborted') ||
+          errorMessage.includes('deadline');
+        
+        // Permission errors should not be retried
+        const isPermissionError = 
+          errorMessage.includes('permission') ||
+          errorMessage.includes('Permission') ||
+          errorMessage.includes('PERMISSION_DENIED');
+        
+        if (isPermissionError) {
+          // Don't retry permission errors
+          throw lastError;
+        }
+        
+        if (!isTransactionConflict) {
+          // Not a retryable error
+          throw lastError;
+        }
+        
+        // If it's a transaction conflict and we have retries left, wait and retry
+        if (attempt < maxRetries - 1) {
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff, max 5s
+          logger.warn(`Transaction conflict on ${operationName}, retrying`, {
+            attempt: attempt + 1,
+            maxRetries,
+            backoffMs,
+            error: errorMessage
+          }, 'MemberRightsService');
+          
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      }
+    }
+    
+    // All retries exhausted
+    logger.error(`Transaction failed after ${maxRetries} attempts`, {
+      operationName,
+      error: lastError?.message
+    }, 'MemberRightsService');
+    
+    throw lastError || new Error('Transaction failed after retries');
+  }
+
+  /**
+   * Get the amount withdrawn today by a member
+   * Returns 0 if last withdrawal was on a different day (resets at midnight UTC)
+   */
+  static getDailyWithdrawnAmount(member: SharedWalletMember): number {
+    if (!member.lastWithdrawalDate || !member.dailyWithdrawnAmount) {
+      return 0;
+    }
+
+    // Check if last withdrawal was today (UTC)
+    const today = new Date();
+    const todayDateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    const lastWithdrawalDateStr = member.lastWithdrawalDate.split('T')[0];
+    
+    // If same day, return the amount; otherwise reset to 0
+    if (lastWithdrawalDateStr === todayDateStr) {
+      return member.dailyWithdrawnAmount || 0;
+    }
+    
+    // Different day - reset to 0
+    return 0;
+  }
+
+  /**
    * Get effective permissions for a member
    * Combines role-based defaults with custom permissions if enabled
    */
@@ -57,11 +146,17 @@ export class MemberRightsService {
       return DEFAULT_ROLE_PERMISSIONS.creator;
     }
 
-    // If custom permissions are enabled and member has custom permissions, use them
-    if (
-      wallet.settings?.enableCustomPermissions &&
-      member.permissions
-    ) {
+    // If member has custom permissions, always use them (merge with role defaults)
+    // Log warning if custom permissions exist but enableCustomPermissions flag is false
+    if (member.permissions) {
+      if (!wallet.settings?.enableCustomPermissions) {
+        logger.warn('Custom permissions exist but enableCustomPermissions flag is false', {
+          walletId: wallet.id,
+          memberId: member.userId,
+          note: 'Custom permissions will still be applied, but flag should be set to true for consistency'
+        }, 'MemberRightsService');
+      }
+      
       // Merge custom permissions with role defaults (custom takes precedence)
       return {
         ...DEFAULT_ROLE_PERMISSIONS[member.role],
@@ -74,6 +169,28 @@ export class MemberRightsService {
   }
 
   /**
+   * Get available balance for withdrawal
+   * Returns the wallet's total balance (pool-based approach)
+   * This is the single source of truth for balance validation
+   */
+  static getAvailableBalance(
+    member: SharedWalletMember,
+    wallet: SharedWallet
+  ): { availableBalance: number; error?: string } {
+    // Pool-based approach: users can withdraw from the shared pool
+    const availableBalance = wallet.totalBalance || 0;
+    
+    if (availableBalance < 0) {
+      return {
+        availableBalance: 0,
+        error: 'Wallet balance is negative - this should not happen'
+      };
+    }
+    
+    return { availableBalance };
+  }
+
+  /**
    * Check if a member has a specific permission
    */
   static hasPermission(
@@ -83,6 +200,74 @@ export class MemberRightsService {
   ): boolean {
     const permissions = this.getMemberPermissions(member, wallet);
     return permissions[permission] === true;
+  }
+
+  /**
+   * Validate permissions for logical consistency
+   * Clears limits when canWithdraw is false, validates limits are positive
+   */
+  static validatePermissions(
+    permissions: Partial<SharedWalletMemberPermissions>
+  ): { valid: boolean; cleaned: Partial<SharedWalletMemberPermissions>; errors: string[] } {
+    const errors: string[] = [];
+    const cleaned: Partial<SharedWalletMemberPermissions> = { ...permissions };
+
+    // If canWithdraw is false, clear withdrawal limits
+    if (permissions.canWithdraw === false) {
+      if (permissions.withdrawalLimit !== undefined) {
+        delete cleaned.withdrawalLimit;
+        errors.push('Withdrawal limit cleared because canWithdraw is false');
+      }
+      if (permissions.dailyWithdrawalLimit !== undefined) {
+        delete cleaned.dailyWithdrawalLimit;
+        errors.push('Daily withdrawal limit cleared because canWithdraw is false');
+      }
+    }
+
+    // Validate withdrawal limits are positive numbers
+    if (cleaned.withdrawalLimit !== undefined) {
+      if (isNaN(cleaned.withdrawalLimit) || cleaned.withdrawalLimit <= 0) {
+        errors.push('Withdrawal limit must be a positive number');
+        delete cleaned.withdrawalLimit;
+      }
+    }
+
+    if (cleaned.dailyWithdrawalLimit !== undefined) {
+      if (isNaN(cleaned.dailyWithdrawalLimit) || cleaned.dailyWithdrawalLimit <= 0) {
+        errors.push('Daily withdrawal limit must be a positive number');
+        delete cleaned.dailyWithdrawalLimit;
+      }
+    }
+
+    // Validate that if limits are set, canWithdraw should be true
+    if ((cleaned.withdrawalLimit !== undefined || cleaned.dailyWithdrawalLimit !== undefined) && 
+        cleaned.canWithdraw === false) {
+      errors.push('Cannot set withdrawal limits when canWithdraw is false');
+    }
+
+    return {
+      valid: errors.length === 0,
+      cleaned,
+      errors
+    };
+  }
+
+  /**
+   * Get error reason for action denial based on member status
+   */
+  static getActionErrorReason(
+    member: SharedWalletMember,
+    action: string
+  ): string {
+    if (member.status === 'invited') {
+      return `You need to accept the invitation to this shared wallet before you can ${action}. Please check your notifications or the wallet details.`;
+    } else if (member.status === 'removed') {
+      return `You have been removed from this shared wallet and can no longer ${action}.`;
+    } else if (member.status === 'left') {
+      return `You have left this shared wallet and can no longer ${action}.`;
+    } else {
+      return `Your account status is "${member.status}". You must be an active member to ${action}. Please contact the wallet creator if you believe this is an error.`;
+    }
   }
 
   /**
@@ -107,12 +292,58 @@ export class MemberRightsService {
       return false;
     }
 
-    // Check if member is active
+    // Check if member is active - use detailed status checks like canWithdrawAmount()
     if (member.status !== 'active') {
       return false;
     }
 
     return this.hasPermission(member, wallet, permission);
+  }
+
+  /**
+   * Check if a member can perform an action with detailed error reason
+   * Returns both allowed status and reason for denial (if applicable)
+   */
+  static canPerformActionWithReason(
+    member: SharedWalletMember,
+    wallet: SharedWallet,
+    action: 'invite' | 'withdraw' | 'manageSettings' | 'removeMembers' | 'viewTransactions' | 'fund'
+  ): { allowed: boolean; reason?: string } {
+    const permissionMap: Record<string, keyof SharedWalletMemberPermissions> = {
+      invite: 'canInviteMembers',
+      withdraw: 'canWithdraw',
+      manageSettings: 'canManageSettings',
+      removeMembers: 'canRemoveMembers',
+      viewTransactions: 'canViewTransactions',
+      fund: 'canFund',
+    };
+
+    const permission = permissionMap[action];
+    if (!permission) {
+      return {
+        allowed: false,
+        reason: `Unknown action: ${action}`
+      };
+    }
+
+    // Check if member is active - provide detailed error reason
+    if (member.status !== 'active') {
+      return {
+        allowed: false,
+        reason: this.getActionErrorReason(member, action)
+      };
+    }
+
+    const hasPermission = this.hasPermission(member, wallet, permission);
+    if (!hasPermission) {
+      const permissions = this.getMemberPermissions(member, wallet);
+      return {
+        allowed: false,
+        reason: `You do not have permission to ${action} in this shared wallet. Please contact the wallet creator or an admin to request access.`
+      };
+    }
+
+    return { allowed: true };
   }
 
   /**
@@ -168,15 +399,16 @@ export class MemberRightsService {
       };
     }
 
-    // Check daily limit (would need to track daily withdrawals)
-    // This is a placeholder - would need to implement daily tracking
+    // Check daily limit - calculate cumulative daily withdrawals
     if (permissions.dailyWithdrawalLimit) {
-      // TODO: Implement daily withdrawal tracking
-      // For now, just check the limit
-      if (amount > permissions.dailyWithdrawalLimit) {
+      const currentDailyAmount = this.getDailyWithdrawnAmount(member);
+      const newDailyTotal = currentDailyAmount + amount;
+      
+      if (newDailyTotal > permissions.dailyWithdrawalLimit) {
+        const remainingDailyLimit = permissions.dailyWithdrawalLimit - currentDailyAmount;
         return {
           allowed: false,
-          reason: `Withdrawal amount exceeds your daily limit of ${permissions.dailyWithdrawalLimit} ${wallet.currency}`,
+          reason: `Withdrawal would exceed your daily limit of ${permissions.dailyWithdrawalLimit} ${wallet.currency}. You have ${remainingDailyLimit.toFixed(6)} ${wallet.currency} remaining today.`,
         };
       }
     }
@@ -260,6 +492,21 @@ export class MemberRightsService {
         };
       }
 
+      // ✅ FIX: Validate permissions before updating
+      const validation = this.validatePermissions(permissions);
+      if (!validation.valid && validation.errors.length > 0) {
+        logger.warn('Permission validation found issues', {
+          walletId,
+          memberId,
+          errors: validation.errors,
+          originalPermissions: permissions
+        }, 'MemberRightsService');
+        // Continue with cleaned permissions - validation fixes issues automatically
+      }
+      
+      // Use cleaned permissions (validation may have removed invalid values)
+      const validatedPermissions = validation.cleaned;
+
       // ✅ FIX: Update member permissions - merge provided permissions with existing
       // This ensures that all fields are preserved, and only updated fields change
       const updatedMembers = wallet.members.map((m) => {
@@ -270,7 +517,7 @@ export class MemberRightsService {
           // Merge with new permissions (new permissions override existing)
           const mergedPermissions: Partial<SharedWalletMemberPermissions> = {
             ...existingPermissions,
-            ...permissions, // New permissions override existing ones
+            ...validatedPermissions, // Use validated permissions
           };
           
           // Remove undefined values (but keep false values - they're intentional)
@@ -286,9 +533,10 @@ export class MemberRightsService {
             walletId,
             memberId,
             existingPermissions: Object.keys(existingPermissions),
-            newPermissions: Object.keys(permissions),
+            newPermissions: Object.keys(validatedPermissions),
             finalPermissions: Object.keys(cleanedPermissions),
             permissionValues: cleanedPermissions,
+            validationErrors: validation.errors,
             note: 'Merging new permissions with existing, keeping all explicitly set fields'
           }, 'MemberRightsService');
           
@@ -309,39 +557,42 @@ export class MemberRightsService {
         : currentSettings;
 
       // ✅ FIX: Use runTransaction for atomic update to ensure consistency and trigger listeners
+      // Wrap in retry logic to handle transaction conflicts
       const { runTransaction } = await import('firebase/firestore');
       try {
-        await runTransaction(db, async (transaction) => {
-          const walletDocRef = doc(db, 'sharedWallets', walletDocId);
-          const walletDoc = await transaction.get(walletDocRef);
-          
-          if (!walletDoc.exists()) {
-            throw new Error('Shared wallet not found');
-          }
-          
-          // Update both members and settings if needed
-          const updateData: any = {
-            members: updatedMembers,
-            updatedAt: serverTimestamp(),
-          };
-          
-          // Only update settings if we need to enable custom permissions
-          if (needsEnableCustomPermissions) {
-            updateData.settings = updatedSettings;
-            logger.info('Enabling custom permissions in wallet settings', {
-              walletId,
-              note: 'Custom permissions are now enabled for this wallet'
-            }, 'MemberRightsService');
-          }
-          
-          transaction.update(walletDocRef, updateData);
-        });
+        await this.retryTransaction(async () => {
+          return await runTransaction(db, async (transaction) => {
+            const walletDocRef = doc(db, 'sharedWallets', walletDocId);
+            const walletDoc = await transaction.get(walletDocRef);
+            
+            if (!walletDoc.exists()) {
+              throw new Error('Shared wallet not found');
+            }
+            
+            // Update both members and settings if needed
+            const updateData: any = {
+              members: updatedMembers,
+              updatedAt: serverTimestamp(),
+            };
+            
+            // Only update settings if we need to enable custom permissions
+            if (needsEnableCustomPermissions) {
+              updateData.settings = updatedSettings;
+              logger.info('Enabling custom permissions in wallet settings', {
+                walletId,
+                note: 'Custom permissions are now enabled for this wallet'
+              }, 'MemberRightsService');
+            }
+            
+            transaction.update(walletDocRef, updateData);
+          });
+        }, 3, 'updateMemberPermissions');
         
         logger.info('Member permissions updated', {
           walletId,
           memberId,
           updaterId,
-          permissions: Object.keys(permissions),
+          permissions: Object.keys(validatedPermissions),
         }, 'MemberRightsService');
       } catch (updateError) {
         const errorMessage = updateError instanceof Error ? updateError.message : String(updateError);
@@ -490,13 +741,32 @@ export class MemberRightsService {
       }
 
       // Update member role
+      // NOTE: Permission reset behavior:
+      // - If enableCustomPermissions is true: custom permissions are preserved when role changes
+      // - If enableCustomPermissions is false: custom permissions are cleared (role defaults apply)
+      // This ensures that custom permissions are only used when explicitly enabled in wallet settings
       const updatedMembers = wallet.members.map((m) => {
         if (m.userId === memberId) {
+          const shouldPreservePermissions = wallet.settings?.enableCustomPermissions === true;
+          
+          logger.info('Updating member role', {
+            walletId,
+            memberId,
+            oldRole: m.role,
+            newRole,
+            hasCustomPermissions: !!m.permissions,
+            enableCustomPermissions: wallet.settings?.enableCustomPermissions,
+            willPreservePermissions: shouldPreservePermissions,
+            note: shouldPreservePermissions 
+              ? 'Custom permissions will be preserved because enableCustomPermissions is true'
+              : 'Custom permissions will be cleared because enableCustomPermissions is false or not set'
+          }, 'MemberRightsService');
+          
           return {
             ...m,
             role: newRole,
             // Reset permissions when role changes (unless custom permissions are enabled)
-            permissions: wallet.settings?.enableCustomPermissions
+            permissions: shouldPreservePermissions
               ? m.permissions
               : undefined,
           };
@@ -505,21 +775,24 @@ export class MemberRightsService {
       });
 
       // ✅ FIX: Use runTransaction for atomic update and better error handling
+      // Wrap in retry logic to handle transaction conflicts
       const { runTransaction } = await import('firebase/firestore');
       try {
-        await runTransaction(db, async (transaction) => {
-          const walletDocRef = doc(db, 'sharedWallets', walletDocId);
-          const walletDoc = await transaction.get(walletDocRef);
-          
-          if (!walletDoc.exists()) {
-            throw new Error('Shared wallet not found');
-          }
-          
-          transaction.update(walletDocRef, {
-            members: updatedMembers,
-            updatedAt: serverTimestamp(),
+        await this.retryTransaction(async () => {
+          return await runTransaction(db, async (transaction) => {
+            const walletDocRef = doc(db, 'sharedWallets', walletDocId);
+            const walletDoc = await transaction.get(walletDocRef);
+            
+            if (!walletDoc.exists()) {
+              throw new Error('Shared wallet not found');
+            }
+            
+            transaction.update(walletDocRef, {
+              members: updatedMembers,
+              updatedAt: serverTimestamp(),
+            });
           });
-        });
+        }, 3, 'updateMemberRole');
         
         logger.info('Member role updated', {
           walletId,
