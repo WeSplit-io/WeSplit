@@ -837,12 +837,12 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                 autoCorrect={false}
               />
 
-              {/* Phone Number Field - Temporarily hidden */}
-              {/* {phoneNumber ? (
+              {/* Phone Number Field */}
+              {currentUser?.phone ? (
                 <Input
                   label="Phone Number"
-                  value={phoneNumber}
-                  onChangeText={setPhoneNumber}
+                  value={currentUser.phone}
+                  onChangeText={() => {}} // Read-only
                   placeholder="+1234567890"
                   keyboardType="phone-pad"
                   editable={false}
@@ -860,14 +860,15 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                   <Button
                     title="Add Phone Number"
                     onPress={() => {
-                      setShowPhoneInputModal(true);
+                      // Navigate to phone prompt flow via Dashboard
+                      navigation.navigate('Dashboard');
                     }}
                     variant="secondary"
                     size="medium"
                     style={{ marginBottom: spacing.md }}
                   />
                 </View>
-              )} */}
+              )}
 
               {/* Settings Section */}
               <View style={{ marginTop: spacing.md }}>

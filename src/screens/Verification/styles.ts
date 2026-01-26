@@ -36,6 +36,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
+    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   mailIconBox: {
     width: spacing.mailIconBoxSize,
@@ -72,23 +73,27 @@ export const styles = StyleSheet.create({
   codeRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: spacing.xl,
+    width: '100%',
+    // No flexWrap - we want all inputs in a single row
+    // No paddingHorizontal here - parent centerContent already has padding
   },
   codeInput: {
-    width: spacing.codeInputSize,
-    height: spacing.codeInputSize,
+    // Width and height are set dynamically in component based on screen size
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.white50,
     backgroundColor: colors.white5,
-    fontSize: typography.fontSize.xxxl,
+    // Font size is set dynamically in component
     color: colors.white,
     textAlign: 'center',
     textAlignVertical: 'center',
-    marginHorizontal: spacing.sm,
+    marginRight: spacing.xs, // Only right margin - last input will have marginRight: 0
     fontWeight: typography.fontWeight.semibold,
     paddingTop: 0,
     paddingBottom: 0,
+    paddingHorizontal: 0, // No horizontal padding to maximize space
     includeFontPadding: false,
   },
   submitButton: {

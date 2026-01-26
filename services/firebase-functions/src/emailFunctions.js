@@ -138,6 +138,107 @@ exports.checkEmailUserExists = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * HTTP Callable Function: Check if username is available
+ * Checks if a username (name field) is already taken (case-insensitive)
+ */
+exports.checkUsernameAvailability = functions.https.onCall(async (data, context) => {
+  try {
+    const { username, excludeUserId } = data;
+
+    // Validate input
+    if (!username || typeof username !== 'string') {
+      throw new functions.https.HttpsError('invalid-argument', 'Username is required');
+    }
+
+    const trimmedUsername = username.trim();
+
+    // Basic validation
+    if (trimmedUsername.length < 2) {
+      return {
+        success: true,
+        available: false,
+        error: 'Username must be at least 2 characters'
+      };
+    }
+
+    if (trimmedUsername.length > 30) {
+      return {
+        success: true,
+        available: false,
+        error: 'Username must be 30 characters or less'
+      };
+    }
+
+    // Check for invalid characters (alphanumeric, spaces, underscores, hyphens only)
+    const validUsernameRegex = /^[a-zA-Z0-9_\-\s]+$/;
+    if (!validUsernameRegex.test(trimmedUsername)) {
+      return {
+        success: true,
+        available: false,
+        error: 'Username can only contain letters, numbers, spaces, underscores, and hyphens'
+      };
+    }
+
+    console.log('🔍 Checking username availability', {
+      username: trimmedUsername.substring(0, 10) + '...',
+      excludeUserId: excludeUserId || 'none'
+    });
+
+    // Query all users and check case-insensitively
+    // Note: Firestore queries are case-sensitive, so we need to check in memory
+    // For better performance in production, consider storing a lowercase version of the name
+    const usersSnapshot = await db.collection('users')
+      .where('name', '!=', null) // Only get users with names
+      .limit(1000) // Reasonable limit
+      .get();
+
+    const usernameLower = trimmedUsername.toLowerCase();
+
+    for (const userDoc of usersSnapshot.docs) {
+      // Skip if this is the current user updating their own username
+      if (excludeUserId && userDoc.id === excludeUserId) {
+        continue;
+      }
+
+      const userData = userDoc.data();
+      const existingName = userData.name;
+
+      // Case-insensitive comparison
+      if (existingName && typeof existingName === 'string' && existingName.toLowerCase() === usernameLower) {
+        console.log('❌ Username already taken', {
+          username: trimmedUsername,
+          existingUserId: userDoc.id
+        });
+
+        return {
+          success: true,
+          available: false,
+          error: 'This username is already taken'
+        };
+      }
+    }
+
+    console.log('✅ Username is available', {
+      username: trimmedUsername.substring(0, 10) + '...'
+    });
+
+    return {
+      success: true,
+      available: true,
+      message: 'Username is available'
+    };
+  } catch (error) {
+    console.error('❌ Error in checkUsernameAvailability', error);
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError('internal', 'Failed to check username availability');
+  }
+});
+
+/**
  * HTTP Callable Function: Send verification code via email
  * Secrets are explicitly bound using runWith to ensure EMAIL_USER and EMAIL_PASSWORD are available
  */

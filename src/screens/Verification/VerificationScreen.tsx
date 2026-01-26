@@ -1,12 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, Linking, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, Linking, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
 import { Header } from '../../components/shared';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { verifyCode, sendVerificationCode } from '../../services/data';
 import { useApp } from '../../context/AppContext';
-import { colors } from '../../theme';
+import { colors, spacing } from '../../theme';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import { authService } from '../../services/auth/AuthService';
@@ -24,6 +24,19 @@ const VerificationScreen: React.FC = () => {
 
   // Get code length based on verification type
   const codeLength = getCodeLength(route.params?.phoneNumber);
+  
+  // Calculate responsive input size based on screen width
+  // Ensure all 6 inputs fit in a single row without wrapping
+  // Formula: (screenWidth - containerPadding) = (6 * inputSize) + (5 * marginBetweenInputs)
+  // marginBetweenInputs = spacing.xs (4px) - only right margin between inputs
+  const screenWidth = Dimensions.get('window').width;
+  const containerPadding = spacing.screenPaddingHorizontal * 2; // 16px on each side = 32px total
+  const marginBetweenInputs = spacing.xs; // 4px margin between inputs (only right margin)
+  const totalMarginSpace = (codeLength - 1) * marginBetweenInputs; // 5 gaps × 4px = 20px total
+  const availableWidth = screenWidth - containerPadding - totalMarginSpace;
+  // Calculate input size: ensure it fits all 6 inputs in one row
+  // Use Math.floor to ensure we don't exceed available space
+  const calculatedInputSize = Math.min(56, Math.max(40, Math.floor(availableWidth / codeLength))); // Between 40-56px
 
   const [code, setCode] = useState(Array(codeLength).fill(''));
   const [error, setError] = useState('');
@@ -154,6 +167,18 @@ const VerificationScreen: React.FC = () => {
                     if (__DEV__) { logger.info('Email preserved in SecureStore after phone linking', { email: transformedUser.email }, 'VerificationScreen'); }
                   } catch (emailSaveError) {
                     logger.warn('Failed to preserve email after phone linking (non-critical)', emailSaveError, 'VerificationScreen');
+                    // Non-critical, continue with authentication
+                  }
+                }
+
+                // CRITICAL: Save phone number to persistence after linking
+                if (transformedUser.phone) {
+                  try {
+                    const { PhonePersistenceService } = await import('../../services/core/phonePersistenceService');
+                    await PhonePersistenceService.savePhone(transformedUser.phone);
+                    if (__DEV__) { logger.info('Phone number saved to persistence after linking', { phone: transformedUser.phone.substring(0, 5) + '...' }, 'VerificationScreen'); }
+                  } catch (phoneSaveError) {
+                    logger.warn('Failed to save phone to persistence after linking (non-critical)', phoneSaveError, 'VerificationScreen');
                     // Non-critical, continue with authentication
                   }
                 }
@@ -836,7 +861,12 @@ const VerificationScreen: React.FC = () => {
                 inputRefs.current[idx] = ref;
                 }
               }}
-              style={styles.codeInput}
+              style={[styles.codeInput, { 
+                width: calculatedInputSize, 
+                height: calculatedInputSize,
+                fontSize: Math.max(20, calculatedInputSize * 0.5), // Responsive font size (50% of input size, min 20)
+                marginRight: idx < codeLength - 1 ? spacing.xs : 0 // Only add margin between inputs, not after last one
+              }]}
               value={digit}
               onChangeText={val => handleChange(val, idx)}
               keyboardType="number-pad"

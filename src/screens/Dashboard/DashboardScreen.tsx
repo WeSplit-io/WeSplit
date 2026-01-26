@@ -81,7 +81,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authenticationError, setAuthenticationError] = useState<string | null>(null);
 
-  // Phone prompt modal state
+  // Phone prompt modal state - FORCE DISPLAY
   const [showPhonePrompt, setShowPhonePrompt] = useState(false);
   const [needsPhoneReminder, setNeedsPhoneReminder] = useState(false);
 
@@ -276,7 +276,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     checkPendingInvitation();
   }, [isAuthenticating, isAuthenticated, currentUser?.id, navigation]);
 
-  // Check phone prompt status
+  // Check phone prompt status - FORCED DISPLAY
   useEffect(() => {
     const checkPhonePromptStatus = async () => {
       if (!currentUser?.id || !isAuthenticated) {
@@ -288,28 +288,37 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         const hasEmail = !!currentUser.email;
         const hasPhone = !!currentUser.phone;
 
+        // FORCE DISPLAY: Always show modal if user has email but no phone (ignores AsyncStorage)
         if (hasEmail && !hasPhone) {
-          // Check if user has seen the prompt before
-          const promptShownKey = `phone_prompt_shown_${currentUser.id}`;
-          const promptShown = await AsyncStorage.getItem(promptShownKey);
-
-          if (!promptShown) {
-            // Show prompt on first login after integration
-            setShowPhonePrompt(true);
-          } else {
-            // User has seen prompt but skipped - show reminder badge
-            setNeedsPhoneReminder(true);
-          }
+          // Always show prompt - removed AsyncStorage check to force display every time
+          setShowPhonePrompt(true);
+          logger.info('Forcing phone prompt modal display', { 
+            userId: currentUser.id,
+            hasEmail,
+            hasPhone 
+          }, 'DashboardScreen');
+        } else if (!hasPhone) {
+          // Even if no email, show if no phone (for testing)
+          setShowPhonePrompt(true);
         } else {
           setShowPhonePrompt(false);
           setNeedsPhoneReminder(false);
         }
       } catch (error) {
         logger.error('Failed to check phone prompt status', error, 'DashboardScreen');
+        // On error, still try to show if user has email but no phone
+        if (currentUser?.email && !currentUser?.phone) {
+          setShowPhonePrompt(true);
+        }
       }
     };
 
-    checkPhonePromptStatus();
+    // Small delay to ensure user is fully loaded
+    const timer = setTimeout(() => {
+      checkPhonePromptStatus();
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [currentUser?.id, currentUser?.email, currentUser?.phone, isAuthenticated]);
 
   useEffect(() => {
@@ -384,14 +393,22 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Handle phone prompt actions
   const handleAddPhone = async (phone: string) => {
     try {
+      // Validate we have a current user ID before proceeding
+      if (!currentUser?.id) {
+        logger.error('Cannot add phone: User ID is missing', { currentUser }, 'DashboardScreen');
+        Alert.alert('Error', 'User session not found. Please log out and log back in.');
+        setShowPhonePrompt(false);
+        return;
+      }
+
       setShowPhonePrompt(false);
 
       // Normalize phone number
       const normalizedPhone = normalizePhoneNumber(phone);
 
       // Link phone to existing user account (not create new account)
-      // Pass userId and email to help with auth state verification
-      const result = await authService.linkPhoneNumberToUser(normalizedPhone, undefined, currentUser?.id, currentUser?.email);
+      // Pass userId as the second parameter (not third)
+      const result = await authService.linkPhoneNumberToUser(normalizedPhone, currentUser.id);
 
       if (result.success && result.verificationId) {
         // Navigate to verification screen with linking context

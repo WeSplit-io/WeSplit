@@ -827,6 +827,17 @@ exports.verifyPhoneForLinking = functions.https.onCall(async (data, context) => 
       verifiedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
+    // Update Firebase Auth user's phone number
+    try {
+      await admin.auth().updateUser(userId, {
+        phoneNumber: phoneNumber
+      });
+      console.log('✅ Updated Firebase Auth user phone number', { userId });
+    } catch (authError) {
+      console.warn('⚠️ Failed to update Firebase Auth phone number (non-critical)', authError);
+      // Non-critical - Firestore update will still work
+    }
+
     // Update user document with phone number
     const userDoc = db.collection('users').doc(userId);
     await userDoc.update({

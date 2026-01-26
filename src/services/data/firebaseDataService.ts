@@ -568,6 +568,110 @@ export const firebaseDataService = {
       }
     },
 
+    /**
+     * Check if a username (name) is available
+     * Uses Firebase Cloud Function for server-side validation, falls back to client-side check
+     * @param username - The username to check
+     * @param excludeUserId - Optional user ID to exclude from check (for updating own username)
+     * @returns true if username is available, false if taken
+     */
+    checkUsernameAvailability: async (username: string, excludeUserId?: string): Promise<{ available: boolean; error?: string }> => {
+      try {
+        // Validate input
+        if (!username || typeof username !== 'string') {
+          return { available: false, error: 'Username is required' };
+        }
+
+        const trimmedUsername = username.trim();
+        
+        // Basic validation
+        if (trimmedUsername.length < 2) {
+          return { available: false, error: 'Username must be at least 2 characters' };
+        }
+
+        if (trimmedUsername.length > 30) {
+          return { available: false, error: 'Username must be 30 characters or less' };
+        }
+
+        // Check for invalid characters (alphanumeric, spaces, underscores, hyphens only)
+        const validUsernameRegex = /^[a-zA-Z0-9_\-\s]+$/;
+        if (!validUsernameRegex.test(trimmedUsername)) {
+          return { available: false, error: 'Username can only contain letters, numbers, spaces, underscores, and hyphens' };
+        }
+
+        // Try Firebase Cloud Function first (if deployed)
+        try {
+          const { checkUsernameAvailability: checkUsername } = await import('./firebaseFunctionsService');
+          const result = await checkUsername(trimmedUsername, excludeUserId);
+          
+          // Check if function was not found (not deployed)
+          if (result.error === 'FUNCTION_NOT_FOUND') {
+            // Silently fall back to client-side check
+            // Fall through to client-side check below
+          } else {
+            // Function worked, return result
+            return {
+              available: result.available,
+              error: result.error
+            };
+          }
+        } catch (cloudFunctionError: any) {
+          // If function not found (not deployed), fall back to client-side check silently
+          const errorCode = cloudFunctionError?.code;
+          const errorMessage = String(cloudFunctionError?.message || '');
+          const isNotFound = errorCode === 'functions/not-found' || 
+                           errorCode === 'not-found' || 
+                           errorMessage.toLowerCase().includes('not-found');
+          
+          if (isNotFound) {
+            // Silently fall back to client-side check - this is expected when function isn't deployed
+            // Fall through to client-side check below
+          } else {
+            // Other errors, log warning and fall through to client-side check
+            logger.warn('Cloud function error, falling back to client-side check', { 
+              error: errorMessage || cloudFunctionError 
+            }, 'FirebaseDataService');
+            // Fall through to client-side check
+          }
+        }
+
+        // Client-side fallback: Query Firestore for users with this name (case-insensitive)
+        // Note: This is less efficient but works when cloud function isn't deployed
+        const usersQuery = query(
+          collection(db, 'users'),
+          limit(500) // Reasonable limit for client-side check
+        );
+        const querySnapshot = await getDocs(usersQuery);
+        
+        const usernameLower = trimmedUsername.toLowerCase();
+        
+        for (const doc of querySnapshot.docs) {
+          // Skip if this is the current user updating their own username
+          if (excludeUserId && doc.id === excludeUserId) {
+            continue;
+          }
+          
+          const userData = doc.data();
+          const existingName = userData.name;
+          
+          // Case-insensitive comparison
+          if (existingName && typeof existingName === 'string' && existingName.toLowerCase() === usernameLower) {
+            logger.debug('Username already taken (client-side check)', { 
+              username: trimmedUsername, 
+              existingUserId: doc.id 
+            }, 'FirebaseDataService');
+            return { available: false, error: 'This username is already taken' };
+          }
+        }
+        
+        return { available: true };
+      } catch (error) {
+        logger.error('Failed to check username availability', { username, error }, 'FirebaseDataService');
+        // Return permissive response - allow user to proceed, backend will validate during creation
+        return { available: true, error: undefined };
+      }
+    },
+
     createUserIfNotExists: async (userData: Omit<User, "id" | "created_at">): Promise<User> => {
       try {
         // Check if user already exists by email

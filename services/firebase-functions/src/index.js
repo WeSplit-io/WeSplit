@@ -49,6 +49,8 @@ const emailFunctions = require('./emailFunctions');
 exports.sendVerificationEmail = emailFunctions.sendVerificationEmail;
 exports.verifyCode = emailFunctions.verifyCode;
 exports.hasVerifiedWithin30Days = emailFunctions.hasVerifiedWithin30Days;
+exports.checkEmailUserExists = emailFunctions.checkEmailUserExists;
+exports.checkUsernameAvailability = emailFunctions.checkUsernameAvailability;
 
 // Import and export phone functions
 const phoneFunctions = require('./phoneFunctions');

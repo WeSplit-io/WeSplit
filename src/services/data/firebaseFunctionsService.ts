@@ -76,6 +76,9 @@ const verifyCodeFunction = httpsCallable(functionsRegion, 'verifyCode', {
 const checkEmailUserExistsFunction = httpsCallable(functionsRegion, 'checkEmailUserExists', {
   timeout: 30000 // 30 seconds timeout
 });
+const checkUsernameAvailabilityFunction = httpsCallable(functionsRegion, 'checkUsernameAvailability', {
+  timeout: 30000 // 30 seconds timeout
+});
 const sendEmailChangeNotificationFunction = httpsCallable(functionsRegion, 'sendEmailChangeNotification', {
   timeout: 30000 // 30 seconds timeout
 });
@@ -396,6 +399,111 @@ export async function checkEmailUserExists(email: string): Promise<{ success: bo
       throw new Error(errorMessage);
     } else {
       throw new Error('Failed to check user existence. Please try again.');
+    }
+  }
+}
+
+/**
+ * Check if username is available
+ */
+export async function checkUsernameAvailability(username: string, excludeUserId?: string): Promise<{ success: boolean; available: boolean; error?: string; message?: string }> {
+  if (__DEV__) { logger.info('checkUsernameAvailability called (Firebase Functions)', { username: username.substring(0, 10) + '...' }, 'firebaseFunctionsService'); }
+
+  // Wrap the entire call in try-catch to handle not-found errors silently
+  try {
+    // Call Firebase Function to check if username is available
+    let result;
+    try {
+      result = await checkUsernameAvailabilityFunction({
+        username: username.trim(),
+        excludeUserId: excludeUserId
+      });
+    } catch (callError: any) {
+      // Check if this is a not-found error BEFORE React Native logs it
+      const errorCode = callError?.code;
+      const errorMessage = String(callError?.message || '');
+      const errorString = String(callError);
+      
+      const isNotFound = errorCode === 'functions/not-found' || 
+                         errorCode === 'not-found' || 
+                         errorMessage.toLowerCase().includes('not-found') ||
+                         errorString.toLowerCase().includes('not-found');
+      
+      if (isNotFound) {
+        // Return special result instead of throwing - prevents React Native error logging
+        return {
+          success: false,
+          available: false,
+          error: 'FUNCTION_NOT_FOUND' // Special marker for caller to detect
+        };
+      }
+      // Re-throw other errors
+      throw callError;
+    }
+
+    if (!result || !result.data) {
+      logger.error('Invalid response from checkUsernameAvailabilityFunction', { result }, 'firebaseFunctionsService');
+      throw new Error('Invalid response from server');
+    }
+
+    const response = result.data as { success: boolean; available: boolean; error?: string; message?: string };
+
+    if (__DEV__) { logger.debug('Firebase Functions checkUsernameAvailability response', { response }, 'firebaseFunctionsService'); }
+
+    // Validate response structure
+    if (typeof response !== 'object' || response === null) {
+      logger.error('Invalid response structure from Firebase Function', { response }, 'firebaseFunctionsService');
+      throw new Error('Invalid response structure from server');
+    }
+
+    if (response.success) {
+      if (__DEV__) { logger.info('Username availability check completed', { available: response.available }, 'firebaseFunctionsService'); }
+      return {
+        success: true,
+        available: response.available || false,
+        error: response.error,
+        message: response.message
+      };
+    } else {
+      throw new Error(response.error || 'Failed to check username availability');
+    }
+
+  } catch (error: unknown) {
+    // Check error code FIRST before any logging
+    const errorCode = (error as any)?.code;
+    const errorMessage = String((error as any)?.message || '');
+    const errorString = String(error);
+
+    // If function not found (not deployed), this is expected - return a special result
+    // Check multiple possible error code formats and error string
+    const isNotFound = errorCode === 'functions/not-found' || 
+                       errorCode === 'not-found' || 
+                       errorMessage.toLowerCase().includes('not-found') ||
+                       errorString.toLowerCase().includes('not-found');
+
+    if (isNotFound) {
+      // Return a special result indicating function not found (caller will use fallback)
+      // Don't throw to avoid React Native error logging
+      return {
+        success: false,
+        available: false,
+        error: 'FUNCTION_NOT_FOUND' // Special marker for caller to detect
+      };
+    }
+
+    // For other errors, log them
+    if (__DEV__) { 
+      console.error('❌ Error checking username availability via Firebase Functions:', error); 
+    }
+
+    if (errorCode === 'functions/invalid-argument') {
+      throw new Error(errorMessage || 'Invalid username format');
+    } else if (errorCode === 'functions/internal') {
+      throw new Error(errorMessage || 'Failed to check username availability. Please try again.');
+    } else if (errorMessage && errorMessage !== 'undefined' && errorMessage !== 'null') {
+      throw new Error(errorMessage);
+    } else {
+      throw new Error('Failed to check username availability. Please try again.');
     }
   }
 }

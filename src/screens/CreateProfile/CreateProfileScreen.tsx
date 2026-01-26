@@ -48,7 +48,13 @@ const CreateProfileScreen: React.FC = () => {
     isValid: boolean | null;
     error?: string;
   }>({ isValidating: false, isValid: null });
+  const [usernameValidation, setUsernameValidation] = useState<{
+    isValidating: boolean;
+    isAvailable: boolean | null;
+    error?: string;
+  }>({ isValidating: false, isAvailable: null });
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const usernameValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { authenticateUser, state } = useApp();
 
   // Validate referral code with debouncing
@@ -151,6 +157,69 @@ const CreateProfileScreen: React.FC = () => {
       }
     }, 500);
   }, []);
+
+  // Validate username availability with debouncing
+  const validateUsername = React.useCallback(async (username: string) => {
+    // Clear previous timeout
+    if (usernameValidationTimeoutRef.current) {
+      clearTimeout(usernameValidationTimeoutRef.current);
+    }
+
+    // Reset validation if username is empty
+    if (!username || username.trim().length === 0) {
+      setUsernameValidation({ isValidating: false, isAvailable: null });
+      return;
+    }
+
+    const trimmedUsername = username.trim();
+
+    // Basic validation
+    if (trimmedUsername.length < 2) {
+      setUsernameValidation({
+        isValidating: false,
+        isAvailable: false,
+        error: 'Username must be at least 2 characters'
+      });
+      return;
+    }
+
+    if (trimmedUsername.length > 30) {
+      setUsernameValidation({
+        isValidating: false,
+        isAvailable: false,
+        error: 'Username must be 30 characters or less'
+      });
+      return;
+    }
+
+    // Set validating state
+    setUsernameValidation({ isValidating: true, isAvailable: null });
+
+    // Debounce validation (wait 500ms after user stops typing)
+    usernameValidationTimeoutRef.current = setTimeout(async () => {
+      try {
+        // Get current user ID to exclude from check (if updating own username)
+        const currentUserId = state.currentUser?.id || auth?.currentUser?.uid;
+
+        // Use firebaseDataService which has fallback logic
+        const result = await firebaseDataService.user.checkUsernameAvailability(trimmedUsername, currentUserId);
+        
+        setUsernameValidation({
+          isValidating: false,
+          isAvailable: result.available,
+          error: result.error
+        });
+      } catch (error) {
+        logger.error('Error validating username', error, 'CreateProfileScreen');
+        // On error, allow user to proceed (validation will happen on backend during creation)
+        setUsernameValidation({
+          isValidating: false,
+          isAvailable: null, // Unknown state - don't block user
+          error: undefined // Don't show error, allow user to try
+        });
+      }
+    }, 500);
+  }, [state.currentUser?.id]);
 
   // Initialize referral code from route params if provided (e.g., from deep link)
   useEffect(() => {
@@ -469,6 +538,28 @@ const CreateProfileScreen: React.FC = () => {
   const createProfile = async (finalReferralCode: string) => {
     try {
       setIsLoading(true);
+
+      // Validate username one more time before creating profile
+      if (!pseudo || pseudo.trim().length < 2) {
+        setError('Please enter a valid username (at least 2 characters)');
+        setIsLoading(false);
+        return;
+      }
+
+      // Final username availability check
+      const currentUserId = state.currentUser?.id || auth?.currentUser?.uid;
+      const usernameCheck = await firebaseDataService.user.checkUsernameAvailability(pseudo.trim(), currentUserId);
+      
+      if (!usernameCheck.available) {
+        setError(usernameCheck.error || 'This username is already taken. Please choose another.');
+        setUsernameValidation({
+          isValidating: false,
+          isAvailable: false,
+          error: usernameCheck.error || 'Username is already taken'
+        });
+        setIsLoading(false);
+        return;
+      }
 
       // Get authentication method and required fields
       const params = route?.params as any;
@@ -965,20 +1056,35 @@ const CreateProfileScreen: React.FC = () => {
               
               {/* Pseudo Input */}
               <View style={styles.inputSection}>
-              <Input
-                containerStyle={styles.fullWidthInput}
-                label="Pseudo *"
+                <Input
+                  containerStyle={styles.fullWidthInput}
+                  label="Pseudo *"
                   placeholder="Enter your pseudo"
                   value={pseudo}
                   onChangeText={(text) => {
                     setPseudo(text);
                     setError(''); // Clear error when user types
+                    validateUsername(text); // Validate username availability
                   }}
-                error={error || undefined}
+                  error={error || usernameValidation.error || undefined}
                   autoCapitalize="none"
                   autoCorrect={false}
                   containerStyle={{ width: '100%' }}
+                  rightIcon={
+                    pseudo.trim().length >= 2 && !usernameValidation.isValidating ? (
+                      usernameValidation.isAvailable === true ? 'CheckCircle' :
+                      usernameValidation.isAvailable === false ? 'XCircle' :
+                      undefined
+                    ) : undefined
+                  }
                 />
+                {/* Show loading indicator below input when validating */}
+                {usernameValidation.isValidating && pseudo.trim().length >= 2 && (
+                  <View style={styles.validationLoadingContainer}>
+                    <ActivityIndicator size="small" color={colors.white70} />
+                    <Text style={styles.validationLoadingText}>Checking availability...</Text>
+                  </View>
+                )}
               </View>
             </View>
           </ScrollView>
@@ -989,7 +1095,7 @@ const CreateProfileScreen: React.FC = () => {
               title="Next"
               onPress={handleNext}
               variant="primary"
-              disabled={!pseudo || isLoading}
+              disabled={!pseudo || isLoading || usernameValidation.isAvailable === false || usernameValidation.isValidating}
               loading={isLoading}
               fullWidth={true}
             />

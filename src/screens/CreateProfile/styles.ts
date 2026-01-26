@@ -92,6 +92,16 @@ export const styles = StyleSheet.create({
     width: '100%',
     marginBottom: spacing.xl,
   },
+  validationLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    gap: spacing.xs,
+  },
+  validationLoadingText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+  },
   inputLabel: {
     color: colors.white,
     fontWeight: typography.fontWeight.medium,
