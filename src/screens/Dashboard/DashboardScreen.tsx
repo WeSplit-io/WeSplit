@@ -276,41 +276,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     checkPendingInvitation();
   }, [isAuthenticating, isAuthenticated, currentUser?.id, navigation]);
 
-  // Check phone prompt status
-  useEffect(() => {
-    const checkPhonePromptStatus = async () => {
-      if (!currentUser?.id || !isAuthenticated) {
-        return;
-      }
-
-      try {
-        // Check if user has email but no phone number
-        const hasEmail = !!currentUser.email;
-        const hasPhone = !!currentUser.phone;
-
-        if (hasEmail && !hasPhone) {
-          // Check if user has seen the prompt before
-          const promptShownKey = `phone_prompt_shown_${currentUser.id}`;
-          const promptShown = await AsyncStorage.getItem(promptShownKey);
-
-          if (!promptShown) {
-            // Show prompt on first login after integration
-            setShowPhonePrompt(true);
-          } else {
-            // User has seen prompt but skipped - show reminder badge
-            setNeedsPhoneReminder(true);
-          }
-        } else {
-          setShowPhonePrompt(false);
-          setNeedsPhoneReminder(false);
-        }
-      } catch (error) {
-        logger.error('Failed to check phone prompt status', error, 'DashboardScreen');
-      }
-    };
-
-    checkPhonePromptStatus();
-  }, [currentUser?.id, currentUser?.email, currentUser?.phone, isAuthenticated]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1835,9 +1800,9 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
       <NavBar currentRoute="Dashboard" navigation={navigation} />
 
-      {/* Phone Prompt Modal */}
+      {/* Phone Prompt Modal - Hidden by default */}
       <PhonePromptModal
-        visible={showPhonePrompt}
+        visible={false}
         onDismiss={handleSkipPhonePrompt}
         onAddPhone={handleAddPhone}
       />

@@ -914,7 +914,7 @@ const VerificationScreen: React.FC = () => {
             <View style={styles.titleContainer}>
               <View style={styles.iconContainer}>
                 <PhosphorIcon
-                  name="Lock"
+                  name="Password"
                   size={24}
                   color={colors.white}
                   weight="regular"

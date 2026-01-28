@@ -16,7 +16,7 @@ export const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    paddingTop: spacing.lg,
+    justifyContent: 'flex-start',
   },
   titleContainer: {
     alignItems: 'flex-start',

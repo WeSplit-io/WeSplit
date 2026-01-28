@@ -2,20 +2,16 @@ import { StyleSheet, TextStyle } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export const styles = StyleSheet.create({
-  keyboardAvoidingView: {
+  container: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 100, // Space for button
-  },
-  contentContainer: {
+  content: {
     flex: 1,
     justifyContent: 'flex-start',
   },
-  titleContainer: {
+  headerSection: {
     alignItems: 'flex-start',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   iconContainer: {
     width: spacing.iconBoxSize,
@@ -39,11 +35,27 @@ export const styles = StyleSheet.create({
     color: colors.white70,
     textAlign: 'left',
   },
-  buttonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingTop: spacing.md,
+  imageContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xxl,
+    width: '100%',
+  },
+  centralImage: {
+    width: '100%',
+    height: '100%',
+    maxHeight: 500,
+  },
+  skipButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    marginTop: spacing.md,
+  },
+  skipButtonText: {
+    ...(typography.textStyles.body as TextStyle),
+    lineHeight: typography.textStyles.body.lineHeight * typography.textStyles.body.fontSize,
+    color: colors.white50,
   },
 });

@@ -107,5 +107,12 @@ export const typography = {
       fontWeight: '556',
       lineHeight: 1.5,
     },
+    bigNumber: {
+      fontFamily: 'SF Compact',
+      fontSize: 30,
+      fontStyle: 'normal',
+      fontWeight: '500',
+      lineHeight: 1.5,
+    },
   },
 }; 
