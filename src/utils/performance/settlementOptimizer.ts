@@ -6,6 +6,12 @@
 import { CalculatedBalance } from './balanceCalculator';
 import { logger } from '../../services/analytics/loggingService';
 
+const ENABLE_VERBOSE_SETTLEMENT_LOGS =
+  __DEV__ && (process.env.ENABLE_VERBOSE_SPLIT_LOGS === '1' || process.env.ENABLE_VERBOSE_SETTLEMENT_LOGS === '1');
+
+// Hard safety cap to prevent pathological cases from creating very large in-memory arrays
+const MAX_PARTICIPANTS_FOR_SETTLEMENT = 200;
+
 export interface SettleTransaction {
   fromUserId: string;
   toUserId: string;
@@ -30,6 +36,18 @@ export function getOptimizedSettlementTransactions(
     return [];
   }
 
+  // Guard against pathological inputs with extremely large participant lists.
+  if (balances.length > MAX_PARTICIPANTS_FOR_SETTLEMENT) {
+    const truncated = balances.slice(0, MAX_PARTICIPANTS_FOR_SETTLEMENT);
+    if (ENABLE_VERBOSE_SETTLEMENT_LOGS) {
+      logger.warn('Settlement optimizer received large balances array, truncating for safety', {
+        originalLength: balances.length,
+        truncatedLength: truncated.length
+      }, 'settlementOptimizer');
+    }
+    balances = truncated;
+  }
+
   // Step 1: Normalize and filter balances
   const normalizedBalances: UserBalance[] = balances
     .map(balance => {
@@ -42,7 +60,7 @@ export function getOptimizedSettlementTransactions(
     })
     .filter(user => Math.abs(user.balance) >= 0.01); // Remove settled users
 
-  if (__DEV__) {
+  if (ENABLE_VERBOSE_SETTLEMENT_LOGS) {
     logger.debug('Normalized balances', { 
       balances: normalizedBalances.map(b => ({
         userId: b.userId,
@@ -61,7 +79,7 @@ export function getOptimizedSettlementTransactions(
     .filter(user => user.balance < 0)
     .sort((a, b) => a.balance - b.balance); // Sort by lowest balance first
 
-  if (__DEV__) {
+  if (ENABLE_VERBOSE_SETTLEMENT_LOGS) {
     logger.debug('Creditors', { 
       creditors: creditors.map(c => ({ 
         userId: c.userId, 
@@ -152,7 +170,7 @@ export function getOptimizedSettlementTransactions(
     t.fromUserId && t.toUserId // Valid user IDs
   );
 
-  if (__DEV__) {
+  if (ENABLE_VERBOSE_SETTLEMENT_LOGS) {
     // Calculate net balances for validation
     const netBalances: Record<string, number> = {};
     normalizedBalances.forEach(b => {
@@ -251,7 +269,7 @@ export function validateSettlementTransactions(transactions: SettleTransaction[]
   // Check if all balances are zero (within rounding error)
   const totalBalance = Object.values(userBalances).reduce((sum, balance) => sum + balance, 0);
   
-  if (__DEV__) {
+  if (ENABLE_VERBOSE_SETTLEMENT_LOGS) {
     logger.debug('Validation', { totalBalance: totalBalance.toFixed(2), userBalances }, 'settlementOptimizer');
   }
   

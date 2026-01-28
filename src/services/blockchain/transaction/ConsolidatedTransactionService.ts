@@ -20,6 +20,7 @@ import {
   UsdcBalanceResult,
   GasCheckResult
 } from './types';
+import TransactionUtils from '../../shared/transactionUtils';
 
 // Import centralized transaction types
 import {
@@ -29,6 +30,90 @@ import {
 
 // Re-export for backward compatibility
 export type { CentralizedTransactionParams as TransactionContextParams, CentralizedTransactionResult as ContextTransactionResult };
+
+type TransactionErrorKind = 'definite_failure' | 'transient' | 'uncertain_success';
+
+/**
+ * Classify low-level transaction errors into high-level categories that the UI can use.
+ * This looks only at error messages/codes and does NOT change core processing logic.
+ */
+function classifyTransactionError(error: unknown): {
+  kind: TransactionErrorKind;
+  message: string;
+  signature?: string;
+  explorerUrl?: string;
+} {
+  if (error && typeof error === 'object' && 'txErrorKind' in error) {
+    const err = error as any;
+    return {
+      kind: err.txErrorKind as TransactionErrorKind,
+      message: String(err.message || 'Unknown transaction error'),
+      signature: err.txSignature,
+      explorerUrl: err.explorerUrl
+    };
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+      ? error
+      : 'Unknown transaction error';
+
+  const lower = message.toLowerCase();
+
+  let kind: TransactionErrorKind = 'definite_failure';
+
+  const isTimeout =
+    lower.includes('timeout') ||
+    lower.includes('timed out') ||
+    lower.includes('deadline exceeded');
+
+  const isNotFound =
+    lower.includes('transaction not found on blockchain') ||
+    lower.includes('transaction verification incomplete');
+
+  const isTransientBackend =
+    lower.includes('rate limit') ||
+    lower.includes('temporarily unavailable') ||
+    lower.includes('signing service is temporarily unavailable') ||
+    lower.includes('service unavailable') ||
+    lower.includes('unavailable') ||
+    lower.includes('network error') ||
+    lower.includes('failed to submit transaction');
+
+  const isHardFailure =
+    lower.includes('insufficient funds') ||
+    lower.includes('user rejected') ||
+    lower.includes('rejected') ||
+    lower.includes('invalid signature') ||
+    lower.includes('authorization failed') ||
+    lower.includes('transaction failed on blockchain');
+
+  if (isTimeout || isNotFound) {
+    kind = 'uncertain_success';
+  } else if (isTransientBackend) {
+    kind = 'transient';
+  } else if (isHardFailure) {
+    kind = 'definite_failure';
+  }
+
+  // Try to extract a signature if present in the message
+  let signature: string | undefined;
+  const signatureMatch = message.match(/Signature:\s*([A-Za-z0-9]{64,88})/);
+  if (signatureMatch) {
+    signature = signatureMatch[1];
+  }
+
+  const explorerUrl = signature ? `https://solscan.io/tx/${signature}` : undefined;
+
+  return {
+    kind,
+    message,
+    signature,
+    explorerUrl
+  };
+}
 
 class ConsolidatedTransactionService {
   private static instance: ConsolidatedTransactionService;
@@ -889,14 +974,99 @@ class ConsolidatedTransactionService {
           };
       }
     } catch (error) {
+      const classified = classifyTransactionError(error);
+
       logger.error('Transaction execution failed', {
         context: params.context,
+        error: classified.message,
+        errorKind: classified.kind
+      }, 'ConsolidatedTransactionService');
+
+      // Fire-and-forget reconciliation for uncertain shared wallet or split-related flows
+      if (
+        classified.kind === 'uncertain_success' &&
+        classified.signature &&
+        (params.context === 'shared_wallet_funding' ||
+          params.context === 'shared_wallet_withdrawal' ||
+          params.context === 'fair_split_contribution' ||
+          params.context === 'degen_split_lock' ||
+          params.context === 'spend_split_payment')
+      ) {
+        this.reconcileTransaction(classified.signature, params).catch((reconcileError) => {
+          logger.warn('Background reconciliation failed', {
+            signature: classified.signature,
+            context: params.context,
+            error: reconcileError instanceof Error ? reconcileError.message : String(reconcileError)
+          }, 'ConsolidatedTransactionService');
+        });
+      }
+
+      return {
+        success: false,
+        error: classified.message,
+        errorKind: classified.kind,
+        transactionSignature: classified.signature,
+        transactionId: classified.signature,
+        txId: classified.signature,
+        explorerUrl: classified.explorerUrl
+      };
+    }
+  }
+
+  /**
+   * Reconcile a transaction that may have succeeded even though verification initially failed.
+   * This is intentionally lightweight and fire-and-forget: it only confirms on-chain status
+   * and logs the outcome; Firestore/shared wallet listeners are expected to pick up changes.
+   */
+  async reconcileTransaction(
+    signature: string,
+    context: CentralizedTransactionParams
+  ): Promise<{
+    status: 'confirmed' | 'pending' | 'not_found';
+    explorerUrl: string;
+  }> {
+    const explorerUrl = `https://solscan.io/tx/${signature}`;
+
+    try {
+      logger.info('Starting background transaction reconciliation', {
+        signature,
+        context: context.context
+      }, 'ConsolidatedTransactionService');
+
+      const utils = TransactionUtils.getInstance();
+      const confirmed = await utils.confirmTransactionWithTimeout(signature, 30000);
+
+      if (confirmed) {
+        logger.info('Reconciliation confirmed transaction on-chain', {
+          signature,
+          context: context.context
+        }, 'ConsolidatedTransactionService');
+
+        return {
+          status: 'confirmed',
+          explorerUrl
+        };
+      }
+
+      logger.warn('Reconciliation did not confirm transaction before timeout', {
+        signature,
+        context: context.context
+      }, 'ConsolidatedTransactionService');
+
+      return {
+        status: 'pending',
+        explorerUrl
+      };
+    } catch (error) {
+      logger.error('Reconciliation failed', {
+        signature,
+        context: context.context,
         error: error instanceof Error ? error.message : String(error)
       }, 'ConsolidatedTransactionService');
 
       return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Transaction failed'
+        status: 'not_found',
+        explorerUrl
       };
     }
   }
@@ -986,9 +1156,15 @@ class ConsolidatedTransactionService {
           message: `Successfully sent ${amount.toFixed(6)} USDC`
         };
       } else {
+        const classified = classifyTransactionError(result.error);
         return {
           success: false,
-          error: result.error || 'Internal transfer failed'
+          error: result.error || 'Internal transfer failed',
+          errorKind: classified.kind,
+          transactionSignature: classified.signature ?? undefined,
+          txId: classified.signature,
+          transactionId: classified.signature,
+          explorerUrl: classified.explorerUrl
         };
       }
     }

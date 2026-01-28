@@ -40,9 +40,20 @@ export interface TransactionParams {
 export interface TransactionResult {
   success: boolean;
   error?: string;
+  /**
+   * High-level classification of the error, when present.
+   * - 'definite_failure': we are confident the transaction failed.
+   * - 'transient': temporary backend/network issue, safe to retry later.
+   * - 'uncertain_success': backend could not confirm; transaction may have succeeded.
+   */
+  errorKind?: 'definite_failure' | 'transient' | 'uncertain_success';
   transactionSignature?: string;
   transactionId?: string;
   txId?: string;
+  /**
+   * Optional explorer URL (e.g. Solscan) for the transaction, when known.
+   */
+  explorerUrl?: string;
   fee?: number;
   netAmount?: number;
   blockchainFee?: number;

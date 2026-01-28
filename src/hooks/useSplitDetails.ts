@@ -10,6 +10,9 @@ import { splitRealtimeService, SplitStorageService, SplitRealtimeUpdate } from '
 import { UnifiedBillData } from '../types/splitNavigation';
 import { logger } from '../services/core';
 
+const ENABLE_VERBOSE_SPLIT_LOGS =
+  __DEV__ && (process.env.ENABLE_VERBOSE_SPLIT_LOGS === '1' || process.env.ENABLE_VERBOSE_SPLIT_LOGS === 'true');
+
 interface UseSplitDetailsParams {
   routeParams: any;
   currentUser: any;
@@ -234,7 +237,9 @@ export const useSplitDetails = ({ routeParams, currentUser: _currentUser }: UseS
   // Copy to clipboard
   const copyToClipboard = useCallback((text: string) => {
     // This would typically use a clipboard library
-    logger.info('Copy to clipboard', { text }, 'useSplitDetails');
+    if (ENABLE_VERBOSE_SPLIT_LOGS) {
+      logger.info('Copy to clipboard', { textLength: text?.length ?? 0 }, 'useSplitDetails');
+    }
   }, []);
 
   // Real-time update functions
@@ -242,17 +247,21 @@ export const useSplitDetails = ({ routeParams, currentUser: _currentUser }: UseS
     if (!routeParams?.splitId || isRealtimeActive) {return;}
     
     try {
-      logger.info('Starting real-time updates for split', { splitId: routeParams.splitId }, 'useSplitDetails');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Starting real-time updates for split', { splitId: routeParams.splitId }, 'useSplitDetails');
+      }
       
       const cleanup = await splitRealtimeService.startListening(
         routeParams.splitId,
         {
           onSplitUpdate: (update: SplitRealtimeUpdate) => {
-            logger.debug('Real-time split update received', { 
-              splitId: routeParams.splitId,
-              hasChanges: update.hasChanges,
-              participantsCount: update.participants.length
-            }, 'useSplitDetails');
+            if (ENABLE_VERBOSE_SPLIT_LOGS) {
+              logger.debug('Real-time split update received', { 
+                splitId: routeParams.splitId,
+                hasChanges: update.hasChanges,
+                participantsCount: update.participants.length
+              }, 'useSplitDetails');
+            }
             
             if (update.split) {
               // Update the unified bill data
@@ -287,10 +296,12 @@ export const useSplitDetails = ({ routeParams, currentUser: _currentUser }: UseS
             }
           },
           onParticipantUpdate: (participants) => {
-            logger.debug('Real-time participant update received', { 
-              splitId: routeParams.splitId,
-              participantsCount: participants.length
-            }, 'useSplitDetails');
+            if (ENABLE_VERBOSE_SPLIT_LOGS) {
+              logger.debug('Real-time participant update received', { 
+                splitId: routeParams.splitId,
+                participantsCount: participants.length
+              }, 'useSplitDetails');
+            }
             
             setParticipants(participants);
           },

@@ -1212,8 +1212,54 @@ export async function processUsdcTransfer(serializedTransaction: Uint8Array): Pr
       confirmation: response.confirmation
     };
   } catch (error) {
-    logger.error('Failed to process USDC transfer', error, 'TransactionSigningService');
-    throw error;
+    const enrichedError: any =
+      error instanceof Error ? error : new Error(typeof error === 'string' ? error : 'Failed to process USDC transfer');
+
+    const message = enrichedError.message as string;
+    const lower = message.toLowerCase ? message.toLowerCase() : String(message).toLowerCase();
+
+    // Attach a coarse-grained classification so higher layers can distinguish behavior
+    if (!enrichedError.txErrorKind) {
+      const isTimeout =
+        lower.includes('timeout') ||
+        lower.includes('timed out') ||
+        lower.includes('deadline exceeded');
+
+      const isNotFound =
+        lower.includes('transaction not found on blockchain') ||
+        lower.includes('transaction verification incomplete');
+
+      const isTransientBackend =
+        lower.includes('rate limit') ||
+        lower.includes('temporarily unavailable') ||
+        lower.includes('signing service is temporarily unavailable') ||
+        lower.includes('service unavailable') ||
+        lower.includes('unavailable') ||
+        lower.includes('network error') ||
+        lower.includes('failed to submit transaction');
+
+      const isHardFailure =
+        lower.includes('insufficient funds') ||
+        lower.includes('user rejected') ||
+        lower.includes('rejected') ||
+        lower.includes('invalid signature') ||
+        lower.includes('transaction failed on blockchain');
+
+      if (isTimeout || isNotFound) {
+        enrichedError.txErrorKind = 'uncertain_success';
+      } else if (isTransientBackend) {
+        enrichedError.txErrorKind = 'transient';
+      } else if (isHardFailure) {
+        enrichedError.txErrorKind = 'definite_failure';
+      }
+    }
+
+    logger.error('Failed to process USDC transfer', {
+      error: enrichedError,
+      txErrorKind: enrichedError.txErrorKind
+    }, 'TransactionSigningService');
+
+    throw enrichedError;
   }
 }
 

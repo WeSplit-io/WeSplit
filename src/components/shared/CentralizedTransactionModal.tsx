@@ -771,16 +771,19 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
           Alert.alert('Success', result.message || 'Transaction completed successfully');
         }
       } else {
-        // Detect transient backend issues (rate limit / signing service unavailable) and provide clearer UX
+        // Use structured error classification when available
         const rawError = result.error || 'Unknown error occurred';
-        const lowerError = rawError.toLowerCase();
-        const isTransientBackendError =
-          lowerError.includes('rate limit') ||
-          lowerError.includes('signing service is temporarily unavailable') ||
-          lowerError.includes('failed to submit transaction') ||
-          lowerError.includes('transaction signing service is temporarily unavailable');
+        const errorKind = result.errorKind || 'definite_failure';
 
-        if (isTransientBackendError) {
+        if (errorKind === 'definite_failure') {
+          const normalizedError = normalizeTransactionErrorMessage(rawError);
+          const message = `Your transaction was rejected: ${normalizedError}`;
+          if (config.onError) {
+            config.onError(message);
+          } else {
+            Alert.alert('Transaction Failed', message);
+          }
+        } else if (errorKind === 'transient') {
           const friendlyMessage =
             'Our transaction service is temporarily busy. Your funds were not moved. Please wait a few seconds and try again.';
 
@@ -796,12 +799,28 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             Alert.alert('Service temporarily unavailable', friendlyMessage);
           }
         } else {
-          // Non-transient error: preserve original behavior but normalize dev-only bundle failures
-          const normalizedError = normalizeTransactionErrorMessage(rawError);
+          // uncertain_success
+          const baseMessage =
+            'We could not confirm this transaction yet. It may still complete on the blockchain. Please check your history before retrying.';
+
+          const explorerHint =
+            result.transactionSignature
+              ? `\n\nTransaction signature: ${result.transactionSignature}`
+              : '';
+
+          const message = `${baseMessage}${explorerHint}`;
+
+          logger.warn('Uncertain transaction result reported to user', {
+            context: params.context,
+            userId: params.userId,
+            error: rawError.substring(0, 200),
+            transactionSignature: result.transactionSignature
+          }, 'CentralizedTransactionModal');
+
           if (config.onError) {
-            config.onError(normalizedError);
+            config.onError(message);
           } else {
-            Alert.alert('Transaction Failed', normalizedError);
+            Alert.alert('Transaction Pending Confirmation', message);
           }
         }
       }
@@ -862,6 +881,10 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
   const canExecute = isAmountValid && !isProcessing && !validationError && !isLoadingSharedWalletData;
 
   const handleClose = () => {
+    // Ensure modal-specific processing state is cleared
+    setIsProcessing(false);
+    isExecutingRef.current = false;
+
     if (config.onClose) {
       config.onClose();
     }

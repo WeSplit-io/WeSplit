@@ -1,5 +1,10 @@
 /**
- * Custom hook for managing shared wallet data and real-time updates
+ * Custom hook for managing shared wallet data and real-time updates.
+ *
+ * NOTE: The primary shared wallet details screen currently manages its own
+ * wallet + transaction loading and listeners. This hook is kept for potential
+ * reuse in other screens, but should not introduce additional listeners for
+ * the same wallet when the details screen is mounted.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -8,6 +13,10 @@ import { db } from '../../../config/firebase/firebase';
 import { SharedWalletService, SharedWallet } from '../../../services/sharedWallet';
 import { UnifiedTransaction } from '../../../components/sharedWallet';
 import { logger } from '../../../services/analytics/loggingService';
+import { recordCountMetric } from '../../../utils/performance/metrics';
+
+const ENABLE_VERBOSE_SHARED_WALLET_LOGS =
+  __DEV__ && (process.env.ENABLE_VERBOSE_SHARED_WALLET_LOGS === '1' || process.env.ENABLE_VERBOSE_SPLIT_LOGS === '1');
 
 // Simple in-memory throttle map to avoid spamming discrepancy logs
 const DISCREPANCY_LOG_THROTTLE_MS = 60_000; // 60 seconds
@@ -71,17 +80,19 @@ export const useSharedWalletData = (
           const onChainResult = await SharedWalletService.getSharedWalletOnChainBalance(walletId);
 
           if (onChainResult.success) {
-            logger.info('On-chain balance check for shared wallet', {
-              walletId,
-              databaseBalance: updatedWallet.totalBalance,
-              onChainBalance: onChainResult.balance,
-              accountExists: onChainResult.accountExists,
-              difference: updatedWallet.totalBalance - (onChainResult.balance || 0)
-            }, 'useSharedWalletData');
+            if (ENABLE_VERBOSE_SHARED_WALLET_LOGS) {
+              logger.info('On-chain balance check for shared wallet', {
+                walletId,
+                databaseBalance: updatedWallet.totalBalance,
+                onChainBalance: onChainResult.balance,
+                accountExists: onChainResult.accountExists,
+                difference: updatedWallet.totalBalance - (onChainResult.balance || 0)
+              }, 'useSharedWalletData');
+            }
 
             // Log significant discrepancies with simple throttling per wallet to avoid log spam
             const difference = Math.abs(updatedWallet.totalBalance - (onChainResult.balance || 0));
-            if (difference > 0.01 && shouldLogDiscrepancy(walletId, difference)) {
+            if (difference > 0.01 && shouldLogDiscrepancy(walletId, difference) && ENABLE_VERBOSE_SHARED_WALLET_LOGS) {
               logger.warn('Balance discrepancy detected', {
                 walletId,
                 databaseBalance: updatedWallet.totalBalance,
@@ -155,10 +166,12 @@ export const useSharedWalletData = (
   useEffect(() => {
     if (!wallet?.firebaseDocId) return;
 
-    logger.info('Setting up real-time listener for shared wallet', {
-      walletId: wallet.id,
-      firebaseDocId: wallet.firebaseDocId
-    }, 'useSharedWalletData');
+    if (ENABLE_VERBOSE_SHARED_WALLET_LOGS) {
+      logger.info('Setting up real-time listener for shared wallet', {
+        walletId: wallet.id,
+        firebaseDocId: wallet.firebaseDocId
+      }, 'useSharedWalletData');
+    }
 
     // Wallet listener
     const walletRef = doc(db, 'sharedWallets', wallet.firebaseDocId);
@@ -169,13 +182,15 @@ export const useSharedWalletData = (
           firebaseDocId: docSnapshot.id,
         } as SharedWallet;
 
-        logger.info('Real-time wallet update received', {
-          walletId: wallet.id,
-          oldBalance: wallet.totalBalance,
-          newBalance: updatedWallet.totalBalance,
-          balanceDifference: updatedWallet.totalBalance - wallet.totalBalance,
-          updatedAt: updatedWallet.updatedAt
-        }, 'useSharedWalletData');
+        if (ENABLE_VERBOSE_SHARED_WALLET_LOGS) {
+          logger.info('Real-time wallet update received', {
+            walletId: wallet.id,
+            oldBalance: wallet.totalBalance,
+            newBalance: updatedWallet.totalBalance,
+            balanceDifference: updatedWallet.totalBalance - wallet.totalBalance,
+            updatedAt: updatedWallet.updatedAt
+          }, 'useSharedWalletData');
+        }
 
         setWallet(updatedWallet);
       }
@@ -201,12 +216,17 @@ export const useSharedWalletData = (
         firebaseDocId: doc.id,
       })) as UnifiedTransaction[];
 
-      logger.debug('Real-time transactions update received', {
-        walletId: wallet.id,
-        transactionCount: updatedTransactions.length
-      }, 'useSharedWalletData');
+      const boundedTransactions = updatedTransactions.slice(0, 100);
+      recordCountMetric('sharedWallet.hook.transactions.count', boundedTransactions.length, wallet.id);
 
-      setTransactions(updatedTransactions);
+      if (ENABLE_VERBOSE_SHARED_WALLET_LOGS) {
+        logger.debug('Real-time transactions update received', {
+          walletId: wallet.id,
+          transactionCount: boundedTransactions.length
+        }, 'useSharedWalletData');
+      }
+
+      setTransactions(boundedTransactions);
     }, (error) => {
       logger.error('Real-time listener error for transactions', {
         walletId: wallet.id,
@@ -215,9 +235,11 @@ export const useSharedWalletData = (
     });
 
     return () => {
-      logger.info('Cleaning up real-time listeners for shared wallet', {
-        walletId: wallet.id
-      }, 'useSharedWalletData');
+      if (ENABLE_VERBOSE_SHARED_WALLET_LOGS) {
+        logger.info('Cleaning up real-time listeners for shared wallet', {
+          walletId: wallet.id
+        }, 'useSharedWalletData');
+      }
       walletUnsubscribe();
       transactionsUnsubscribe();
     };

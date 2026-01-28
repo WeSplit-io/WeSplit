@@ -3,7 +3,7 @@
  * Screen for editing bill split details, managing participants, and configuring split methods
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -885,6 +885,32 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
     checkSplitStateAndRedirect();
   }, [currentSplitData, navigation, billData, currentProcessedBillData, splitWallet, isFromNotification, notificationId, isActuallyNewBill, isActuallyManualCreation, totalAmount]);
+
+  /**
+   * Presentational subcomponents
+   * These help keep the main screen leaner and make it easier to reason
+   * about specific sections without pulling extra state into the top-level
+   * component.
+   */
+
+  const InvitedContactsSection = memo(() => {
+    if (!route?.params?.selectedContacts || !Array.isArray(route.params.selectedContacts)) {
+      return null;
+    }
+
+    const count = route.params.selectedContacts.length;
+    if (count === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.invitedContactsBanner}>
+        <Text style={styles.invitedContactsText}>
+          {count} contact{count > 1 ? 's' : ''} selected. They will be invited when you confirm the split.
+        </Text>
+      </View>
+    );
+  });
 
   // Track if loadSplitData is currently running to prevent duplicate calls
   const isLoadingSplitDataRef = useRef(false);

@@ -3,8 +3,8 @@
  * Displays transaction history for shared wallets and splits
  */
 
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, RefreshControl } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, ListRenderItem } from 'react-native';
 import { ModernLoader } from '../shared';
 import TransactionHistoryItem, { UnifiedTransaction } from './TransactionHistoryItem';
 import { colors } from '../../theme/colors';
@@ -68,6 +68,22 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     ? 'Transactions will appear here when you top up or withdraw funds'
     : 'Transactions will appear here when payments are made';
 
+  const keyExtractor = useCallback(
+    (tx: UnifiedTransaction) => (tx.id || tx.firebaseDocId || `${tx.type}-${tx.amount}-${tx.createdAt}`),
+    []
+  );
+
+  const renderItem: ListRenderItem<UnifiedTransaction> = useCallback(
+    ({ item: tx }) => (
+      <TransactionHistoryItem
+        transaction={tx}
+        variant={variant}
+        onPress={onTransactionPress ? () => onTransactionPress(tx) : undefined}
+      />
+    ),
+    [onTransactionPress, variant]
+  );
+
   if (isLoading) {
     if (hideChrome) {
       return (
@@ -86,24 +102,23 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     );
   }
 
-  const renderTransactions = () => (
-    <View style={[styles.transactionsList, hideChrome && styles.transactionsListMinimal]}>
-      {enrichedTransactions.map((tx) => (
-        <TransactionHistoryItem
-          key={tx.id || tx.firebaseDocId}
-          transaction={tx}
-          variant={variant}
-          onPress={onTransactionPress ? () => onTransactionPress(tx) : undefined}
-        />
-      ))}
-    </View>
-  );
-
   if (hideChrome) {
     if (enrichedTransactions.length === 0) {
       return null;
     }
-    return renderTransactions();
+    return (
+      <FlatList
+        data={enrichedTransactions}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        contentContainerStyle={[styles.transactionsList, styles.transactionsListMinimal]}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={20}
+        windowSize={5}
+        removeClippedSubviews
+      />
+    );
   }
 
   return (
@@ -127,7 +142,19 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
           )}
         </View>
       ) : (
-        renderTransactions()
+        <FlatList
+          data={enrichedTransactions}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          contentContainerStyle={styles.transactionsList}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={20}
+          windowSize={5}
+          removeClippedSubviews
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+        />
       )}
     </View>
   );

@@ -22,6 +22,13 @@ export interface TransactionResult {
   txId: string;
   success: boolean;
   error?: string;
+  /**
+   * High-level classification of the error, when present.
+   * - 'definite_failure': we are confident the transaction failed.
+   * - 'transient': temporary backend/network issue, safe to retry later.
+   * - 'uncertain_success': backend could not confirm; transaction may have succeeded.
+   */
+  errorKind?: 'definite_failure' | 'transient' | 'uncertain_success';
   companyFee?: number;
   netAmount?: number;
 }
