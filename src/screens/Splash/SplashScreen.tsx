@@ -314,30 +314,10 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
             }
           }
         } else {
-          // User is not authenticated - navigate to login screen
+          // User is not authenticated - always navigate to GetStarted first
           // NOTE: We don't auto-authenticate here even if user verified within 30 days
           // The 30-day check happens in AuthMethodsScreen when user enters their email
-          logger.info('User not authenticated, navigating to login', null, 'SplashScreen');
-          
-          try {
-            const storedEmail = await AuthPersistenceService.loadEmail();
-            if (storedEmail) {
-              logger.info('Found stored email, navigating to AuthMethods with pre-filled email', { email: storedEmail }, 'SplashScreen');
-              // Navigate to AuthMethods with the stored email pre-filled
-              // The 30-day verification check will happen when user clicks "Next"
-              setHasNavigated(true);
-              navigation.replace('AuthMethods');
-              return;
-            }
-          } catch (error) {
-            logger.error('Error checking stored email', { error }, 'SplashScreen');
-            // Continue to normal flow if check fails
-          }
-
-          // No stored email, go through onboarding
-          if (__DEV__) {
-            logger.info('No stored email, navigating to GetStarted', null, 'SplashScreen');
-          }
+          logger.info('User not authenticated, navigating to GetStarted', null, 'SplashScreen');
           setHasNavigated(true);
           navigation.replace('GetStarted');
         }

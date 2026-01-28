@@ -34,24 +34,58 @@ export const typography = {
 
   // Text styles
   textStyles: {
+    h1: {
+      fontFamily: 'Satoshi',
+      fontSize: 35,
+      fontStyle: 'normal',
+      fontWeight: '700',
+      lineHeight: 1.5,
+    },
+    h2: {
+      fontFamily: 'Satoshi',
+      fontSize: 22,
+      fontStyle: 'normal',
+      fontWeight: '700',
+      lineHeight: 1.2,
+    },
     h3: {
-      fontSize: 32,
-      fontWeight: '600' as const,
-      lineHeight: 40,
-      letterSpacing: -0.5,
+      fontFamily: 'Satoshi',
+      fontSize: 16,
+      fontStyle: 'normal',
+      fontWeight: '500',
+      lineHeight: 1.2,
     },
     body: {
+      fontFamily: 'Satoshi',
       fontSize: 16,
-      fontWeight: '400' as const,
-      lineHeight: 24,
-      letterSpacing: 0,
+      fontStyle: 'normal',
+      fontWeight: '400',
+      lineHeight: 1.5,
+    },
+    bodySmall: {
+      fontFamily: 'Satoshi',
+      fontSize: 14,
+      fontStyle: 'normal',
+      fontWeight: '400',
+      lineHeight: 1.2,
     },
     button: {
+      fontFamily: 'Satoshi',
       fontSize: 18,
-      fontWeight: '600' as const,
-      lineHeight: 20,
-      letterSpacing: 0.5,
+      fontStyle: 'normal',
+      fontWeight: '500',
+      lineHeight: 1.2,
     },
+    navbar: {
+      fontFamily: 'Satoshi',
+      fontSize: 12,
+      fontStyle: 'normal',
+      fontWeight: '500',
+      lineHeight: 1.2,
+    },
+
+
+// not used
     buttonSmall: {
       fontSize: 16,
       fontWeight: '600' as const,
@@ -63,6 +97,15 @@ export const typography = {
       fontWeight: '400' as const,
       lineHeight: 16,
       letterSpacing: 0.25,
+    },
+  },
+  numberStyles: {
+    balance: {
+      fontFamily: 'SF Compact',
+      fontSize: 35,
+      fontStyle: 'normal',
+      fontWeight: '556',
+      lineHeight: 1.5,
     },
   },
 }; 

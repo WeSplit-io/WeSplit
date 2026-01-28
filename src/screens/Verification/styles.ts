@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TextStyle } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 // Legacy color constants for compatibility - now using theme colors
@@ -7,125 +7,101 @@ export const GREEN = colors.green;
 export const GRAY = colors.white70;
 
 export const styles = StyleSheet.create({
-  mainContainer: {
+  keyboardAvoidingView: {
     flex: 1,
   },
-
   scrollContent: {
-    flex: 1,
-  },
-  scrollContentContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
+    paddingBottom: 100, // Space for button
   },
-  logoSection: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
+  contentContainer: {
+    flex: 1,
+    paddingTop: spacing.lg,
+  },
+  titleContainer: {
+    alignItems: 'flex-start',
+    marginBottom: spacing.xl,
+  },
+  iconContainer: {
+    width: spacing.iconBoxSize,
+    height: spacing.iconBoxSize,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  logo: {
-    height: 30,
-    width: 170,
-    objectFit: 'contain',
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  mailIconBox: {
-    width: spacing.mailIconBoxSize,
-    height: spacing.mailIconBoxSize,
-    borderRadius: 16,
     backgroundColor: colors.white5,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: spacing.sm,
     marginBottom: spacing.md,
   },
-  mailIcon: {
-    width: spacing.xl,
-    height: spacing.xl,
-    resizeMode: 'contain',
-    tintColor: colors.white,
-  },
   title: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
+    ...(typography.textStyles.h2 as TextStyle),
+    lineHeight: typography.textStyles.h2.lineHeight * typography.textStyles.h2.fontSize,
     color: colors.white,
+    textAlign: 'left',
     marginBottom: spacing.sm,
-    textAlign: 'center',
   },
   subtitle: {
-    fontSize: typography.fontSize.md,
-    color: colors.white,
-    marginBottom: spacing.xxl,
-    textAlign: 'center',
-    opacity: 0.8,
-  },
-  emailHighlight: {
-    color: colors.white,
+    ...(typography.textStyles.body as TextStyle),
+    lineHeight: typography.textStyles.body.lineHeight * typography.textStyles.body.fontSize,
+    color: colors.white70,
+    textAlign: 'left',
   },
   codeRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: spacing.xl,
+    justifyContent: 'flex-start',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+    width: '100%',
   },
   codeInput: {
-    width: spacing.codeInputSize,
-    height: spacing.codeInputSize,
-    borderRadius: 16,
+    flex: 1, // Fill available width dynamically
+    height: 48,
+    borderRadius: spacing.radiusMd,
     borderWidth: 1,
     borderColor: colors.white50,
     backgroundColor: colors.white5,
-    fontSize: typography.fontSize.xxxl,
+    fontSize: typography.fontSize.xl,
     color: colors.white,
     textAlign: 'center',
     textAlignVertical: 'center',
-    marginHorizontal: spacing.sm,
     fontWeight: typography.fontWeight.semibold,
     paddingTop: 0,
     paddingBottom: 0,
     includeFontPadding: false,
+    minWidth: 40, // Minimum width to ensure readability
   },
-  submitButton: {
-    borderRadius: 16,
+  buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingTop: spacing.md,
+    backgroundColor: colors.black,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.md,
     width: '100%',
-    marginBottom: spacing.lg,
-    overflow: 'hidden',
-  },
-  gradientButton: {
-    paddingVertical: 15,
-    alignItems: 'center',
-    borderRadius: 16,
-  },
-  submitButtonText: {
-    color: colors.black,
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.medium,
-  },
-  timerSection: {
-    alignItems: 'center',
-  },
-  timer: {
-    color: colors.white70,
-    fontSize: typography.fontSize.md,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-    marginTop: 0,
-    opacity: 1,
   },
   resendLink: {
-    marginBottom: 0,
+    flex: 1,
+  },
+  pasteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  pasteButtonText: {
+    ...(typography.textStyles.body as TextStyle),
+    lineHeight: typography.textStyles.body.lineHeight * typography.textStyles.body.fontSize,
+    color: colors.white80,
+    textAlign: 'left',
   },
   resendText: {
-    color: colors.green,
-    fontSize: typography.fontSize.md,
-    textAlign: 'center',
-    fontWeight: typography.fontWeight.semibold,
+    ...(typography.textStyles.bodySmall as TextStyle),
+    lineHeight: typography.textStyles.bodySmall.lineHeight * typography.textStyles.bodySmall.fontSize,
+    color: colors.white80,
+    textAlign: 'left',
   },
   resendTextDisabled: {
     opacity: 0.5,
@@ -134,15 +110,6 @@ export const styles = StyleSheet.create({
     color: colors.red,
     marginBottom: spacing.sm,
     fontSize: typography.fontSize.sm,
-    textAlign: 'center',
-  },
-  helpSection: {
-    alignItems: 'center',
-    paddingTop: spacing.lg,
-  },
-  helpText: {
-    color: colors.white50,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.regular,
+    textAlign: 'left',
   },
 }); 

@@ -20,6 +20,7 @@ import UserProfileScreen from './src/screens/UserProfile/UserProfileScreen';
 import SplashScreen from './src/screens/Splash/SplashScreen';
 import GetStartedScreen from './src/screens/GetStarted/GetStartedScreen';
 import AuthMethodsScreen from './src/screens/AuthMethods/AuthMethodsScreen';
+import EmailPhoneInputScreen from './src/screens/EmailPhoneInput/EmailPhoneInputScreen';
 import VerificationScreen from './src/screens/Verification/VerificationScreen';
 import CreateProfileScreen from './src/screens/CreateProfile/CreateProfileScreen';
 import OnboardingScreen from './src/screens/Onboarding/OnboardingScreen';
@@ -158,6 +159,7 @@ export default function App() {
 
                     <Stack.Screen name="GetStarted" component={GetStartedScreen} />
                     <Stack.Screen name="AuthMethods" component={AuthMethodsScreen} />
+                    <Stack.Screen name="EmailPhoneInput" component={EmailPhoneInputScreen} />
                     <Stack.Screen name="Verification" component={VerificationScreen} />
                     <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
                     <Stack.Screen name="Onboarding" component={OnboardingScreen} />

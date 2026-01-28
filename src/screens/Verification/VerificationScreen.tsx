@@ -1,17 +1,18 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, Linking, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Header } from '../../components/shared';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, TouchableOpacity, TextInput, Alert, ActivityIndicator, Linking, Keyboard, ScrollView, TextStyle, Dimensions } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { Header, Button } from '../../components/shared';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { styles, BG_COLOR, GREEN, GRAY } from './styles';
+import { styles } from './styles';
 import { verifyCode, sendVerificationCode } from '../../services/data';
 import { useApp } from '../../context/AppContext';
-import { colors } from '../../theme';
+import { colors, spacing, typography } from '../../theme';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import { authService } from '../../services/auth/AuthService';
 import { auth } from '../../config/firebase/firebase';
 import { AuthPersistenceService } from '../../services/core/authPersistenceService';
+import PhosphorIcon from '../../components/shared/PhosphorIcon';
 
 // Dynamic code length based on verification type
 const getCodeLength = (phoneNumber?: string) => phoneNumber ? 6 : 6; // 6 digits for phone, 6 for email
@@ -30,7 +31,37 @@ const VerificationScreen: React.FC = () => {
   const [timer, setTimer] = useState(RESEND_SECONDS);
   const [resending, setResending] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+
+  // Keyboard listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  // Auto-focus first input to open keyboard by default
+  useEffect(() => {
+    setTimeout(() => {
+      inputRefs.current[0]?.focus();
+    }, 300);
+  }, []);
 
   useEffect(() => {
     if (timer === 0) {return;}
@@ -60,11 +91,29 @@ const VerificationScreen: React.FC = () => {
   }, [route.params?.phoneNumber]); // Re-run when phoneNumber param changes
 
   const handleChange = (val: string, idx: number) => {
-    if (val.length === codeLength && new RegExp(`^\\d{${codeLength}}$`).test(val)) {
-      setCode(val.split(''));
-      inputRefs.current[codeLength - 1]?.focus();
-      return;
+    // Handle paste: if multiple digits are pasted, fill all inputs
+    if (val.length > 1) {
+      const cleanedCode = val.replace(/\D/g, ''); // Remove non-digits
+      if (cleanedCode.length >= codeLength) {
+        // Full code pasted
+        const codeArray = cleanedCode.substring(0, codeLength).split('');
+        setCode(codeArray);
+        inputRefs.current[codeLength - 1]?.focus();
+        return;
+      } else if (cleanedCode.length > 0) {
+        // Partial code pasted - fill from current index
+        const newCode = [...code];
+        for (let i = 0; i < cleanedCode.length && (idx + i) < codeLength; i++) {
+          newCode[idx + i] = cleanedCode[i];
+        }
+        setCode(newCode);
+        const nextFocusIdx = Math.min(idx + cleanedCode.length, codeLength - 1);
+        inputRefs.current[nextFocusIdx]?.focus();
+        return;
+      }
     }
+    
+    // Handle single digit input
     if (/^\d?$/.test(val)) {
       const newCode = [...code];
       newCode[idx] = val;
@@ -76,8 +125,65 @@ const VerificationScreen: React.FC = () => {
   };
 
   const handleKeyPress = (e: any, idx: number) => {
-    if (e.nativeEvent.key === 'Backspace' && !code[idx] && idx > 0) {
-      inputRefs.current[idx - 1]?.focus();
+    if (e.nativeEvent.key === 'Backspace') {
+      if (!code[idx] && idx > 0) {
+        // If current input is empty, delete previous digit and focus previous input
+        const newCode = [...code];
+        newCode[idx - 1] = '';
+        setCode(newCode);
+        inputRefs.current[idx - 1]?.focus();
+      } else if (code[idx]) {
+        // If current input has a digit, clear it
+        const newCode = [...code];
+        newCode[idx] = '';
+        setCode(newCode);
+      }
+    }
+  };
+
+  const handleInputPress = () => {
+    // Check if code is complete
+    const isCodeComplete = code.join('').length === codeLength;
+    
+    if (isCodeComplete) {
+      // If code is complete, focus last input to allow deletion
+      inputRefs.current[codeLength - 1]?.focus();
+    } else {
+      // If code is incomplete, focus first empty input or first input
+      const firstEmptyIndex = code.findIndex(digit => !digit);
+      const targetIndex = firstEmptyIndex !== -1 ? firstEmptyIndex : 0;
+      inputRefs.current[targetIndex]?.focus();
+    }
+  };
+
+  const handlePaste = async () => {
+    try {
+      const clipboardContent = await Clipboard.getStringAsync();
+      
+      if (!clipboardContent || clipboardContent.trim() === '') {
+        return; // Empty clipboard
+      }
+      
+      const cleanedCode = clipboardContent.replace(/\D/g, ''); // Remove non-digits
+      
+      if (cleanedCode.length >= codeLength) {
+        // Full code pasted
+        const codeArray = cleanedCode.substring(0, codeLength).split('');
+        setCode(codeArray);
+        inputRefs.current[codeLength - 1]?.focus();
+      } else if (cleanedCode.length > 0) {
+        // Partial code pasted
+        const newCode = [...code];
+        for (let i = 0; i < cleanedCode.length && i < codeLength; i++) {
+          newCode[i] = cleanedCode[i];
+        }
+        setCode(newCode);
+        const nextFocusIdx = Math.min(cleanedCode.length, codeLength - 1);
+        inputRefs.current[nextFocusIdx]?.focus();
+      }
+    } catch (error) {
+      logger.error('Failed to paste code', { error }, 'VerificationScreen');
+      Alert.alert('Error', 'Failed to paste code. Please try again.');
     }
   };
 
@@ -780,123 +886,117 @@ const VerificationScreen: React.FC = () => {
     }
   };
 
-  const timerText = `00:${timer < 10 ? '0' : ''}${timer}`;
+  const handleHelpCenterPress = () => {
+    Linking.openURL('https://help.wesplit.io/');
+  };
+
+  const timerText = `00 : ${timer < 10 ? '0' : ''}${timer}`;
+  const email = route.params?.email || '';
+  const phoneNumber = route.params?.phoneNumber || '';
 
   return (
     <Container>
-      <KeyboardAvoidingView 
-        style={{flex: 1}} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <View style={styles.mainContainer}>
-          {/* Header with Logo Centered */}
+      <View style={styles.keyboardAvoidingView}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <Header
-            onBackPress={() => navigation.goBack()}
             showBackButton={true}
-            variant="logoWithBack"
+            onBackPress={() => navigation.goBack()}
+            showHelpCenter={true}
+            onHelpCenterPress={handleHelpCenterPress}
           />
 
-          {/* Main Content - Scrollable */}
-          <ScrollView 
-            style={styles.scrollContent}
-            contentContainerStyle={styles.scrollContentContainer}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.centerContent}>
-        <View style={styles.mailIconBox}>
-          <Image 
-            source={{ 
-              uri: route.params?.phoneNumber 
-                ? 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fphone.png?alt=media' 
-                : 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmail.png?alt=media&token=5e3ac6e7-79b1-47e7-8087-f7e4c070d222' 
-            }} 
-            style={styles.mailIcon} 
-          />
-        </View>
-        <Text style={styles.title}>
-          {route.params?.phoneNumber ? 'Check your Phone' : 'Check your Email'}
-        </Text>
-        <Text style={styles.subtitle}>
-          We sent a {codeLength}-digit code to{' '}
-          <Text style={styles.emailHighlight}>
-            {route.params?.phoneNumber 
-              ? route.params.phoneNumber.substring(0, 5) + '***' + route.params.phoneNumber.slice(-2)
-              : route.params?.email || 'yourname@gmail.com'}
-          </Text>
-        </Text>
-        
-        <View style={styles.codeRow}>
-          {code.map((digit, idx) => (
-            <TextInput
-              key={`input-${idx}`}
-              ref={(ref) => {
-                if (inputRefs.current) {
-                inputRefs.current[idx] = ref;
-                }
-              }}
-              style={styles.codeInput}
-              value={digit}
-              onChangeText={val => handleChange(val, idx)}
-              keyboardType="number-pad"
-              maxLength={1} // Each input accepts only 1 digit
-              onKeyPress={e => handleKeyPress(e, idx)}
-              textContentType="oneTimeCode"
-              returnKeyType="done"
-              autoComplete="one-time-code"
-              enablesReturnKeyAutomatically={true}
-              placeholder="0"
-              placeholderTextColor={colors.white30}
-            />
-          ))}
-        </View>
-        
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        
-        <TouchableOpacity 
-          style={styles.submitButton} 
-          onPress={handleSubmit}
-          disabled={verifying}
-        >
-          <LinearGradient
-            colors={verifying ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradientButton}
-          >
-            {verifying ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <Text style={styles.submitButtonText}>Submit</Text>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
-        
-        {/* Timer and resend */}
-        <View style={styles.timerSection}>
-        <Text style={styles.timer}>{timerText}</Text>
-        <TouchableOpacity
-          style={styles.resendLink}
-          onPress={handleResend}
-          disabled={timer !== 0 || resending}
-        >
-            <Text style={[styles.resendText, timer !== 0 || resending ? styles.resendTextDisabled : null]}>
-              Resend Code
-            </Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.contentContainer}>
+            {/* Title */}
+            <View style={styles.titleContainer}>
+              <View style={styles.iconContainer}>
+                <PhosphorIcon
+                  name="Lock"
+                  size={24}
+                  color={colors.white}
+                  weight="regular"
+                />
+              </View>
+              <Text style={styles.title}>Enter Code</Text>
+              <Text style={styles.subtitle}>
+                We sent a verification code to{' '}
+                {phoneNumber 
+                  ? `your phone ${phoneNumber.substring(0, 5)}***${phoneNumber.slice(-2)}`
+                  : `your email ${email}`}
+              </Text>
             </View>
-          </ScrollView>
 
-          {/* Help Link - Fixed at bottom */}
-          <View style={styles.helpSection}>
-            <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
-              <Text style={styles.helpText}>Need help?</Text>
-            </TouchableOpacity>
+            {/* Code Input */}
+            <View style={styles.codeRow}>
+              {code.map((digit, idx) => (
+                <TextInput
+                  key={`input-${idx}`}
+                  ref={(ref) => {
+                    if (inputRefs.current) {
+                      inputRefs.current[idx] = ref;
+                    }
+                  }}
+                  style={styles.codeInput}
+                  value={digit}
+                  onChangeText={val => handleChange(val, idx)}
+                  onPressIn={handleInputPress}
+                  onFocus={handleInputPress}
+                  keyboardType="number-pad"
+                  maxLength={codeLength} // Allow paste of full code
+                  onKeyPress={e => handleKeyPress(e, idx)}
+                  textContentType="oneTimeCode"
+                  returnKeyType="done"
+                  autoComplete="one-time-code"
+                  enablesReturnKeyAutomatically={true}
+                  placeholder="—"
+                  placeholderTextColor={colors.white30}
+                />
+              ))}
+            </View>
+
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            {/* Resend Code and Paste Button - Same Row */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={styles.resendLink}
+                onPress={handleResend}
+                disabled={timer !== 0 || resending}
+              >
+                <Text style={[styles.resendText, timer !== 0 || resending ? styles.resendTextDisabled : null]}>
+                  Resend Code ({timerText})
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity onPress={handlePaste} style={styles.pasteButton}>
+                <PhosphorIcon
+                  name="Clipboard"
+                  size={16}
+                  color={colors.white80}
+                  weight="regular"
+                />
+                <Text style={styles.pasteButtonText}>Paste</Text>
+              </TouchableOpacity>
+            </View>
           </View>
+        </ScrollView>
+
+        {/* Next Button - Positioned above keyboard */}
+        <View style={[styles.buttonContainer, { paddingBottom: keyboardHeight > 0 ? keyboardHeight - 20 : 20 }]}>
+          <Button
+            title="Next"
+            onPress={handleSubmit}
+            variant="primary"
+            size="large"
+            fullWidth={true}
+            disabled={code.join('').length !== codeLength || verifying}
+            loading={verifying}
+          />
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Container>
   );
 };

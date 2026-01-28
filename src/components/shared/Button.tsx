@@ -23,7 +23,7 @@ import { spacing } from '../../theme/spacing';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface ButtonProps {
-  title: string;
+  title?: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary';
   size?: 'small' | 'medium' | 'large';
@@ -35,6 +35,7 @@ interface ButtonProps {
   icon?: PhosphorIconName;
   iconPosition?: 'left' | 'right';
   gradientColors?: string[]; // Custom gradient colors for primary variant
+  children?: React.ReactNode; // Allow custom content
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -50,6 +51,7 @@ const Button: React.FC<ButtonProps> = ({
   icon,
   iconPosition = 'left',
   gradientColors,
+  children,
 }) => {
   // Animation values
   const opacityAnim = useRef(new Animated.Value(disabled ? 0.5 : 1)).current;
@@ -123,11 +125,16 @@ const Button: React.FC<ButtonProps> = ({
   };
 
   const getTextStyle = (): TextStyle => {
+    const buttonStyle = typography.textStyles.button;
+    
+    // Convert typography styles to React Native TextStyle format
+    // lineHeight multiplier needs to be converted to absolute value
     const baseStyle: TextStyle = {
-      fontSize: typography.fontSize.button,
-      textAlign: 'center',
-      color: colors.white,
-      fontWeight: typography.fontWeight.semibold,
+      fontFamily: buttonStyle.fontFamily,
+      fontSize: buttonStyle.fontSize,
+      fontStyle: buttonStyle.fontStyle as 'normal' | 'italic' | undefined,
+      fontWeight: buttonStyle.fontWeight as TextStyle['fontWeight'],
+      lineHeight: buttonStyle.lineHeight * buttonStyle.fontSize, // Convert multiplier to absolute value
     };
 
     switch (variant) {
@@ -142,7 +149,10 @@ const Button: React.FC<ButtonProps> = ({
           color: disabled ? colors.white70 : colors.white,
         };
       default:
-        return baseStyle;
+        return {
+          ...baseStyle,
+          color: disabled ? colors.white70 : colors.white,
+        };
     }
   };
 
@@ -155,8 +165,8 @@ const Button: React.FC<ButtonProps> = ({
         };
       case 'large':
         return {
-          paddingHorizontal: spacing.xl,
-          paddingVertical: spacing.lg,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.md,
         };
       default: // medium
         return {
@@ -168,31 +178,41 @@ const Button: React.FC<ButtonProps> = ({
 
   const isDisabled = disabled || loading;
 
-  const renderButtonContent = () => (
-    <>
-      {loading && (
-        <ActivityIndicator
-          size="small"
-          color={colors.white}
-          style={styles.loader}
-        />
-      )}
-      
-      {icon && iconPosition === 'left' && !loading && (
-        <PhosphorIcon name={icon} size={title ? 16 : 24} color={getTextStyle().color as string} style={styles.iconLeft} />
-      )}
-      
-      {title && (
-        <Text style={[getTextStyle(), textStyle]}>
-          {loading ? 'Loading...' : title}
-        </Text>
-      )}
-      
-      {icon && iconPosition === 'right' && !loading && (
-        <PhosphorIcon name={icon} size={title ? 16 : 24} color={getTextStyle().color as string} style={styles.iconRight} />
-      )}
-    </>
-  );
+  const renderButtonContent = () => {
+    // If children are provided, render them instead of title
+    if (children) {
+      return children;
+    }
+
+    return (
+      <>
+        {loading && (
+          <ActivityIndicator
+            size="small"
+            color={colors.white}
+            style={styles.loader}
+          />
+        )}
+        
+        {icon && iconPosition === 'left' && !loading && (
+          <PhosphorIcon name={icon} size={title ? 16 : 24} color={getTextStyle().color as string} style={styles.iconLeft} />
+        )}
+        
+        {title && (
+          <Text 
+            style={[getTextStyle(), textStyle]}
+            allowFontScaling={false}
+          >
+            {loading ? 'Loading...' : title}
+          </Text>
+        )}
+        
+        {icon && iconPosition === 'right' && !loading && (
+          <PhosphorIcon name={icon} size={title ? 16 : 24} color={getTextStyle().color as string} style={styles.iconRight} />
+        )}
+      </>
+    );
+  };
 
   // Primary variant with LinearGradient
   if (variant === 'primary') {
@@ -219,7 +239,7 @@ const Button: React.FC<ButtonProps> = ({
           accessibilityHint={loading ? "Loading" : undefined}
         >
           {disabled ? (
-            <View style={[styles.gradient, { backgroundColor: colors.white10 }]}>
+            <View style={[styles.gradient, { backgroundColor: colors.white10 }, getSizeStyle()]}>
               {renderButtonContent()}
             </View>
           ) : (
@@ -227,7 +247,7 @@ const Button: React.FC<ButtonProps> = ({
               colors={gradientColors || [colors.green, colors.greenBlue || colors.green]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.gradient}
+              style={[styles.gradient, getSizeStyle()]}
             >
               {renderButtonContent()}
             </LinearGradient>
@@ -268,8 +288,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    // Padding will be set by getSizeStyle() based on size prop
   },
   loader: {
     marginRight: spacing.sm,

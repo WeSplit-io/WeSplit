@@ -17,6 +17,9 @@ interface HeaderProps {
   variant?: HeaderVariant;
   logoUri?: string; // Custom logo URI for partner logos
   logoHeight?: number; // Custom logo height (default: 40)
+  showHelpCenter?: boolean; // Show help center button on the right
+  onHelpCenterPress?: () => void; // Callback when help center button is pressed
+  helpCenterColor?: string; // Color for help center icon (default: white)
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -31,10 +34,19 @@ const Header: React.FC<HeaderProps> = ({
   variant = 'default',
   logoUri,
   logoHeight = 40,
+  showHelpCenter = false,
+  onHelpCenterPress,
+  helpCenterColor = colors.white,
 }) => {
   const handleBackPress = () => {
     if (onBackPress) {
       onBackPress();
+    }
+  };
+
+  const handleHelpCenterPress = () => {
+    if (onHelpCenterPress) {
+      onHelpCenterPress();
     }
   };
 
@@ -100,7 +112,19 @@ const Header: React.FC<HeaderProps> = ({
       
       {renderCenterContent()}
       
-      {rightElement || <View style={styles.placeholder} />}
+      {showHelpCenter ? (
+        <TouchableOpacity onPress={handleHelpCenterPress} style={styles.helpButton}>
+          <PhosphorIcon
+            name="Question"
+            size={24}
+            color={colors.white50}
+          />
+        </TouchableOpacity>
+      ) : rightElement ? (
+        rightElement
+      ) : (
+        <View style={styles.placeholder} />
+      )}
     </View>
   );
 };
@@ -114,9 +138,16 @@ const styles = {
     paddingBottom: spacing.md,
   },
   backButton: {
-    width: 80,
-    height: 40,
+    width: spacing.iconBoxSize,
+    height: spacing.iconBoxSize,
     alignItems: 'flex-start' as const,
+    justifyContent: 'center' as const,
+    zIndex: 1,
+  },
+  helpButton: {
+    width: spacing.iconBoxSize,
+    height: spacing.iconBoxSize,
+    alignItems: 'flex-end' as const,
     justifyContent: 'center' as const,
     zIndex: 1,
   },
@@ -131,8 +162,8 @@ const styles = {
     zIndex: 0,
   },
   placeholder: {
-    width: 80,
-    height: 40,
+    width: spacing.iconBoxSize,
+    height: spacing.iconBoxSize,
   },
   logoSection: {
     alignItems: 'center' as const,

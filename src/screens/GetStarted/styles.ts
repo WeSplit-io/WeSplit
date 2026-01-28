@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TextStyle } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export const styles = StyleSheet.create({
@@ -34,15 +34,14 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
   headline: {
-    fontSize: typography.fontSize.title,
-    fontWeight: typography.fontWeight.bold,
+    ...(typography.textStyles.h1 as TextStyle),
+    lineHeight: typography.textStyles.h1.lineHeight * typography.textStyles.h1.fontSize,
     color: colors.white,
-    lineHeight: 52,
   },
   subtitle: {
-    fontSize: typography.fontSize.lg,
-    color: colors.white70,
-    lineHeight: 24,
+    ...(typography.textStyles.body as TextStyle),
+    lineHeight: typography.textStyles.body.lineHeight * typography.textStyles.body.fontSize,
+    color: colors.white80,
     marginTop: spacing.md,
   },
   buttonSection: {
