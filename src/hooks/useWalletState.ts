@@ -5,7 +5,10 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { walletService, UserWalletBalance } from '../services/blockchain/wallet';
+import {
+  simplifiedWalletService as walletService,
+  type UserWalletBalance
+} from '../services/blockchain/wallet/simplifiedWalletService';
 import { balanceManagementService } from '../services/blockchain/wallet/balanceManagementService';
 import { logger } from '../services/analytics/loggingService';
 

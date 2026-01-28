@@ -221,6 +221,65 @@ class ConsolidatedTransactionService {
         userId: params.userId
       });
 
+      // x402 authorization - fail-safe: if x402 fails, allow transaction to proceed
+      try {
+        const { X402Service } = await import('../../integrations/corbits');
+        const x402Authorization = await X402Service.authorizeTransaction(
+          {
+            userId: params.userId,
+            amount: params.amount,
+            currency: params.currency || 'USDC',
+            context: params.context,
+            metadata: {
+              splitId: (params as any).splitId,
+              splitWalletId: (params as any).splitWalletId,
+              billId: (params as any).billId,
+              sharedWalletId: (params as any).sharedWalletId,
+            },
+          },
+          params.to
+        );
+
+        // If x402 authorization explicitly fails, block transaction
+        if (x402Authorization.success && !x402Authorization.authorized) {
+          cleanup();
+          logger.warn('x402 authorization blocked transaction', {
+            userId: params.userId,
+            amount: params.amount,
+            to: params.to,
+            context: params.context,
+            error: x402Authorization.error,
+          }, 'ConsolidatedTransactionService');
+
+          return {
+            signature: '',
+            txId: '',
+            success: false,
+            error: x402Authorization.error || 'Transaction authorization failed',
+          };
+        }
+
+        // Log x402 authorization result (even if it passes)
+        if (x402Authorization.success && x402Authorization.authorizationId) {
+          logger.debug('x402 authorization passed', {
+            userId: params.userId,
+            amount: params.amount,
+            to: params.to,
+            context: params.context,
+            authorizationId: x402Authorization.authorizationId,
+          }, 'ConsolidatedTransactionService');
+        }
+      } catch (x402Error) {
+        // Fail-safe: Log error but allow transaction to proceed
+        logger.warn('x402 authorization error, allowing transaction to proceed', {
+          error: x402Error instanceof Error ? x402Error.message : String(x402Error),
+          userId: params.userId,
+          amount: params.amount,
+          to: params.to,
+          context: params.context,
+        }, 'ConsolidatedTransactionService');
+      }
+
       // ✅ CRITICAL: Execute actual transaction and resolve placeholder promise
       // This ensures all waiting calls get the same result
       const actualTransactionPromise = this.transactionProcessor.sendUSDCTransaction(params, keypair);

@@ -96,6 +96,66 @@ export class SpendMerchantPaymentService {
         lastPaymentAttempt: new Date().toISOString(),
       });
 
+      // x402 validation for merchant payment - fail-safe: if x402 fails, allow payment to proceed
+      try {
+        const { X402Service } = await import('../corbits');
+        const treasuryWallet = split.externalMetadata?.treasuryWallet;
+        if (treasuryWallet) {
+          const x402Validation = await X402Service.validatePaymentRequest({
+            userId: wallet.creatorId,
+            amount: split.totalAmount,
+            currency: split.currency || 'USDC',
+            context: 'spend_split_payment',
+            metadata: {
+              splitId: split.id,
+              orderId: split.externalMetadata?.orderId,
+              treasuryWallet,
+            },
+          });
+
+          // If x402 validation explicitly fails, block merchant payment
+          if (x402Validation.success && !x402Validation.valid) {
+            await this.updatePaymentStatus(split, {
+              paymentStatus: 'failed',
+              paymentAttempts: (split.externalMetadata?.paymentAttempts || 0),
+            });
+
+            logger.warn('x402 validation blocked merchant payment', {
+              splitId,
+              orderId: split.externalMetadata?.orderId,
+              amount: split.totalAmount,
+              riskScore: x402Validation.riskScore,
+              riskLevel: x402Validation.riskLevel,
+              error: x402Validation.error,
+            }, 'SpendMerchantPaymentService');
+
+            return {
+              success: false,
+              error: x402Validation.error || 'Merchant payment failed risk assessment',
+            };
+          }
+
+          // Log x402 validation result (even if it passes)
+          if (x402Validation.success) {
+            logger.debug('x402 validation passed for merchant payment', {
+              splitId,
+              orderId: split.externalMetadata?.orderId,
+              amount: split.totalAmount,
+              riskScore: x402Validation.riskScore,
+              riskLevel: x402Validation.riskLevel,
+            }, 'SpendMerchantPaymentService');
+          }
+        }
+      } catch (x402Error) {
+        // Fail-safe: Log error but allow merchant payment to proceed
+        logger.warn('x402 validation error for merchant payment, allowing payment to proceed', {
+          error: x402Error instanceof Error ? x402Error.message : String(x402Error),
+          splitId,
+          orderId: split.externalMetadata?.orderId,
+          amount: split.totalAmount,
+        }, 'SpendMerchantPaymentService');
+      }
+
       // Send payment to merchant
       const paymentResult = await this.sendPaymentToMerchant(split, splitWalletId, wallet.creatorId);
 

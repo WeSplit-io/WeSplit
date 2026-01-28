@@ -91,7 +91,7 @@ const SeedPhraseRecoveryScreen: React.FC = () => {
       }, 'SeedPhraseRecoveryScreen');
 
       // Import required modules
-      const { walletService } = await import('../../services/blockchain/wallet');
+      const { simplifiedWalletService } = await import('../../services/blockchain/wallet/simplifiedWalletService');
 
       let derivedWallet;
       let derivedAddress;
@@ -147,13 +147,13 @@ const SeedPhraseRecoveryScreen: React.FC = () => {
       // Restore wallet using the appropriate method
       let restoreResult;
       if (inputType === 'phrase') {
-        restoreResult = await walletService.restoreWalletFromSeedPhrase(
+        restoreResult = await simplifiedWalletService.restoreWalletFromSeedPhrase(
           userId,
           recoveryInput.trim(),
           expectedAddress
         );
       } else {
-        restoreResult = await walletService.restoreWalletFromPrivateKey(
+        restoreResult = await simplifiedWalletService.restoreWalletFromPrivateKey(
           userId,
           recoveryInput.trim(),
           expectedAddress

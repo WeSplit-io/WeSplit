@@ -161,7 +161,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 }
               }
               
-              const { walletService } = await import('../../../services/blockchain/wallet');
+              const { simplifiedWalletService } = await import('../../../services/blockchain/wallet/simplifiedWalletService');
               const { AuthPersistenceService } = await import('../../../services/core/authPersistenceService');
               const { clearAesKeyCache } = await import('../../../services/security/secureVault');
               const { PhantomAuthService } = await import('../../../services/auth/PhantomAuthService');
@@ -213,13 +213,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               // Step 2.5: Clear wallet balance cache for current user
                 if (currentUser?.id) {
                   try {
-                    walletService.clearUserCache(String(currentUser.id));
+                    simplifiedWalletService.clearUserCache(String(currentUser.id));
                     if (__DEV__) { logger.info('Wallet balance cache cleared for user', { userId: currentUser.id }, 'ProfileScreen'); }
                   } catch (cacheError) {
-                  console.warn('⚠️ Failed to clear wallet balance cache:', cacheError);
-                  // Continue with logout even if cache clearing fails
+                    console.warn('⚠️ Failed to clear wallet balance cache:', cacheError);
+                    // Continue with logout even if cache clearing fails
+                  }
                 }
-              }
 
               // Step 3: Clear AES key cache (prevents Face ID bypass after logout)
               try {

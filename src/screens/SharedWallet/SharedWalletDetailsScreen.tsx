@@ -39,6 +39,29 @@ import CentralizedTransactionModal, { type TransactionModalConfig } from '../../
 import { db } from '../../config/firebase/firebase';
 import { doc, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
 
+// Simple in-memory throttle map to avoid spamming discrepancy logs for a wallet
+const DISCREPANCY_LOG_THROTTLE_MS = 60_000; // 60 seconds
+const lastDiscrepancyLogByWallet: Record<string, number> = {};
+
+function shouldLogDiscrepancy(walletId: string, difference: number): boolean {
+  if (!walletId) return false;
+  const now = Date.now();
+  const last = lastDiscrepancyLogByWallet[walletId] || 0;
+  const shouldLog = now - last >= DISCREPANCY_LOG_THROTTLE_MS;
+
+  if (shouldLog) {
+    lastDiscrepancyLogByWallet[walletId] = now;
+  } else {
+    logger.debug('Shared wallet balance discrepancy detected but throttled', {
+      walletId,
+      difference,
+      secondsSinceLastLog: (now - last) / 1000,
+    }, 'SharedWalletDetailsScreen');
+  }
+
+  return shouldLog;
+}
+
 const SharedWalletDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -423,9 +446,9 @@ const SharedWalletDetailsScreen: React.FC = () => {
               difference: updatedWallet.totalBalance - (onChainResult.balance || 0)
             }, 'SharedWalletDetailsScreen');
 
-            // If there's a significant difference, log it for monitoring
+            // If there's a significant difference, log it for monitoring with simple throttling per wallet
             const difference = Math.abs(updatedWallet.totalBalance - (onChainResult.balance || 0));
-            if (difference > 0.01) { // More than 1 cent difference
+            if (difference > 0.01 && shouldLogDiscrepancy(walletId, difference)) { // More than 1 cent difference
               logger.warn('Balance discrepancy detected', {
                 walletId,
                 databaseBalance: updatedWallet.totalBalance,

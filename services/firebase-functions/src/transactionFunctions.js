@@ -351,6 +351,7 @@ exports.submitTransaction = functions.runWith({
     }
 
     // Convert base64 string to Buffer
+    // NOTE: Declare transactionBuffer in the outer scope so it is available in the catch block
     let transactionBuffer;
     try {
       transactionBuffer = Buffer.from(serializedTransaction, 'base64');

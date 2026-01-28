@@ -1091,14 +1091,14 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               });
 
               // Trigger appropriate refreshes
-              if (shouldRefreshBalance) {
-                // ✅ OPTIMIZATION: Dynamic import to reduce bundle size
-                (async () => {
-                  const { walletService } = await import('../../services/blockchain/wallet');
-                  walletService.clearUserCache(currentUserId);
-                  refreshWallet();
-                })();
-              }
+                  if (shouldRefreshBalance) {
+                    // ✅ OPTIMIZATION: Dynamic import to reduce bundle size
+                    (async () => {
+                      const { simplifiedWalletService } = await import('../../services/blockchain/wallet/simplifiedWalletService');
+                      simplifiedWalletService.clearUserCache(currentUserId);
+                      refreshWallet();
+                    })();
+                  }
 
               if (shouldRefreshRequests) {
                 loadPaymentRequests();

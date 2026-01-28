@@ -7,10 +7,7 @@ export { simplifiedWalletService as walletService } from './simplifiedWalletServ
 export { walletRecoveryService, WalletRecoveryService, WalletRecoveryError } from './walletRecoveryService';
 
 // Emergency recovery for lost funds
-export const emergencyFundRecovery = async (userId: string, originalAddress: string) => {
-  const { WalletRecoveryService } = await import('./walletRecoveryService');
-  return WalletRecoveryService.emergencyFundRecovery(userId, originalAddress);
-};
+export { emergencyFundRecovery } from './emergencyFundRecovery';
 export { walletExportService, WalletExportService } from './walletExportService';
 export { LinkedWalletService } from './LinkedWalletService';
 export { SolanaAppKitService } from './solanaAppKitService';

@@ -29,9 +29,13 @@ const LOG_LEVELS = {
   error: 3,
 } as const;
 
-// Get log level from environment or default to 'warn' in production, 'debug' in dev
+// Determine environment: prefer NODE_ENV when available so tooling like
+// `NODE_ENV=production npx expo start` is treated as production for logging.
+const IS_PROD_ENV = process.env.NODE_ENV === 'production';
+
+// Get log level from environment or default to 'warn' in production-like envs, 'debug' otherwise
 const getLogLevel = (): number => {
-  const envLevel = process.env.LOG_LEVEL || (__DEV__ ? 'debug' : 'warn');
+  const envLevel = process.env.LOG_LEVEL || (IS_PROD_ENV || !__DEV__ ? 'warn' : 'debug');
   const level = envLevel.toLowerCase() as keyof typeof LOG_LEVELS;
   return LOG_LEVELS[level] ?? LOG_LEVELS.warn;
 };
@@ -61,7 +65,8 @@ const VERBOSE_SOURCES = [
 class LoggingService {
   private static instance: LoggingService;
   private logs: LogEntry[] = [];
-  private maxLogs = 1000;
+  // Use a much smaller in-memory buffer in production-like envs to reduce heap usage
+  private maxLogs = IS_PROD_ENV || !__DEV__ ? 200 : 1000;
 
   private constructor() {}
 
@@ -73,8 +78,10 @@ class LoggingService {
   }
 
   private shouldLog(level: string, source?: string): boolean {
-    // In production, completely silence all logs except errors
-    if (!__DEV__) {
+    // In production-like environments, completely silence all logs except errors
+    // This is keyed off NODE_ENV so that `NODE_ENV=production npx expo start`
+    // behaves like production for logging even if __DEV__ is true.
+    if (IS_PROD_ENV || !__DEV__) {
       // Only allow ERROR level logs in production
       return level.toLowerCase() === 'error';
     }
@@ -103,10 +110,37 @@ class LoggingService {
       return;
     }
 
+    // In production-like envs, aggressively sanitize log data to avoid retaining huge objects
+    let safeData: LogData | undefined = data;
+    if ((IS_PROD_ENV || !__DEV__) && data && typeof data === 'object') {
+      try {
+        // Keep only shallow, JSON-safe summary to avoid deep graphs / large arrays
+        const keys = Object.keys(data as Record<string, unknown>).slice(0, 10);
+        const summary: Record<string, unknown> = {};
+        for (const key of keys) {
+          const value = (data as Record<string, unknown>)[key];
+          if (value === null || value === undefined) {
+            summary[key] = value;
+          } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            // Trim very long strings
+            summary[key] =
+              typeof value === 'string' && value.length > 256
+                ? `${value.slice(0, 256)}...`
+                : value;
+          } else {
+            summary[key] = '[object]';
+          }
+        }
+        safeData = summary;
+      } catch {
+        safeData = '[unserializable]';
+      }
+    }
+
     const entry: LogEntry = {
       level,
       message,
-      data,
+      data: safeData,
       timestamp: new Date().toISOString(),
       source
     };
