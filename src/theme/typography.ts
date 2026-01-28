@@ -114,5 +114,12 @@ export const typography = {
       fontWeight: '500',
       lineHeight: 1.5,
     },
+    bodyNumber: {
+      fontFamily: 'SF Compact',
+      fontSize: 16,
+      fontStyle: 'normal',
+      fontWeight: '500',
+      lineHeight: 1.2,
+    },
   },
 }; 

@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   historySection: {
-    marginBottom: spacing.lg,
+    marginVertical: spacing.lg,
   },
   historyHeader: {
     flexDirection: 'row',

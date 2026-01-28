@@ -220,10 +220,6 @@ const ReferralScreen: React.FC = () => {
               <PhosphorIcon name="CopySimple" size={20} color={colors.white} weight="regular" />
               <Text style={styles.actionButtonText}>Copy</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => setShowQRModal(true)}>
-              <PhosphorIcon name="QrCode" size={20} color={colors.white} weight="regular" />
-              <Text style={styles.actionButtonText}>QR Code</Text>
-            </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
               <PhosphorIcon name="ShareNetwork" size={20} color={colors.white} weight="regular" />
               <Text style={styles.actionButtonText}>Share</Text>
@@ -358,7 +354,7 @@ const styles = StyleSheet.create({
   },
   scoreLabel: {
     fontSize: typography.fontSize.sm,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     marginBottom: spacing.xs,
   },
   scoreValue: {
@@ -368,7 +364,7 @@ const styles = StyleSheet.create({
   },
   scoreCaption: {
     fontSize: typography.fontSize.sm,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     marginTop: spacing.xs,
   },
   referralCodeSection: {
@@ -377,7 +373,7 @@ const styles = StyleSheet.create({
   referralCodeLabel: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.whiteSecondary,
+    color: colors.white70,
     marginBottom: spacing.sm,
   },
   referralCodeCard: {
@@ -420,7 +416,7 @@ const styles = StyleSheet.create({
   rewardsTitle: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.whiteSecondary,
+    color: colors.white70,
 
   },
   stepsContainer: {

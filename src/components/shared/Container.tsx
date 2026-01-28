@@ -23,7 +23,7 @@ const Container: React.FC<ContainerProps> = ({
   children,
   style,
   backgroundColor = colors.black,
-  paddingHorizontal = spacing.lg,
+  paddingHorizontal = spacing.md,
   paddingVertical = spacing.sm,
   safeAreaEdges = ['top', 'bottom'],
 }) => {

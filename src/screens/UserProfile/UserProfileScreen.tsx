@@ -12,12 +12,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
 import { PaperPlaneTilt, HandCoins } from 'phosphor-react-native';
-import { Container, Header } from '../../components/shared';
+import { Container, Header, Loader } from '../../components/shared';
 import Avatar from '../../components/shared/Avatar';
 import CommunityBadge from '../../components/profile/CommunityBadge';
 import { useApp } from '../../context/AppContext';
@@ -362,9 +361,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation, route
           onBackPress={() => navigation.goBack()}
           showBackButton={true}
         />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.green} />
-        </View>
+        <Loader />
       </Container>
     );
   }

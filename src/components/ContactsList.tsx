@@ -4,7 +4,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import Icon from './Icon';
-import { Input, PhosphorIcon, ModernLoader } from './shared';
+import { Input, PhosphorIcon, Loader } from './shared';
 import { useApp } from '../context/AppContext';
 import { useContacts, useContactActions } from '../hooks';
 import { deepLinkHandler } from '../services/core';
@@ -875,11 +875,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ModernLoader size="large" text="Loading contacts..." />
-      </View>
-    );
+    return <Loader />;
   }
 
   return (
@@ -945,11 +941,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
             {/* Search Results - Show when searching */}
             {searchQuery.trim() && searchQuery.length >= 2 ? (
               <>
-                {isSearching && (
-                  <View style={styles.loadingContainer}>
-                    <ModernLoader size="medium" text="Searching users..." />
-                  </View>
-                )}
+                {isSearching && <Loader />}
                 {!isSearching && searchResults.length > 0 && (
                   <View style={styles.sectionContainer}>
                     <Text style={styles.sectionTitle}>Search Results</Text>
