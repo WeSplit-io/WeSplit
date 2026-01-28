@@ -9,6 +9,29 @@ import { SharedWalletService, SharedWallet } from '../../../services/sharedWalle
 import { UnifiedTransaction } from '../../../components/sharedWallet';
 import { logger } from '../../../services/analytics/loggingService';
 
+// Simple in-memory throttle map to avoid spamming discrepancy logs
+const DISCREPANCY_LOG_THROTTLE_MS = 60_000; // 60 seconds
+const lastDiscrepancyLogByWallet: Record<string, number> = {};
+
+function shouldLogDiscrepancy(walletId: string, difference: number): boolean {
+  if (!walletId) return false;
+  const now = Date.now();
+  const last = lastDiscrepancyLogByWallet[walletId] || 0;
+  const shouldLog = now - last >= DISCREPANCY_LOG_THROTTLE_MS;
+
+  if (shouldLog) {
+    lastDiscrepancyLogByWallet[walletId] = now;
+  } else {
+    logger.debug('Shared wallet balance discrepancy detected but throttled', {
+      walletId,
+      difference,
+      secondsSinceLastLog: (now - last) / 1000,
+    }, 'useSharedWalletData');
+  }
+
+  return shouldLog;
+}
+
 export interface UseSharedWalletDataResult {
   wallet: SharedWallet | null;
   transactions: UnifiedTransaction[];
@@ -56,9 +79,9 @@ export const useSharedWalletData = (
               difference: updatedWallet.totalBalance - (onChainResult.balance || 0)
             }, 'useSharedWalletData');
 
-            // Log significant discrepancies
+            // Log significant discrepancies with simple throttling per wallet to avoid log spam
             const difference = Math.abs(updatedWallet.totalBalance - (onChainResult.balance || 0));
-            if (difference > 0.01) {
+            if (difference > 0.01 && shouldLogDiscrepancy(walletId, difference)) {
               logger.warn('Balance discrepancy detected', {
                 walletId,
                 databaseBalance: updatedWallet.totalBalance,

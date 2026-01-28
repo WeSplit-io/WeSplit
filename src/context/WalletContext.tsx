@@ -7,9 +7,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { walletService, walletExportService } from '../services/blockchain/wallet';
+import {
+  simplifiedWalletService as walletService,
+} from '../services/blockchain/wallet/simplifiedWalletService';
+import { walletExportService } from '../services/blockchain/wallet/walletExportService';
 import { consolidatedTransactionService } from '../services/blockchain/transaction';
-import { solanaWalletService } from '../services/blockchain/wallet';
+import { solanaWalletService } from '../services/blockchain/wallet/api/solanaWalletApi';
 import { logger } from '../services/analytics/loggingService';
 import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
 import { getConfig } from '../config/unified';
@@ -275,7 +278,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const hydrateAppWalletSecrets = async (userId: string) => {
     try {
-      const { walletService } = await import('../services/blockchain/wallet');
       const mnemonic = await walletService.getSeedPhrase(userId);
       if (mnemonic) {
         setAppWalletMnemonic(mnemonic);
@@ -617,9 +619,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   // App wallet methods
   const ensureAppWallet = async (userId: string): Promise<{ success: boolean; wallet?: any; error?: string }> => {
     try {
-      // Import userWalletService to ensure app wallet
-      const { walletService } = await import('../services/blockchain/wallet');
-      
       const walletResult = await walletService.ensureUserWallet(userId);
       
       if (walletResult.success && walletResult.wallet) {
@@ -662,8 +661,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const getAppWalletBalance = async (userId: string): Promise<number> => {
     try {
-      // Import userWalletService to get app wallet balance
-      const { walletService } = await import('../services/blockchain/wallet');
       const balance = await walletService.getUserWalletBalance(userId);
       
       const totalUSD = balance?.totalUSD || 0;
@@ -704,8 +701,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const getAppWalletInfo = async (userId: string) => {
     try {
-      // Import userWalletService to get app wallet info
-      const { walletService } = await import('../services/blockchain/wallet');
       // walletService doesn't have getWalletInfoForUser, use getWalletInfo instead
       const walletInfo = await walletService.getWalletInfo(userId);
       const result = walletInfo ? { success: true, walletAddress: walletInfo.address } : { success: false, walletAddress: undefined };
@@ -735,8 +730,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const fixAppWalletMismatch = async (userId: string) => {
     try {
-      // Import userWalletService to fix wallet mismatch
-      const { walletService } = await import('../services/blockchain/wallet');
       // walletService doesn't have fixWalletMismatch, use ensureUserWallet instead
       const walletResult = await walletService.ensureUserWallet(userId);
       const result = walletResult.success && walletResult.wallet ? {

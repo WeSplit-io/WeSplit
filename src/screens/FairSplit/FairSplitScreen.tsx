@@ -3280,7 +3280,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             ]
           );
         } else {
-          Alert.alert('Transfer Failed', transferResult.error || 'Failed to transfer funds. Please try again.');
+          const rawMessage = transferResult.error || 'Failed to transfer funds. Please try again.';
+          const normalizedMessage = normalizeTransactionErrorMessage
+            ? normalizeTransactionErrorMessage(rawMessage)
+            : rawMessage;
+          Alert.alert('Transfer Failed', normalizedMessage);
         }
       }
       

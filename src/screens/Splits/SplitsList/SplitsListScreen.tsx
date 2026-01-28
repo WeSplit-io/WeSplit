@@ -99,6 +99,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
   const [sharedWalletsError, setSharedWalletsError] = useState<string | null>(null); // Track errors to prevent infinite retries
   const [hasAttemptedLoadSharedWallets, setHasAttemptedLoadSharedWallets] = useState(false); // Track if we've attempted to load
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isOpeningSplit, setIsOpeningSplit] = useState(false);
   const SPLITS_PER_PAGE = 10;
   
   // Refs to prevent infinite loops
@@ -965,18 +966,27 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
   }, [currentUser?.id]);
 
   const handleSplitPress = useCallback(async (split: Split) => {
-    try {
-      logger.debug('Opening split', {
-        id: split.id,
-        title: split.title,
-        status: split.status,
-        splitType: split.splitType
-      });
+    // Prevent multiple rapid taps while a split is opening
+    if (isOpeningSplit) {
+      return;
+    }
 
-      // Check if this is a completed degen split that should go to result screen
-      if (split.splitType === 'degen' && split.walletId) {
-        try {
-          logger.debug('Checking degen split wallet status', { walletId: split.walletId }, 'SplitsListScreen');
+    // Set a lightweight loading state immediately so the UI can render
+    setIsOpeningSplit(true);
+
+    const openSplit = async () => {
+      try {
+        logger.debug('Opening split', {
+          id: split.id,
+          title: split.title,
+          status: split.status,
+          splitType: split.splitType
+        });
+
+        // Check if this is a completed degen split that should go to result screen
+        if (split.splitType === 'degen' && split.walletId) {
+          try {
+            logger.debug('Checking degen split wallet status', { walletId: split.walletId }, 'SplitsListScreen');
 
           // ✅ OPTIMIZATION: Use cached wallet data first for faster navigation
           // Import SplitWalletService dynamically to avoid circular dependencies
@@ -1024,21 +1034,21 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         }
       }
 
-      // Debug: Log the split data being passed to navigation
-      logger.info('Navigating to SplitDetails with split data', {
-        splitId: split.id,
-        splitTitle: split.title,
-        splitObject: split,
-        splitKeys: Object.keys(split),
-        splitType: typeof split,
-        hasParticipants: !!split.participants,
-        participantsCount: split.participants?.length || 0,
-        // Additional debugging
-        splitStringified: JSON.stringify(split, null, 2),
-        splitHasId: !!split.id,
-        splitIdType: typeof split.id,
-        splitIdValue: split.id
-      });
+      // Debug: Log the split data being passed to navigation (avoid huge payloads in production)
+      if (__DEV__) {
+        logger.info('Navigating to SplitDetails with split data', {
+          splitId: split.id,
+          splitTitle: split.title,
+          splitKeys: Object.keys(split),
+          hasParticipants: !!split.participants,
+          participantsCount: split.participants?.length || 0,
+        });
+      } else {
+        logger.info('Navigating to SplitDetails', {
+          splitId: split.id,
+          splitTitle: split.title,
+        });
+      }
 
       // Always navigate to SplitDetails first for consistent behavior
       // This ensures all splits (OCR and manual) follow the same flow
@@ -1053,8 +1063,17 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
     } catch (err) {
       console.error('❌ SplitsListScreen: Error navigating to split details:', err);
       Alert.alert('Navigation Error', 'Failed to open split details');
+    } finally {
+      // If this screen is still mounted, clear the loading state.
+      // When navigation succeeds, the screen usually unmounts and this no-ops.
+      setIsOpeningSplit(false);
     }
-  }, [navigation, currentUser]);
+    };
+
+    // Defer heavy work (dynamic imports, wallet checks) to the next tick so the
+    // lightweight loading overlay can render first.
+    setTimeout(openSplit, 0);
+  }, [navigation, currentUser, isOpeningSplit]);
 
 
 
@@ -1459,6 +1478,25 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
         )}
         </ScrollView>
       </View>
+
+      {/* Lightweight overlay while a split is opening to avoid "frozen" feel during bundling */}
+      {isOpeningSplit && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <ModernLoader size="large" text="Opening split..." />
+        </View>
+      )}
 
       {/* Create Choice Modal */}
       {activeTab === 'splits' && (

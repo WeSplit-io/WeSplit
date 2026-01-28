@@ -577,26 +577,14 @@ export class TransactionProcessor {
       
       while (submissionAttempts < maxSubmissionAttempts) {
         try {
-          // Log transaction details before submission to track duplicates
-          const transactionForLogging = VersionedTransaction.deserialize(currentTxArray);
-          // Access instructions from compiled message - VersionedMessage doesn't have instructions directly
-          const compiledMessage = transactionForLogging.message;
-          const instructions = 'instructions' in compiledMessage 
-            ? (compiledMessage as any).instructions 
-            : [];
-          const transferInstructions = instructions.filter((ix: any) => {
-            // Check if instruction is a token transfer (has token program)
-            return ix.programId && ix.programId.equals && ix.programId.equals(TOKEN_PROGRAM_ID);
-          });
-          
+          // Log lightweight transaction details before submission to track duplicates
+          // NOTE: Avoid deserializing the full VersionedTransaction here to reduce memory usage
           logger.info('Processing USDC transfer (sign and submit)', {
             transactionSize: currentTxArray.length,
             attempt: submissionAttempts + 1,
             maxAttempts: maxSubmissionAttempts,
             blockhashAge: Date.now() - currentBlockhashTimestamp,
             isMainnet,
-            transferInstructionsCount: transferInstructions.length,
-            totalInstructionsCount: instructions.length,
             recipientAmount,
             companyFee,
             note: submissionAttempts > 0 ? 'RETRY ATTEMPT - previous attempt may have succeeded' : 'Initial submission'

@@ -51,6 +51,57 @@ export class ExternalCardPaymentService {
         };
       }
 
+      // x402 validation for external card payment - fail-safe: if x402 fails, allow payment to proceed
+      try {
+        const { X402Service } = await import('../corbits');
+        const x402Validation = await X402Service.validatePaymentRequest({
+          userId: params.userId,
+          amount: params.amount,
+          currency: params.currency || 'USDC',
+          context: 'external_payment',
+          metadata: {
+            cardId: params.cardId,
+            description: params.description,
+          },
+        });
+
+        // If x402 validation explicitly fails, block card payment
+        if (x402Validation.success && !x402Validation.valid) {
+          logger.warn('x402 validation blocked external card payment', {
+            cardId: params.cardId,
+            userId: params.userId,
+            amount: params.amount,
+            riskScore: x402Validation.riskScore,
+            riskLevel: x402Validation.riskLevel,
+            error: x402Validation.error,
+          }, 'ExternalCardPaymentService');
+
+          return {
+            success: false,
+            error: x402Validation.error || 'Card payment failed risk assessment',
+          };
+        }
+
+        // Log x402 validation result (even if it passes)
+        if (x402Validation.success) {
+          logger.debug('x402 validation passed for external card payment', {
+            cardId: params.cardId,
+            userId: params.userId,
+            amount: params.amount,
+            riskScore: x402Validation.riskScore,
+            riskLevel: x402Validation.riskLevel,
+          }, 'ExternalCardPaymentService');
+        }
+      } catch (x402Error) {
+        // Fail-safe: Log error but allow card payment to proceed
+        logger.warn('x402 validation error for external card payment, allowing payment to proceed', {
+          error: x402Error instanceof Error ? x402Error.message : String(x402Error),
+          cardId: params.cardId,
+          userId: params.userId,
+          amount: params.amount,
+        }, 'ExternalCardPaymentService');
+      }
+
       // Get the KAST card wallet address for USDC transfer
       const cardInfo = await ExternalCardService.getCardInfo(params.cardId);
       if (!cardInfo.success || !cardInfo.card) {

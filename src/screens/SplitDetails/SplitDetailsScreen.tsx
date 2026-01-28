@@ -2035,9 +2035,28 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Show processing screen for new bills
   if (isProcessingNewBill) {
-      return (
+    return (
       <LoadingScreen
         message="Processing your bill..."
+        showSpinner={true}
+      />
+    );
+  }
+
+  // Show a blocking loading screen while an existing split is being loaded.
+  // This prevents the user from interacting with a half-initialized screen and helps avoid
+  // heavy re-renders / OOM issues when multiple expensive effects are running in parallel.
+  const isExistingSplitInitialLoad =
+    !!effectiveSplitId &&
+    !isActuallyNewBill &&
+    !isActuallyManualCreation &&
+    !currentSplitData &&
+    !isProcessingNewBill;
+
+  if (isExistingSplitInitialLoad) {
+    return (
+      <LoadingScreen
+        message="Loading split..."
         showSpinner={true}
       />
     );
@@ -2047,9 +2066,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // This prevents content flash before redirect happens
   // Check both currentSplitData (from state) and splitData (from route params) for early detection
   const splitDataToCheck = currentSplitData || splitData;
-  const shouldRedirectToSpend = !isActuallyNewBill && 
-                                 !isActuallyManualCreation && 
-                                 splitDataToCheck?.splitType === 'spend' && 
+  const shouldRedirectToSpend = !isActuallyNewBill &&
+                                 !isActuallyManualCreation &&
+                                 splitDataToCheck?.splitType === 'spend' &&
                                  (splitDataToCheck.status === 'active' || splitDataToCheck.status === 'locked' || splitDataToCheck.status === 'pending');
   
   if (shouldRedirectToSpend) {

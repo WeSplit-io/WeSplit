@@ -14,7 +14,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
-import { walletExportService } from '../../services/blockchain/wallet';
+import { walletExportService } from '../../services/blockchain/wallet/walletExportService';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import { Container, Button, PhosphorIcon } from '../../components/shared';

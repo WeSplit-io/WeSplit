@@ -38,6 +38,67 @@ export class CentralizedTransactionHandler {
     try {
       const { userId, amount, context } = params;
 
+      // Toggle x402 (Corbits) validation via environment flags so we can
+      // disable it in local development to avoid bundling the integration.
+      const x402Enabled =
+        process.env.EXPO_PUBLIC_X402_ENABLED === 'true' ||
+        process.env.X402_ENABLED === 'true';
+
+      // x402 validation - fail-safe: if x402 fails, allow transaction to proceed
+      if (x402Enabled) {
+        try {
+          const { X402Service } = await import('../integrations/corbits');
+          const x402Validation = await X402Service.validatePaymentRequest({
+            userId,
+            amount,
+            currency: params.currency || 'USDC',
+            context,
+            metadata: {
+              splitId: (params as any).splitId,
+              splitWalletId: (params as any).splitWalletId,
+              billId: (params as any).billId,
+              sharedWalletId: (params as any).sharedWalletId,
+            },
+          });
+
+          // If x402 validation explicitly fails, block transaction
+          if (x402Validation.success && !x402Validation.valid) {
+            logger.warn('x402 validation blocked transaction', {
+              userId,
+              amount,
+              context,
+              riskScore: x402Validation.riskScore,
+              riskLevel: x402Validation.riskLevel,
+              error: x402Validation.error,
+            }, 'CentralizedTransactionHandler');
+
+            return {
+              canExecute: false,
+              error: x402Validation.error || 'Transaction failed risk assessment',
+            };
+          }
+
+          // Log x402 validation result (even if it passes)
+          if (x402Validation.success) {
+            logger.debug('x402 validation passed', {
+              userId,
+              amount,
+              context,
+              riskScore: x402Validation.riskScore,
+              riskLevel: x402Validation.riskLevel,
+            }, 'CentralizedTransactionHandler');
+          }
+        } catch (x402Error) {
+          // Fail-safe: Log error but allow transaction to proceed
+          logger.warn('x402 validation error, allowing transaction to proceed', {
+            error: x402Error instanceof Error ? x402Error.message : String(x402Error),
+            userId,
+            amount,
+            context,
+          }, 'CentralizedTransactionHandler');
+        }
+      }
+
       // Get available balance based on context
       let availableBalance: number;
       let requiredBalance: number;

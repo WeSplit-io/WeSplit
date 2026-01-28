@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { LinkedWalletService } from '../../services/blockchain/wallet';
+import { LinkedWalletService } from '../../services/blockchain/wallet/LinkedWalletService';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';

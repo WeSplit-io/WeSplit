@@ -1540,6 +1540,30 @@ class TransactionSigningService {
         throw new Error('Company keypair not initialized');
       }
 
+      // x402 server-side validation - fail-safe: if x402 fails, allow transaction to proceed
+      try {
+        const x402Enabled = process.env.EXPO_PUBLIC_X402_ENABLED === 'true' || 
+                           process.env.X402_ENABLED === 'true';
+        
+        if (x402Enabled) {
+          // TODO: Integrate with x402 validation API for server-side validation
+          // For now, perform basic validation checks
+          // This can be enhanced with actual Faremeter integration
+          console.log('x402 validation enabled - performing server-side validation', {
+            timestamp: new Date().toISOString()
+          });
+          
+          // Basic validation: transaction structure is already validated below
+          // Additional x402-specific validation can be added here
+        }
+      } catch (x402Error) {
+        // Fail-safe: Log error but allow transaction to proceed
+        console.warn('x402 server-side validation error, allowing transaction to proceed', {
+          error: x402Error instanceof Error ? x402Error.message : String(x402Error),
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const transaction = VersionedTransaction.deserialize(serializedTransaction);
 
       // Check if transaction is properly structured

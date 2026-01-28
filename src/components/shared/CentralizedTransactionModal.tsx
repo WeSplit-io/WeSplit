@@ -18,6 +18,28 @@ import { colors } from '../../theme';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
+// Normalize error messages so dev-only bundle failures don't look like on-chain
+// transaction errors. This is especially important when Metro/Expo crashes with
+// messages like \"Could not load bundle\" while the transaction actually succeeded.
+const normalizeTransactionErrorMessage = (message: string): string => {
+  if (!message) return message;
+  const lower = message.toLowerCase();
+
+  const devBundleIndicators = [
+    'could not load bundle',
+    'unable to load bundle',
+    'unable to resolve host',
+    'could not connect to development server',
+    'metro has encountered an error'
+  ];
+
+  if (devBundleIndicators.some(snippet => lower.includes(snippet))) {
+    return 'Development bundle crashed or disconnected. The transaction may have already been submitted. Please refresh and check your balances before retrying.';
+  }
+
+  return message;
+};
+
 export interface TransactionModalConfig {
   // Modal configuration
   title: string;
@@ -713,7 +735,10 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
       setIsProcessing(false);
       isExecutingRef.current = false;
       // Match screen behavior - show Alert for validation errors
-      Alert.alert('Transaction Error', validation.error || 'Transaction validation failed');
+      const normalized = normalizeTransactionErrorMessage(
+        validation.error || 'Transaction validation failed'
+      );
+      Alert.alert('Transaction Error', normalized);
       return;
     }
 
@@ -746,12 +771,38 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
           Alert.alert('Success', result.message || 'Transaction completed successfully');
         }
       } else {
-        // Call error callback if provided
-        if (config.onError) {
-          config.onError(result.error || 'Unknown error occurred');
+        // Detect transient backend issues (rate limit / signing service unavailable) and provide clearer UX
+        const rawError = result.error || 'Unknown error occurred';
+        const lowerError = rawError.toLowerCase();
+        const isTransientBackendError =
+          lowerError.includes('rate limit') ||
+          lowerError.includes('signing service is temporarily unavailable') ||
+          lowerError.includes('failed to submit transaction') ||
+          lowerError.includes('transaction signing service is temporarily unavailable');
+
+        if (isTransientBackendError) {
+          const friendlyMessage =
+            'Our transaction service is temporarily busy. Your funds were not moved. Please wait a few seconds and try again.';
+
+          logger.warn('Transient backend error detected for transaction', {
+            context: params.context,
+            userId: params.userId,
+            error: rawError.substring(0, 200),
+          }, 'CentralizedTransactionModal');
+
+          if (config.onError) {
+            config.onError(friendlyMessage);
+          } else {
+            Alert.alert('Service temporarily unavailable', friendlyMessage);
+          }
         } else {
-          // Default error behavior
-          Alert.alert('Transaction Failed', result.error || 'Unknown error occurred');
+          // Non-transient error: preserve original behavior but normalize dev-only bundle failures
+          const normalizedError = normalizeTransactionErrorMessage(rawError);
+          if (config.onError) {
+            config.onError(normalizedError);
+          } else {
+            Alert.alert('Transaction Failed', normalizedError);
+          }
         }
       }
     } catch (error) {
@@ -780,11 +831,12 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
           Alert.alert('Transaction Timeout', timeoutMessage);
         }
       } else {
-        // Regular error
+        // Regular error - normalize dev-only bundle failures
+        const normalizedError = normalizeTransactionErrorMessage(errorMessage);
         if (config.onError) {
-          config.onError(errorMessage);
+          config.onError(normalizedError);
         } else {
-          Alert.alert('Transaction Error', errorMessage);
+          Alert.alert('Transaction Error', normalizedError);
         }
       }
     } finally {
