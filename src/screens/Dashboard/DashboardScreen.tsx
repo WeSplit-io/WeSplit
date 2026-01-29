@@ -72,6 +72,9 @@ const vaultAuthSession = {
   lastUserId: null as string | null,
 };
 
+// User has already passed PinUnlock this app session (so we don't redirect when they tap Dashboard tab)
+let hasUnlockedThisSession = false;
+
 const DEFAULT_WALLET_BACKGROUND = 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-bg-linear.png?alt=media&token=4347e0cd-056e-4681-a066-0fd74a563013';
 
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) => {
@@ -152,12 +155,24 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     refreshWallet
   } = useWalletState(currentUser?.id);
 
-  // ✅ PIN GATE: If user has a PIN set, they must have come from PinUnlock. Otherwise redirect.
+  // Clear session flag when user logs out so next login requires PinUnlock again
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser?.id) {
+      hasUnlockedThisSession = false;
+    }
+  }, [isAuthenticated, currentUser?.id]);
+
+  // ✅ PIN GATE: If user has a PIN set, they must have come from PinUnlock (or already unlocked this session). Otherwise redirect.
   useEffect(() => {
     let cancelled = false;
+    const fromPinUnlock = (route?.params as { fromPinUnlock?: boolean } | undefined)?.fromPinUnlock;
+    if (fromPinUnlock) {
+      hasUnlockedThisSession = true;
+    }
     (async () => {
       if (!currentUser?.id || !isAuthenticated) return;
-      if ((route?.params as { fromPinUnlock?: boolean } | undefined)?.fromPinUnlock) return;
+      if (fromPinUnlock) return;
+      if (hasUnlockedThisSession) return; // Already unlocked this session (e.g. tapped Dashboard tab from another tab)
       try {
         const userIdStr = String(currentUser.id);
         const hasPin = await AuthPersistenceService.hasPin(userIdStr);
