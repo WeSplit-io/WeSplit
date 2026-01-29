@@ -129,7 +129,7 @@ export const styles = StyleSheet.create({
   forgotPinText: {
     ...(typography.textStyles.bodySmall as TextStyle),
     lineHeight: typography.textStyles.bodySmall.lineHeight! * typography.textStyles.bodySmall.fontSize!,
-    color: colors.white,
+    color: colors.white80,
     textAlign: 'center',
   },
   useDifferentAccount: {

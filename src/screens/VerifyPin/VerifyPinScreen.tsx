@@ -197,11 +197,9 @@ const VerifyPinScreen: React.FC = () => {
               ))}
             </View>
 
-            {/* Row 4: fingerprint (visual consistency), 0, backspace */}
+            {/* Row 4: empty (fingerprint hidden), 0, backspace */}
             <View style={styles.keypadRow}>
-              <View style={styles.keypadButtonFingerprint}>
-                <PhosphorIcon name="Fingerprint" size={28} color="#fff" weight="regular" />
-              </View>
+              <View style={styles.keypadButtonEmpty} />
               <TouchableOpacity
                 style={styles.keypadButton}
                 onPress={() => handleNumberPress('0')}
@@ -228,10 +226,6 @@ const VerifyPinScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-
-          <TouchableOpacity style={styles.useDifferentAccount} onPress={handleUseDifferentAccount}>
-            <Text style={styles.useDifferentAccountText}>Use a different account</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Container>

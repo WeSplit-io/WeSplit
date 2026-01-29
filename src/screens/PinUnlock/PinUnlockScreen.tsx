@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Linking, Image, Animated, Platform, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Animated, Platform, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Container, Header } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import { colors, spacing } from '../../theme';
 import { styles } from './styles';
 import { AuthPersistenceService } from '../../services/core/authPersistenceService';
 import { useApp } from '../../context/AppContext';
@@ -93,9 +94,6 @@ const PinUnlockScreen: React.FC = () => {
     })();
   }, [userId, navigation]);
 
-  const handleHelpCenterPress = () => {
-    Linking.openURL('https://help.wesplit.io/');
-  };
 
   const handleNumberPress = (number: string) => {
     if (!userId || pin.length >= PIN_LENGTH) return;
@@ -196,8 +194,17 @@ const PinUnlockScreen: React.FC = () => {
       <View style={styles.container}>
         <Header
           showBackButton={false}
-          showHelpCenter={true}
-          onHelpCenterPress={handleHelpCenterPress}
+          rightElement={
+            <TouchableOpacity
+              onPress={handleUseDifferentAccount}
+              disabled={loading}
+              hitSlop={HIT_SLOP}
+              activeOpacity={0.7}
+              style={{ width: spacing.iconBoxSize, height: spacing.iconBoxSize, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <PhosphorIcon name="SignOut" size={24} color={colors.white80} weight="regular" />
+            </TouchableOpacity>
+          }
         />
 
         <ScrollView
@@ -281,16 +288,6 @@ const PinUnlockScreen: React.FC = () => {
                 activeOpacity={0.7}
               >
                 <Text style={styles.forgotPinText}>Forgot your pin?</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.useDifferentAccount}
-                onPress={handleUseDifferentAccount}
-                disabled={loading}
-                hitSlop={HIT_SLOP}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.useDifferentAccountText}>Use a different account</Text>
               </TouchableOpacity>
             </View>
           </View>
