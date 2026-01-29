@@ -22,9 +22,9 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, navigation }) => {
           style={styles.button}
           onPress={() => {
             if ('replace' in navigation) {
-              navigation.replace('AuthMethods');
+              navigation.replace('GetStarted');
             } else if ('navigate' in navigation) {
-              navigation.navigate('AuthMethods');
+              navigation.navigate('GetStarted');
             }
           }}
         >

@@ -5,17 +5,31 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 80,
+  },
+  content: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
   },
   title: {
     ...(typography.textStyles.h2 as TextStyle),
-    lineHeight: typography.textStyles.h2.lineHeight * typography.textStyles.h2.fontSize,
+    lineHeight: typography.textStyles.h2.lineHeight! * typography.textStyles.h2.fontSize!,
     color: colors.white,
     textAlign: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  subtitle: {
+    ...(typography.textStyles.body as TextStyle),
+    lineHeight: typography.textStyles.body.lineHeight! * typography.textStyles.body.fontSize!,
+    color: colors.white70,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
   },
   pinIndicators: {
     flexDirection: 'row',
@@ -73,7 +87,7 @@ export const styles = StyleSheet.create({
   },
   keypadButtonText: {
     ...(typography.numberStyles.bigNumber as TextStyle),
-    lineHeight: typography.numberStyles.bigNumber.lineHeight * typography.numberStyles.bigNumber.fontSize,
+    lineHeight: typography.numberStyles.bigNumber.lineHeight! * typography.numberStyles.bigNumber.fontSize!,
     color: colors.white,
   },
   deleteIcon: {
@@ -84,17 +98,45 @@ export const styles = StyleSheet.create({
   deleteIconDisabled: {
     opacity: 0.5,
   },
+  bottomLinksWrap: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+    zIndex: 10,
+    elevation: 10,
+    backgroundColor: 'transparent',
+  },
+  forgotPin: {
+    paddingVertical: spacing.sm,
+    minHeight: 40,
+    justifyContent: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
+  forgotPinText: {
+    ...(typography.textStyles.body as TextStyle),
+    fontSize: 17,
+    lineHeight: 22,
+    color: colors.white,
+    fontWeight: '700',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+    opacity: 1,
+  },
   useDifferentAccount: {
-    marginTop: spacing.xxl,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 40,
+    justifyContent: 'center',
     zIndex: 10,
     elevation: 10,
   },
   useDifferentAccountText: {
     ...(typography.textStyles.body as TextStyle),
     fontSize: 17,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    lineHeight: 22,
+    color: colors.white,
+    fontWeight: '700',
     textAlign: 'center',
+    opacity: 1,
   },
 });

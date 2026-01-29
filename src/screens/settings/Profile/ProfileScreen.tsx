@@ -93,20 +93,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             try {
               if (__DEV__) { logger.info('Starting logout process', null, 'ProfileScreen'); }
 
-              // ✅ CRITICAL: Set Phantom logout flag FIRST (before any imports or async operations)
-              // This prevents auto-connect from triggering during logout
-              if (currentUser?.wallet_type === 'external') {
-                try {
-                  const { PhantomAuthService } = await import('../../../services/auth/PhantomAuthService');
-                  const phantomService = PhantomAuthService.getInstance();
-                  phantomService.setLogoutFlag();
-                  if (__DEV__) { logger.info('Phantom logout flag set immediately', null, 'ProfileScreen'); }
-                } catch (phantomFlagError) {
-                  logger.warn('Failed to set Phantom logout flag (non-critical)', {
-                    error: phantomFlagError instanceof Error ? phantomFlagError.message : String(phantomFlagError)
-                  }, 'ProfileScreen');
-                  // Continue with logout even if flag setting fails
-                }
+              // ✅ CRITICAL: Set Phantom logout flag FIRST so GetStarted never auto-triggers Phantom
+              try {
+                const { PhantomAuthService } = await import('../../../services/auth/PhantomAuthService');
+                const phantomService = PhantomAuthService.getInstance();
+                phantomService.setLogoutFlag();
+                if (__DEV__) { logger.info('Phantom logout flag set immediately', null, 'ProfileScreen'); }
+              } catch (phantomFlagError) {
+                logger.warn('Failed to set Phantom logout flag (non-critical)', {
+                  error: phantomFlagError instanceof Error ? phantomFlagError.message : String(phantomFlagError)
+                }, 'ProfileScreen');
               }
 
               // Import required services
@@ -156,7 +152,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                     [{ text: 'OK' }]
                   );
                   logoutUser();
-                  navigation.replace('AuthMethods');
+                  navigation.replace('GetStarted');
                   return;
                 }
               }
@@ -166,30 +162,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               const { clearAesKeyCache } = await import('../../../services/security/secureVault');
               const { PhantomAuthService } = await import('../../../services/auth/PhantomAuthService');
 
-              // Step 0: Sign out from Phantom if user is using Phantom auth
-              // ✅ CRITICAL: Do this FIRST to set logout flag before any navigation or state changes
-              // Check if user has external wallet (likely Phantom)
-              if (currentUser?.wallet_type === 'external') {
+              // Step 0: Disconnect Phantom SDK on every logout so GetStarted does not auto sign-in with Phantom
+              try {
+                const phantomService = PhantomAuthService.getInstance();
+                phantomService.setLogoutFlag();
+                await phantomService.signOut();
+                if (__DEV__) { logger.info('Phantom signOut completed', null, 'ProfileScreen'); }
+              } catch (phantomError) {
+                logger.warn('Failed to sign out from Phantom (non-critical)', {
+                  error: phantomError instanceof Error ? phantomError.message : String(phantomError)
+                }, 'ProfileScreen');
                 try {
-                  const phantomService = PhantomAuthService.getInstance();
-                  // Ensure logout flag is still set (in case it wasn't set above)
-                  phantomService.setLogoutFlag();
-                  
-                  // Then perform full sign out
-                  await phantomService.signOut();
-                  if (__DEV__) { logger.info('Phantom signOut completed', null, 'ProfileScreen'); }
-                } catch (phantomError) {
-                  logger.warn('Failed to sign out from Phantom (non-critical)', {
-                    error: phantomError instanceof Error ? phantomError.message : String(phantomError)
-                  }, 'ProfileScreen');
-                  // Still set logout flag even if signOut fails
-                  try {
-                    const phantomService = PhantomAuthService.getInstance();
-                    phantomService.setLogoutFlag();
-                  } catch (flagError) {
-                    // Ignore flag setting errors
-                  }
-                  // Continue with logout even if Phantom signOut fails
+                  PhantomAuthService.getInstance().setLogoutFlag();
+                } catch {
+                  // ignore
                 }
               }
 
@@ -239,14 +225,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 // Continue with logout even if wallet context clearing fails
               }
 
-              // Step 5: Clear stored email and phone
+              // Step 5: Clear stored email/phone for session; do NOT clear PIN so it persists when user signs back in
               try {
                 await AuthPersistenceService.clearEmail();
                 await AuthPersistenceService.clearPhone();
-                if (__DEV__) { logger.info('Stored email and phone cleared', null, 'ProfileScreen'); }
+                if (__DEV__) { logger.info('Stored email/phone cleared (PIN preserved)', null, 'ProfileScreen'); }
               } catch (authDataError) {
                 console.warn('⚠️ Failed to clear stored auth data:', authDataError);
-                // Continue with logout even if auth data clearing fails
               }
 
               // Step 6: Clear app context state (this also clears listeners and cache)
@@ -260,13 +245,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               await new Promise(resolve => setTimeout(resolve, 500));
               
               // Step 7: Navigate to auth methods screen
-              navigation.replace('AuthMethods');
+              navigation.replace('GetStarted');
 
             } catch (error) {
               console.error('❌ Logout error:', error);
               // Still clear app context even if Firebase logout fails
               logoutUser();
-              navigation.replace('AuthMethods');
+              navigation.replace('GetStarted');
             }
           }
         }
@@ -297,6 +282,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const handleReferralFriend = () => {
     navigation.navigate('Referral');
+  };
+
+  const handleCommunity = () => {
+    navigation.navigate('HowToEarnPoints', { openToRedeem: true });
   };
 
   const handleHelpCenter = () => {
@@ -380,6 +369,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <TouchableOpacity style={styles.menuItem} onPress={handleReferralFriend}>
             <PhosphorIcon name="UserPlus" size={20} color={colors.white} weight="regular" />
             <Text style={styles.menuItemText}>Referral Friend</Text>
+            <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={handleCommunity}>
+            <PhosphorIcon name="UsersThree" size={20} color={colors.white} weight="regular" />
+            <Text style={styles.menuItemText}>Community</Text>
             <PhosphorIcon name="CaretRight" size={16} color={colors.white70} weight="regular" />
           </TouchableOpacity>
         </View>

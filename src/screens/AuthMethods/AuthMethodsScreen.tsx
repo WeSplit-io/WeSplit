@@ -23,6 +23,12 @@ import { PhantomAuthService } from '../../services/auth/PhantomAuthService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { isValidPhoneNumber as validatePhoneE164, normalizePhoneNumber } from '../../utils/validation/phone';
 
+/**
+ * AuthMethodsScreen: email/phone tabs + Phantom. Used by Forgot PIN, logout, deep links, AuthGuard.
+ * DUPLICATION: Email/phone auth logic is duplicated in EmailPhoneInputScreen (used by GetStarted).
+ * See EmailPhoneInputScreen file comment. Consider extracting shared logic to avoid drift.
+ */
+
 type RootStackParamList = {
   Dashboard: undefined;
   Verification: { email?: string; phoneNumber?: string; verificationId?: string; referralCode?: string };

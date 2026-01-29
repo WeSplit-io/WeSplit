@@ -622,10 +622,19 @@ export const firebaseDataService = {
           const isNotFound = errorCode === 'functions/not-found' || 
                            errorCode === 'not-found' || 
                            errorMessage.toLowerCase().includes('not-found');
-          
+          const isPermissionError = errorMessage.toLowerCase().includes('permission') ||
+                                  errorMessage.toLowerCase().includes('insufficient');
+
           if (isNotFound) {
             // Silently fall back to client-side check - this is expected when function isn't deployed
             // Fall through to client-side check below
+          } else if (isPermissionError) {
+            // Callable may require auth; client might not be signed in yet (e.g. Phantom flow).
+            // Return permissive so profile creation can proceed; backend will validate on create.
+            logger.warn('Username check failed with permission error (user may not be signed in yet), allowing proceed', {
+              error: errorMessage
+            }, 'FirebaseDataService');
+            return { available: true, error: undefined };
           } else {
             // Other errors, log warning and fall through to client-side check
             logger.warn('Cloud function error, falling back to client-side check', { 
@@ -633,6 +642,12 @@ export const firebaseDataService = {
             }, 'FirebaseDataService');
             // Fall through to client-side check
           }
+        }
+
+        // Client-side fallback: only if user is authenticated (Firestore rules require request.auth)
+        if (!auth?.currentUser) {
+          logger.warn('Username check: user not authenticated, skipping client-side fallback (allow proceed)', null, 'FirebaseDataService');
+          return { available: true, error: undefined };
         }
 
         // Client-side fallback: Query Firestore for users with this name (case-insensitive)

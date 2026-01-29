@@ -110,8 +110,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           });
         }
 
-        if (firebaseUser && firebaseUser.emailVerified) {
-          // User is authenticated and email is verified
+        if (firebaseUser) {
+          // User is authenticated via Firebase (persisted session). Require PIN if set, then Dashboard.
+          // We do not require emailVerified: custom-token (e.g. email code) login may leave it false.
           logger.info('User authenticated via Firebase, fetching fresh user data from Firestore', { uid: firebaseUser.uid }, 'SplashScreen');
 
           // CRITICAL: Fetch fresh user data from Firestore instead of relying on stale app context
@@ -172,22 +173,12 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
                 }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('CreateProfile', { email: transformedUser.email });
-              } else if (hasCompletedOnboarding) {
-                // User has name and completed onboarding - go to dashboard
-                logger.info('User completed onboarding, navigating to Dashboard', { 
-                  userId: transformedUser.id,
-                  name: transformedUser.name
-                }, 'SplashScreen');
-                setHasNavigated(true);
-                navigation.replace('Dashboard');
               } else {
-                // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
-                logger.info('User needs onboarding, navigating to Dashboard', { 
-                  userId: transformedUser.id,
-                  name: transformedUser.name
-                }, 'SplashScreen');
+                // User has profile: always go through PinUnlock (single gate). PinUnlock will redirect to Dashboard if no PIN set.
+                const userId = transformedUser.id || firebaseUser.uid;
+                logger.info('User has profile, routing through PinUnlock gate', { userId, name: transformedUser.name?.substring(0, 10) }, 'SplashScreen');
                 setHasNavigated(true);
-                navigation.replace('Dashboard');
+                navigation.replace('PinUnlock');
               }
             } else {
               // User document doesn't exist in Firestore - this shouldn't happen but handle gracefully
@@ -266,22 +257,12 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
                 }, 'SplashScreen');
                 setHasNavigated(true);
                 navigation.replace('CreateProfile', { email: transformedUser.email });
-              } else if (hasCompletedOnboarding) {
-                // User has name and completed onboarding - go to dashboard
-                logger.info('User completed onboarding, navigating to Dashboard', { 
-                  userId: transformedUser.id,
-                  name: transformedUser.name
-                }, 'SplashScreen');
-                setHasNavigated(true);
-                navigation.replace('Dashboard');
               } else {
-                // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
-                logger.info('User needs onboarding, navigating to Dashboard', { 
-                  userId: transformedUser.id,
-                  name: transformedUser.name
-                }, 'SplashScreen');
+                // User has profile: always go through PinUnlock gate. PinUnlock will redirect to Dashboard if no PIN set.
+                const userIdForPin = transformedUser.id || currentUser.id;
+                logger.info('User has profile (app context), routing through PinUnlock gate', { userId: userIdForPin }, 'SplashScreen');
                 setHasNavigated(true);
-                navigation.replace('Dashboard');
+                navigation.replace('PinUnlock');
               }
             } else {
               // User document not found - use app context data
@@ -290,33 +271,36 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
               if (needsProfile) {
                 setHasNavigated(true);
                 navigation.replace('CreateProfile', { email: currentUser.email || '' });
-              } else if (currentUser.hasCompletedOnboarding) {
-                setHasNavigated(true);
-                navigation.replace('Dashboard');
               } else {
                 setHasNavigated(true);
-                navigation.replace('Onboarding');
+                navigation.replace('PinUnlock');
               }
             }
           } catch (error) {
             logger.error('Failed to fetch user data from Firestore, using app context', error, 'SplashScreen');
-            // Fallback to app context data
             const needsProfile = !currentUser.name || currentUser.name.trim() === '';
             if (needsProfile) {
               setHasNavigated(true);
               navigation.replace('CreateProfile', { email: currentUser.email || '' });
-            } else if (currentUser.hasCompletedOnboarding) {
-              setHasNavigated(true);
-              navigation.replace('Dashboard');
             } else {
               setHasNavigated(true);
-              navigation.replace('Onboarding');
+              navigation.replace('PinUnlock');
             }
           }
         } else {
-          // User is not authenticated - always navigate to GetStarted first
-          // NOTE: We don't auto-authenticate here even if user verified within 30 days
-          // The 30-day check happens in AuthMethodsScreen when user enters their email
+          // User is not authenticated - check if we have last-used email and PIN so we can offer PIN-only sign-in
+          const persistedEmail = await AuthPersistenceService.loadEmail();
+          if (persistedEmail?.trim()) {
+            const pinData = await AuthPersistenceService.getPinLoginData(persistedEmail.trim());
+            if (pinData?.userId) {
+              logger.info('Returning user with email and PIN - offering PIN sign-in', {
+                email: persistedEmail.substring(0, 5) + '...',
+              }, 'SplashScreen');
+              setHasNavigated(true);
+              navigation.replace('PinLogin', { email: persistedEmail.trim() });
+              return;
+            }
+          }
           logger.info('User not authenticated, navigating to GetStarted', null, 'SplashScreen');
           setHasNavigated(true);
           navigation.replace('GetStarted');

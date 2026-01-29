@@ -62,16 +62,16 @@ const OnboardingScreen: React.FC = () => {
     if (page < slides.length - 1) {
       scrollRef.current?.scrollTo({ x: width * (page + 1), animated: true });
     } else {
-      // User completed onboarding
+      // User completed onboarding - route through PinUnlock so PIN is asked or created
       await markOnboardingCompleted();
-      (navigation as any).replace('Dashboard');
+      (navigation as any).replace('PinUnlock');
     }
   };
 
   const handleSkip = async () => {
-    // User skipped onboarding
+    // User skipped onboarding - route through PinUnlock so PIN is asked or created
     await markOnboardingCompleted();
-    (navigation as any).replace('Dashboard');
+    (navigation as any).replace('PinUnlock');
   };
 
   const onScroll = (e: any) => {

@@ -58,6 +58,7 @@ import { getAssetInfo } from '../../services/rewards/assetConfig';
 import { resolveStorageUrl } from '../../services/shared/storageUrlService';
 import SharedWalletGridCard from '../../components/SharedWalletGridCard';
 import { SharedWalletService, SharedWallet } from '../../services/sharedWallet';
+import { AuthPersistenceService } from '../../services/core/authPersistenceService';
 
 
 
@@ -150,6 +151,25 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     needsRecovery,
     refreshWallet
   } = useWalletState(currentUser?.id);
+
+  // ✅ PIN GATE: If user has a PIN set, they must have come from PinUnlock. Otherwise redirect.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!currentUser?.id || !isAuthenticated) return;
+      if ((route?.params as { fromPinUnlock?: boolean } | undefined)?.fromPinUnlock) return;
+      try {
+        const userIdStr = String(currentUser.id);
+        const hasPin = await AuthPersistenceService.hasPin(userIdStr);
+        if (cancelled || !hasPin) return;
+        logger.info('Dashboard: user has PIN but did not come from PinUnlock, redirecting to PinUnlock', { userId: userIdStr }, 'DashboardScreen');
+        (navigation as any).replace('PinUnlock');
+      } catch (e) {
+        if (!cancelled) logger.warn('Dashboard PIN check failed', e, 'DashboardScreen');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser?.id, isAuthenticated, navigation, route?.params]);
 
   // ✅ PRIMARY AUTHENTICATION POINT: Authenticate with Face ID/Knox before rendering dashboard
   // This is the main entry point for biometric authentication after login.

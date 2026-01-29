@@ -751,7 +751,7 @@ export async function processDeepLink(
           }
           Alert.alert('Authentication Required', 'Please log in to join the group.');
           // Navigate to login if needed
-          safeNavigate('AuthMethods');
+          safeNavigate('GetStarted');
           return;
         }
 
@@ -781,7 +781,7 @@ export async function processDeepLink(
             console.warn('🔥 User not authenticated, cannot add contact');
           }
           Alert.alert('Authentication Required', 'Please log in to add contacts.');
-          safeNavigate('AuthMethods');
+          safeNavigate('GetStarted');
           return;
         }
 
@@ -808,7 +808,7 @@ export async function processDeepLink(
             console.warn('🔥 User not authenticated, cannot send money');
           }
           Alert.alert('Authentication Required', 'Please log in to send money.');
-          safeNavigate('AuthMethods');
+          safeNavigate('GetStarted');
           return;
         }
 
@@ -829,7 +829,7 @@ export async function processDeepLink(
             console.warn('🔥 User not authenticated, cannot initiate transfer');
           }
           Alert.alert('Authentication Required', 'Please log in to initiate transfers.');
-          safeNavigate('AuthMethods');
+          safeNavigate('GetStarted');
           return;
         }
 
@@ -932,7 +932,7 @@ export async function processDeepLink(
 
         // Handle legacy format (existing code)
         // The Phantom SDK will handle the authentication result internally
-        // The usePhantom hook in AuthMethodsScreen will detect the state change
+        // The usePhantom hook in GetStartedScreen will detect the state change
         // and process the authenticated user. We just log here for debugging.
 
         if (linkData.response_type === 'success') {
@@ -992,9 +992,8 @@ export async function processDeepLink(
               [
                 {
                   text: 'Sign In',
-                  onPress: () => safeNavigate('AuthMethods', {
+                  onPress: () => safeNavigate('GetStarted', {
                     prefilledEmail: prefilledEmail || undefined,
-                    email: prefilledEmail || undefined,
                   }),
                 },
               ]
@@ -1115,11 +1114,11 @@ export async function processDeepLink(
 
         // If user is not authenticated, route through auth flow with referralCode
         if (!currentUser?.id) {
-          logger.info('Received referral deep link for unauthenticated user, navigating to AuthMethods', {
+          logger.info('Received referral deep link for unauthenticated user, navigating to GetStarted', {
             referralCode: linkData.referralCode
           }, 'deepLinkHandler');
 
-          safeNavigate('AuthMethods', {
+          safeNavigate('GetStarted', {
             referralCode: linkData.referralCode
           } as any);
           return;

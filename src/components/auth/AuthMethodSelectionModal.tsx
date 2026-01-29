@@ -6,7 +6,7 @@
  * - Continue with Phantom (white10 with image)
  */
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TextStyle } from 'react-native';
 import { Modal, Button } from '../shared';
 import { colors, spacing, typography } from '../../theme';
@@ -34,12 +34,12 @@ const AuthMethodSelectionModal: React.FC<AuthMethodSelectionModalProps> = ({
   const isPhantomEnabled = isPhantomSocialLoginEnabled();
   const { open } = useModal();
   const { isConnected, user } = usePhantom();
+  /** Only process Phantom success when user explicitly tapped "Continue with Phantom"; prevents auto sign-in after logout. */
+  const userInitiatedPhantomRef = useRef(false);
 
   const handlePhantomPress = () => {
-    // Close this modal first to make room for Phantom modal
+    userInitiatedPhantomRef.current = true;
     onClose();
-    
-    // Small delay to ensure modal closes before opening Phantom modal
     setTimeout(() => {
       const authService = PhantomAuthService.getInstance();
       authService.resetLogoutFlag();
@@ -48,13 +48,21 @@ const AuthMethodSelectionModal: React.FC<AuthMethodSelectionModalProps> = ({
     }, 300);
   };
 
-  // Listen for Phantom connection changes
-  React.useEffect(() => {
-    if (isConnected && user && onPhantomSuccess) {
-      // Process Phantom auth success
-      onPhantomSuccess(user);
-      onClose();
+  // Reset ref when modal closes so we don't carry over state
+  useEffect(() => {
+    if (!visible) {
+      userInitiatedPhantomRef.current = false;
     }
+  }, [visible]);
+
+  // Only process Phantom success when user explicitly tapped "Continue with Phantom"
+  React.useEffect(() => {
+    const isLoggedOut = PhantomAuthService.getInstance().getIsLoggedOut();
+    if (isLoggedOut) return;
+    if (!isConnected || !user || !onPhantomSuccess || !userInitiatedPhantomRef.current) return;
+    userInitiatedPhantomRef.current = false;
+    onPhantomSuccess(user);
+    onClose();
   }, [isConnected, user, onPhantomSuccess, onClose]);
 
   return (

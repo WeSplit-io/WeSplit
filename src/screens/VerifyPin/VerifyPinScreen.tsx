@@ -5,13 +5,19 @@ import { Container, Header } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { colors, spacing, typography } from '../../theme';
 import { styles } from './styles';
+import { useApp } from '../../context/AppContext';
+import { AuthPersistenceService } from '../../services/core/authPersistenceService';
+import { logger } from '../../services/analytics/loggingService';
+import { auth } from '../../config/firebase/firebase';
 
 const PIN_LENGTH = 6;
 
 const VerifyPinScreen: React.FC = () => {
   const navigation = useNavigation();
-  const route = useRoute();
-  const originalPin = (route.params as any)?.pin || '';
+  const route = useRoute<{ params?: { pin?: string; fromPinUnlock?: boolean } }>();
+  const originalPin = route.params?.pin || '';
+  const fromPinUnlock = route.params?.fromPinUnlock === true;
+  const { state } = useApp();
   const [pin, setPin] = useState<string[]>([]);
   const [error, setError] = useState<boolean>(false);
   const shakeAnimation = useRef(new Animated.Value(0)).current;
@@ -20,8 +26,9 @@ const VerifyPinScreen: React.FC = () => {
     Linking.openURL('https://help.wesplit.io/');
   };
 
-  const handleNumberPress = (number: string) => {
+  const handleNumberPress = async (number: string) => {
     if (pin.length < PIN_LENGTH) {
+      setError(false); // Clear error so dots turn back to white when user starts new attempt
       const newPin = [...pin, number];
       setPin(newPin);
       
@@ -29,10 +36,34 @@ const VerifyPinScreen: React.FC = () => {
       if (newPin.length === PIN_LENGTH) {
         const enteredPin = newPin.join('');
         if (enteredPin === originalPin) {
-          // PIN matches, navigate to FaceIdSetup
+          // PIN matches - persist it for the current user (wire PIN/signup data with backend)
           setError(false);
+
+          // Use app context first; fallback to Firebase Auth UID so we always save when user is signed in
+          const currentUserId = state.currentUser?.id ?? auth?.currentUser?.uid;
+          const currentUserEmail = state.currentUser?.email;
+          const userIdStr = currentUserId != null ? String(currentUserId) : '';
+          if (!userIdStr) {
+            logger.warn('No current user ID available when trying to save app PIN', null, 'VerifyPinScreen');
+          } else {
+            try {
+              await AuthPersistenceService.savePin(userIdStr, enteredPin, currentUserEmail ?? undefined);
+              const stored = await AuthPersistenceService.hasPin(userIdStr);
+              if (stored) {
+                logger.info('PIN persisted and verified for user', { userId: userIdStr }, 'VerifyPinScreen');
+              } else {
+                logger.warn('PIN save may not have persisted, retrying once', { userId: userIdStr }, 'VerifyPinScreen');
+                await AuthPersistenceService.savePin(userIdStr, enteredPin, currentUserEmail ?? undefined);
+              }
+            } catch (saveError) {
+              logger.error('Failed to persist app PIN after verification', { error: saveError, userId: userIdStr }, 'VerifyPinScreen');
+              // Still navigate - user can set PIN again later
+            }
+          }
+
           setTimeout(() => {
-            (navigation as any).navigate('FaceIdSetup');
+            // Flow: Create Profile → PIN → Face ID → Notifications → Dashboard
+            (navigation as any).replace('FaceIdSetup');
           }, 300);
         } else {
           // PIN doesn't match, show error animation and reset
@@ -73,8 +104,13 @@ const VerifyPinScreen: React.FC = () => {
 
   const handleBackspace = () => {
     if (pin.length > 0) {
+      setError(false); // Clear error so dots turn back to white when user edits
       setPin(pin.slice(0, -1));
     }
+  };
+
+  const handleUseDifferentAccount = () => {
+    (navigation as any).replace('GetStarted');
   };
 
   return (
@@ -184,6 +220,10 @@ const VerifyPinScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
+
+          <TouchableOpacity style={styles.useDifferentAccount} onPress={handleUseDifferentAccount}>
+            <Text style={styles.useDifferentAccountText}>Use a different account</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Container>

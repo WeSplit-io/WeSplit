@@ -13,7 +13,7 @@ import {
   Alert,
   Linking,
 } from 'react-native';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, useRoute, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
@@ -32,18 +32,22 @@ import { badgeService, BadgeProgress } from '../../services/rewards/badgeService
 import { pointsService } from '../../services/rewards/pointsService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 
+type HowToEarnPointsParams = { openToRedeem?: boolean } | undefined;
+
 const HowToEarnPointsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<any>>();
+  const route = useRoute<{ params?: HowToEarnPointsParams }>();
   const rewardNav = useMemo(() => new RewardNavigationHelper(navigation), [navigation]);
   const { state, updateUser } = useApp();
   const { currentUser } = state;
-  
+
+  const openToRedeem = route.params?.openToRedeem === true;
   const [userQuests, setUserQuests] = useState<Quest[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentSeason, setCurrentSeason] = useState<Season>(1);
-  const [activeSection, setActiveSection] = useState<'quest' | 'badges'>('quest');
+  const [activeSection, setActiveSection] = useState<'quest' | 'badges'>(openToRedeem ? 'badges' : 'quest');
   const [badgeProgress, setBadgeProgress] = useState<BadgeProgress[]>([]);
-  const [badgeTab, setBadgeTab] = useState<'all' | 'claimed' | 'redeem'>('all');
+  const [badgeTab, setBadgeTab] = useState<'all' | 'claimed' | 'redeem'>(openToRedeem ? 'redeem' : 'all');
   const [claimingBadge, setClaimingBadge] = useState<string | null>(null);
   const [redeemCode, setRedeemCode] = useState('');
   const [redeemingBadge, setRedeemingBadge] = useState(false);

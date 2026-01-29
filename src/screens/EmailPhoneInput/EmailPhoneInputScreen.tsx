@@ -1,8 +1,11 @@
 /**
  * EmailPhoneInputScreen
- * Screen for entering email or phone number
- * Separated from AuthMethodsScreen to follow the new flow:
- * GetStarted -> Modal -> EmailPhoneInput -> Verification
+ * Screen for entering email or phone number.
+ * Flow: GetStarted -> EmailPhoneInput -> Verification
+ *
+ * DUPLICATION: Email/phone auth logic is duplicated from AuthMethodsScreen (see comment there).
+ * Used by GetStarted; AuthMethods is used by Forgot PIN, logout, deep links. Consider extracting
+ * shared auth logic (send code, verify, navigate) into a single service or hook to avoid drift.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -42,7 +45,8 @@ const EmailPhoneInputScreen: React.FC = () => {
   // Get auth method from route params (default to 'email' if not provided)
   const authMethod = (route.params as any)?.authMethod || 'email';
   const referralCode = (route.params as any)?.referralCode;
-  const prefilledEmail = (route.params as any)?.prefilledEmail;
+  // Support both prefilledEmail and email (legacy) for autofill
+  const prefilledEmail = (route.params as any)?.prefilledEmail ?? (route.params as any)?.email;
 
   // State management
   const [email, setEmail] = useState('');
@@ -135,6 +139,14 @@ const EmailPhoneInputScreen: React.FC = () => {
 
     if (!isValidEmail(email)) {
       Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    // PIN GATE: If this email has PIN login data, user must sign in via PIN (PinLogin), not OTP
+    const pinData = await AuthPersistenceService.getPinLoginData(email.trim());
+    if (pinData?.userId) {
+      logger.info('Email has PIN - redirecting to PinLogin', { email: email.trim().substring(0, 5) + '...' }, 'EmailPhoneInputScreen');
+      (navigation as any).replace('PinLogin', { email: email.trim() });
       return;
     }
 
@@ -243,19 +255,10 @@ const EmailPhoneInputScreen: React.FC = () => {
                   userId: userExistsResult.userId
                 }, 'EmailPhoneInputScreen');
 
+                // Login vs signup: existing user with profile → PinUnlock (PIN → Dashboard); new user → CreateProfile
                 const hasName = authenticatedUser.name && authenticatedUser.name.trim() !== '';
-                const hasCompletedOnboarding = authenticatedUser.hasCompletedOnboarding === true;
-                
-                logger.info('Checking user profile status', {
-                  userId: userExistsResult.userId,
-                  hasName,
-                  hasCompletedOnboarding,
-                  name: authenticatedUser.name?.substring(0, 10) + '...',
-                  email: email.trim()
-                }, 'EmailPhoneInputScreen');
-
                 if (!hasName) {
-                  logger.info('Email user needs to create profile (no name), navigating to CreateProfile', {
+                  logger.info('Email user needs profile, navigating to CreateProfile', {
                     userId: userExistsResult.userId,
                     email: email.trim(),
                     hasReferralCode: !!referralCode
@@ -268,25 +271,14 @@ const EmailPhoneInputScreen: React.FC = () => {
                       referralCode: referralCode
                     } }],
                   });
-                } else if (hasCompletedOnboarding) {
-                  logger.info('Email user has profile and completed onboarding, navigating to Dashboard', {
-                    userId: userExistsResult.userId,
-                    name: authenticatedUser.name,
-                    email: email.trim()
-                  }, 'EmailPhoneInputScreen');
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Dashboard' }],
-                  });
                 } else {
-                  logger.info('Email user has name but needs onboarding, navigating to Dashboard', {
+                  logger.info('Email user has profile, routing to PinUnlock (PIN → Dashboard)', {
                     userId: userExistsResult.userId,
-                    name: authenticatedUser.name,
-                    email: email.trim()
+                    name: authenticatedUser.name?.substring(0, 10) + '...'
                   }, 'EmailPhoneInputScreen');
                   navigation.reset({
                     index: 0,
-                    routes: [{ name: 'Dashboard' }],
+                    routes: [{ name: 'PinUnlock' }],
                   });
                 }
                 return;
@@ -390,10 +382,10 @@ const EmailPhoneInputScreen: React.FC = () => {
               userId: result.user.uid
             }, 'EmailPhoneInputScreen');
 
+            // Login vs signup: existing user with profile → PinUnlock (PIN → Dashboard); new user → CreateProfile
             const needsProfile = !authenticatedUser.name || authenticatedUser.name.trim() === '';
-
             if (needsProfile) {
-              logger.info('Phone user needs to create profile (no name), navigating to CreateProfile', {
+              logger.info('Phone user needs profile, navigating to CreateProfile', {
                 userId: result.user.uid,
                 phoneNumber: formattedPhone.substring(0, 5) + '...',
                 hasReferralCode: !!referralCode
@@ -407,14 +399,13 @@ const EmailPhoneInputScreen: React.FC = () => {
                 } }],
               });
             } else {
-              logger.info('Phone user already has name, navigating to Dashboard', {
+              logger.info('Phone user has profile, routing to PinUnlock (PIN → Dashboard)', {
                 userId: result.user.uid,
-                name: authenticatedUser.name,
-                phoneNumber: formattedPhone.substring(0, 5) + '...'
+                name: authenticatedUser.name?.substring(0, 10) + '...'
               }, 'EmailPhoneInputScreen');
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'Dashboard' }],
+                routes: [{ name: 'PinUnlock' }],
               });
             }
             return;

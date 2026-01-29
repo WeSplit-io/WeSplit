@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, Image, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, StatusBar, Alert } from 'react-native';
+import { useRoute } from '@react-navigation/native';
 import { styles } from './styles';
 import { colors } from '../../theme';
 import { Container } from '../../components/shared';
@@ -10,17 +11,67 @@ import { logger } from '../../services/analytics/loggingService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { authService } from '../../services/auth/AuthService';
 import { PhantomAuthService } from '../../services/auth/PhantomAuthService';
+import { AuthPersistenceService } from '../../services/core/authPersistenceService';
 
 interface GetStartedScreenProps {
   navigation: any;
-} 
+}
 
 const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
+  const route = useRoute<{ params?: { prefilledEmail?: string; referralCode?: string } }>();
+  const prefilledEmail = route.params?.prefilledEmail;
+  const referralCode = route.params?.referralCode;
   const [modalVisible, setModalVisible] = useState(false);
   const { authenticateUser } = useApp();
 
+  // PIN GATE: If prefilledEmail has PIN login data, user must use PinLogin (enter PIN), not email OTP
+  useEffect(() => {
+    if (!prefilledEmail?.trim()) return;
+    (async () => {
+      const pinData = await AuthPersistenceService.getPinLoginData(prefilledEmail.trim());
+      if (pinData?.userId) {
+        logger.info('GetStarted: prefilled email has PIN, redirecting to PinLogin', { email: prefilledEmail.substring(0, 5) + '...' }, 'GetStartedScreen');
+        (navigation as any).replace('PinLogin', { email: prefilledEmail.trim() });
+      }
+    })();
+  }, [prefilledEmail, navigation]);
+
   // Process Phantom authentication success - extracted from AuthMethodsScreen
+  // AuthMethodSelectionModal passes the raw SDK user (authUserId, walletId, provider); we must
+  // run it through PhantomAuthService to get/create Firebase user and full PhantomUser shape.
   const processPhantomAuthSuccess = async (phantomUser: any) => {
+    if (!phantomUser) {
+      logger.error('processPhantomAuthSuccess called with no user', null, 'GetStartedScreen');
+      return;
+    }
+
+    const hasProcessedShape = phantomUser.firebaseUserId != null && (phantomUser.id != null || phantomUser.phantomWalletAddress != null);
+    const hasRawShape = (phantomUser.authUserId != null || phantomUser.wallet_id != null || phantomUser.walletId != null);
+
+    if (hasRawShape && !hasProcessedShape) {
+      const provider = (phantomUser.provider || phantomUser.authProvider || phantomUser.socialProvider || 'google') as 'google' | 'apple';
+      logger.info('Phantom raw SDK user received, processing via PhantomAuthService', {
+        authUserId: phantomUser.authUserId,
+        walletId: phantomUser.walletId ?? phantomUser.wallet_id,
+        provider
+      }, 'GetStartedScreen');
+      try {
+        const phantomAuthService = PhantomAuthService.getInstance();
+        const result = await phantomAuthService.processAuthenticatedUser(phantomUser, provider);
+        if (!result.success || !result.user) {
+          logger.error('Phantom processAuthenticatedUser failed', { error: result.error }, 'GetStartedScreen');
+          Alert.alert('Authentication Failed', result.error || 'Phantom sign-in could not be completed. Try again or use Email/Phone.');
+          return;
+        }
+        phantomUser = result.user;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error('Phantom processAuthenticatedUser threw', { error: msg }, 'GetStartedScreen');
+        Alert.alert('Authentication Failed', msg || 'Phantom sign-in failed. Try again or use Email/Phone.');
+        return;
+      }
+    }
+
     logger.info('Processing phantom auth success', {
       phantomUserId: phantomUser.id,
       socialProvider: phantomUser.socialProvider,
@@ -54,23 +105,23 @@ const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
 
           authenticateUser(appUser, 'social');
 
+          // Login vs signup: existing user with profile → PinUnlock (PIN → Dashboard); new user → CreateProfile
           const hasName = appUser.name && appUser.name.trim() !== '';
-          const hasCompletedOnboarding = appUser.hasCompletedOnboarding === true;
-
           if (!hasName) {
+            // Phantom: always pass a non-empty email so CreateProfile never blocks (use id fallback)
+            const emailForProfile =
+              appUser.email?.trim() ||
+              phantomUser.email?.trim() ||
+              (phantomUser.id ? `${phantomUser.id}@phantom.app` : '') ||
+              (appUser.id && typeof appUser.id === 'string' && !String(appUser.id).includes('@') ? `${appUser.id}@phantom.app` : '');
             navigation.reset({
               index: 0,
-              routes: [{ name: 'CreateProfile', params: { email: appUser.email } }],
-            });
-          } else if (hasCompletedOnboarding) {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Dashboard' }],
+              routes: [{ name: 'CreateProfile', params: { email: emailForProfile || undefined, referralCode } }],
             });
           } else {
             navigation.reset({
               index: 0,
-              routes: [{ name: 'Dashboard' }],
+              routes: [{ name: 'PinUnlock' }],
             });
           }
           return;
@@ -144,23 +195,23 @@ const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
 
     authenticateUser(appUser, 'social');
 
+    // Login vs signup: existing user with profile → PinUnlock (PIN → Dashboard); new user → CreateProfile
     const hasName = appUser.name && appUser.name.trim() !== '';
-    const hasCompletedOnboarding = appUser.hasCompletedOnboarding === true;
-
     if (!hasName) {
+      // Phantom: always pass a non-empty email so CreateProfile never blocks (use id fallback)
+      const emailForProfile =
+        appUser.email?.trim() ||
+        phantomUser.email?.trim() ||
+        (phantomUser.id ? `${phantomUser.id}@phantom.app` : '') ||
+        (appUser.id && typeof appUser.id === 'string' && !String(appUser.id).includes('@') ? `${appUser.id}@phantom.app` : '');
       navigation.reset({
         index: 0,
-        routes: [{ name: 'CreateProfile', params: { email: appUser.email } }],
-      });
-    } else if (hasCompletedOnboarding) {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Dashboard' }],
+        routes: [{ name: 'CreateProfile', params: { email: emailForProfile || undefined, referralCode } }],
       });
     } else {
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Dashboard' }],
+        routes: [{ name: 'PinUnlock' }],
       });
     }
   };
@@ -206,10 +257,20 @@ const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
           onSelectEmail={() => {
-            navigation.navigate('EmailPhoneInput', { authMethod: 'email' });
+            const emailToPrefill = prefilledEmail || undefined;
+            navigation.navigate('EmailPhoneInput', {
+              authMethod: 'email',
+              prefilledEmail: emailToPrefill,
+              email: emailToPrefill, // alias for legacy / deep link compatibility
+            });
           }}
           onSelectPhone={() => {
-            navigation.navigate('EmailPhoneInput', { authMethod: 'phone' });
+            const emailToPrefill = prefilledEmail || undefined;
+            navigation.navigate('EmailPhoneInput', {
+              authMethod: 'phone',
+              prefilledEmail: emailToPrefill,
+              email: emailToPrefill,
+            });
           }}
           onPhantomSuccess={processPhantomAuthSuccess}
           onPhantomError={(error) => {

@@ -18,6 +18,7 @@ import PhosphorIcon from '../../components/shared/PhosphorIcon';
 const getCodeLength = (phoneNumber?: string) => phoneNumber ? 6 : 6; // 6 digits for phone, 6 for email
 const RESEND_SECONDS = 30;
 
+/** After login/signup, always go through PinUnlock gate: user enters PIN or is sent to CreatePin if none set. */
 const VerificationScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
@@ -382,12 +383,10 @@ const VerificationScreen: React.FC = () => {
             logger.warn('Failed to ensure wallet for phone user', error, 'VerificationScreen');
           }
 
-          // Check if profile needed
+          // Login vs signup: existing user with profile → PinUnlock; new user → CreateProfile
           const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-
+          const referralCode = route.params?.referralCode;
           if (needsProfile) {
-            // Preserve referral code from route params
-            const referralCode = route.params?.referralCode;
             (navigation as any).reset({
               index: 0,
               routes: [{ name: 'CreateProfile', params: {
@@ -399,7 +398,7 @@ const VerificationScreen: React.FC = () => {
           } else {
             (navigation as any).reset({
               index: 0,
-              routes: [{ name: 'Dashboard' }],
+              routes: [{ name: 'PinUnlock' }],
             });
           }
           try {
@@ -460,16 +459,13 @@ const VerificationScreen: React.FC = () => {
                 // Non-critical, continue with authentication
               }
 
-              // Check if user needs to create a profile (same logic for both email and phone)
+              // Login vs signup: existing user with profile → PinUnlock; new user → CreateProfile
               const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-
+              const referralCode = route.params?.referralCode;
               if (needsProfile) {
-                // Preserve referral code from route params
-                const referralCode = route.params?.referralCode;
-                logger.info('User needs to create profile (no name), navigating to CreateProfile', {
-                  method: route.params?.phoneNumber ? 'phone' : 'email',
+                logger.info('Phone user needs profile, navigating to CreateProfile', {
+                  method: 'phone',
                   phoneNumber: transformedUser.phone,
-                  email: transformedUser.email,
                   hasReferralCode: !!referralCode
                 }, 'VerificationScreen');
                 (navigation as any).reset({
@@ -481,13 +477,13 @@ const VerificationScreen: React.FC = () => {
                   } }],
                 });
               } else {
-                logger.info('User already has name, navigating to Dashboard', {
-                  name: transformedUser.name,
-                  method: route.params?.phoneNumber ? 'phone' : 'email'
+                logger.info('Phone user has profile, routing to PinUnlock (PIN → Dashboard)', {
+                  name: transformedUser.name?.substring(0, 10) + '...',
+                  method: 'phone'
                 }, 'VerificationScreen');
                 (navigation as any).reset({
                   index: 0,
-                  routes: [{ name: 'Dashboard' }],
+                  routes: [{ name: 'PinUnlock' }],
                 });
               }
             } else {
@@ -537,13 +533,11 @@ const VerificationScreen: React.FC = () => {
                 // Non-critical, continue with authentication
               }
 
-              // Check if user needs to create a profile (same logic as email)
+              // Login vs signup: existing user with profile → PinUnlock; new user → CreateProfile
               const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-
+              const referralCode = route.params?.referralCode;
               if (needsProfile) {
-                // Preserve referral code from route params
-                const referralCode = route.params?.referralCode;
-                logger.info('Phone user needs to create profile (no name, fallback case), navigating to CreateProfile', { 
+                logger.info('Phone user (fallback) needs profile, navigating to CreateProfile', { 
                   phoneNumber: transformedUser.phone,
                   hasReferralCode: !!referralCode
                 }, 'VerificationScreen');
@@ -556,10 +550,9 @@ const VerificationScreen: React.FC = () => {
                   } }],
                 });
               } else {
-                logger.info('Phone user already has name (fallback case), navigating to Dashboard', { name: transformedUser.name, phoneNumber: transformedUser.phone }, 'VerificationScreen');
                 (navigation as any).reset({
                   index: 0,
-                  routes: [{ name: 'Dashboard' }],
+                  routes: [{ name: 'PinUnlock' }],
                 });
               }
               return;
@@ -618,13 +611,11 @@ const VerificationScreen: React.FC = () => {
               // Non-critical, continue with authentication
             }
 
-            // Check if user needs to create a profile (same logic as email, even for fallback)
+            // Login vs signup: existing user with profile → PinUnlock; new user → CreateProfile
             const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-
+            const referralCode = route.params?.referralCode;
             if (needsProfile) {
-              // Preserve referral code from route params
-              const referralCode = route.params?.referralCode;
-              logger.info('Phone user needs to create profile (no name, Firestore error fallback), navigating to CreateProfile', { 
+              logger.info('Phone user (Firestore error fallback) needs profile, navigating to CreateProfile', { 
                 phoneNumber: transformedUser.phone,
                 hasReferralCode: !!referralCode
               }, 'VerificationScreen');
@@ -637,10 +628,9 @@ const VerificationScreen: React.FC = () => {
                 } }],
               });
             } else {
-              logger.info('Phone user already has name (Firestore error fallback), navigating to Dashboard', { name: transformedUser.name, phoneNumber: transformedUser.phone }, 'VerificationScreen');
               (navigation as any).reset({
                 index: 0,
-                routes: [{ name: 'Dashboard' }],
+                routes: [{ name: 'PinUnlock' }],
               });
             }
             return;
@@ -814,10 +804,10 @@ const VerificationScreen: React.FC = () => {
         email: transformedUser.email?.substring(0, 10) + '...'
       }, 'VerificationScreen');
       
+      // Login vs signup: existing user with profile → PinUnlock (PIN → Dashboard); new user → CreateProfile
+      const referralCode = route.params?.referralCode;
       if (!hasName) {
-        // User doesn't have a name - needs to create profile
-        const referralCode = route.params?.referralCode;
-        logger.info('User needs to create profile (no name), navigating to CreateProfile', {
+        logger.info('Email user needs profile, navigating to CreateProfile', {
           userId: transformedUser.id,
           hasReferralCode: !!referralCode
         }, 'VerificationScreen');
@@ -828,25 +818,14 @@ const VerificationScreen: React.FC = () => {
             referralCode: referralCode
           } }],
         });
-      } else if (hasCompletedOnboarding) {
-        // User has name and completed onboarding - go to dashboard
-        logger.info('User has profile and completed onboarding, navigating to Dashboard', { 
-          userId: transformedUser.id,
-          name: transformedUser.name 
-        }, 'VerificationScreen');
-        (navigation as any).reset({
-          index: 0,
-          routes: [{ name: 'Dashboard' }],
-        });
       } else {
-        // User has name but hasn't completed onboarding - go to dashboard (onboarding handled there)
-        logger.info('User has name but needs onboarding, navigating to Dashboard', { 
+        logger.info('Email user has profile, routing to PinUnlock (PIN → Dashboard)', {
           userId: transformedUser.id,
-          name: transformedUser.name 
+          name: transformedUser.name?.substring(0, 10) + '...'
         }, 'VerificationScreen');
         (navigation as any).reset({
           index: 0,
-          routes: [{ name: 'Dashboard' }],
+          routes: [{ name: 'PinUnlock' }],
         });
       }
       } else {

@@ -15,11 +15,27 @@ export const styles = StyleSheet.create({
     lineHeight: typography.textStyles.h2.lineHeight * typography.textStyles.h2.fontSize,
     color: colors.white,
     textAlign: 'center',
-    marginBottom: 200,
+    marginBottom: spacing.md,
+  },
+  subtitle: {
+    ...(typography.textStyles.body as TextStyle),
+    lineHeight: typography.textStyles.body.lineHeight * typography.textStyles.body.fontSize,
+    color: colors.white70,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
   },
   buttonContainer: {
     width: '100%',
     paddingHorizontal: spacing.screenPaddingHorizontal,
+    gap: spacing.md,
+  },
+  skipButton: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  skipButtonText: {
+    ...(typography.textStyles.body as TextStyle),
+    color: colors.white70,
   },
   modalOverlay: {
     flex: 1,

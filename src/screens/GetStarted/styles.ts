@@ -45,11 +45,11 @@ export const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   buttonSection: {
-    paddingBottom: spacing.md,
+    paddingBottom: 48,
   },
   helpSection: {
     alignItems: 'center',
-    paddingBottom: spacing.xl,
+    paddingBottom: 48,
   },
   helpText: {
     color: colors.white50,

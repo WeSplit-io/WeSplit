@@ -32,6 +32,8 @@ import { typography } from '../../theme';
 import { normalizeReferralCode, REFERRAL_CODE_MIN_LENGTH, REFERRAL_CODE_MAX_LENGTH } from '../../services/shared/referralUtils';
 import { auth } from '../../config/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { AuthPersistenceService } from '../../services/core/authPersistenceService';
+import { authService } from '../../services/auth/AuthService';
 
 const CreateProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -551,20 +553,30 @@ const CreateProfileScreen: React.FC = () => {
       const isPhoneAuth = !!phoneNumber && !params?.email;
 
       // Get email from route/params, authenticated user, or stored email
-      let email = (route?.params as any)?.email || state.currentUser?.email;
+      // Phantom/social: params may be set by GetStartedScreen; also use app context (may update after nav)
+      let email = (route?.params as any)?.email?.trim() || state.currentUser?.email?.trim();
       
       // If still no email, try loading from SecureStore
       if (!email) {
         try {
-          const { AuthPersistenceService } = await import('../../../services/core/authPersistenceService');
-          email = await AuthPersistenceService.loadEmail();
+          const stored = await AuthPersistenceService.loadEmail();
+          email = stored?.trim() || undefined;
         } catch (error) {
           logger.warn('Failed to load email from SecureStore', error, 'CreateProfileScreen');
         }
       }
       
+      // Phantom/social fallback: use user id as email placeholder so profile creation never blocks
+      if (!isPhoneAuth && !email && state.currentUser?.id) {
+        const idStr = String(state.currentUser.id);
+        if (!idStr.includes('@')) {
+          email = `${idStr}@phantom.app`;
+          logger.info('Using Phantom/social fallback email for profile creation', { email: email.substring(0, 12) + '...' }, 'CreateProfileScreen');
+        }
+      }
+      
       // For phone authentication, email is optional
-      // For email authentication, email is required
+      // For email/social (Phantom) authentication, email is required for profile creation
       if (!isPhoneAuth && !email) {
         logger.error('No email available for email-based profile creation', null, 'CreateProfileScreen');
         Alert.alert('Error', 'Email address is required. Please log in again.');
@@ -619,8 +631,10 @@ const CreateProfileScreen: React.FC = () => {
         }
         
         if (existingUser && existingUser.name && existingUser.name.trim() !== '') {
+          const hasCompletedOnboarding = existingUser.hasCompletedOnboarding === true;
           logger.info('User already has username, skipping profile creation', {
             name: existingUser.name,
+            hasCompletedOnboarding,
             authMethod: isPhoneAuth ? 'phone' : 'email'
           }, 'CreateProfileScreen');
           
@@ -638,7 +652,7 @@ const CreateProfileScreen: React.FC = () => {
             wallet_address: existingUser.wallet_address,
             wallet_public_key: existingUser.wallet_public_key,
             created_at: existingUser.created_at,
-            hasCompletedOnboarding: true,
+            hasCompletedOnboarding: existingUser.hasCompletedOnboarding ?? false,
             // Ensure asset fields are included with proper defaults
             badges: existingUser.badges || [],
             active_badge: existingUser.active_badge || undefined,
@@ -649,9 +663,9 @@ const CreateProfileScreen: React.FC = () => {
           };
 
           authenticateUser(user, isPhoneAuth ? 'phone' : 'email');
-          
+          // Flow: Create Profile → PIN → Notifications → Dashboard
           try {
-            (navigation as any).replace('Dashboard');
+            (navigation as any).replace('PinUnlock');
           } catch (e) {
             console.error('Navigation error:', e);
             Alert.alert('Navigation Error', 'Navigation error: ' + (e as any).message);
@@ -901,6 +915,28 @@ const CreateProfileScreen: React.FC = () => {
         }, 'CreateProfileScreen');
 
         authenticateUser(appUser, isPhoneAuth ? 'phone' : 'email');
+
+        // Persist email/phone for future logins and PIN (backend signup data wired for auth)
+        try {
+          if (appUser.email?.trim()) {
+            await AuthPersistenceService.saveEmail(appUser.email.trim());
+            logger.info('Email persisted after profile creation', { email: appUser.email.substring(0, 5) + '...' }, 'CreateProfileScreen');
+          }
+          if (appUser.phone?.trim()) {
+            await AuthPersistenceService.savePhone(appUser.phone.trim());
+            logger.info('Phone persisted after profile creation', { phone: appUser.phone.substring(0, 5) + '...' }, 'CreateProfileScreen');
+          }
+        } catch (persistError) {
+          logger.warn('Failed to persist email/phone after profile creation (non-critical)', persistError as Record<string, unknown>, 'CreateProfileScreen');
+        }
+
+        // Ensure wallet exists for the user (backend wallet creation if needed)
+        try {
+          await authService.ensureUserWallet(appUser.id);
+          logger.info('Wallet ensured for user after profile creation', { userId: appUser.id }, 'CreateProfileScreen');
+        } catch (walletError) {
+          logger.warn('Failed to ensure wallet after profile creation (non-critical)', walletError as Record<string, unknown>, 'CreateProfileScreen');
+        }
         
         // Sync onboarding and profile image quests after user is authenticated
         try {
@@ -979,7 +1015,7 @@ const CreateProfileScreen: React.FC = () => {
         }
         
         try {
-          (navigation as any).replace('CreatePin');
+          (navigation as any).replace('PinUnlock');
         } catch (e) {
           console.error('Navigation error:', e);
           Alert.alert('Navigation Error', 'Navigation error: ' + (e as any).message);

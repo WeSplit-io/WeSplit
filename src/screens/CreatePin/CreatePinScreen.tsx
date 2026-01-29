@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Linking, Image } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Container, Header } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { colors, spacing, typography } from '../../theme';
@@ -10,6 +10,7 @@ const PIN_LENGTH = 6;
 
 const CreatePinScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute<{ params?: { fromPinUnlock?: boolean } }>();
   const [pin, setPin] = useState<string[]>([]);
 
   const handleHelpCenterPress = () => {
@@ -24,7 +25,10 @@ const CreatePinScreen: React.FC = () => {
       // Navigate to VerifyPin when PIN is complete
       if (newPin.length === PIN_LENGTH) {
         setTimeout(() => {
-          (navigation as any).navigate('VerifyPin', { pin: newPin.join('') });
+          (navigation as any).navigate('VerifyPin', {
+            pin: newPin.join(''),
+            fromPinUnlock: route.params?.fromPinUnlock,
+          });
         }, 300);
       }
     }

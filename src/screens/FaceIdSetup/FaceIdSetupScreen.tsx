@@ -1,58 +1,72 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, Modal, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Container, Header, Button } from '../../components/shared';
 import { colors, spacing, typography } from '../../theme';
 import { styles } from './styles';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { logger } from '../../services/analytics/loggingService';
 
 const FaceIdSetupScreen: React.FC = () => {
   const navigation = useNavigation();
-  const [showModal, setShowModal] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
 
   const handleHelpCenterPress = () => {
     Linking.openURL('https://help.wesplit.io/');
   };
 
-  const handleEnableFaceId = async () => {
+  const getBiometricPromptMessage = async (): Promise<string> => {
+    try {
+      const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+      if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+        return 'Unlock WeSplit with Face ID';
+      }
+      if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+        return Platform.OS === 'ios' ? 'Unlock WeSplit with Touch ID' : 'Verify your identity';
+      }
+    } catch (e) {
+      logger.warn('Could not get supported auth types', { error: e }, 'FaceIdSetupScreen');
+    }
+    return 'Verify your identity';
+  };
+
+  const handleContinue = async () => {
     setIsEnabling(true);
     try {
-      // Check if biometric authentication is available
       const compatible = await LocalAuthentication.hasHardwareAsync();
       if (!compatible) {
-        // Skip Face ID if not available
+        logger.info('Biometrics not available, skipping to notifications', null, 'FaceIdSetupScreen');
         handleSkip();
         return;
       }
 
-      // Check if biometrics are enrolled
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       if (!enrolled) {
-        // Skip if not enrolled
+        logger.info('Biometrics not enrolled, skipping to notifications', null, 'FaceIdSetupScreen');
         handleSkip();
         return;
       }
 
-      // Try to authenticate
+      const promptMessage = await getBiometricPromptMessage();
+      logger.info('Triggering system biometric prompt', { promptMessage }, 'FaceIdSetupScreen');
+
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Enable Face ID',
+        promptMessage,
         cancelLabel: 'Cancel',
         fallbackLabel: 'Use Passcode',
+        disableDeviceFallback: false,
       });
 
       if (result.success) {
-        // Face ID enabled successfully
-        setShowModal(false);
+        logger.info('Biometric verification succeeded', null, 'FaceIdSetupScreen');
         setTimeout(() => {
           (navigation as any).navigate('SetupNotifications');
         }, 300);
       } else {
-        // User cancelled or failed
-        setShowModal(false);
+        logger.info('Biometric cancelled or failed', { error: result.error }, 'FaceIdSetupScreen');
       }
     } catch (error) {
-      console.error('Face ID error:', error);
+      logger.error('Face ID error', error, 'FaceIdSetupScreen');
       handleSkip();
     } finally {
       setIsEnabling(false);
@@ -60,14 +74,9 @@ const FaceIdSetupScreen: React.FC = () => {
   };
 
   const handleSkip = () => {
-    setShowModal(false);
     setTimeout(() => {
       (navigation as any).navigate('SetupNotifications');
     }, 300);
-  };
-
-  const handleContinue = () => {
-    setShowModal(true);
   };
 
   return (
@@ -81,55 +90,29 @@ const FaceIdSetupScreen: React.FC = () => {
 
         <View style={styles.content}>
           <Text style={styles.title}>Use Face ID</Text>
+          <Text style={styles.subtitle}>
+            Use Face ID or Touch ID to quickly and securely access your account.
+          </Text>
           
           <View style={styles.buttonContainer}>
             <Button
-              title="Continue"
+              title={isEnabling ? 'Verifying...' : 'Continue'}
               onPress={handleContinue}
               variant="primary"
               size="large"
               fullWidth={true}
+              disabled={isEnabling}
             />
+            <TouchableOpacity
+              onPress={handleSkip}
+              style={styles.skipButton}
+              activeOpacity={0.7}
+              disabled={isEnabling}
+            >
+              <Text style={styles.skipButtonText}>Not now</Text>
+            </TouchableOpacity>
           </View>
         </View>
-
-        {/* Face ID Modal */}
-        <Modal
-          visible={showModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Enable Face ID</Text>
-              <Text style={styles.modalMessage}>
-                Use Face ID to quickly and securely access your account.
-              </Text>
-              
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={styles.modalButton}
-                  onPress={() => setShowModal(false)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <View style={styles.modalButtonDivider} />
-                <TouchableOpacity
-                  style={styles.modalButton}
-                  onPress={handleEnableFaceId}
-                  activeOpacity={0.7}
-                  disabled={isEnabling}
-                >
-                  <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>
-                    {isEnabling ? 'Enabling...' : 'Continue'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </View>
     </Container>
   );

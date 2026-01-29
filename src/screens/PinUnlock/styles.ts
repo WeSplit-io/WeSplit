@@ -5,14 +5,21 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 80,
+  },
+  content: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
   },
   title: {
     ...(typography.textStyles.h2 as TextStyle),
-    lineHeight: typography.textStyles.h2.lineHeight * typography.textStyles.h2.fontSize,
+    lineHeight: typography.textStyles.h2.lineHeight! * typography.textStyles.h2.fontSize!,
     color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.lg,
@@ -22,7 +29,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: spacing.md,
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.lg,
     height: 60,
   },
   pinDot: {
@@ -73,7 +80,7 @@ export const styles = StyleSheet.create({
   },
   keypadButtonText: {
     ...(typography.numberStyles.bigNumber as TextStyle),
-    lineHeight: typography.numberStyles.bigNumber.lineHeight * typography.numberStyles.bigNumber.fontSize,
+    lineHeight: typography.numberStyles.bigNumber.lineHeight! * typography.numberStyles.bigNumber.fontSize!,
     color: colors.white,
   },
   deleteIcon: {
@@ -84,17 +91,58 @@ export const styles = StyleSheet.create({
   deleteIconDisabled: {
     opacity: 0.5,
   },
-  useDifferentAccount: {
-    marginTop: spacing.xxl,
+  faceIdButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  faceIdButtonText: {
+    ...(typography.textStyles.body as TextStyle),
+    color: colors.white,
+  },
+  bottomLinksWrap: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+    zIndex: 10,
+    elevation: 10,
+    backgroundColor: 'transparent',
+  },
+  forgotPin: {
+    paddingVertical: spacing.sm,
+    minHeight: 40,
+    justifyContent: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
+  forgotPinText: {
+    ...(typography.textStyles.body as TextStyle),
+    fontSize: 17,
+    lineHeight: 22,
+    color: colors.white,
+    fontWeight: '700',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+    opacity: 1,
+  },
+  useDifferentAccount: {
+    paddingVertical: spacing.sm,
+    minHeight: 40,
+    justifyContent: 'center',
     zIndex: 10,
     elevation: 10,
   },
   useDifferentAccountText: {
     ...(typography.textStyles.body as TextStyle),
     fontSize: 17,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    lineHeight: 22,
+    color: colors.white,
+    fontWeight: '700',
     textAlign: 'center',
+    opacity: 1,
   },
 });

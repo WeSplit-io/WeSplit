@@ -13,6 +13,7 @@ import {
   AddressType
 } from '@phantom/react-native-sdk';
 import { PHANTOM_CONFIG } from '../config/env';
+import { PhantomDisconnectRegistration } from '../components/auth/PhantomDisconnectRegistration';
 
 // Validate configuration and provide helpful error messages
 const validatePhantomConfiguration = () => {
@@ -161,6 +162,7 @@ export const PhantomSDKProvider: React.FC<PhantomSDKProviderProps> = ({
       appIcon={PHANTOM_BRANDING.appIcon}
       appName={PHANTOM_BRANDING.appName}
     >
+      <PhantomDisconnectRegistration />
       {children}
     </PhantomProvider>
   );

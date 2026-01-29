@@ -19,21 +19,18 @@ const SetupNotificationsScreen: React.FC = () => {
       // Request notification permissions
       const { status } = await Notifications.requestPermissionsAsync();
       if (status === 'granted') {
-        // Navigate to Dashboard
-        (navigation as any).replace('Dashboard');
+        (navigation as any).replace('Dashboard', { fromPinUnlock: true });
       } else {
-        // User denied, still navigate
-        (navigation as any).replace('Dashboard');
+        (navigation as any).replace('Dashboard', { fromPinUnlock: true });
       }
     } catch (error) {
       console.error('Notification permission error:', error);
-      // Navigate anyway
-      (navigation as any).replace('Dashboard');
+      (navigation as any).replace('Dashboard', { fromPinUnlock: true });
     }
   };
 
   const handleNotRightNow = () => {
-    (navigation as any).replace('Dashboard');
+    (navigation as any).replace('Dashboard', { fromPinUnlock: true });
   };
 
   return (

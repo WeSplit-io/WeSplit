@@ -627,7 +627,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
               onPress: () => {
                 // Clear user context and navigate to auth
                 logoutUser();
-                navigation.navigate('AuthMethods');
+                navigation.navigate('GetStarted');
               }
             }
           ]
