@@ -9,6 +9,12 @@ import { roundUsdcAmount } from '../../utils/ui/format';
 import type { SplitWalletParticipant, SplitWalletResult, PaymentResult } from './types';
 // Firebase and BalanceUtils are dynamically imported to reduce bundle size
 
+// Dev-only verbose logging flag for split payments and balance checks.
+// This mirrors the split queries hook pattern and prevents large payload
+// logs from spamming production.
+const ENABLE_VERBOSE_SPLIT_LOGS =
+  __DEV__ && (process.env.ENABLE_VERBOSE_SPLIT_LOGS === '1' || process.env.ENABLE_VERBOSE_SPLIT_LOGS === 'true');
+
 // Helper function to verify transaction on blockchain
 async function verifyTransactionOnBlockchain(transactionSignature: string): Promise<boolean> {
   try {
@@ -72,16 +78,18 @@ export class SplitWalletPayments {
         const { totalAmount: totalPaymentAmount } = FeeService.calculateCompanyFee(roundedAmount, 'split_payment');
       const feeAmount = totalPaymentAmount - roundedAmount;
         
-      logger.info(`User USDC balance check for ${context}`, {
-        userId,
-        walletAddress,
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info(`User USDC balance check for ${context}`, {
+          userId,
+          walletAddress,
           userUsdcBalance,
           shareAmount: roundedAmount,
           totalPaymentAmount,
-        feeAmount,
+          feeAmount,
           source: balanceResult.source,
           isReliable: balanceResult.isReliable
         }, 'SplitWalletPayments');
+      }
 
         if (balanceResult.isReliable && userUsdcBalance < totalPaymentAmount) {
         return `Insufficient USDC balance. You have ${userUsdcBalance.toFixed(6)} USDC but need ${totalPaymentAmount.toFixed(6)} USDC to make this payment (${roundedAmount.toFixed(6)} USDC for your share + ${feeAmount.toFixed(6)} USDC in fees). Please add USDC to your wallet first.`;
@@ -242,7 +250,9 @@ export class SplitWalletPayments {
     error?: string;
   }> {
     try {
-      logger.info('Verifying split wallet balance', { splitWalletId }, 'SplitWalletPayments');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Verifying split wallet balance', { splitWalletId }, 'SplitWalletPayments');
+      }
       
       const walletResult = await this.getSplitWallet(splitWalletId);
       if (!walletResult.success || !walletResult.wallet) {
@@ -259,11 +269,13 @@ export class SplitWalletPayments {
       const cached = this.balanceCache.get(walletAddress);
       const now = Date.now();
       if (cached && (now - cached.timestamp) < this.BALANCE_CACHE_TTL) {
-        logger.debug('Split wallet balance retrieved from cache', {
-          splitWalletId,
-          balance: cached.balance,
-          cacheAge: now - cached.timestamp
-        }, 'SplitWalletPayments');
+        if (ENABLE_VERBOSE_SPLIT_LOGS) {
+          logger.debug('Split wallet balance retrieved from cache', {
+            splitWalletId,
+            balance: cached.balance,
+            cacheAge: now - cached.timestamp
+          }, 'SplitWalletPayments');
+        }
         return {
           success: true,
           balance: cached.balance
@@ -295,12 +307,14 @@ export class SplitWalletPayments {
         timestamp: now
       });
 
-      logger.info('Split wallet balance verified', {
-        splitWalletId,
-        balance: balance,
-        currency: wallet.currency as 'USDC' | 'SOL',
-        fromCache: false
-      }, 'SplitWalletPayments');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Split wallet balance verified', {
+          splitWalletId,
+          balance: balance,
+          currency: wallet.currency as 'USDC' | 'SOL',
+          fromCache: false
+        }, 'SplitWalletPayments');
+      }
       
       return {
         success: true,
@@ -442,11 +456,13 @@ export class SplitWalletPayments {
     amount: number
   ): Promise<PaymentResult> {
     try {
-      logger.info('🚀 payParticipantShareNEW called - delegating to processParticipantPayment', {
-        splitWalletId,
-        participantId,
-        amount
-      }, 'SplitWalletPayments');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('🚀 payParticipantShareNEW called - delegating to processParticipantPayment', {
+          splitWalletId,
+          participantId,
+          amount
+        }, 'SplitWalletPayments');
+      }
 
       // Delegate to the clean processParticipantPayment method
       return await this.processParticipantPayment(splitWalletId, participantId, amount);

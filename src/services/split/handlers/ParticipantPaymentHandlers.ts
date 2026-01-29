@@ -1,6 +1,9 @@
 /**
  * Participant Payment Handlers
  * Extracted from SplitWalletPayments to reduce bundle size
+ *
+ * @deprecated Internal handlers used by SplitWalletPayments and the split facade.
+ *             Do not import this directly from UI or non-split services.
  */
 
 import { logger } from '../../core';

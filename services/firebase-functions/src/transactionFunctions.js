@@ -32,26 +32,23 @@ async function checkRateLimit(transactionBuffer, db) {
   
   const rateLimitRef = db.collection('rateLimits').doc(rateLimitKey);
   
-  // CRITICAL: Aggressive timeout to prevent blockhash expiration
-  // Reduced to 500ms with no retries - fail fast to prevent blocking
+  // Timeout to avoid blocking; if Firestore is slow we skip rate limit and proceed (non-critical)
+  const RATE_LIMIT_READ_TIMEOUT_MS = 1500;
   let rateLimitDoc;
   try {
     rateLimitDoc = await Promise.race([
       rateLimitRef.get(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Rate limit check timeout')), 500)
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Rate limit check timeout')), RATE_LIMIT_READ_TIMEOUT_MS)
       )
     ]);
   } catch (timeoutError) {
-    // Don't retry - fail fast to prevent blockhash expiration
-    console.warn('Rate limit check timed out - skipping to prevent blockhash expiration', {
-      error: timeoutError.message
+    // Don't throw - rate limiting is non-critical; proceeding avoids failing valid withdrawals
+    console.warn('Rate limit check timed out - proceeding with transaction', {
+      error: timeoutError.message,
+      note: 'Rate limiting skipped to prevent blockhash expiration.'
     });
-    // ✅ FIX: Throw a special error that callers can catch and ignore
-    // This allows callers to distinguish between timeout (non-critical) and rate limit exceeded (critical)
-    const timeoutErrorObj = new Error('Rate limit check timeout');
-    timeoutErrorObj.isTimeout = true; // Mark as timeout so callers can handle it gracefully
-    throw timeoutErrorObj;
+    return;
   }
   
   if (rateLimitDoc.exists) {

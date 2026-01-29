@@ -224,10 +224,11 @@ export class UnifiedWithdrawalService {
           };
         }
 
-        // CRITICAL: Use on-chain balance, not database balance
-        // Database balance (wallet.totalBalance) may be stale or incorrect
-        const { SplitWalletPayments } = await import('../split/SplitWalletPayments');
-        const balanceResult = await SplitWalletPayments.verifySplitWalletBalance(params.sourceId);
+        // CRITICAL: Use on-chain balance, not database balance.
+        // Database balance (wallet.totalBalance) may be stale or incorrect.
+        // Reuse the SplitWalletService facade imported above so low-level payment
+        // logic stays encapsulated inside the split module.
+        const balanceResult = await SplitWalletService.verifySplitWalletBalance(params.sourceId);
         
         if (!balanceResult.success) {
           return {

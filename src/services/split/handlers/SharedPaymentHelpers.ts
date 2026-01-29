@@ -1,6 +1,9 @@
 /**
  * Shared Payment Helpers
  * Common functions used across all payment handlers to reduce duplication
+ *
+ * @deprecated Internal helpers used by SplitWalletPayments and the split facade.
+ *             Do not import this directly from UI or non-split services.
  */
 
 import { logger } from '../../core';

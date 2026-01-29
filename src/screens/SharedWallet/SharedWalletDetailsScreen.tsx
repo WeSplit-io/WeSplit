@@ -3,7 +3,7 @@
  * Clean wallet interface with balance display and tabbed content
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -85,6 +85,8 @@ const SharedWalletDetailsScreen: React.FC = () => {
   // Tab state
   const [activeTab, setActiveTab] = useState<'transactions' | 'members'>('transactions');
 
+  const isMountedRef = useRef(true);
+
   // Bound the number of transactions we keep in memory for a single wallet
   const MAX_SHARED_WALLET_TRANSACTIONS = 100;
 
@@ -118,7 +120,8 @@ const SharedWalletDetailsScreen: React.FC = () => {
         currentUser?.id?.toString(), // ✅ FIX: Pass userId for permission check
         50
       );
-      
+      if (!isMountedRef.current) return;
+
       logger.info('Transaction load result', {
         walletId: wallet.id,
         success: result.success,
@@ -131,7 +134,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
           walletId: wallet.id,
           transactionCount: result.transactions.length
         }, 'SharedWalletDetailsScreen');
-        
+
         // Transform transactions to match the UnifiedTransaction interface
         const unifiedTransactions = result.transactions.map((tx: any) => {
           // ✅ FIX: Handle createdAt field - it might be a Timestamp or ISO string
@@ -175,20 +178,20 @@ const SharedWalletDetailsScreen: React.FC = () => {
           transactionCount: unifiedTransactions.length
         }, 'SharedWalletDetailsScreen');
 
-        setTransactions(unifiedTransactions);
+        if (isMountedRef.current) setTransactions(unifiedTransactions);
       } else {
         logger.warn('No transactions returned from service', {
           walletId: wallet.id,
           success: result.success,
           error: result.error
         }, 'SharedWalletDetailsScreen');
-        setTransactions([]);
+        if (isMountedRef.current) setTransactions([]);
       }
     } catch (error) {
       logger.error('Error loading transactions', { error: String(error) }, 'SharedWalletDetailsScreen');
-      setTransactions([]);
+      if (isMountedRef.current) setTransactions([]);
     } finally {
-      setIsLoadingTransactions(false);
+      if (isMountedRef.current) setIsLoadingTransactions(false);
     }
   }, [wallet?.id]);
 
@@ -219,6 +222,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
 
     const walletRef = doc(db, 'sharedWallets', wallet.firebaseDocId);
     const unsubscribe = onSnapshot(walletRef, (docSnapshot) => {
+      if (!isMountedRef.current) return;
       if (docSnapshot.exists()) {
         const updatedWallet = {
           ...docSnapshot.data(),
@@ -250,6 +254,13 @@ const SharedWalletDetailsScreen: React.FC = () => {
       unsubscribe();
     };
   }, [wallet?.firebaseDocId, wallet?.id]);
+
+  // Set mounted to false only on unmount (prevents setState-after-unmount when navigating away)
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Set up real-time listener for transactions
   useEffect(() => {
@@ -288,6 +299,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
     }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      if (!isMountedRef.current) return;
       logger.info('Real-time listener snapshot received', {
         walletId: wallet.id,
         docCount: querySnapshot.docs.length,
@@ -363,7 +375,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
         transactionIdsSample: boundedTransactions.slice(0, 5).map(t => t.id)
       }, 'SharedWalletDetailsScreen');
 
-      setTransactions(boundedTransactions);
+      if (isMountedRef.current) setTransactions(boundedTransactions);
     }, (error) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Real-time listener error for shared wallet transactions', {
@@ -388,6 +400,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
         );
         
         const fallbackUnsubscribe = onSnapshot(fallbackQ, (querySnapshot) => {
+          if (!isMountedRef.current) return;
           let updatedTransactions = querySnapshot.docs.map((doc) => {
             const data = doc.data();
             return {
@@ -416,20 +429,20 @@ const SharedWalletDetailsScreen: React.FC = () => {
 
           const boundedTransactions = updatedTransactions.slice(0, MAX_SHARED_WALLET_TRANSACTIONS);
           recordCountMetric('sharedWallet.transactions.count', boundedTransactions.length, wallet.id);
-          setTransactions(boundedTransactions);
+          if (isMountedRef.current) setTransactions(boundedTransactions);
         }, (fallbackError) => {
           logger.error('Fallback query also failed', {
             walletId: wallet.id,
             error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
           }, 'SharedWalletDetailsScreen');
-          setTransactions([]);
+          if (isMountedRef.current) setTransactions([]);
         });
         
         return () => {
           fallbackUnsubscribe();
         };
       } else {
-        setTransactions([]);
+        if (isMountedRef.current) setTransactions([]);
       }
     });
 
@@ -446,6 +459,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
     try {
       const { SharedWalletService } = await import('../../services/sharedWallet');
       const result = await SharedWalletService.getSharedWallet(walletId);
+      if (!isMountedRef.current) return null;
 
       if (result.success && result.wallet) {
         let updatedWallet = result.wallet;
@@ -453,6 +467,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
         // Fetch on-chain balance for verification
         try {
           const onChainResult = await SharedWalletService.getSharedWalletOnChainBalance(walletId);
+          if (!isMountedRef.current) return null;
 
           if (onChainResult.success) {
             logger.info('On-chain balance check for shared wallet', {
@@ -463,9 +478,8 @@ const SharedWalletDetailsScreen: React.FC = () => {
               difference: updatedWallet.totalBalance - (onChainResult.balance || 0)
             }, 'SharedWalletDetailsScreen');
 
-            // If there's a significant difference, log it for monitoring with simple throttling per wallet
             const difference = Math.abs(updatedWallet.totalBalance - (onChainResult.balance || 0));
-            if (difference > 0.01 && shouldLogDiscrepancy(walletId, difference)) { // More than 1 cent difference
+            if (difference > 0.01 && shouldLogDiscrepancy(walletId, difference)) {
               logger.warn('Balance discrepancy detected', {
                 walletId,
                 databaseBalance: updatedWallet.totalBalance,
@@ -486,7 +500,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
           }, 'SharedWalletDetailsScreen');
         }
 
-        setWallet(updatedWallet);
+        if (isMountedRef.current) setWallet(updatedWallet);
         return updatedWallet;
       } else {
         logger.error('Failed to load wallet data', { walletId, error: result.error }, 'SharedWalletDetailsScreen');
@@ -505,16 +519,16 @@ const SharedWalletDetailsScreen: React.FC = () => {
   useEffect(() => {
     const loadWallet = async () => {
       if (routeWallet) {
-        setWallet(routeWallet);
-        setIsLoadingWallet(false);
-        loadTransactions();
-        
-        // CRITICAL FIX: Also load user wallet address when routeWallet is provided
-        if (currentUser?.id) {
+        if (isMountedRef.current) {
+          setWallet(routeWallet);
+          setIsLoadingWallet(false);
+          loadTransactions();
+        }
+        if (currentUser?.id && isMountedRef.current) {
           try {
             const { consolidatedTransactionService } = await import('../../services/blockchain/transaction');
             const userWalletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
-            setUserWalletAddress(userWalletAddress || '');
+            if (isMountedRef.current) setUserWalletAddress(userWalletAddress || '');
           } catch (error) {
             logger.warn('Failed to get user wallet address', { error }, 'SharedWalletDetailsScreen');
           }
@@ -532,17 +546,16 @@ const SharedWalletDetailsScreen: React.FC = () => {
       try {
         logger.info('Loading shared wallet', effectiveWalletId ? { walletId: effectiveWalletId } : {}, 'SharedWalletDetailsScreen');
         const result = await SharedWalletService.getSharedWallet(effectiveWalletId);
+        if (!isMountedRef.current) return;
 
         if (result.success && result.wallet) {
           setWallet(result.wallet);
           loadTransactions();
-
-          // Get user's wallet address for withdrawal transactions
           if (currentUser?.id) {
             try {
               const { consolidatedTransactionService } = await import('../../services/blockchain/transaction');
               const userWalletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
-              setUserWalletAddress(userWalletAddress || '');
+              if (isMountedRef.current) setUserWalletAddress(userWalletAddress || '');
             } catch (error) {
               logger.warn('Failed to get user wallet address', { error }, 'SharedWalletDetailsScreen');
             }
@@ -556,7 +569,7 @@ const SharedWalletDetailsScreen: React.FC = () => {
         Alert.alert('Error', 'Failed to load shared wallet');
         handleBack();
       } finally {
-        setIsLoadingWallet(false);
+        if (isMountedRef.current) setIsLoadingWallet(false);
       }
     };
 

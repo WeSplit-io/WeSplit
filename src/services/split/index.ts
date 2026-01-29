@@ -354,6 +354,38 @@ export class SplitWalletService {
     return SplitWalletQueries.getParticipantPaymentStatus(splitWalletId, participantId);
   }
 
+  /**
+   * Synchronize split status in the splits collection based on the split wallet status.
+   * Thin wrapper around SplitDataSynchronizer so callers don't need to import it directly.
+   */
+  static async syncSplitStatusFromSplitWalletToSplitStorage(
+    billId: string,
+    splitWalletStatus: string,
+    completedAt?: string
+  ) {
+    const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
+    return SplitDataSynchronizer.syncSplitStatusFromSplitWalletToSplitStorage(
+      billId,
+      splitWalletStatus,
+      completedAt
+    );
+  }
+
+  /**
+   * Synchronize all participants from split wallet to split storage.
+   * Facade wrapper so callers don't import SplitDataSynchronizer directly.
+   */
+  static async syncAllParticipantsFromSplitWalletToSplitStorage(
+    billId: string,
+    splitWalletParticipants: import('./types').SplitWalletParticipant[]
+  ) {
+    const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
+    return SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
+      billId,
+      splitWalletParticipants
+    );
+  }
+
   // Cleanup methods
   static async cancelSplitWallet(splitWalletId: string, reason?: string) {
     await loadModules();

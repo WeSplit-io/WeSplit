@@ -580,20 +580,24 @@ export class SplitStorageServiceClass {
         updatedAt: new Date().toISOString(),
       });
 
-      // CRITICAL: Also update the splitWallets collection to keep both databases synchronized
+      // CRITICAL: Also update the splitWallets collection to keep both databases synchronized.
+      // Go through the SplitWalletService facade so low-level management logic stays internal.
       try {
         const { SplitWalletQueries } = await import('../split/SplitWalletQueries');
-        const { SplitWalletManagement } = await import('../split/SplitWalletManagement');
+        const { SplitWalletService } = await import('../split');
         
         // Find the split wallet by billId (splitId)
         const walletResult = await SplitWalletQueries.getSplitWalletByBillId(splitId);
         
         if (walletResult.success && walletResult.wallet) {
           // Update the split wallet with the wallet information
-          const walletUpdateResult = await SplitWalletManagement.updateSplitWallet(walletResult.wallet.id, {
-            walletAddress,
-            updatedAt: new Date().toISOString(),
-          });
+          const walletUpdateResult = await SplitWalletService.updateSplitWallet(
+            walletResult.wallet.id,
+            {
+              walletAddress,
+              updatedAt: new Date().toISOString(),
+            }
+          );
           
           if (walletUpdateResult.success) {
             logger.info('Split wallet database synchronized successfully (wallet info update)', {
@@ -889,17 +893,18 @@ export class SplitStorageServiceClass {
 
       await deleteDoc(doc(db, this.COLLECTION_NAME, docId));
 
-      // CRITICAL: Also delete the corresponding split wallet from splitWallets collection
+      // CRITICAL: Also delete the corresponding split wallet from splitWallets collection.
+      // Use the SplitWalletService facade to encapsulate cleanup behavior.
       try {
         const { SplitWalletQueries } = await import('../split/SplitWalletQueries');
-        const { SplitWalletCleanup } = await import('../split/SplitWalletCleanup');
+        const { SplitWalletService } = await import('../split');
         
         // Find the split wallet by billId (splitId)
         const walletResult = await SplitWalletQueries.getSplitWalletByBillId(splitId);
         
         if (walletResult.success && walletResult.wallet) {
           // Delete the split wallet
-          const walletDeleteResult = await SplitWalletCleanup.burnSplitWalletAndCleanup(
+          const walletDeleteResult = await SplitWalletService.burnSplitWalletAndCleanup(
             walletResult.wallet.id,
             walletResult.wallet.creatorId,
             'Split deleted - cleaning up associated wallet'

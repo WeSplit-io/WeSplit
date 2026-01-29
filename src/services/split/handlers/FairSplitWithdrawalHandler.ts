@@ -2,6 +2,9 @@
  * Fair Split Withdrawal Handler
  * Extracted from SplitWalletPayments to reduce bundle size
  * All heavy imports are dynamically loaded to prevent bundling issues
+ *
+ * @deprecated Internal handler used by SplitWalletPayments and the split facade.
+ *             Do not import this directly from UI or non-split services.
  */
 
 import { logger } from '../../core';

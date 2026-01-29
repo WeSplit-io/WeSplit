@@ -280,7 +280,7 @@ export class SplitInvitationService {
           // CRITICAL: Also update the splitWallets collection to keep both databases synchronized
           try {
             const { SplitWalletQueries } = await import('../split/SplitWalletQueries');
-            const { SplitWalletManagement } = await import('../split/SplitWalletManagement');
+            const { SplitWalletService } = await import('../split');
 
             // Find the split wallet by billId (splitId)
             const walletResult = await SplitWalletQueries.getSplitWalletByBillId(invitationData.splitId);
@@ -299,15 +299,10 @@ export class SplitInvitationService {
                 return p;
               });
               
-              // Update the split wallet participants
-              const walletUpdateResult = await SplitWalletManagement.updateSplitWalletParticipants(
+              // Update the split wallet participants via the facade
+              const walletUpdateResult = await SplitWalletService.updateSplitWalletParticipants(
                 wallet.id,
-                updatedWalletParticipants.map(p => ({
-                  userId: p.userId,
-                  name: p.name,
-                  walletAddress: p.walletAddress,
-                  amountOwed: p.amountOwed,
-                }))
+                updatedWalletParticipants
               );
               
               if (walletUpdateResult.success) {
@@ -416,10 +411,9 @@ export class SplitInvitationService {
 
       // CRITICAL FIX: Also update the splitWallets collection to keep both databases synchronized
       // Add rollback mechanism: if wallet update fails, remove participant from split
-      let walletUpdateSuccess = false;
       try {
         const { SplitWalletQueries } = await import('../split/SplitWalletQueries');
-        const { SplitWalletManagement } = await import('../split/SplitWalletManagement');
+        const { SplitWalletService } = await import('../split');
         
         // Find the split wallet by billId (splitId)
         const walletResult = await SplitWalletQueries.getSplitWalletByBillId(invitationData.splitId);
@@ -427,36 +421,28 @@ export class SplitInvitationService {
         if (walletResult.success && walletResult.wallet) {
           // Add the new participant to the split wallet
           const wallet = walletResult.wallet;
-          const newWalletParticipant = {
-            userId: newParticipant.userId,
-            name: newParticipant.name,
-            walletAddress: newParticipant.walletAddress,
-            amountOwed: newParticipant.amountOwed,
-          };
-          
-          // Get existing participants and add the new one
-          const existingParticipants = wallet.participants.map(p => ({
-            userId: p.userId,
-            name: p.name,
-            walletAddress: p.walletAddress,
-            amountOwed: p.amountOwed,
-          }));
-          
-          const allParticipants = [...existingParticipants, newWalletParticipant];
+          const allParticipants = [
+            ...wallet.participants,
+            {
+              userId: newParticipant.userId,
+              name: newParticipant.name,
+              walletAddress: newParticipant.walletAddress,
+              amountOwed: newParticipant.amountOwed,
+            },
+          ];
           
           // CRITICAL FIX: Add retry mechanism for wallet update (3 attempts)
-          let walletUpdateResult = null;
+          let walletUpdateResult: { success: boolean; error?: string } | null = null;
           let lastWalletError: string | undefined;
           const maxRetries = 3;
           
           for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            walletUpdateResult = await SplitWalletManagement.updateSplitWalletParticipants(
-            wallet.id,
-            allParticipants
-          );
+            walletUpdateResult = await SplitWalletService.updateSplitWalletParticipants(
+              wallet.id,
+              allParticipants
+            );
           
           if (walletUpdateResult.success) {
-              walletUpdateSuccess = true;
             logger.info('Split wallet database synchronized successfully (new participant)', {
               splitId: invitationData.splitId,
               userId,

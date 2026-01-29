@@ -21,7 +21,7 @@ import { typography } from '../../theme/typography';
 // Normalize error messages so dev-only bundle failures don't look like on-chain
 // transaction errors. This is especially important when Metro/Expo crashes with
 // messages like \"Could not load bundle\" while the transaction actually succeeded.
-const normalizeTransactionErrorMessage = (message: string): string => {
+export const normalizeTransactionErrorMessage = (message: string): string => {
   if (!message) return message;
   const lower = message.toLowerCase();
 

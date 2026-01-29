@@ -219,8 +219,8 @@ export async function handleFairSplitWithdrawal(
     const privateKey = privateKeyResult.privateKey;
 
     // Execute blockchain transaction
-    const { createSolanaConnection } = await import('../../connection/connectionFactory');
-    const connectionInstance = await createSolanaConnection();
+    const { getConnectionWithFallback } = await import('../../connection/connectionFactory');
+    const connectionInstance = await getConnectionWithFallback();
 
     const { PublicKey } = await import('@solana/web3.js');
     const { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction, getAccount } = await import('../../secureTokenUtils');
@@ -265,21 +265,59 @@ export async function handleFairSplitWithdrawal(
     const fromTokenAccount = await getAssociatedTokenAddress(usdcMint, fromPublicKey);
     const toTokenAccount = await getAssociatedTokenAddress(usdcMint, toPublicKey);
 
-    // Check source balance
+    // Check source balance (use 'confirmed' and 3 retries for consistency with shared wallet path)
     let sourceTokenAccount;
     let sourceBalance = 0;
     try {
-      sourceTokenAccount = await getAccount(connectionInstance, fromTokenAccount);
+      sourceTokenAccount = await getAccount(connectionInstance, fromTokenAccount, 'confirmed', 3);
       sourceBalance = Number(sourceTokenAccount.amount) / Math.pow(10, 6);
     } catch (sourceAccountError) {
-      const errorMessage = sourceAccountError instanceof Error ? sourceAccountError.message : String(sourceAccountError);
+      const errorMessage =
+        sourceAccountError instanceof Error ? sourceAccountError.message : String(sourceAccountError);
+
+      // If the token account truly doesn't exist, keep existing behavior.
       if (errorMessage.includes('Token account not found') || errorMessage.includes('not found')) {
         return {
           success: false,
           error: 'Split wallet has no USDC balance. Please fund the wallet first before withdrawing.'
         };
       }
-      throw sourceAccountError;
+
+      // Network / RPC failures: fall back to ConsolidatedTransactionService balance (same RPC via getConnectionWithFallback).
+      try {
+        const { consolidatedTransactionService } = await import('../ConsolidatedTransactionService');
+        const fallbackBalance = await consolidatedTransactionService.getUsdcBalance(actualSplitWalletAddress);
+
+        if (!fallbackBalance.success) {
+          return {
+            success: false,
+            error:
+              fallbackBalance.error ||
+              'Network error while verifying split wallet balance. Please check your connection and try again.'
+          };
+        }
+
+        sourceBalance = fallbackBalance.balance || 0;
+        logger.warn('FairSplitWithdrawalHandler: used fallback ConsolidatedTransactionService balance after getAccount failure', {
+          splitWalletId,
+          actualSplitWalletAddress,
+          sourceBalance,
+          originalError: errorMessage,
+        }, 'FairSplitWithdrawalHandler');
+      } catch (fallbackError) {
+        logger.error('FairSplitWithdrawalHandler: fallback balance check failed after getAccount error', {
+          splitWalletId,
+          actualSplitWalletAddress,
+          originalError: errorMessage,
+          fallbackError: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+        }, 'FairSplitWithdrawalHandler');
+
+        return {
+          success: false,
+          error:
+            'Network error while talking to Solana RPC. Please check your connection and try the withdrawal again.'
+        };
+      }
     }
 
     // Recalculate fee for on-chain balance check (use same logic as above)
@@ -393,7 +431,23 @@ export async function handleFairSplitWithdrawal(
 
     // Company wallet must be the fee payer (already set above for fee transfer)
     transaction.feePayer = companyPublicKey;
-    const latestBlockhash = await connectionInstance.getLatestBlockhash();
+
+    // Use shared blockhash retry (same as shared wallet path)
+    let latestBlockhash: { blockhash: string; lastValidBlockHeight: number };
+    try {
+      const { getLatestBlockhashWithRetry } = await import('../../../shared/blockhashUtils');
+      latestBlockhash = await getLatestBlockhashWithRetry(connectionInstance);
+    } catch (blockhashError) {
+      logger.error('Fair split withdrawal error', {
+        error: blockhashError instanceof Error ? blockhashError.message : String(blockhashError),
+        splitWalletId,
+        userId,
+      }, 'FairSplitWithdrawalHandler');
+      return {
+        success: false,
+        error: 'Network error while contacting Solana. Please check your connection and try again.',
+      };
+    }
     transaction.recentBlockhash = latestBlockhash.blockhash;
 
     // Sign transaction with split wallet keypair
@@ -478,15 +532,24 @@ export async function handleFairSplitWithdrawal(
       message: `Successfully withdrew ${amount.toFixed(6)} USDC from fair split${companyFee > 0 ? ` (${companyFee.toFixed(6)} USDC fee applied)` : ''}`
     };
   } catch (error) {
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const isNetworkError =
+      rawMessage.includes('Network request failed') ||
+      rawMessage.includes('get recent blockhash') ||
+      rawMessage.includes('failed to get recent blockhash') ||
+      rawMessage.includes('fetch failed');
+
     logger.error('Fair split withdrawal error', {
-      error: error instanceof Error ? error.message : String(error),
+      error: rawMessage,
       splitWalletId,
       userId
     }, 'FairSplitWithdrawalHandler');
 
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Fair split withdrawal failed'
+      error: isNetworkError
+        ? 'Network error. Please check your connection and try again.'
+        : rawMessage || 'Fair split withdrawal failed'
     };
   }
 }

@@ -36,7 +36,10 @@ import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
 import { Container, Button, AppleSlider, ErrorScreen, ModernLoader } from '../../components/shared';
 import Modal from '../../components/shared/Modal';
-import CentralizedTransactionModal, { type TransactionModalConfig } from '../../components/shared/CentralizedTransactionModal';
+import CentralizedTransactionModal, {
+  type TransactionModalConfig,
+  normalizeTransactionErrorMessage,
+} from '../../components/shared/CentralizedTransactionModal';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { 
   getParticipantStatusDisplayText
@@ -133,7 +136,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const [lastRealtimeUpdate, setLastRealtimeUpdate] = useState<string | null>(null);
   const [hasReceivedRealtimeData, setHasReceivedRealtimeData] = useState(false);
   const realtimeCleanupRef = useRef<(() => void) | null>(null);
-  
+  const isMountedRef = useRef(true);
+
   // Helper function to check if current user is the creator
   const isCurrentUserCreator = useCallback(() => {
     if (!currentUser || !splitData) {return false;}
@@ -979,10 +983,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             }
             
             // Sync split storage from split wallet to fix stale data (non-blocking)
-            const { SplitDataSynchronizer } = await import('../../services/split/SplitDataSynchronizer');
+            const { SplitWalletService } = await import('../../services/split');
             if (splitData?.billId) {
               // Run sync asynchronously to not block UI
-              SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
+              SplitWalletService.syncAllParticipantsFromSplitWalletToSplitStorage(
                 splitData.billId,
                 walletResult.wallet.participants
               ).catch(syncError => {
@@ -1048,6 +1052,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         splitData.id,
         {
           onSplitUpdate: (update: SplitRealtimeUpdate) => {
+            if (!isMountedRef.current) return;
             logger.debug('Real-time split update received in FairSplit', { 
               splitId: splitData.id,
               hasChanges: update.hasChanges,
@@ -1055,33 +1060,26 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             }, 'FairSplitScreen');
             
             if (update.split) {
-              // Update the split data
               setLastRealtimeUpdate(update.lastUpdated);
               setHasReceivedRealtimeData(true);
-              
-              // Update participants if they have changed
-              if (update.participants.length !== participants.length) {
-                // Reload split wallet data to get updated participants
-                if (splitWallet?.id) {
-                  loadSplitWalletData();
-                }
+              if (update.participants.length !== participants.length && splitWallet?.id) {
+                loadSplitWalletData();
               }
             }
           },
           onParticipantUpdate: (participants) => {
+            if (!isMountedRef.current) return;
             logger.debug('Real-time participant update received in FairSplit', { 
               splitId: splitData.id,
               participantsCount: participants.length
             }, 'FairSplitScreen');
-            
             setHasReceivedRealtimeData(true);
-            
-            // Reload split wallet data to get updated participants
             if (splitWallet?.id) {
               loadSplitWalletData();
             }
           },
           onError: (error) => {
+            if (!isMountedRef.current) return;
             logger.error('Real-time update error in FairSplit', { 
               splitId: splitData.id,
               error: error.message 
@@ -1139,11 +1137,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
   }, [splitData?.id, isRealtimeActive]);
 
-  // Cleanup real-time updates on unmount
+  // Cleanup real-time updates on unmount (prevents setState-after-unmount crash when navigating away)
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       if (realtimeCleanupRef.current) {
         realtimeCleanupRef.current();
+        realtimeCleanupRef.current = null;
       }
     };
   }, []);
@@ -1382,16 +1382,15 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   const loadSplitWalletData = async () => {
     if (!splitWallet?.id || isLoadingCompletionData) {return;}
-    
-    // Add guard to prevent multiple simultaneous calls
+    if (!isMountedRef.current) return;
+
     setIsLoadingCompletionData(true);
-    
+
     try {
-      // First, fix any precision issues in the split wallet data
       const { fixSplitWalletPrecision, fixSplitWalletDataConsistency } = await import('../../services/split/SplitWalletManagement');
       await fixSplitWalletPrecision(splitWallet.id);
-      
-      // Then, fix any data consistency issues (participants marked as paid but no funds on-chain)
+      if (!isMountedRef.current) return;
+
       const consistencyResult = await fixSplitWalletDataConsistency(splitWallet.id);
       if (consistencyResult.success && consistencyResult.fixed) {
         if (__DEV__) {
@@ -1408,25 +1407,22 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       } else {
         logger.warn('Data consistency fix failed', { error: consistencyResult.error }, 'FairSplitScreen');
       }
-      
+      if (!isMountedRef.current) return;
+
       const result = await SplitWalletService.getSplitWallet(splitWallet.id);
+      if (!isMountedRef.current) return;
       if (result.success && result.wallet) {
         setSplitWallet(result.wallet);
-        
-        // Update participants with the repaired data
+
         const totalAmount = splitData?.totalAmount || 0;
         const amountPerPerson = totalAmount / result.wallet.participants.length;
-        
+
         const updatedParticipants = result.wallet.participants.map((p: any) => {
-          // Import roundUsdcAmount to fix precision issues
           const { roundUsdcAmount } = require('../../utils/ui/format/formatUtils');
           const roundedAmountOwed = p.amountOwed > 0 ? roundUsdcAmount(p.amountOwed) : roundUsdcAmount(amountPerPerson);
-          
-          // CRITICAL: Map split wallet status to participant status correctly
-          // 'paid' status in split wallet means fully paid
           let participantStatus: 'pending' | 'locked' | 'confirmed' | 'accepted' | 'declined' = 'pending';
           if (p.status === 'paid') {
-            participantStatus = 'accepted'; // Fully paid participants are accepted
+            participantStatus = 'accepted';
           } else if (p.status === 'locked') {
             participantStatus = 'locked';
           } else if (p.status === 'accepted') {
@@ -1434,13 +1430,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           } else if (p.status === 'declined') {
             participantStatus = 'declined';
           }
-          
-          // Also check if amountPaid >= amountOwed to determine if fully paid
           const isFullyPaid = (p.amountPaid || 0) >= roundedAmountOwed;
           if (isFullyPaid && participantStatus !== 'declined') {
             participantStatus = 'accepted';
           }
-          
           return {
             id: p.userId,
             name: p.name,
@@ -1449,27 +1442,25 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             amountPaid: p.amountPaid || 0,
             amountLocked: 0,
             status: participantStatus,
-            avatar: p.avatar, // Include avatar from wallet participant data
+            avatar: p.avatar,
           };
         });
-        
+        if (!isMountedRef.current) return;
         setParticipants(updatedParticipants);
-        
-        // CRITICAL: Load completion data immediately after updating participants
-        // This ensures progress bar shows correct data
+
         try {
-          const completionResult = await SplitWalletService.getSplitWalletCompletion(walletResult.wallet.id);
+          const completionResult = await SplitWalletService.getSplitWalletCompletion(result.wallet.id);
+          if (!isMountedRef.current) return;
           if (completionResult.success) {
             const rawCompletionPercentage = completionResult.completionPercentage ?? 0;
             const cappedCompletionPercentage = Math.min(100, Math.max(0, rawCompletionPercentage));
-            
             setCompletionData({
               completionPercentage: cappedCompletionPercentage,
-              totalAmount: Math.max(0, completionResult.totalAmount ?? walletResult.wallet.totalAmount ?? 0),
+              totalAmount: Math.max(0, completionResult.totalAmount ?? result.wallet.totalAmount ?? 0),
               collectedAmount: Math.max(0, completionResult.collectedAmount ?? 0),
-              remainingAmount: Math.max(0, completionResult.remainingAmount ?? (completionResult.totalAmount ?? walletResult.wallet.totalAmount ?? 0)),
+              remainingAmount: Math.max(0, completionResult.remainingAmount ?? (completionResult.totalAmount ?? result.wallet.totalAmount ?? 0)),
               participantsPaid: Math.max(0, completionResult.participantsPaid ?? 0),
-              totalParticipants: Math.max(0, completionResult.totalParticipants ?? walletResult.wallet.participants?.length ?? 0),
+              totalParticipants: Math.max(0, completionResult.totalParticipants ?? result.wallet.participants?.length ?? 0),
             });
           }
         } catch (completionError) {
@@ -1481,7 +1472,9 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     } catch (error) {
       logger.error('Failed to reload split wallet data', error as Record<string, unknown>, 'FairSplitScreen');
     } finally {
-      setIsLoadingCompletionData(false);
+      if (isMountedRef.current) {
+        setIsLoadingCompletionData(false);
+      }
     }
   };
 

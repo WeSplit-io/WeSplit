@@ -3,7 +3,7 @@
  * Allows users to manage participants and access the private key
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -64,7 +64,8 @@ const SharedWalletSettingsScreen: React.FC = () => {
   const [goalInputValue, setGoalInputValue] = useState(goalAmount ? String(goalAmount) : '');
   const [isSavingGoal, setIsSavingGoal] = useState(false);
   const [customizationTab, setCustomizationTab] = useState<'icon' | 'color'>('icon');
-  
+  const isMountedRef = useRef(true);
+
   // Update local state when wallet changes
   useEffect(() => {
     if (wallet) {
@@ -78,18 +79,25 @@ const SharedWalletSettingsScreen: React.FC = () => {
     }
   }, [wallet]);
   
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Load wallet
   useEffect(() => {
     const loadWallet = async () => {
       if (routeWallet) {
-        setWallet(routeWallet);
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setWallet(routeWallet);
+          setIsLoading(false);
+        }
         return;
       }
 
       if (!walletId) {
         Alert.alert('Error', 'Wallet ID is required');
-        // Navigate to shared wallets list if no wallet ID
         navigation.navigate('SplitsList', { activeTab: 'sharedWallets' });
         return;
       }
@@ -97,6 +105,7 @@ const SharedWalletSettingsScreen: React.FC = () => {
       setIsLoading(true);
       try {
         const result = await SharedWalletService.getSharedWallet(walletId);
+        if (!isMountedRef.current) return;
         if (result.success && result.wallet) {
           setWallet(result.wallet);
         } else {
@@ -108,7 +117,7 @@ const SharedWalletSettingsScreen: React.FC = () => {
         Alert.alert('Error', 'Failed to load shared wallet');
         navigation.navigate('SplitsList', { activeTab: 'sharedWallets' });
       } finally {
-        setIsLoading(false);
+        if (isMountedRef.current) setIsLoading(false);
       }
     };
 
@@ -126,6 +135,7 @@ const SharedWalletSettingsScreen: React.FC = () => {
 
     const walletRef = doc(db, 'sharedWallets', wallet.firebaseDocId);
     const unsubscribe = onSnapshot(walletRef, (docSnapshot) => {
+      if (!isMountedRef.current) return;
       if (docSnapshot.exists()) {
         const updatedWallet = {
           ...docSnapshot.data(),
@@ -161,7 +171,7 @@ const SharedWalletSettingsScreen: React.FC = () => {
         const reloadWallet = async () => {
           try {
             const result = await SharedWalletService.getSharedWallet(wallet.id);
-            if (result.success && result.wallet) {
+            if (isMountedRef.current && result.success && result.wallet) {
               setWallet(result.wallet);
             }
           } catch (error) {
@@ -170,8 +180,8 @@ const SharedWalletSettingsScreen: React.FC = () => {
         };
         // Only reload if we don't have a real-time listener set up
         if (!wallet?.firebaseDocId) {
-        reloadWallet();
-      }
+          reloadWallet();
+        }
       }
     }, [wallet?.id, wallet?.firebaseDocId])
   );

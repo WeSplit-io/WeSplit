@@ -4,7 +4,7 @@
  */
 
 import { Split, SplitStorageService } from '../../splits/splitStorageService';
-import { SplitWalletPayments } from '../../split/SplitWalletPayments';
+import { SplitWalletService } from '../../split';
 import { SpendPaymentModeService } from './SpendPaymentModeService';
 import { SpendWebhookService } from './SpendWebhookService';
 import { SpendPaymentResult, SPEND_CONFIG } from './SpendTypes';
@@ -32,9 +32,9 @@ export class SpendMerchantPaymentService {
         splitWalletId,
       }, 'SpendMerchantPaymentService');
 
-      // Get split by billId (splitWallet has billId)
-      const { SplitWalletQueries } = await import('../../split/SplitWalletQueries');
-      const walletResult = await SplitWalletQueries.getSplitWallet(splitWalletId);
+      // Get split wallet by ID using the unified SplitWalletService facade
+      const { SplitWalletService } = await import('../../split');
+      const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
       
       if (!walletResult.success || !walletResult.wallet) {
         return {
@@ -316,13 +316,12 @@ export class SpendMerchantPaymentService {
       memo,
     }, 'SpendMerchantPaymentService');
 
-    // Use existing extractFairSplitFunds with treasury wallet and custom memo
-    const result = await SplitWalletPayments.extractFairSplitFunds(
+    // Use existing extractFairSplitFunds via SplitWalletService with treasury wallet and custom memo
+    const result = await SplitWalletService.extractFairSplitFunds(
       splitWalletId,
       treasuryWallet,
       creatorId,
-      memo,
-      true // fastMode
+      memo
     );
 
     // Verify transaction on-chain if successful

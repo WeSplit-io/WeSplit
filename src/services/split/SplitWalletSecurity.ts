@@ -2,6 +2,10 @@
  * Split Wallet Security Service
  * Handles private key storage and security operations for split wallets
  * Part of the modularized SplitWalletService
+ *
+ * @deprecated This module is an internal implementation detail of SplitWalletService.
+ *             New code should call the facade in `src/services/split/index.ts` instead
+ *             of importing SplitWalletSecurity directly.
  */
 
 import * as SecureStore from 'expo-secure-store';
@@ -927,7 +931,7 @@ export class SplitWalletSecurity {
         
         return {
           success: false,
-          error: `Private key not found for Degen Split wallet ${splitWalletId}. This might be an old wallet created before shared private key access was implemented. Please contact the split creator to recreate the wallet.`,
+          error: `Private key not found for split wallet ${splitWalletId}. This might be an older wallet created before shared private key access was implemented. Please contact the split creator to recreate the wallet or rotate to a new split.`,
         };
       }
 

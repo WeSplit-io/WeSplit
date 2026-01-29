@@ -586,8 +586,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation, route }
                     }, 'SplitsListScreen');
                     
                     try {
-                      const { SplitDataSynchronizer } = await import('../../../services/split/SplitDataSynchronizer');
-                      await SplitDataSynchronizer.syncSplitStatusFromSplitWalletToSplitStorage(
+                      const { SplitWalletService } = await import('../../../services/split');
+                      await SplitWalletService.syncSplitStatusFromSplitWalletToSplitStorage(
                         split.billId,
                         'closed',
                         wallet.completedAt

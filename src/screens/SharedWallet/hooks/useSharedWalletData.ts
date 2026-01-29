@@ -7,7 +7,7 @@
  * the same wallet when the details screen is mounted.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { doc, onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../../config/firebase/firebase';
 import { SharedWalletService, SharedWallet } from '../../../services/sharedWallet';
@@ -60,6 +60,13 @@ export const useSharedWalletData = (
   const [isLoadingWallet, setIsLoadingWallet] = useState(false);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Load wallet data with on-chain verification
   const loadWalletData = useCallback(async (walletId: string): Promise<SharedWallet | null> => {
@@ -71,6 +78,7 @@ export const useSharedWalletData = (
 
       const { SharedWalletService } = await import('../../../services/sharedWallet');
       const result = await SharedWalletService.getSharedWallet(walletId);
+      if (!isMountedRef.current) return null;
 
       if (result.success && result.wallet) {
         let updatedWallet = result.wallet;
@@ -78,6 +86,7 @@ export const useSharedWalletData = (
         // Fetch on-chain balance for verification
         try {
           const onChainResult = await SharedWalletService.getSharedWalletOnChainBalance(walletId);
+          if (!isMountedRef.current) return null;
 
           if (onChainResult.success) {
             if (ENABLE_VERBOSE_SHARED_WALLET_LOGS) {
@@ -113,21 +122,21 @@ export const useSharedWalletData = (
           }, 'useSharedWalletData');
         }
 
-        setWallet(updatedWallet);
+        if (isMountedRef.current) setWallet(updatedWallet);
         return updatedWallet;
       } else {
         const errorMsg = result.error || 'Failed to load shared wallet';
-        setError(errorMsg);
+        if (isMountedRef.current) setError(errorMsg);
         logger.error('Failed to load wallet data', { walletId, error: errorMsg }, 'useSharedWalletData');
         return null;
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to load wallet data';
-      setError(errorMsg);
+      if (isMountedRef.current) setError(errorMsg);
       logger.error('Error loading wallet data', { walletId, error: errorMsg }, 'useSharedWalletData');
       return null;
     } finally {
-      setIsLoadingWallet(false);
+      if (isMountedRef.current) setIsLoadingWallet(false);
     }
   }, []);
 
@@ -143,9 +152,10 @@ export const useSharedWalletData = (
         currentUserId, // ✅ FIX: Pass userId for permission check
         50
       );
+      if (!isMountedRef.current) return;
 
       if (result.success && result.transactions) {
-        setTransactions(result.transactions);
+        if (isMountedRef.current) setTransactions(result.transactions);
       } else {
         logger.error('Failed to load transactions', {
           walletId,
@@ -158,7 +168,7 @@ export const useSharedWalletData = (
         error: err instanceof Error ? err.message : String(err)
       }, 'useSharedWalletData');
     } finally {
-      setIsLoadingTransactions(false);
+      if (isMountedRef.current) setIsLoadingTransactions(false);
     }
   }, [walletId]);
 
@@ -176,6 +186,7 @@ export const useSharedWalletData = (
     // Wallet listener
     const walletRef = doc(db, 'sharedWallets', wallet.firebaseDocId);
     const walletUnsubscribe = onSnapshot(walletRef, (docSnapshot) => {
+      if (!isMountedRef.current) return;
       if (docSnapshot.exists()) {
         const updatedWallet = {
           ...docSnapshot.data(),
@@ -211,6 +222,7 @@ export const useSharedWalletData = (
     );
 
     const transactionsUnsubscribe = onSnapshot(q, (querySnapshot) => {
+      if (!isMountedRef.current) return;
       const updatedTransactions = querySnapshot.docs.map(doc => ({
         ...doc.data(),
         firebaseDocId: doc.id,

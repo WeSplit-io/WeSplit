@@ -2390,7 +2390,8 @@ class ConsolidatedTransactionService {
       // The shared wallet might not have SOL to pay for transaction fees
       // ✅ FIX: companyPublicKey is already set above for fee transfer, reuse it
       transaction.feePayer = companyPublicKey;
-      const latestBlockhash = await connectionInstance.getLatestBlockhash();
+      const { getLatestBlockhashWithRetry } = await import('../../shared/blockhashUtils');
+      const latestBlockhash = await getLatestBlockhashWithRetry(connectionInstance);
       transaction.recentBlockhash = latestBlockhash.blockhash;
 
       // Sign transaction with shared wallet keypair (for the transfer instruction)

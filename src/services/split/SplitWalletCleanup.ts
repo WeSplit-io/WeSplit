@@ -2,6 +2,10 @@
  * Split Wallet Cleanup Service
  * Handles cleanup, cancellation, and completion operations for split wallets
  * Part of the modularized SplitWalletService
+ *
+ * @deprecated This module is an internal implementation detail of SplitWalletService.
+ *             New code should call the facade in `src/services/split/index.ts` instead
+ *             of importing SplitWalletCleanup directly.
  */
 
 import { logger } from '../core';

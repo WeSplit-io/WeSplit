@@ -12,6 +12,12 @@ import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './t
 // import { SplitWalletCache } from './SplitWalletCache';
 import { RequestDeduplicator } from './utils/debounceUtils';
 
+// Dev-only verbose logging flag for split wallet queries.
+// This mirrors the pattern used in split-focused hooks and prevents
+// large payloads from being logged in production.
+const ENABLE_VERBOSE_SPLIT_LOGS =
+  __DEV__ && (process.env.ENABLE_VERBOSE_SPLIT_LOGS === '1' || process.env.ENABLE_VERBOSE_SPLIT_LOGS === 'true');
+
 export class SplitWalletQueries {
   // Request deduplication to prevent multiple simultaneous calls for the same wallet
   private static walletDeduplicator = new RequestDeduplicator<(id: string) => Promise<SplitWalletResult>>();
@@ -44,7 +50,9 @@ export class SplitWalletQueries {
         };
       }
 
-      logger.debug('Getting split wallet', { splitWalletId }, 'SplitWalletQueries');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.debug('Getting split wallet', { splitWalletId }, 'SplitWalletQueries');
+      }
 
       // Try to get by Firebase document ID first
       const docRef = doc(db, 'splitWallets', splitWalletId);
@@ -67,26 +75,26 @@ export class SplitWalletQueries {
         const { SplitWalletCache } = await import('./SplitWalletCache');
         SplitWalletCache.setWallet(wallet);
 
-        // CRITICAL: Sync split storage from split wallet to fix stale data (non-blocking)
-        if (wallet.billId) {
-          // Run sync asynchronously to not block the query
-          (async () => {
-            try {
-              const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
-              await SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
-                wallet.billId,
-                wallet.participants
-              );
-            } catch (syncError) {
-              // Don't fail the query if sync fails, but log it
-              logger.warn('Failed to sync split storage from wallet', {
-                splitWalletId,
-                billId: wallet.billId,
-                error: syncError instanceof Error ? syncError.message : String(syncError)
-              }, 'SplitWalletQueries');
-            }
-          })();
-        }
+      // CRITICAL: Sync split storage from split wallet to fix stale data (non-blocking)
+      if (wallet.billId) {
+        // Run sync asynchronously to not block the query
+        (async () => {
+          try {
+            const { SplitWalletService } = await import('./index');
+            await SplitWalletService.syncAllParticipantsFromSplitWalletToSplitStorage(
+              wallet.billId,
+              wallet.participants
+            );
+          } catch (syncError) {
+            // Don't fail the query if sync fails, but log it
+            logger.warn('Failed to sync split storage from wallet', {
+              splitWalletId,
+              billId: wallet.billId,
+              error: syncError instanceof Error ? syncError.message : String(syncError)
+            }, 'SplitWalletQueries');
+          }
+        })();
+      }
 
         return {
           success: true,
@@ -125,8 +133,8 @@ export class SplitWalletQueries {
           // Run sync asynchronously to not block the query
           (async () => {
             try {
-              const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
-              await SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
+              const { SplitWalletService } = await import('./index');
+              await SplitWalletService.syncAllParticipantsFromSplitWalletToSplitStorage(
                 wallet.billId,
                 wallet.participants
               );
@@ -189,7 +197,9 @@ export class SplitWalletQueries {
         };
       }
 
-      logger.debug('Getting split wallet by bill ID', { billId }, 'SplitWalletQueries');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.debug('Getting split wallet by bill ID', { billId }, 'SplitWalletQueries');
+      }
 
       const q = query(
         collection(db, 'splitWallets'),
@@ -229,8 +239,8 @@ export class SplitWalletQueries {
         // Run sync asynchronously to not block the query
         (async () => {
           try {
-            const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
-            await SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
+            const { SplitWalletService } = await import('./index');
+            await SplitWalletService.syncAllParticipantsFromSplitWalletToSplitStorage(
               wallet.billId,
               wallet.participants
             );
@@ -267,11 +277,13 @@ export class SplitWalletQueries {
     amount: number
   ): Promise<SplitWalletResult> {
     try {
-      logger.debug('Locking participant amount', {
-        splitWalletId,
-        participantId,
-        amount
-      });
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.debug('Locking participant amount', {
+          splitWalletId,
+          participantId,
+          amount
+        }, 'SplitWalletQueries');
+      }
 
       // Get current wallet
       const walletResult = await this.getSplitWallet(splitWalletId);
@@ -331,11 +343,13 @@ export class SplitWalletQueries {
         updatedAt: new Date().toISOString(),
       };
 
-      logger.debug('Participant amount locked successfully', {
-        splitWalletId,
-        participantId,
-        amount
-      });
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.debug('Participant amount locked successfully', {
+          splitWalletId,
+          participantId,
+          amount
+        }, 'SplitWalletQueries');
+      }
 
       logger.info('Participant amount locked', {
         splitWalletId,
@@ -363,7 +377,9 @@ export class SplitWalletQueries {
    */
   static async getSplitWalletsByCreator(creatorId: string): Promise<{ success: boolean; wallets: SplitWallet[]; error?: string }> {
     try {
-      logger.info('Getting split wallets by creator', { creatorId }, 'SplitWalletQueries');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Getting split wallets by creator', { creatorId }, 'SplitWalletQueries');
+      }
 
       const q = query(
         collection(db, 'splitWallets'),
@@ -379,15 +395,12 @@ export class SplitWalletQueries {
         };
       });
 
-      logger.info('Split wallets retrieved for creator', {
-        creatorId,
-        count: wallets.length
-      });
-
-      logger.info('Split wallets retrieved for creator', {
-        creatorId,
-        count: wallets.length
-      }, 'SplitWalletQueries');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Split wallets retrieved for creator', {
+          creatorId,
+          count: wallets.length
+        }, 'SplitWalletQueries');
+      }
 
       return {
         success: true,
@@ -410,7 +423,9 @@ export class SplitWalletQueries {
    */
   static async getSplitWalletsByStatus(status: SplitWallet['status']): Promise<{ success: boolean; wallets: SplitWallet[]; error?: string }> {
     try {
-      logger.info('Getting split wallets by status', { status }, 'SplitWalletQueries');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Getting split wallets by status', { status }, 'SplitWalletQueries');
+      }
 
       const q = query(
         collection(db, 'splitWallets'),
@@ -426,15 +441,12 @@ export class SplitWalletQueries {
         };
       });
 
-      logger.info('Split wallets retrieved by status', {
-        status,
-        count: wallets.length
-      });
-
-      logger.info('Split wallets retrieved by status', {
-        status,
-        count: wallets.length
-      }, 'SplitWalletQueries');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Split wallets retrieved by status', {
+          status,
+          count: wallets.length
+        }, 'SplitWalletQueries');
+      }
 
       return {
         success: true,
@@ -562,7 +574,9 @@ export class SplitWalletQueries {
     error?: string;
   }> {
     try {
-      logger.info('Getting split wallet completion', { splitWalletId }, 'SplitWalletQueries');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Getting split wallet completion', { splitWalletId }, 'SplitWalletQueries');
+      }
 
       const result = await this.getSplitWallet(splitWalletId);
       if (!result.success || !result.wallet) {
@@ -635,32 +649,35 @@ export class SplitWalletQueries {
       const onChainBalanceHigher = actualOnChainBalance > databaseCollectedAmount + tolerance;
       
       if (hasOnChainFunds && (participantsPaid === 0 || onChainBalanceHigher)) {
-        logger.warn('Data consistency issue detected: on-chain funds exist but database not updated', {
-          splitWalletId,
-          actualOnChainBalance,
-          databaseCollectedAmount,
-          collectedAmount,
-          totalParticipants,
-          participantsPaid,
-          onChainBalanceHigher,
-          participants: wallet.participants.map(p => ({
-            userId: p.userId,
-            name: p.name,
-            status: p.status,
-            amountPaid: p.amountPaid,
-            amountOwed: p.amountOwed
-          }))
-        }, 'SplitWalletQueries');
+      // Log a compact diagnostic payload to avoid large arrays in logs
+      logger.warn('Data consistency issue detected: on-chain funds exist but database not updated', {
+        splitWalletId,
+        actualOnChainBalance,
+        databaseCollectedAmount,
+        collectedAmount,
+        totalParticipants,
+        participantsPaid,
+        onChainBalanceHigher,
+        sampleParticipants: wallet.participants.slice(0, 3).map(p => ({
+          userId: p.userId,
+          name: p.name,
+          status: p.status,
+          amountPaid: p.amountPaid,
+          amountOwed: p.amountOwed
+        }))
+      }, 'SplitWalletQueries');
         
         // Auto-fix: If on-chain balance >= total amount, mark all participants as paid
         // This handles cases where transaction succeeded but database wasn't updated
         if (actualOnChainBalance >= totalAmount - tolerance) {
-          logger.info('Auto-fixing participant status: on-chain balance covers full amount', {
-            splitWalletId,
-            actualOnChainBalance,
-            totalAmount,
-            totalParticipants
-          }, 'SplitWalletQueries');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Auto-fixing participant status: on-chain balance covers full amount', {
+          splitWalletId,
+          actualOnChainBalance,
+          totalAmount,
+          totalParticipants
+        }, 'SplitWalletQueries');
+      }
           
           // Update the participant status in the database
           try {
@@ -687,12 +704,14 @@ export class SplitWalletQueries {
           }
         } else if (totalParticipants === 1 && collectedAmount >= wallet.participants[0].amountOwed) {
           // Fallback: For single participant splits, mark as paid if collected amount covers their share
-          logger.info('Auto-fixing single participant status: collected amount covers share', {
-            splitWalletId,
-            participantId: wallet.participants[0].userId,
-            collectedAmount,
-            amountOwed: wallet.participants[0].amountOwed
-          }, 'SplitWalletQueries');
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.info('Auto-fixing single participant status: collected amount covers share', {
+          splitWalletId,
+          participantId: wallet.participants[0].userId,
+          collectedAmount,
+          amountOwed: wallet.participants[0].amountOwed
+        }, 'SplitWalletQueries');
+      }
           
           try {
             const { fixSplitWalletDataConsistency } = await import('./SplitWalletManagement');
@@ -712,6 +731,7 @@ export class SplitWalletQueries {
       // treat all participants as paid for completion/eligibility calculations
       // even if participant status fields weren't updated yet.
       if (collectedAmount >= totalAmount - tolerance && participantsPaid < totalParticipants) {
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
         logger.info('Applying fallback paid count from collected amount coverage', {
           splitWalletId,
           collectedAmount,
@@ -720,25 +740,28 @@ export class SplitWalletQueries {
           participantsPaidBefore: participantsPaid,
           totalParticipants
         }, 'SplitWalletQueries');
+      }
         participantsPaid = totalParticipants;
       }
 
-      logger.debug('getSplitWalletCompletion calculation', {
-        walletId: splitWalletId,
-        totalAmount,
-        databaseCollectedAmount,
-        actualOnChainBalance,
-        finalCollectedAmount: collectedAmount,
-        remainingAmount,
-        completionPercentage,
-        participantsCount: wallet.participants.length,
-        participantsPaid,
-        totalParticipants,
-        isSingleParticipant,
-        isAmountClose,
-        tolerance,
-        dataConsistencyIssue: Math.abs(databaseCollectedAmount - actualOnChainBalance) > tolerance
-      });
+      if (ENABLE_VERBOSE_SPLIT_LOGS) {
+        logger.debug('getSplitWalletCompletion calculation', {
+          walletId: splitWalletId,
+          totalAmount,
+          databaseCollectedAmount,
+          actualOnChainBalance,
+          finalCollectedAmount: collectedAmount,
+          remainingAmount,
+          completionPercentage,
+          participantsCount: wallet.participants.length,
+          participantsPaid,
+          totalParticipants,
+          isSingleParticipant,
+          isAmountClose,
+          tolerance,
+          dataConsistencyIssue: Math.abs(databaseCollectedAmount - actualOnChainBalance) > tolerance
+        }, 'SplitWalletQueries');
+      }
 
       return {
         success: true,

@@ -34,6 +34,50 @@ export interface BlockhashWithTimestamp {
 }
 
 /**
+ * Default retry/backoff for getLatestBlockhash (used by split and shared wallet withdrawals)
+ */
+const DEFAULT_BLOCKHASH_RETRIES = 3;
+const DEFAULT_BLOCKHASH_BACKOFF_MS = [1000, 2000];
+
+/**
+ * Get latest blockhash with retry for transient network errors.
+ * Shared by Fair Split and Shared Wallet withdrawal handlers (centralized RPC usage).
+ * @returns { blockhash, lastValidBlockHeight }
+ */
+export async function getLatestBlockhashWithRetry(
+  connection: Connection,
+  commitment: 'confirmed' | 'finalized' = 'confirmed',
+  maxRetries: number = DEFAULT_BLOCKHASH_RETRIES,
+  backoffMs: number[] = DEFAULT_BLOCKHASH_BACKOFF_MS
+): Promise<{ blockhash: string; lastValidBlockHeight: number }> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await connection.getLatestBlockhash(commitment);
+      return result;
+    } catch (err) {
+      lastError = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      const isNetworkError =
+        msg.includes('Network request failed') ||
+        msg.includes('get recent blockhash') ||
+        msg.includes('failed to get recent blockhash') ||
+        msg.includes('fetch failed');
+      if (!isNetworkError || attempt === maxRetries) {
+        throw err;
+      }
+      logger.warn('getLatestBlockhash failed, retrying', {
+        attempt,
+        maxAttempts: maxRetries,
+        error: msg,
+      }, 'BlockhashUtils');
+      await new Promise((r) => setTimeout(r, backoffMs[attempt - 1] ?? 2000));
+    }
+  }
+  throw lastError;
+}
+
+/**
  * Get fresh blockhash with timestamp tracking
  * Best practice: Get blockhash right before transaction creation
  * CRITICAL: Also validates the blockhash is actually valid on-chain

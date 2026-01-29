@@ -22,6 +22,10 @@ import { PARTICIPANT_STATUS, VALIDATION_TOLERANCE } from './constants/splitConst
 /**
  * Fix data consistency issues in split wallets
  * Checks if participants marked as "paid" actually have funds on-chain
+ *
+ * @deprecated Internal helper used by SplitWalletService and queries.
+ *             Do not call directly from UI or non-split services; route
+ *             through the SplitWalletService facade instead.
  */
 export async function fixSplitWalletDataConsistency(splitWalletId: string): Promise<{ success: boolean; error?: string; fixed?: boolean }> {
   try {
@@ -219,6 +223,14 @@ export async function fixSplitWalletPrecision(splitWalletId: string): Promise<{ 
   }
 }
 
+/**
+ * Split Wallet Management Service
+ * Handles updates and modifications to existing split wallets.
+ *
+ * @deprecated This class is an internal implementation detail of SplitWalletService.
+ *             New code should call the facade in `src/services/split/index.ts` instead
+ *             of importing SplitWalletManagement directly.
+ */
 export class SplitWalletManagement {
   /**
    * Update split wallet amount

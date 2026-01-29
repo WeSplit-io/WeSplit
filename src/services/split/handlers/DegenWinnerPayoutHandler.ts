@@ -1,6 +1,9 @@
 /**
  * Degen Winner Payout Handler
  * Extracted from SplitWalletPayments to reduce bundle size
+ *
+ * @deprecated Internal handler used by SplitWalletPayments and the split facade.
+ *             Do not import this directly from UI or non-split services.
  */
 
 import { logger } from '../../core';
