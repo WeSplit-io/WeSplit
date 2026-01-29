@@ -11,8 +11,9 @@ import {
   ActionSheetIOS,
   Platform,
   Linking,
+  Keyboard,
+  TextStyle,
   KeyboardAvoidingView,
-  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -25,9 +26,9 @@ import { AvatarUploadFallbackService } from '../../services/core/avatarUploadFal
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import * as ImagePicker from 'expo-image-picker';
 import { logger } from '../../services/analytics/loggingService';
-import { Container, Input, Button } from '../../components/shared';
-import Header from '../../components/shared/Header';
+import { Container, Input, Button, Header } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import { typography } from '../../theme';
 import { normalizeReferralCode, REFERRAL_CODE_MIN_LENGTH, REFERRAL_CODE_MAX_LENGTH } from '../../services/shared/referralUtils';
 import { auth } from '../../config/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -40,8 +41,7 @@ const CreateProfileScreen: React.FC = () => {
   const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showReferralModal, setShowReferralModal] = useState(false);
-  const [hasReferralCode, setHasReferralCode] = useState<boolean | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [referralInput, setReferralInput] = useState('');
   const [referralValidation, setReferralValidation] = useState<{
     isValidating: boolean;
@@ -54,8 +54,38 @@ const CreateProfileScreen: React.FC = () => {
     error?: string;
   }>({ isValidating: false, isAvailable: null });
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const usernameValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const referralValidationRef = useRef(referralValidation);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const displayNameInputRef = useRef<View | null>(null);
+  const referralInputRef = useRef<View | null>(null);
   const { authenticateUser, state } = useApp();
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    referralValidationRef.current = referralValidation;
+  }, [referralValidation]);
+
+  // Keyboard listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   // Validate referral code with debouncing
   const validateReferralCode = React.useCallback(async (code: string) => {
@@ -446,93 +476,47 @@ const CreateProfileScreen: React.FC = () => {
     }
   };
 
-  const handleNext = () => {
-      logger.info('Next pressed', null, 'CreateProfileScreen');
-      if (!pseudo) {
-        setError('Pseudo is required');
-        return;
-      }
-      
-      // Prevent multiple submissions
-      if (isLoading) {
-        logger.debug('Already processing, ignoring duplicate request', null, 'CreateProfileScreen');
-        return;
-      }
-      
-      setError('');
-    // Show referral modal instead of proceeding directly
-    setShowReferralModal(true);
-    setHasReferralCode(null);
-    // Reset validation state
-    setReferralValidation({ isValidating: false, isValid: null });
-    // Preserve referral code if it was pre-filled from route params
-    if (!referralInput && referralCode) {
-      setReferralInput(referralCode);
-      // Validate if code exists
-      if (referralCode.length >= REFERRAL_CODE_MIN_LENGTH) {
-        validateReferralCode(referralCode);
-      }
+  const handleNext = async () => {
+    logger.info('Next pressed', null, 'CreateProfileScreen');
+    if (!pseudo) {
+      setError('Pseudo is required');
+      return;
     }
-  };
-
-  const handleReferralChoice = (hasCode: boolean) => {
-    setHasReferralCode(hasCode);
-    if (!hasCode) {
-      // User doesn't have a referral code, proceed with profile creation
-      setShowReferralModal(false);
+    
+    // Prevent multiple submissions
+    if (isLoading) {
+      logger.debug('Already processing, ignoring duplicate request', null, 'CreateProfileScreen');
+      return;
+    }
+    
+    setError('');
+  
+    // Use referralInput if available, otherwise use referralCode from route params
+    const finalReferralCode = referralInput.trim() || referralCode || '';
+    
+    // Validate referral code if provided
+    if (finalReferralCode && finalReferralCode.length >= REFERRAL_CODE_MIN_LENGTH) {
+      const normalizedCode = normalizeReferralCode(finalReferralCode);
+      await validateReferralCode(normalizedCode);
+      
+      // Wait a bit for validation to complete
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      // Check validation state after waiting using ref for latest state
+      if (referralValidationRef.current.isValid === false) {
+        return;
+      }
+      
+      // Use validated code (or proceed even if validation is still pending/null)
+      createProfile(normalizedCode);
+    } else {
+      // No referral code or too short, proceed without it
       createProfile('');
     }
   };
 
-  const handleReferralSubmit = () => {
-    const trimmedCode = normalizeReferralCode(referralInput);
-    
-    // Validate before submitting
-    if (!trimmedCode || trimmedCode.length < REFERRAL_CODE_MIN_LENGTH) {
-      setReferralValidation({
-        isValidating: false,
-        isValid: false,
-        error: `Please enter a valid referral code (at least ${REFERRAL_CODE_MIN_LENGTH} characters)`
-      });
-      return;
-    }
-
-    // If validation hasn't completed yet, wait for it
-    if (referralValidation.isValidating) {
-      // Wait a bit for validation to complete
-      setTimeout(() => {
-        if (referralValidation.isValid === true) {
-          setShowReferralModal(false);
-          createProfile(trimmedCode);
-        } else {
-          setReferralValidation({
-            isValidating: false,
-            isValid: false,
-            error: 'Please verify the referral code is correct'
-          });
-        }
-      }, 600);
-      return;
-    }
-
-    // If code is invalid, don't proceed
-    if (referralValidation.isValid === false) {
-      setReferralValidation({
-        isValidating: false,
-        isValid: false,
-        error: 'Please enter a valid referral code before continuing'
-      });
-      return;
-    }
-
-    // Proceed with profile creation
-    setShowReferralModal(false);
-    createProfile(trimmedCode);
-  };
-
-  const handleSkipReferral = () => {
-    setShowReferralModal(false);
-    createProfile('');
+  const handleHelpCenterPress = () => {
+    Linking.openURL('https://help.wesplit.io/');
   };
 
   const createProfile = async (finalReferralCode: string) => {
@@ -995,7 +979,7 @@ const CreateProfileScreen: React.FC = () => {
         }
         
         try {
-          (navigation as any).replace('Dashboard');
+          (navigation as any).replace('CreatePin');
         } catch (e) {
           console.error('Navigation error:', e);
           Alert.alert('Navigation Error', 'Navigation error: ' + (e as any).message);
@@ -1014,273 +998,168 @@ const CreateProfileScreen: React.FC = () => {
   };
 
   return (
-    <Container style={{ backgroundColor: colors.black }}>
-      <KeyboardAvoidingView 
+    <Container>
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        style={{ flex: 1 }}
+        enabled={true}
       >
-        <View style={[styles.mainContainer, { backgroundColor: colors.black }]}>
-          {/* Header with Logo */}
-          <Header variant="logoOnly" />
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
+          keyboardDismissMode="interactive"
+          scrollEnabled={false}
+        >
+          <Header
+            showBackButton={false}
+            showHelpCenter={true}
+            onHelpCenterPress={handleHelpCenterPress}
+          />
 
-          {/* Main Content - Scrollable */}
-          <ScrollView 
-            style={[styles.scrollContent, { backgroundColor: colors.black }]}
-            contentContainerStyle={[styles.scrollContentContainer, { backgroundColor: colors.black }]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={[styles.centerContent, { backgroundColor: colors.black }]}>
-              <Text style={[styles.title, { color: colors.white, fontSize: 24, fontWeight: 'bold' }]}>Create Your Profile</Text>
-              <Text style={[styles.subtitle, { color: colors.white70, fontSize: 16, paddingHorizontal: spacing.lg }]}>
+          <View style={styles.contentContainer}>
+            {/* Title */}
+            <View style={styles.titleContainer}>
+              <View style={styles.iconContainer}>
+                <PhosphorIcon
+                  name="UserCircleGear"
+                  size={24}
+                  color={colors.white}
+                  weight="regular"
+                />
+              </View>
+              <Text style={styles.title}>Create your Profile</Text>
+              <Text style={styles.subtitle}>
                 You can always edit it later.
               </Text>
-              
+            </View>
 
-              {/* Profile Picture */}
+            {/* Profile Picture Section */}
+            <View style={styles.avatarSection}>
               <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
                 {avatar ? (
                   <Image source={{ uri: avatar }} style={styles.avatarImage} />
                 ) : (
                   <View style={styles.avatarPlaceholder}>
-                    <PhosphorIcon name="Camera" size={48} color={colors.white70} />
-                  </View>
-                )}
-                {avatar && (
-                  <View style={styles.cameraIconContainer}>
-                    <PhosphorIcon name="Pencil" size={16} color={colors.black} weight="fill" />
+                    <PhosphorIcon name="CameraPlus" size={35} color={colors.white70} />
                   </View>
                 )}
               </TouchableOpacity>
               
-              {/* Pseudo Input */}
-              <View style={styles.inputSection}>
-                <Input
-                  containerStyle={styles.fullWidthInput}
-                  label="Pseudo *"
-                  placeholder="Enter your pseudo"
-                  value={pseudo}
-                  onChangeText={(text) => {
-                    setPseudo(text);
-                    setError(''); // Clear error when user types
-                    validateUsername(text); // Validate username availability
-                  }}
-                  error={error || usernameValidation.error || undefined}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  containerStyle={{ width: '100%' }}
-                  rightIcon={
-                    pseudo.trim().length >= 2 && !usernameValidation.isValidating ? (
-                      usernameValidation.isAvailable === true ? 'CheckCircle' :
-                      usernameValidation.isAvailable === false ? 'XCircle' :
-                      undefined
-                    ) : undefined
-                  }
-                />
-                {/* Show loading indicator below input when validating */}
-                {usernameValidation.isValidating && pseudo.trim().length >= 2 && (
-                  <View style={styles.validationLoadingContainer}>
-                    <ActivityIndicator size="small" color={colors.white70} />
-                    <Text style={styles.validationLoadingText}>Checking availability...</Text>
-                  </View>
-                )}
-              </View>
+              {avatar && (
+                <TouchableOpacity onPress={handlePickImage} style={styles.changePictureButton}>
+                  <Text style={styles.changePictureText}>Change Picture</Text>
+                </TouchableOpacity>
+              )}
             </View>
-          </ScrollView>
 
-          {/* Next Button - Fixed at bottom */}
-          <View style={styles.buttonContainer}>
-            <Button
-              title="Next"
-              onPress={handleNext}
-              variant="primary"
-              disabled={!pseudo || isLoading || usernameValidation.isAvailable === false || usernameValidation.isValidating}
-              loading={isLoading}
-              fullWidth={true}
-            />
-          </View>
+            {/* Display Name Input */}
+            <View
+              style={styles.inputSection}
+              ref={(ref) => {
+                displayNameInputRef.current = ref;
+              }}
+            >
+              <Input
+                label="Display Name *"
+                placeholder="Enter display name"
+                value={pseudo}
+                onChangeText={(text) => {
+                  setPseudo(text);
+                  setError('');
+                }}
+                onFocus={() => {
+                  // Minimal scroll - let KeyboardAvoidingView handle most of it
+                  // Only scroll if absolutely necessary
+                }}
+                error={error || undefined}
+                autoCapitalize="words"
+                autoCorrect={false}
+                labelStyle={styles.inputLabel}
+              />
+            </View>
 
-          {/* Help Link - Fixed at bottom */}
-          <View style={styles.helpSection}>
-            <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
-              <Text style={styles.helpText}>Need help?</Text>
-            </TouchableOpacity>
+            {/* Referral Code Input */}
+            <View
+              style={styles.inputSection}
+              ref={(ref) => {
+                referralInputRef.current = ref;
+              }}
+            >
+              <Input
+                label="Referral Code"
+                placeholder="Enter referral code"
+                value={referralInput}
+                onChangeText={(text) => {
+                  const cleaned = text.toUpperCase().replace(/\s/g, '');
+                  setReferralInput(cleaned);
+                  validateReferralCode(cleaned);
+                }}
+                onFocus={() => {
+                  // Scroll up 100px to show input above keyboard
+                  setTimeout(() => {
+                    const inputView = referralInputRef.current;
+                    if (inputView && scrollViewRef.current) {
+                      inputView.measureLayout(
+                        scrollViewRef.current as any,
+                        (x, y) => {
+                          scrollViewRef.current?.scrollTo({
+                            y: Math.max(0, y - 100),
+                            animated: true,
+                          });
+                        },
+                        () => {}
+                      );
+                    }
+                  }, 200);
+                }}
+                rightIcon={
+                  referralValidation.isValidating
+                    ? undefined
+                    : referralValidation.isValid === true
+                    ? "CheckCircle"
+                    : referralValidation.isValid === false
+                    ? "XCircle"
+                    : undefined
+                }
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={REFERRAL_CODE_MAX_LENGTH}
+                error={referralValidation.error}
+                labelStyle={styles.inputLabel}
+              />
+              {referralValidation.isValidating && (
+                <View style={styles.validationContainer}>
+                  <ActivityIndicator size="small" color={colors.white50} />
+                  <Text style={styles.validationText}>Validating code...</Text>
+                </View>
+              )}
+              {referralValidation.isValid === true && !referralValidation.isValidating && (
+                <View style={styles.validationContainer}>
+                  <PhosphorIcon name="CheckCircle" size={16} color={colors.green} weight="fill" />
+                  <Text style={[styles.validationText, { color: colors.green }]}>Valid referral code</Text>
+                </View>
+              )}
+            </View>
           </View>
+        </ScrollView>
+
+        {/* Continue Button - Fixed at bottom of screen */}
+        <View style={styles.buttonContainer}>
+          <Button
+            title="Continue"
+            onPress={handleNext}
+            variant="primary"
+            size="large"
+            fullWidth={true}
+            disabled={!pseudo || isLoading}
+            loading={isLoading}
+          />
         </View>
       </KeyboardAvoidingView>
-
-      {/* Referral Code Modal */}
-      <Modal
-        visible={showReferralModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowReferralModal(false)}
-        statusBarTranslucent={true}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            justifyContent: 'flex-end',
-          }}
-        >
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={1}
-            onPress={() => setShowReferralModal(false)}
-          />
-          <View style={{
-            backgroundColor: colors.blackWhite5,
-            borderTopLeftRadius: spacing.lg,
-            borderTopRightRadius: spacing.lg,
-            padding: spacing.lg,
-            paddingBottom: 40,
-            maxHeight: '80%',
-          }}>
-            {/* Handle bar */}
-            <View style={{
-              alignSelf: 'center',
-              width: 50,
-              height: 4,
-              backgroundColor: colors.white50,
-              borderRadius: 2,
-              marginBottom: spacing.lg,
-            }} />
-
-            {hasReferralCode === null ? (
-              // Initial question
-              <>
-                <Text style={{
-                  fontSize: 24,
-                  fontWeight: 'bold',
-                  color: colors.white,
-                  textAlign: 'center',
-                  marginBottom: spacing.md,
-                }}>
-                  Do you have a referral code?
-                </Text>
-                <Text style={{
-                  fontSize: 16,
-                  color: colors.white70,
-                  textAlign: 'center',
-                  marginBottom: spacing.xl,
-                }}>
-                  Enter a referral code to earn bonus points for you and your friend!
-                </Text>
-                <View style={{ gap: spacing.md }}>
-                  <Button
-                    title="Yes, I have a code"
-                    onPress={() => handleReferralChoice(true)}
-                    variant="primary"
-                    fullWidth={true}
-                  />
-                  <Button
-                    title="No, skip"
-                    onPress={() => handleReferralChoice(false)}
-                    variant="secondary"
-                    fullWidth={true}
-                  />
-                </View>
-              </>
-            ) : (
-              // Referral code input
-              <>
-                <Text style={{
-                  fontSize: 24,
-                  fontWeight: 'bold',
-                  color: colors.white,
-                  textAlign: 'center',
-                  marginBottom: spacing.md,
-                }}>
-                  Enter Referral Code
-                </Text>
-                <Text style={{
-                  fontSize: 16,
-                  color: colors.white70,
-                  textAlign: 'center',
-                  marginBottom: spacing.xl,
-                }}>
-                  Paste your referral code below
-                </Text>
-                <View style={{ marginBottom: spacing.lg }}>
-                  <Input
-                    label=""
-                    placeholder="Enter referral code"
-                    value={referralInput}
-                    onChangeText={(text) => {
-                      // Auto-uppercase and remove spaces
-                      const cleaned = text.toUpperCase().replace(/\s/g, '');
-                      setReferralInput(cleaned);
-                      // Validate as user types (with debouncing)
-                      validateReferralCode(cleaned);
-                    }}
-                    leftIcon="Handshake"
-                    rightIcon={
-                      referralValidation.isValidating
-                        ? undefined
-                        : referralValidation.isValid === true
-                        ? "CheckCircle"
-                        : referralValidation.isValid === false
-                        ? "XCircle"
-                        : undefined
-                    }
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    maxLength={REFERRAL_CODE_MAX_LENGTH}
-                    error={referralValidation.error}
-                    containerStyle={{ width: '100%' }}
-                  />
-                  {referralValidation.isValidating && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs }}>
-                      <ActivityIndicator size="small" color={colors.white50} />
-                      <Text style={{ 
-                        color: colors.white50, 
-                        fontSize: 14, 
-                        marginLeft: spacing.sm 
-                      }}>
-                        Validating code...
-                      </Text>
-                    </View>
-                  )}
-                  {referralValidation.isValid === true && !referralValidation.isValidating && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs }}>
-                      <PhosphorIcon name="CheckCircle" size={16} color={colors.green} weight="fill" />
-                      <Text style={{ 
-                        color: colors.green, 
-                        fontSize: 14, 
-                        marginLeft: spacing.sm 
-                      }}>
-                        Valid referral code
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <View style={{ gap: spacing.md }}>
-                  <Button
-                    title="Continue"
-                    onPress={handleReferralSubmit}
-                    variant="primary"
-                    fullWidth={true}
-                    disabled={
-                      !referralInput.trim() || 
-                      referralValidation.isValidating || 
-                      referralValidation.isValid === false
-                    }
-                  />
-                  <Button
-                    title="Skip"
-                    onPress={handleSkipReferral}
-                    variant="secondary"
-                    fullWidth={true}
-                  />
-                </View>
-              </>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </Container>
   );
 };

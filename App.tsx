@@ -20,8 +20,13 @@ import UserProfileScreen from './src/screens/UserProfile/UserProfileScreen';
 import SplashScreen from './src/screens/Splash/SplashScreen';
 import GetStartedScreen from './src/screens/GetStarted/GetStartedScreen';
 import AuthMethodsScreen from './src/screens/AuthMethods/AuthMethodsScreen';
+import EmailPhoneInputScreen from './src/screens/EmailPhoneInput/EmailPhoneInputScreen';
 import VerificationScreen from './src/screens/Verification/VerificationScreen';
 import CreateProfileScreen from './src/screens/CreateProfile/CreateProfileScreen';
+import CreatePinScreen from './src/screens/CreatePin/CreatePinScreen';
+import VerifyPinScreen from './src/screens/VerifyPin/VerifyPinScreen';
+import FaceIdSetupScreen from './src/screens/FaceIdSetup/FaceIdSetupScreen';
+import SetupNotificationsScreen from './src/screens/SetupNotifications/SetupNotificationsScreen';
 import OnboardingScreen from './src/screens/Onboarding/OnboardingScreen';
 
 import DepositScreen from './src/screens/Deposit/DepositScreen';
@@ -158,8 +163,13 @@ export default function App() {
 
                     <Stack.Screen name="GetStarted" component={GetStartedScreen} />
                     <Stack.Screen name="AuthMethods" component={AuthMethodsScreen} />
+                    <Stack.Screen name="EmailPhoneInput" component={EmailPhoneInputScreen} />
                     <Stack.Screen name="Verification" component={VerificationScreen} />
                     <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
+                    <Stack.Screen name="CreatePin" component={CreatePinScreen} />
+                    <Stack.Screen name="VerifyPin" component={VerifyPinScreen} />
+                    <Stack.Screen name="FaceIdSetup" component={FaceIdSetupScreen} />
+                    <Stack.Screen name="SetupNotifications" component={SetupNotificationsScreen} />
                     <Stack.Screen name="Onboarding" component={OnboardingScreen} />
                     <Stack.Screen name="Dashboard" component={DashboardScreen} />
                     <Stack.Screen name="Profile" component={ProfileScreen} />

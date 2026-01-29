@@ -22,12 +22,16 @@ interface LoadingScreenProps {
   message?: string;
   showSpinner?: boolean;
   style?: StyleProp<ViewStyle>;
+  spinnerColor?: string;
+  showMessage?: boolean;
 }
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({
   message = 'Loading...',
   showSpinner = true,
   style,
+  spinnerColor = colors.white,
+  showMessage = true,
 }) => {
   return (
     <SafeAreaView style={[styles.container, style]}>
@@ -35,11 +39,11 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
         {showSpinner && (
           <ActivityIndicator 
             size="large" 
-            color={colors.green} 
-            style={styles.spinner}
+            color={spinnerColor} 
+            style={showMessage ? styles.spinner : undefined}
           />
         )}
-        <Text style={styles.message}>{message}</Text>
+        {showMessage && <Text style={styles.message}>{message}</Text>}
       </View>
     </SafeAreaView>
   );

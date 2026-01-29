@@ -10,7 +10,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
   StyleSheet,
 } from 'react-native';
@@ -19,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
-import { Container, Header } from '../../components/shared';
+import { Container, Header, Loader } from '../../components/shared';
 import Avatar from '../../components/shared/Avatar';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import Tabs from '../../components/shared/Tabs';
@@ -576,10 +575,7 @@ const LeaderboardDetailScreen: React.FC = () => {
         }
       >
         {loading && !refreshing ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.green} />
-            <Text style={styles.loadingText}>Loading leaderboard...</Text>
-          </View>
+          <Loader />
         ) : (
           <>
             {/* Top 3 Display */}

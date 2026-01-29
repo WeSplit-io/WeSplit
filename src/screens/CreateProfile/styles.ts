@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TextStyle } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 // Legacy color constants for compatibility
@@ -7,90 +7,83 @@ export const GREEN = '#A5EA15';
 export const GRAY = '#A89B9B';
 
 export const styles = StyleSheet.create({
-  mainContainer: {
+  keyboardAvoidingView: {
     flex: 1,
   },
   scrollContent: {
-    flex: 1,
-  },
-  scrollContentContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingBottom: spacing.lg,
+    paddingBottom: 100, // Space for fixed button at bottom
   },
-  buttonContainer: {
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'flex-start',
   },
-
-  centerContent: {
-    justifyContent: 'center',
+  titleContainer: {
+    alignItems: 'flex-start',
+    marginBottom: spacing.xl,
+  },
+  iconContainer: {
+    width: spacing.iconBoxSize,
+    height: spacing.iconBoxSize,
     alignItems: 'center',
-    width: '100%',
-  },
-  fullWidthInput: {
-    width: '100%',
+    justifyContent: 'center',
+    backgroundColor: colors.white5,
+    borderRadius: spacing.sm,
+    marginBottom: spacing.md,
   },
   title: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
+    ...(typography.textStyles.h2 as TextStyle),
+    lineHeight: typography.textStyles.h2.lineHeight * typography.textStyles.h2.fontSize,
     color: colors.white,
+    textAlign: 'left',
     marginBottom: spacing.sm,
-    textAlign: 'center',
   },
   subtitle: {
-    fontSize: typography.fontSize.md,
+    ...(typography.textStyles.body as TextStyle),
+    lineHeight: typography.textStyles.body.lineHeight * typography.textStyles.body.fontSize,
     color: colors.white70,
+    textAlign: 'left',
+  },
+  avatarSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     marginBottom: spacing.xl,
-    textAlign: 'center',
-    flexWrap: 'wrap',
+    gap: spacing.lg,
   },
   avatarContainer: {
-    width: 140,
-    height: 140,
-    borderRadius: 170,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: colors.white5,
     borderWidth: 1,
-    borderColor: colors.white50,
+    borderColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xl,
-    position: 'relative',
   },
   avatarImage: {
-    width: 140,
-    height: 140,
-    borderRadius: 170,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   avatarPlaceholder: {
-    width: 140,
-    height: 140,
-    borderRadius: 170,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarIcon: {
-    width: 48,
-    height: 48,
-    tintColor: colors.white70,
+  changePictureButton: {
+    flex: 1,
   },
-  cameraIconContainer: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: spacing.xl,
-    height: spacing.xl,
-    borderRadius: spacing.md,
-    backgroundColor: colors.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cameraIcon: {
-    width: 16,
-    height: 16,
-    tintColor: colors.white,
+  changePictureText: {
+    ...(typography.textStyles.body as TextStyle),
+    lineHeight: typography.textStyles.body.lineHeight * typography.textStyles.body.fontSize,
+    color: colors.white80,
+    textAlign: 'left',
   },
   inputSection: {
     width: '100%',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   validationLoadingContainer: {
     flexDirection: 'row',
@@ -103,88 +96,28 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
   },
   inputLabel: {
+    ...(typography.textStyles.h3 as TextStyle),
+    lineHeight: typography.textStyles.h3.lineHeight * typography.textStyles.h3.fontSize,
     color: colors.white,
-    fontWeight: typography.fontWeight.medium,
-    fontSize: typography.fontSize.md,
-    marginBottom: spacing.sm,
   },
-  input: {
-    width: '100%',
-    backgroundColor: colors.white5,
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: spacing.lg,
-    fontSize: typography.fontSize.md,
-    color: colors.white,
-    borderWidth: 1,
-    borderColor: colors.white50,
-  },
-  errorText: {
-    color: colors.red,
-    fontSize: 15,
-    marginTop: spacing.sm,
-  },
-  referralCodeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  optionalLabel: {
-    color: colors.white50,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.regular,
-    marginBottom: spacing.sm,
-
-  },
-  referralCodeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white5,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.white50,
-    paddingHorizontal: spacing.md,
-  },
-  referralCodeIcon: {
-    marginRight: spacing.sm,
-  },
-  referralCodeInput: {
-    flex: 1,
-    paddingVertical: 15,
-    fontSize: typography.fontSize.md,
-    color: colors.white,
-    letterSpacing: 1,
-  },
-  referralCodeHint: {
-    color: colors.white50,
-    fontSize: typography.fontSize.sm,
-    marginTop: spacing.xs,
-    lineHeight: 18,
-  },
-  nextButton: {
-    borderRadius: 16,
-    width: '100%',
-    overflow: 'hidden',
-  },
-  gradientButton: {
-    paddingVertical: 15,
-    alignItems: 'center',
-    borderRadius: 16,
-  },
-  nextButtonText: {
-    color: colors.black,
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.medium,
-  },
-  helpSection: {
-    alignItems: 'center',
-    paddingTop: spacing.lg,
+  buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingTop: spacing.md,
     paddingBottom: spacing.lg,
+    backgroundColor: colors.black,
   },
-  helpText: {
+  validationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    gap: spacing.xs,
+  },
+  validationText: {
+    ...(typography.textStyles.bodySmall as TextStyle),
+    lineHeight: typography.textStyles.bodySmall.lineHeight * typography.textStyles.bodySmall.fontSize,
     color: colors.white50,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.regular,
   },
 }); 

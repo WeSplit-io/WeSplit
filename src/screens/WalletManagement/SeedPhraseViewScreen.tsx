@@ -4,21 +4,19 @@ import {
   Text,
   TouchableOpacity,
   Alert,
-  Image,
-  Clipboard,
   ScrollView,
+  Linking,
+  TextStyle,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
-import { styles } from './styles';
-import { useWallet } from '../../context/WalletContext';
+import { styles } from './SeedPhraseViewScreen.styles';
 import { walletExportService } from '../../services/blockchain/wallet/walletExportService';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
-import { Container, Button, PhosphorIcon } from '../../components/shared';
-import Header from '../../components/shared/Header';
+import { Container, Header, Button, PhosphorIcon, Loader } from '../../components/shared';
+import { typography } from '../../theme/typography';
+import * as ClipboardModule from 'expo-clipboard';
 
 const SeedPhraseViewScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -32,15 +30,6 @@ const SeedPhraseViewScreen: React.FC = () => {
   const [activeWalletAddress, setActiveWalletAddress] = useState<string | null>(null);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [hasValidSeedPhrase, setHasValidSeedPhrase] = useState(false);
-  
-  const { 
-    // App wallet state (for seed phrase)
-    appWalletAddress,
-    appWalletConnected,
-    // External wallet state (for fallback)
-    walletInfo, 
-    secretKey 
-  } = useWallet();
 
   // Get seed phrase from secure device storage (never from database)
   useEffect(() => {
@@ -108,6 +97,10 @@ const SeedPhraseViewScreen: React.FC = () => {
     navigation.goBack();
   };
 
+  const handleHelpCenterPress = () => {
+    Linking.openURL('https://help.wesplit.io/');
+  };
+
   const handleReveal = () => {
     if (seedPhrase.length === 0) {
       // Don't show popup - let the UI handle the empty state
@@ -137,7 +130,7 @@ const SeedPhraseViewScreen: React.FC = () => {
     
     try {
       const seedPhraseText = seedPhrase.join(' ');
-      await Clipboard.setString(seedPhraseText);
+      await ClipboardModule.setStringAsync(seedPhraseText);
       Alert.alert('Copied', 'Seed phrase copied to clipboard!');
       
       // Track seed phrase export reward (non-blocking)
@@ -181,7 +174,7 @@ const SeedPhraseViewScreen: React.FC = () => {
               text: 'Copy Private Key', 
               onPress: async () => {
                 try {
-                  await Clipboard.setString(exportResult.privateKey!);
+                  await ClipboardModule.setStringAsync(exportResult.privateKey!);
                   Alert.alert('Copied', 'Private key copied to clipboard!');
                 } catch (error) {
                   Alert.alert('Error', 'Failed to copy private key');
@@ -208,14 +201,13 @@ const SeedPhraseViewScreen: React.FC = () => {
   if (loading) {
     return (
       <Container safeAreaEdges={['top', 'bottom']}>
-        <Header 
-          title="Seed phrase"
-          onBackPress={handleBack}
+        <Header
           showBackButton={true}
+          onBackPress={handleBack}
+          showHelpCenter={true}
+          onHelpCenterPress={handleHelpCenterPress}
         />
-        <View style={styles.loaderSeedPhraseContainer}>
-          <Text style={styles.instructionsText}>Loading seed phrase...</Text>
-        </View>
+        <Loader />
       </Container>
     );
   }
@@ -223,33 +215,92 @@ const SeedPhraseViewScreen: React.FC = () => {
   if (error) {
     return (
       <Container safeAreaEdges={['top', 'bottom']}>
-        <Header 
-          title="Seed phrase"
-          onBackPress={handleBack}
-          showBackButton={true}
-        />
-        <View style={styles.content}>
-          <View style={styles.instructionsContainer}>
-            <Text style={styles.instructionsTitle}>Seed Phrase Unavailable</Text>
-            <Text style={styles.instructionsText}>
-              {error}
-            </Text>
-            <Text style={styles.instructionsText}>
-              This may be because you're using an external wallet or the seed phrase is not available for this wallet type.
-            </Text>
+        <View style={styles.keyboardAvoidingView}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Header
+              showBackButton={true}
+              onBackPress={handleBack}
+              showHelpCenter={true}
+              onHelpCenterPress={handleHelpCenterPress}
+            />
+            <View style={styles.contentContainer}>
+              <View style={styles.titleContainer}>
+                <View style={styles.iconContainer}>
+                  <PhosphorIcon name="Keyhole" size={24} color={colors.white} weight="regular" />
+                </View>
+                <Text style={styles.title}>Seed Phrase Unavailable</Text>
+                <Text style={styles.subtitle}>
+                  {error}
+                </Text>
+                <Text style={styles.subtitle}>
+                  This may be because you're using an external wallet or the seed phrase is not available for this wallet type.
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+          <View style={styles.buttonContainer}>
+            <Button
+              title="Done"
+              onPress={handleDone}
+              variant="primary"
+              size="large"
+              fullWidth={true}
+            />
           </View>
         </View>
-        
-        {/* Done Button */}
-        <View style={styles.doneButtonFixed}>
-          <Button
-            title="Done"
-            onPress={handleDone}
-            variant="secondary"
-            fullWidth
-            style={styles.doneButtonWrapper}
-            textStyle={styles.doneButtonText}
-          />
+      </Container>
+    );
+  }
+
+  // Only show seed phrase view if we have a valid seed phrase
+  if (!hasValidSeedPhrase) {
+    // Fallback to private key view if no seed phrase
+    return (
+      <Container safeAreaEdges={['top', 'bottom']}>
+        <View style={styles.keyboardAvoidingView}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Header
+              showBackButton={true}
+              onBackPress={handleBack}
+              showHelpCenter={true}
+              onHelpCenterPress={handleHelpCenterPress}
+            />
+            <View style={styles.contentContainer}>
+              <View style={styles.titleContainer}>
+                <View style={styles.iconContainer}>
+                  <PhosphorIcon name="Keyhole" size={24} color={colors.white} weight="regular" />
+                </View>
+                <Text style={styles.title}>Export Your Private Key</Text>
+                <Text style={styles.subtitle}>
+                  Your wallet was created using random key generation or the seed phrase is not available. You can export your wallet using the private key below.
+                </Text>
+              </View>
+              <View style={styles.privateKeyContainer}>
+                <View style={styles.privateKeyDisplay}>
+                  <Text style={styles.privateKeyText}>
+                    {privateKey || 'Private key not available'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+          <View style={styles.buttonContainer}>
+            <Button
+              title="Done"
+              onPress={handleDone}
+              variant="primary"
+              size="large"
+              fullWidth={true}
+            />
+          </View>
         </View>
       </Container>
     );
@@ -257,164 +308,88 @@ const SeedPhraseViewScreen: React.FC = () => {
 
   return (
     <Container safeAreaEdges={['top', 'bottom']}>
-      {/* Header */}
-      <Header 
-        title="Seed phrase"
-        onBackPress={handleBack}
-        showBackButton={true}
-      />
+      <View style={styles.keyboardAvoidingView}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Header
+            showBackButton={true}
+            onBackPress={handleBack}
+            showHelpCenter={true}
+            onHelpCenterPress={handleHelpCenterPress}
+          />
 
-      <ScrollView 
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Instructions */}
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.instructionsTitle}>
-            {hasValidSeedPhrase 
-              ? (showPrivateKey ? 'Export Your Private Key' : 'Write Down Your Seed Phrase')
-              : 'Export Your Private Key'
-            }
-          </Text>
-          <Text style={styles.instructionsText}>
-            {hasValidSeedPhrase 
-              ? (showPrivateKey 
-                  ? 'Your wallet\'s private key. Write it down and keep it in a safe place. You can use this to import your wallet into other apps.'
-                  : 'This is your wallet\'s 24-word seed phrase. Write it down on paper and keep it in a safe place. This seed phrase is compatible with most external wallets like Phantom and Solflare.'
-                )
-              : 'Your wallet was created using random key generation or the seed phrase is not available. You can export your wallet using the private key below. Write it down and keep it in a safe place.'
-            }
-          </Text>
-          
-          {/* Display wallet address for verification */}
-          {activeWalletAddress && (
-            <View style={styles.walletAddressContainer}>
-              <Text style={styles.walletAddressText}>{activeWalletAddress}</Text>
-            </View>
-          )}
-
-          {/* Production Toggle Button - Only show if seed phrase is available */}
-          {hasValidSeedPhrase && (
-            <View style={{
-              flexDirection: 'row',
-              backgroundColor: colors.white5,
-              borderRadius: spacing.radiusMd,
-              padding: 4,
-              marginTop: spacing.lg,
-              borderWidth: 1,
-              borderColor: colors.white10,
-            }}>
-              <TouchableOpacity 
-                style={{
-                  flex: 1,
-                  paddingVertical: spacing.sm,
-                  paddingHorizontal: spacing.md,
-                  borderRadius: spacing.radiusSm,
-                  alignItems: 'center',
-                  backgroundColor: !showPrivateKey ? colors.green : 'transparent',
-                }}
-                onPress={() => setShowPrivateKey(false)}
-              >
-                <Text style={{
-                  color: !showPrivateKey ? colors.white : colors.white70,
-                  fontSize: typography.fontSize.sm,
-                  fontWeight: !showPrivateKey ? typography.fontWeight.semibold : typography.fontWeight.medium,
-                }}>
-                  Seed Phrase
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={{
-                  flex: 1,
-                  paddingVertical: spacing.sm,
-                  paddingHorizontal: spacing.md,
-                  borderRadius: spacing.radiusSm,
-                  alignItems: 'center',
-                  backgroundColor: showPrivateKey ? colors.green : 'transparent',
-                }}
-                onPress={() => setShowPrivateKey(true)}
-              >
-                <Text style={{
-                  color: showPrivateKey ? colors.white : colors.white70,
-                  fontSize: typography.fontSize.sm,
-                  fontWeight: showPrivateKey ? typography.fontWeight.semibold : typography.fontWeight.medium,
-                }}>
-                  Private Key
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Seed Phrase or Private Key Display */}
-        <View style={styles.seedPhraseContainer}>
-          {showPrivateKey || !hasValidSeedPhrase ? (
-            <View style={styles.privateKeyContainer}>
-              <View style={styles.privateKeyDisplay}>
-                <Text style={styles.privateKeyText}>
-                  {privateKey || 'Private key not available'}
-                </Text>
+          <View style={styles.contentContainer}>
+            {/* Title and Subtitle */}
+            <View style={styles.titleContainer}>
+              <View style={styles.iconContainer}>
+                <PhosphorIcon name="Keyhole" size={24} color={colors.white} weight="regular" />
               </View>
-              <Text style={styles.privateKeyWarning}>
-                ⚠️ Keep your private key secure and never share it with anyone.
+              <Text style={styles.title}>
+                Write down your seed phrase
+              </Text>
+              <Text style={styles.subtitle}>
+                Write down the words in the sequence below and keep them safe. Don't share them with anyone, or you may permanently lose your assets.
               </Text>
             </View>
-          ) : !isRevealed ? (
-            <TouchableOpacity 
-              style={styles.blurredContainer}
-              onPress={handleReveal}
-              activeOpacity={0.8}
-            >
-              <View style={styles.blurOverlay} />
-              <Text style={styles.blurredText}>Tap to reveal your seed phrase</Text>
-              <Text style={styles.blurredSubtext}>Make sure no one is watching your screen.</Text>
-              <View style={styles.revealButton}>
-                <PhosphorIcon name="Eye" size={20} color={colors.white} style={styles.iconWrapper} />
-                <Text style={styles.revealButtonText}>View</Text>
-              </View>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.seedPhraseGrid}>
-              {seedPhrase.map((word, index) => (
-                <View key={index} style={styles.seedWordContainer}>
-                  <Text style={styles.seedWordNumber}>{index + 1}.</Text>
-                  <Text style={styles.seedWord}>{word}</Text>
-                </View>
-              ))}
+
+            {/* Seed Phrase Display */}
+            <View style={styles.seedPhraseContainer}>
+              {!isRevealed ? (
+                <TouchableOpacity 
+                  style={styles.blurredContainer}
+                  onPress={handleReveal}
+                  activeOpacity={0.8}
+                >
+                  <TouchableOpacity 
+                    style={styles.revealButton}
+                    onPress={handleReveal}
+                    activeOpacity={0.7}
+                  >
+                    <PhosphorIcon name="Eye" size={20} color={colors.white} />
+                    <Text style={styles.revealButtonText}>Reveal</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <View style={styles.seedPhraseGrid}>
+                    {seedPhrase.map((word, index) => (
+                      <View key={index} style={styles.seedWordContainer}>
+                        <Text style={styles.seedWordNumber}>
+                          {String(index + 1).padStart(2, '0')}
+                        </Text>
+                        <Text style={styles.seedWord}>{word}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {/* Copy Button */}
+                  <TouchableOpacity 
+                    style={styles.copyLinkContainer}
+                    onPress={handleCopySeedPhrase}
+                    activeOpacity={0.7}
+                  >
+                    <PhosphorIcon name="Copy" size={16} color={colors.white} />
+                    <Text style={styles.copyLinkText}>Copy</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
-          )}
-        </View>
-
-        {/* Action Buttons - Simplified for production */}
-        {(isRevealed || !hasValidSeedPhrase) && (
-          <View style={styles.actionButtonsContainer}>
-            <Button
-              title={showPrivateKey || !hasValidSeedPhrase ? 'Copy Private Key' : 'Copy Seed Phrase'}
-              onPress={showPrivateKey || !hasValidSeedPhrase ? handleExportPrivateKey : handleCopySeedPhrase}
-              variant="primary"
-              style={styles.copyButton}
-              textStyle={styles.copyButtonText}
-            />
           </View>
-        )}
+        </ScrollView>
 
-        {/* Spacer to ensure content doesn't get covered by fixed button */}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
-      
-      {/* Done Button - Fixed at bottom */}
-      <View style={styles.doneButtonFixed}>
-        <Button
-          title="Done"
-          onPress={handleDone}
-          variant="secondary"
-          fullWidth
-          style={styles.doneButtonWrapper}
-          textStyle={styles.doneButtonText}
-        />
+        {/* Done Button - Fixed at bottom */}
+        <View style={styles.buttonContainer}>
+          <Button
+            title="Done"
+            onPress={handleDone}
+            variant="primary"
+            size="large"
+            fullWidth={true}
+          />
+        </View>
       </View>
-
     </Container>
   );
 };

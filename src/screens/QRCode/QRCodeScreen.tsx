@@ -393,7 +393,7 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
   );
 
   return (
-    <Container style={{ backgroundColor: colors.black }}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
 
       {/* Only show Header if permission is granted OR if we're on myCode tab */}

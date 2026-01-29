@@ -8,6 +8,14 @@ export const spacing = {
   xxl: 40,
   xxxl: 48,
 
+  // Icons
+  iconBoxSize: 44,
+  iconBigSize: 32,
+  iconRegularSize: 24,
+  iconMediumSize: 20,
+  iconSmallSize: 16,
+
+
   // Screen-level padding
   screenPadding: 16,
   screenPaddingHorizontal: 16,
