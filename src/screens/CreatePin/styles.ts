@@ -61,6 +61,13 @@ export const styles = StyleSheet.create({
     flex: 1,
     aspectRatio: 1,
   },
+  keypadButtonFingerprint: {
+    flex: 1,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
   keypadButtonDelete: {
     flex: 1,
     aspectRatio: 1,

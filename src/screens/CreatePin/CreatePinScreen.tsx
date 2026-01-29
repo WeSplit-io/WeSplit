@@ -110,9 +110,11 @@ const CreatePinScreen: React.FC = () => {
               ))}
             </View>
 
-            {/* Row 4: empty, 0, backspace */}
+            {/* Row 4: fingerprint (visual consistency), 0, backspace */}
             <View style={styles.keypadRow}>
-              <View style={styles.keypadButtonEmpty} />
+              <View style={styles.keypadButtonFingerprint}>
+                <PhosphorIcon name="Fingerprint" size={28} color="#fff" weight="regular" />
+              </View>
               <TouchableOpacity
                 style={styles.keypadButton}
                 onPress={() => handleNumberPress('0')}

@@ -209,13 +209,6 @@ const PinUnlockScreen: React.FC = () => {
           <View style={styles.content}>
             <Text style={styles.title}>Enter your PIN</Text>
 
-            {biometricAvailable && (
-              <TouchableOpacity style={styles.faceIdButton} onPress={handleFaceIdPress} disabled={loading}>
-                <PhosphorIcon name="Fingerprint" size={28} color="#fff" weight="regular" />
-                <Text style={styles.faceIdButtonText}>Use Face ID</Text>
-              </TouchableOpacity>
-            )}
-
             <Animated.View
             style={[
               styles.pinIndicators,
@@ -239,7 +232,15 @@ const PinUnlockScreen: React.FC = () => {
               <View key={rowIdx} style={styles.keypadRow}>
                 {row.map((num) =>
                   num === '' ? (
-                    <View key="empty" style={styles.keypadButtonEmpty} />
+                    <TouchableOpacity
+                      key="biometric"
+                      style={styles.keypadButtonFingerprint}
+                      onPress={handleFaceIdPress}
+                      disabled={loading}
+                      activeOpacity={0.7}
+                    >
+                      <PhosphorIcon name="Fingerprint" size={28} color="#fff" weight="regular" />
+                    </TouchableOpacity>
                   ) : num === 'back' ? (
                     <TouchableOpacity
                       key="back"

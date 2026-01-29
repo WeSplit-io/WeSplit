@@ -9,6 +9,7 @@ import { useApp } from '../../context/AppContext';
 import { AuthPersistenceService } from '../../services/core/authPersistenceService';
 import { logger } from '../../services/analytics/loggingService';
 import { auth } from '../../config/firebase/firebase';
+import { secureVault } from '../../services/security/secureVault';
 
 const PIN_LENGTH = 6;
 
@@ -61,9 +62,14 @@ const VerifyPinScreen: React.FC = () => {
             }
           }
 
+          // Trigger Face ID once here (after PIN verified, before leaving screen); primes vault so Dashboard won't prompt again
+          try {
+            await secureVault.preAuthenticate();
+          } catch (e) {
+            logger.warn('Face ID / vault pre-auth skipped or failed, continuing', { error: e }, 'VerifyPinScreen');
+          }
           setTimeout(() => {
-            // Flow: Create Profile → PIN → Face ID → Notifications → Dashboard
-            (navigation as any).replace('FaceIdSetup');
+            (navigation as any).replace('SetupNotifications');
           }, 300);
         } else {
           // PIN doesn't match, show error animation and reset
@@ -191,9 +197,11 @@ const VerifyPinScreen: React.FC = () => {
               ))}
             </View>
 
-            {/* Row 4: empty, 0, backspace */}
+            {/* Row 4: fingerprint (visual consistency), 0, backspace */}
             <View style={styles.keypadRow}>
-              <View style={styles.keypadButtonEmpty} />
+              <View style={styles.keypadButtonFingerprint}>
+                <PhosphorIcon name="Fingerprint" size={28} color="#fff" weight="regular" />
+              </View>
               <TouchableOpacity
                 style={styles.keypadButton}
                 onPress={() => handleNumberPress('0')}

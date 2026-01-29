@@ -72,6 +72,13 @@ export const styles = StyleSheet.create({
     flex: 1,
     aspectRatio: 1,
   },
+  keypadButtonFingerprint: {
+    flex: 1,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
   keypadButtonDelete: {
     flex: 1,
     aspectRatio: 1,
@@ -120,14 +127,10 @@ export const styles = StyleSheet.create({
     elevation: 10,
   },
   forgotPinText: {
-    ...(typography.textStyles.body as TextStyle),
-    fontSize: 17,
-    lineHeight: 22,
+    ...(typography.textStyles.bodySmall as TextStyle),
+    lineHeight: typography.textStyles.bodySmall.lineHeight! * typography.textStyles.bodySmall.fontSize!,
     color: colors.white,
-    fontWeight: '700',
     textAlign: 'center',
-    textDecorationLine: 'underline',
-    opacity: 1,
   },
   useDifferentAccount: {
     paddingVertical: spacing.sm,
@@ -137,12 +140,9 @@ export const styles = StyleSheet.create({
     elevation: 10,
   },
   useDifferentAccountText: {
-    ...(typography.textStyles.body as TextStyle),
-    fontSize: 17,
-    lineHeight: 22,
+    ...(typography.textStyles.bodySmall as TextStyle),
+    lineHeight: typography.textStyles.bodySmall.lineHeight! * typography.textStyles.bodySmall.fontSize!,
     color: colors.white,
-    fontWeight: '700',
     textAlign: 'center',
-    opacity: 1,
   },
 });
