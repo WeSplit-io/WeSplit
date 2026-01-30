@@ -18,6 +18,7 @@ import {
 import type { TransactionContext, TransactionParams } from '../../services/transactions/types';
 import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 import { formatWalletAddress } from '../../utils/spend/spendDataUtils';
+import { showTransactionConfirmation } from '../../utils/transactionConfirmation';
 
 // Screen configuration based on transaction context
 interface TransactionScreenConfig {
@@ -646,6 +647,20 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
     }
   }, [amount, context, currentUser, recipientInfo, contact, wallet, requestId, isSettlement, centralizedTransactionHandler]);
 
+  // Show validation popup before executing; on Confirm, run the actual transaction
+  const handleConfirmAndExecute = useCallback(() => {
+    const numAmount = parseFloat(amount.replace(',', '.'));
+    const amountStr = isNaN(numAmount) ? amount : formatAmountWithComma(numAmount);
+    const recipientName = finalRecipientInfo?.name || contact?.name || wallet?.label || wallet?.name || 'recipient';
+    showTransactionConfirmation({
+      title: 'Confirm transaction',
+      message: `Send ${amountStr} USDC to ${recipientName}?\n\nThis action cannot be undone.`,
+      confirmLabel: 'Yes, send',
+      cancelLabel: 'Cancel',
+      onConfirm: () => handleExecuteTransaction(),
+    });
+  }, [amount, finalRecipientInfo, contact, wallet, handleExecuteTransaction]);
+
   // For spend split payment, auto-execute on mount
   useEffect(() => {
     if (context === 'spend_split_payment' && splitId && splitWalletId) {
@@ -800,7 +815,7 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
             networkFee={networkFee}
             totalPaid={totalPaid}
             showNetworkFee={true}
-            onSendPress={handleExecuteTransaction}
+            onSendPress={handleConfirmAndExecute}
             sendButtonDisabled={!canExecute || isProcessing}
             sendButtonLoading={isProcessing}
             sendButtonTitle={isProcessing ? 'Processing...' : 'Send'}
@@ -825,7 +840,7 @@ const CentralizedTransactionScreen: React.FC<CentralizedTransactionScreenProps> 
           showNetworkFee={true}
           onSlideComplete={() => {
             setShowConfirmationModal(false);
-            handleExecuteTransaction();
+            handleConfirmAndExecute();
           }}
           disabled={!canExecute || isProcessing}
           loading={isProcessing}

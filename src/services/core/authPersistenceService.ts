@@ -1,7 +1,8 @@
 /**
  * Authentication Persistence Service
  * Manages email, phone number, and local app PIN storage for authentication flow
- * SECURITY: Uses SecureStore for sensitive data storage
+ * SECURITY: PIN is stored in the same way as the wallet (react-native-keychain when available)
+ * so it persists across app opens like the user's private key. Falls back to SecureStore in Expo Go.
  */
 
 import * as SecureStore from 'expo-secure-store';
@@ -11,7 +12,20 @@ import { logger } from '../analytics/loggingService';
 const EMAIL_STORAGE_KEY = 'wesplit_user_email';
 const PHONE_STORAGE_KEY = 'wesplit_user_phone';
 const PIN_STORAGE_KEY_PREFIX = 'wesplit_user_pin_';
+const PIN_KEYCHAIN_SERVICE_PREFIX = 'wesplit-pin-'; // same Keychain persistence as wallet
 const PIN_LOGIN_EMAIL_PREFIX = 'wesplit_pin_login_email_';
+
+let Keychain: any = null;
+async function getKeychain(): Promise<any> {
+  if (Keychain === null) {
+    try {
+      Keychain = await import('react-native-keychain');
+    } catch {
+      Keychain = undefined;
+    }
+  }
+  return Keychain;
+}
 
 export class AuthPersistenceService {
   /**
@@ -110,11 +124,9 @@ export class AuthPersistenceService {
   
   /**
    * Save a 6-digit app PIN for the given user.
-   * SECURITY: PIN is never stored in plaintext. We store a SHA-256 hash
-   * of `${userId}:${pin}` in SecureStore so it cannot be reversed.
-   * If email is provided, also stores email -> userId so returning users can sign in with PIN only.
-   * USAGE: Callers must pass userId as string (e.g. String(userId)) so storage/retrieval/verify
-   * use the same key; hasPin, verifyPin, clearPin must use the same string format.
+   * SECURITY: PIN is never stored in plaintext. We store a SHA-256 hash.
+   * Uses the same storage as the wallet (react-native-keychain with AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY)
+   * so the PIN persists across app opens like the user's private key. Fallback: SecureStore (e.g. Expo Go).
    */
   static async savePin(userId: string, pin: string, email?: string | null): Promise<void> {
     try {
@@ -135,18 +147,23 @@ export class AuthPersistenceService {
         hashInput
       );
 
-      const storageKey = `${PIN_STORAGE_KEY_PREFIX}${userId}`;
-      await SecureStore.setItemAsync(storageKey, hash, {
-        requireAuthentication: false,
-      });
-
-      if (email && email.trim()) {
-        await this.savePinLoginData(email.trim(), userId);
+      const kc = await getKeychain();
+      if (kc?.setGenericPassword) {
+        const service = `${PIN_KEYCHAIN_SERVICE_PREFIX}${userId}`;
+        const opts: any = {
+          service,
+          accessible: kc.ACCESSIBLE?.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY ?? kc.ACCESSIBLE?.AFTER_FIRST_UNLOCK,
+        };
+        await kc.setGenericPassword('pin', hash, opts);
+        logger.info('App PIN hash saved to Keychain (same persistence as wallet)', { userId }, 'AuthPersistenceService');
+      } else {
+        await SecureStore.setItemAsync(`${PIN_STORAGE_KEY_PREFIX}${userId}`, hash, {
+          requireAuthentication: false,
+        });
+        logger.info('App PIN hash saved to SecureStore fallback', { userId }, 'AuthPersistenceService');
       }
-
-      logger.info('App PIN hash saved to secure storage', { userId, hasEmail: !!email }, 'AuthPersistenceService');
     } catch (error) {
-      logger.error('Failed to save app PIN to secure storage', { error, userId }, 'AuthPersistenceService');
+      logger.error('Failed to save app PIN', { error, userId }, 'AuthPersistenceService');
       throw error;
     }
   }
@@ -223,55 +240,83 @@ export class AuthPersistenceService {
 
   /**
    * Check if a PIN has been set for the given user.
+   * Reads from Keychain first (same as wallet), then SecureStore (fallback + migration from old installs).
    */
   static async hasPin(userId: string): Promise<boolean> {
     try {
-      if (!userId) {
-        return false;
+      if (!userId) return false;
+      const kc = await getKeychain();
+      if (kc?.getGenericPassword) {
+        const service = `${PIN_KEYCHAIN_SERVICE_PREFIX}${userId}`;
+        const creds = await kc.getGenericPassword({ service });
+        if (creds?.password) return true;
       }
       const storageKey = `${PIN_STORAGE_KEY_PREFIX}${userId}`;
       const storedHash = await SecureStore.getItemAsync(storageKey);
-      return !!storedHash;
+      if (storedHash) {
+        await this.migratePinToKeychain(userId, storedHash);
+        return true;
+      }
+      return false;
     } catch (error) {
       logger.error('Failed to check if app PIN exists', { error, userId }, 'AuthPersistenceService');
       return false;
     }
   }
 
+  /** Migrate PIN hash from SecureStore to Keychain so it persists like the wallet. */
+  private static async migratePinToKeychain(userId: string, hash: string): Promise<void> {
+    try {
+      const kc = await getKeychain();
+      if (!kc?.setGenericPassword) return;
+      const service = `${PIN_KEYCHAIN_SERVICE_PREFIX}${userId}`;
+      const opts: any = {
+        service,
+        accessible: kc.ACCESSIBLE?.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY ?? kc.ACCESSIBLE?.AFTER_FIRST_UNLOCK,
+      };
+      await kc.setGenericPassword('pin', hash, opts);
+      await SecureStore.deleteItemAsync(`${PIN_STORAGE_KEY_PREFIX}${userId}`);
+      logger.info('PIN migrated from SecureStore to Keychain', { userId }, 'AuthPersistenceService');
+    } catch (e) {
+      logger.warn('PIN migration to Keychain failed (non-fatal)', { userId }, 'AuthPersistenceService');
+    }
+  }
+
   /**
    * Verify a candidate PIN for the given user.
    * Returns true only if a stored hash exists and matches.
+   * Reads from Keychain first (same as wallet), then SecureStore (fallback + migration).
    */
   static async verifyPin(userId: string, pin: string): Promise<boolean> {
     try {
-      if (!userId || !pin) {
-        return false;
-      }
-
-      const storageKey = `${PIN_STORAGE_KEY_PREFIX}${userId}`;
-      const storedHash = await SecureStore.getItemAsync(storageKey);
-      if (!storedHash) {
-        return false;
-      }
-
+      if (!userId || !pin) return false;
       const trimmedPin = pin.trim();
-      if (!/^\d{6}$/.test(trimmedPin)) {
-        return false;
+      if (!/^\d{6}$/.test(trimmedPin)) return false;
+
+      let storedHash: string | null = null;
+      const kc = await getKeychain();
+      if (kc?.getGenericPassword) {
+        const service = `${PIN_KEYCHAIN_SERVICE_PREFIX}${userId}`;
+        const creds = await kc.getGenericPassword({ service });
+        storedHash = creds?.password ?? null;
       }
+      if (!storedHash) {
+        storedHash = await SecureStore.getItemAsync(`${PIN_STORAGE_KEY_PREFIX}${userId}`);
+        if (storedHash) await this.migratePinToKeychain(userId, storedHash);
+      }
+      if (!storedHash) return false;
 
       const hashInput = `${userId}:${trimmedPin}`;
       const computedHash = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
         hashInput
       );
-
       const matches = storedHash === computedHash;
-      if (!matches) {
-        logger.warn('App PIN verification failed', { userId }, 'AuthPersistenceService');
-      } else {
+      if (matches) {
         logger.info('App PIN verification succeeded', { userId }, 'AuthPersistenceService');
+      } else {
+        logger.warn('App PIN verification failed', { userId }, 'AuthPersistenceService');
       }
-
       return matches;
     } catch (error) {
       logger.error('Error verifying app PIN', { error, userId }, 'AuthPersistenceService');
@@ -281,15 +326,17 @@ export class AuthPersistenceService {
 
   /**
    * Clear stored PIN for a user (e.g., on logout or PIN reset).
+   * Clears both Keychain and SecureStore so the PIN is fully removed.
    */
   static async clearPin(userId: string): Promise<void> {
     try {
-      if (!userId) {
-        return;
+      if (!userId) return;
+      const kc = await getKeychain();
+      if (kc?.resetGenericPassword) {
+        await kc.resetGenericPassword({ service: `${PIN_KEYCHAIN_SERVICE_PREFIX}${userId}` });
       }
-      const storageKey = `${PIN_STORAGE_KEY_PREFIX}${userId}`;
-      await SecureStore.deleteItemAsync(storageKey);
-      logger.info('Stored app PIN cleared', { userId }, 'AuthPersistenceService');
+      await SecureStore.deleteItemAsync(`${PIN_STORAGE_KEY_PREFIX}${userId}`);
+      logger.info('Stored app PIN cleared (Keychain + SecureStore)', { userId }, 'AuthPersistenceService');
     } catch (error) {
       logger.error('Failed to clear stored app PIN', { error, userId }, 'AuthPersistenceService');
       throw error;

@@ -11,8 +11,6 @@ import { logger } from '../../services/analytics/loggingService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { authService } from '../../services/auth/AuthService';
 import { PhantomAuthService } from '../../services/auth/PhantomAuthService';
-import { AuthPersistenceService } from '../../services/core/authPersistenceService';
-
 interface GetStartedScreenProps {
   navigation: any;
 }
@@ -23,18 +21,6 @@ const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
   const referralCode = route.params?.referralCode;
   const [modalVisible, setModalVisible] = useState(false);
   const { authenticateUser } = useApp();
-
-  // PIN GATE: If prefilledEmail has PIN login data, user must use PinLogin (enter PIN), not email OTP
-  useEffect(() => {
-    if (!prefilledEmail?.trim()) return;
-    (async () => {
-      const pinData = await AuthPersistenceService.getPinLoginData(prefilledEmail.trim());
-      if (pinData?.userId) {
-        logger.info('GetStarted: prefilled email has PIN, redirecting to PinLogin', { email: prefilledEmail.substring(0, 5) + '...' }, 'GetStartedScreen');
-        (navigation as any).replace('PinLogin', { email: prefilledEmail.trim() });
-      }
-    })();
-  }, [prefilledEmail, navigation]);
 
   // Process Phantom authentication success - extracted from AuthMethodsScreen
   // AuthMethodSelectionModal passes the raw SDK user (authUserId, walletId, provider); we must

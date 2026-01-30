@@ -11,6 +11,7 @@ import type { TransactionContext, TransactionParams } from '../../services/trans
 import type { UserContact } from '../../types';
 import { formatAmountWithComma } from '../../utils/ui/format/formatUtils';
 import { formatWalletAddress } from '../../utils/spend/spendDataUtils';
+import { showTransactionConfirmation } from '../../utils/transactionConfirmation';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
@@ -865,6 +866,45 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
     }
   }, [amount, config.context, currentUser, finalRecipientInfo, contact, wallet, requestId, isSettlement, effectiveSplitWalletId, effectiveSplitId, effectiveBillId, effectiveSharedWalletId, centralizedTransactionHandler]);
 
+  // Build confirmation message by context (splits, shared wallet, 1-to-1)
+  const getConfirmationTitleAndMessage = useCallback(() => {
+    const numAmount = parseFloat(amount.replace(',', '.'));
+    const amountStr = isNaN(numAmount) ? amount : formatAmountWithComma(numAmount);
+    const recipientName = finalRecipientInfo?.name || 'recipient';
+    const suffix = '\n\nThis action cannot be undone.';
+    switch (config.context) {
+      case 'send_1to1':
+        return { title: 'Confirm transaction', message: `Send ${amountStr} USDC to ${recipientName}?${suffix}` };
+      case 'fair_split_contribution':
+        return { title: 'Confirm contribution', message: `Contribute ${amountStr} USDC to the fair split?${suffix}` };
+      case 'fair_split_withdrawal':
+        return { title: 'Confirm withdrawal', message: `Withdraw ${amountStr} USDC to ${recipientName}?${suffix}` };
+      case 'degen_split_lock':
+        return { title: 'Confirm lock', message: `Lock ${amountStr} USDC for the degen split?${suffix}` };
+      case 'spend_split_payment':
+        return { title: 'Confirm payment', message: `Pay ${amountStr} USDC to ${recipientName}?${suffix}` };
+      case 'shared_wallet_funding':
+        return { title: 'Confirm top-up', message: `Top up shared wallet with ${amountStr} USDC?${suffix}` };
+      case 'shared_wallet_withdrawal':
+        return { title: 'Confirm withdrawal', message: `Withdraw ${amountStr} USDC from shared wallet to ${recipientName}?${suffix}` };
+      default:
+        return { title: 'Confirm transaction', message: `Send ${amountStr} USDC to ${recipientName}?${suffix}` };
+    }
+  }, [amount, config.context, finalRecipientInfo?.name]);
+
+  // Show validation popup before executing; on Confirm run the actual transaction
+  const handleConfirmAndExecute = useCallback(() => {
+    const { title, message } = getConfirmationTitleAndMessage();
+    const confirmLabel = config.context === 'degen_split_lock' ? 'Yes, lock' : 'Yes, confirm';
+    showTransactionConfirmation({
+      title,
+      message,
+      confirmLabel,
+      cancelLabel: 'Cancel',
+      onConfirm: () => handleExecuteTransaction(),
+    });
+  }, [getConfirmationTitleAndMessage, config.context, handleExecuteTransaction]);
+
   // ✅ REMOVED: Auto-execution for spend_split_payment
   // Transactions to split wallets should only occur when user explicitly triggers them
   // User must click the "Send" or "Confirm" button to execute the transaction
@@ -1076,7 +1116,7 @@ const CentralizedTransactionModal: React.FC<CentralizedTransactionModalProps> = 
             networkFee={networkFee}
             totalPaid={totalPaid}
             showNetworkFee={!isSharedWalletWithdrawal} // ✅ FIX: Hide fee display for shared wallet withdrawals
-            onSendPress={handleExecuteTransaction}
+            onSendPress={handleConfirmAndExecute}
             sendButtonDisabled={!canExecute || isProcessing || isLoadingSharedWalletData}
             sendButtonLoading={isProcessing || isLoadingSharedWalletData}
             sendButtonTitle={

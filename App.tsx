@@ -24,7 +24,6 @@ import VerificationScreen from './src/screens/Verification/VerificationScreen';
 import CreateProfileScreen from './src/screens/CreateProfile/CreateProfileScreen';
 import CreatePinScreen from './src/screens/CreatePin/CreatePinScreen';
 import VerifyPinScreen from './src/screens/VerifyPin/VerifyPinScreen';
-import PinLoginScreen from './src/screens/PinLogin/PinLoginScreen';
 import PinUnlockScreen from './src/screens/PinUnlock/PinUnlockScreen';
 import FaceIdSetupScreen from './src/screens/FaceIdSetup/FaceIdSetupScreen';
 import SetupNotificationsScreen from './src/screens/SetupNotifications/SetupNotificationsScreen';
@@ -167,7 +166,6 @@ export default function App() {
                     <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
                     <Stack.Screen name="CreatePin" component={CreatePinScreen} />
                     <Stack.Screen name="VerifyPin" component={VerifyPinScreen} />
-                    <Stack.Screen name="PinLogin" component={PinLoginScreen} />
                     <Stack.Screen name="PinUnlock" component={PinUnlockScreen} />
                     <Stack.Screen name="FaceIdSetup" component={FaceIdSetupScreen} />
                     <Stack.Screen name="SetupNotifications" component={SetupNotificationsScreen} />

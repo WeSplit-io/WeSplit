@@ -22,6 +22,8 @@ const VerifyPinScreen: React.FC = () => {
   const [pin, setPin] = useState<string[]>([]);
   const [error, setError] = useState<boolean>(false);
   const shakeAnimation = useRef(new Animated.Value(0)).current;
+  // Ensure Face ID setup and navigation run only once (prevents double-tap / Strict Mode double-invoke)
+  const verificationCompletedRef = useRef(false);
 
   const handleHelpCenterPress = () => {
     Linking.openURL('https://help.wesplit.io/');
@@ -37,6 +39,10 @@ const VerifyPinScreen: React.FC = () => {
       if (newPin.length === PIN_LENGTH) {
         const enteredPin = newPin.join('');
         if (enteredPin === originalPin) {
+          // Single-run guard: Face ID and navigation must run exactly once after PIN creation
+          if (verificationCompletedRef.current) return;
+          verificationCompletedRef.current = true;
+
           // PIN matches - persist it for the current user (wire PIN/signup data with backend)
           setError(false);
 

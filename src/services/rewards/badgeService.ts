@@ -635,6 +635,14 @@ class BadgeService {
   }
 
   /**
+   * Get badge by redeem code (public) – for validating community/event codes without claiming.
+   * Use this to check if a code is a valid community badge redeem code (e.g. during signup).
+   */
+  async getBadgeByRedeemCode(redeemCode: string): Promise<BadgeInfo | null> {
+    return this.getBadgeInfoByRedeemCode(redeemCode);
+  }
+
+  /**
    * Get badge info by redeem code from Firestore
    * Event/community badges are now managed entirely in Firestore
    */

@@ -142,14 +142,6 @@ const EmailPhoneInputScreen: React.FC = () => {
       return;
     }
 
-    // PIN GATE: If this email has PIN login data, user must sign in via PIN (PinLogin), not OTP
-    const pinData = await AuthPersistenceService.getPinLoginData(email.trim());
-    if (pinData?.userId) {
-      logger.info('Email has PIN - redirecting to PinLogin', { email: email.trim().substring(0, 5) + '...' }, 'EmailPhoneInputScreen');
-      (navigation as any).replace('PinLogin', { email: email.trim() });
-      return;
-    }
-
     setLoading(true);
     try {
       logger.info('Starting email authentication', { email: email.trim() }, 'EmailPhoneInputScreen');
@@ -278,7 +270,7 @@ const EmailPhoneInputScreen: React.FC = () => {
                   }, 'EmailPhoneInputScreen');
                   navigation.reset({
                     index: 0,
-                    routes: [{ name: 'PinUnlock' }],
+                    routes: [{ name: 'PinUnlock', params: { userId: userExistsResult.userId } }],
                   });
                 }
                 return;
@@ -405,7 +397,7 @@ const EmailPhoneInputScreen: React.FC = () => {
               }, 'EmailPhoneInputScreen');
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'PinUnlock' }],
+                routes: [{ name: 'PinUnlock', params: { userId: result.user.uid } }],
               });
             }
             return;

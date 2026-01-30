@@ -9,6 +9,7 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { FeeService } from '../../config/constants/feeConfig';
 import { logger } from '../../services/analytics/loggingService';
+import { showTransactionConfirmation } from '../../utils/transactionConfirmation';
 
 // --- AppleSlider adapted from SendConfirmationScreen ---
 interface AppleSliderProps {
@@ -144,6 +145,18 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
+    const destAddress = externalWalletAddress || walletAddress || '';
+    const destShort = destAddress ? `${destAddress.substring(0, 6)}...${destAddress.substring(destAddress.length - 4)}` : 'your wallet';
+    showTransactionConfirmation({
+      title: 'Confirm withdrawal',
+      message: `Withdraw ${safeTotalWithdraw} USDC to ${destShort}?\n\nThis action cannot be undone.`,
+      confirmLabel: 'Yes, withdraw',
+      cancelLabel: 'Cancel',
+      onConfirm: () => runWithdrawTransaction(),
+    });
+  };
+
+  const runWithdrawTransaction = async () => {
     setSigning(true);
     
     try {

@@ -18,6 +18,7 @@ import { typography } from '../../theme/typography';
 import { FallbackDataService } from '../../services/data';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
+import { showTransactionConfirmation } from '../../utils/transactionConfirmation';
 
 interface PaymentConfirmationScreenProps {
   navigation: any;
@@ -62,23 +63,28 @@ const PaymentConfirmationScreen: React.FC<PaymentConfirmationScreenProps> = ({ n
     }
   }, [userKastAddress, navigation, billData, participants, totalAmount, totalLocked]);
 
-  const handleTransferMoney = async () => {
+  const handleTransferMoney = () => {
+    showTransactionConfirmation({
+      title: 'Confirm transfer',
+      message: `Transfer ${totalAmount} USDC to your Kast Account?\n\nThis action cannot be undone.`,
+      confirmLabel: 'Yes, transfer',
+      cancelLabel: 'Cancel',
+      onConfirm: () => runTransferMoney(),
+    });
+  };
+
+  const runTransferMoney = async () => {
     setIsTransferring(true);
-    
     try {
       // Simulate transfer process
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
       Alert.alert(
         'Transfer Successful',
         `${totalAmount} USDC has been successfully transferred to your Kast Card.`,
         [
           {
             text: 'OK',
-            onPress: () => {
-              // Navigate back to splits list or dashboard
-              navigation.navigate('SplitsList');
-            },
+            onPress: () => navigation.navigate('SplitsList'),
           },
         ]
       );

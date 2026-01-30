@@ -49,6 +49,8 @@ const CreateProfileScreen: React.FC = () => {
     isValidating: boolean;
     isValid: boolean | null;
     error?: string;
+    codeType?: 'referral' | 'community' | null;
+    badgeTitle?: string;
   }>({ isValidating: false, isValid: null });
   const [usernameValidation, setUsernameValidation] = useState<{
     isValidating: boolean;
@@ -56,6 +58,7 @@ const CreateProfileScreen: React.FC = () => {
     error?: string;
   }>({ isValidating: false, isAvailable: null });
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const usernameValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const referralValidationRef = useRef(referralValidation);
   const scrollViewRef = useRef<ScrollView>(null);
   const displayNameInputRef = useRef<View | null>(null);
@@ -89,7 +92,10 @@ const CreateProfileScreen: React.FC = () => {
     };
   }, []);
 
-  // Validate referral code with debouncing
+  // Minimum length for community/redeem codes (same as Rewards redeem)
+  const COMMUNITY_CODE_MIN_LENGTH = 4;
+
+  // Validate referral OR community code with debouncing (same input works for both)
   const validateReferralCode = React.useCallback(async (code: string) => {
     // Clear previous timeout
     if (validationTimeoutRef.current) {
@@ -98,38 +104,35 @@ const CreateProfileScreen: React.FC = () => {
 
     // Reset validation if code is empty
     if (!code || code.trim().length === 0) {
-      setReferralValidation({ isValidating: false, isValid: null });
+      setReferralValidation({ isValidating: false, isValid: null, codeType: null });
       return;
     }
 
-    // Minimum length check
-    if (code.length < REFERRAL_CODE_MIN_LENGTH) {
+    // Minimum length: allow community codes (4+) and referral codes
+    if (code.length < COMMUNITY_CODE_MIN_LENGTH) {
       setReferralValidation({
         isValidating: false,
         isValid: false,
-        error: `Referral code must be at least ${REFERRAL_CODE_MIN_LENGTH} characters`
+        error: `Code must be at least ${COMMUNITY_CODE_MIN_LENGTH} characters`,
+        codeType: null
       });
       return;
     }
 
     // Set validating state
-    setReferralValidation({ isValidating: true, isValid: null });
+    setReferralValidation((prev) => ({ ...prev, isValidating: true, isValid: null, codeType: null }));
 
     // Debounce validation (wait 500ms after user stops typing)
     validationTimeoutRef.current = setTimeout(async () => {
       try {
         // Wait for Firebase Auth to be ready (may take time after custom token sign-in)
-        // Check both app state and Firebase Auth state
         let currentUserId = state.currentUser?.id;
         let authReady = !!auth?.currentUser;
 
-        // If Firebase Auth isn't ready but we have app state user, wait a bit for auth to sync
         if (!authReady && currentUserId) {
           logger.debug('Waiting for Firebase Auth to sync after custom token sign-in', {
             userId: currentUserId
           }, 'CreateProfileScreen');
-          
-          // Wait up to 2 seconds for auth state to sync
           const maxWait = 2000;
           const startTime = Date.now();
           while (!authReady && (Date.now() - startTime) < maxWait) {
@@ -142,53 +145,73 @@ const CreateProfileScreen: React.FC = () => {
           }
         }
 
-        // Use Firebase Auth UID if available, otherwise fall back to app state
         if (auth?.currentUser?.uid) {
           currentUserId = auth.currentUser.uid;
         }
 
-        // If still no user ID, we can't validate (but this should be rare)
         if (!currentUserId) {
-          logger.warn('Cannot validate referral code: no user ID available', {
+          logger.warn('Cannot validate code: no user ID available', {
             hasAppStateUser: !!state.currentUser?.id,
             hasAuthUser: !!auth?.currentUser
           }, 'CreateProfileScreen');
           setReferralValidation({
             isValidating: false,
             isValid: null,
-            error: 'Please wait for authentication to complete'
+            error: 'Please wait for authentication to complete',
+            codeType: null
           });
           return;
         }
 
-        const { referralService } = await import('../../services/rewards/referralService');
-        // Pass original code to service - it will handle normalization and case variations
-        // This allows the service to try multiple case variations if normalized query fails
-        const validation = await referralService.validateReferralCode(code, currentUserId);
-        
-        if (validation.exists) {
+        const normalizedCode = code.trim().toUpperCase();
+
+        // 1) Try referral code first (if long enough for referral)
+        if (normalizedCode.length >= REFERRAL_CODE_MIN_LENGTH) {
+          const { referralService } = await import('../../services/rewards/referralService');
+          const referralResult = await referralService.validateReferralCode(code, currentUserId);
+          if (referralResult.exists) {
+            setReferralValidation({
+              isValidating: false,
+              isValid: true,
+              error: undefined,
+              codeType: 'referral'
+            });
+            return;
+          }
+        }
+
+        // 2) Try community/event badge redeem code (same as Rewards section)
+        const { badgeService } = await import('../../services/rewards/badgeService');
+        const badgeInfo = await badgeService.getBadgeByRedeemCode(normalizedCode);
+        if (badgeInfo) {
           setReferralValidation({
             isValidating: false,
             isValid: true,
-            error: undefined
+            error: undefined,
+            codeType: 'community',
+            badgeTitle: badgeInfo.title
           });
-        } else {
-          setReferralValidation({
-            isValidating: false,
-            isValid: false,
-            error: validation.error || 'Referral code not found. Please check and try again.'
-          });
+          return;
         }
+
+        // Neither referral nor community code found
+        setReferralValidation({
+          isValidating: false,
+          isValid: false,
+          error: 'Code not found. Check referral or community code and try again.',
+          codeType: null
+        });
       } catch (error) {
-        logger.error('Error validating referral code', error, 'CreateProfileScreen');
+        logger.error('Error validating referral/community code', error, 'CreateProfileScreen');
         setReferralValidation({
           isValidating: false,
           isValid: null,
-          error: 'Unable to validate code. Please try again.'
+          error: 'Unable to validate code. Please try again.',
+          codeType: null
         });
       }
     }, 500);
-  }, []);
+  }, [state.currentUser?.id]);
 
   // Validate username availability with debouncing
   const validateUsername = React.useCallback(async (username: string) => {
@@ -494,25 +517,17 @@ const CreateProfileScreen: React.FC = () => {
     setError('');
   
     // Use referralInput if available, otherwise use referralCode from route params
-    const finalReferralCode = referralInput.trim() || referralCode || '';
+    const finalCode = (referralInput.trim() || referralCode || '').toUpperCase().replace(/\s/g, '');
     
-    // Validate referral code if provided
-    if (finalReferralCode && finalReferralCode.length >= REFERRAL_CODE_MIN_LENGTH) {
-      const normalizedCode = normalizeReferralCode(finalReferralCode);
-      await validateReferralCode(normalizedCode);
-      
-      // Wait a bit for validation to complete
+    // Validate referral or community code if provided (min 4 chars for community codes)
+    if (finalCode && finalCode.length >= COMMUNITY_CODE_MIN_LENGTH) {
+      await validateReferralCode(finalCode);
       await new Promise(resolve => setTimeout(resolve, 600));
-      
-      // Check validation state after waiting using ref for latest state
       if (referralValidationRef.current.isValid === false) {
         return;
       }
-      
-      // Use validated code (or proceed even if validation is still pending/null)
-      createProfile(normalizedCode);
+      createProfile(finalCode);
     } else {
-      // No referral code or too short, proceed without it
       createProfile('');
     }
   };
@@ -954,50 +969,44 @@ const CreateProfileScreen: React.FC = () => {
           // Don't fail profile creation if sync fails
         }
 
-        // Track referral if referral code was provided (non-blocking)
+        // Apply referral OR community code after account creation (same as Rewards: claim community badge)
+        const codeType = referralValidationRef.current.codeType;
         if (finalReferralCode && finalReferralCode.trim()) {
           (async () => {
             try {
-              const { referralService } = await import('../../services/rewards/referralService');
-              // Pass original code (not pre-normalized) to allow case variation matching
-              // The service will normalize internally and try case variations if needed
-              logger.info('Tracking referral', { 
-                userId: appUser.id, 
-                referralCode: finalReferralCode,
-                normalizedCode: normalizeReferralCode(finalReferralCode)
-              }, 'CreateProfileScreen');
-              
-              // Pass original code to trackReferral - it handles normalization and case variations
-              const result = await referralService.trackReferral(appUser.id, finalReferralCode);
-              
-              if (result.success) {
-                logger.info('Referral tracked successfully', { 
-                  userId: appUser.id, 
-                  referrerId: result.referrerId 
-                }, 'CreateProfileScreen');
+              if (codeType === 'referral') {
+                const { referralService } = await import('../../services/rewards/referralService');
+                logger.info('Tracking referral', { userId: appUser.id, referralCode: finalReferralCode }, 'CreateProfileScreen');
+                const result = await referralService.trackReferral(appUser.id, finalReferralCode);
+                if (result.success) {
+                  logger.info('Referral tracked successfully', { userId: appUser.id, referrerId: result.referrerId }, 'CreateProfileScreen');
+                } else {
+                  logger.warn('Referral tracking failed', { userId: appUser.id, error: result.error }, 'CreateProfileScreen');
+                }
+              } else if (codeType === 'community') {
+                const { badgeService } = await import('../../services/rewards/badgeService');
+                logger.info('Claiming community badge from signup code', { userId: appUser.id, code: finalReferralCode }, 'CreateProfileScreen');
+                const claimResult = await badgeService.claimEventBadge(appUser.id, finalReferralCode.trim());
+                if (claimResult.success) {
+                  logger.info('Community badge claimed at signup', { userId: appUser.id, badgeId: claimResult.badgeId }, 'CreateProfileScreen');
+                } else {
+                  logger.warn('Community badge claim failed at signup', { userId: appUser.id, error: claimResult.error }, 'CreateProfileScreen');
+                }
               } else {
-                logger.warn('Referral tracking failed', { 
-                  userId: appUser.id, 
-                  referralCode: finalReferralCode,
-                  error: result.error 
-                }, 'CreateProfileScreen');
-                // Don't show error to user - referral is optional
+                // Fallback: try referral first, then community (e.g. validation ref not set)
+                const { referralService } = await import('../../services/rewards/referralService');
+                const refResult = await referralService.trackReferral(appUser.id, finalReferralCode);
+                if (!refResult.success) {
+                  const { badgeService } = await import('../../services/rewards/badgeService');
+                  await badgeService.claimEventBadge(appUser.id, finalReferralCode.trim());
+                }
               }
-            } catch (referralError) {
-              logger.error('Error tracking referral', { 
-                userId: appUser.id, 
-                referralCode: finalReferralCode.trim(),
-                error: referralError 
-              }, 'CreateProfileScreen');
-              // Don't fail account creation if referral tracking fails
+            } catch (err) {
+              logger.error('Error applying referral/community code', { userId: appUser.id, codeType, error: err }, 'CreateProfileScreen');
             }
           })().catch((backgroundError) => {
-            // Ensure background errors are logged for observability
-            logger.error('Background referral tracking task failed', { 
-              userId: appUser.id,
-              error: backgroundError 
-            }, 'CreateProfileScreen');
-          }); // Still non-blocking for the user flow
+            logger.error('Background referral/community code task failed', { userId: appUser.id, error: backgroundError }, 'CreateProfileScreen');
+          });
         }
         
         // Verify data was saved correctly
@@ -1106,19 +1115,32 @@ const CreateProfileScreen: React.FC = () => {
                 onChangeText={(text) => {
                   setPseudo(text);
                   setError('');
+                  validateUsername(text);
                 }}
                 onFocus={() => {
                   // Minimal scroll - let KeyboardAvoidingView handle most of it
                   // Only scroll if absolutely necessary
                 }}
-                error={error || undefined}
+                error={error || usernameValidation.error}
                 autoCapitalize="words"
                 autoCorrect={false}
                 labelStyle={styles.inputLabel}
               />
+              {usernameValidation.isValidating && (
+                <View style={styles.validationContainer}>
+                  <ActivityIndicator size="small" color={colors.white50} />
+                  <Text style={styles.validationText}>Checking availability...</Text>
+                </View>
+              )}
+              {usernameValidation.isAvailable === true && !usernameValidation.isValidating && (
+                <View style={styles.validationContainer}>
+                  <PhosphorIcon name="CheckCircle" size={16} color={colors.green} weight="fill" />
+                  <Text style={[styles.validationText, { color: colors.green }]}>Display name available</Text>
+                </View>
+              )}
             </View>
 
-            {/* Referral Code Input */}
+            {/* Referral or community code input – works for both referral and community badge codes */}
             <View
               style={styles.inputSection}
               ref={(ref) => {
@@ -1126,8 +1148,8 @@ const CreateProfileScreen: React.FC = () => {
               }}
             >
               <Input
-                label="Referral Code"
-                placeholder="Enter referral code"
+                label="Referral or community code"
+                placeholder="Enter referral or community code"
                 value={referralInput}
                 onChangeText={(text) => {
                   const cleaned = text.toUpperCase().replace(/\s/g, '');
@@ -1176,7 +1198,11 @@ const CreateProfileScreen: React.FC = () => {
               {referralValidation.isValid === true && !referralValidation.isValidating && (
                 <View style={styles.validationContainer}>
                   <PhosphorIcon name="CheckCircle" size={16} color={colors.green} weight="fill" />
-                  <Text style={[styles.validationText, { color: colors.green }]}>Valid referral code</Text>
+                  <Text style={[styles.validationText, { color: colors.green }]}>
+                    {referralValidation.codeType === 'community'
+                      ? (referralValidation.badgeTitle ? `Valid community code – ${referralValidation.badgeTitle}` : 'Valid community code')
+                      : 'Valid referral code'}
+                  </Text>
                 </View>
               )}
             </View>

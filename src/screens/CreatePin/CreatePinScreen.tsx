@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, Linking, Image } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Container, Header } from '../../components/shared';
@@ -12,6 +12,7 @@ const CreatePinScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<{ params?: { fromPinUnlock?: boolean } }>();
   const [pin, setPin] = useState<string[]>([]);
+  const hasNavigatedToVerifyRef = useRef(false);
 
   const handleHelpCenterPress = () => {
     Linking.openURL('https://help.wesplit.io/');
@@ -22,8 +23,9 @@ const CreatePinScreen: React.FC = () => {
       const newPin = [...pin, number];
       setPin(newPin);
       
-      // Navigate to VerifyPin when PIN is complete
-      if (newPin.length === PIN_LENGTH) {
+      // Navigate to VerifyPin when PIN is complete (single-run to avoid double navigation)
+      if (newPin.length === PIN_LENGTH && !hasNavigatedToVerifyRef.current) {
+        hasNavigatedToVerifyRef.current = true;
         setTimeout(() => {
           (navigation as any).navigate('VerifyPin', {
             pin: newPin.join(''),

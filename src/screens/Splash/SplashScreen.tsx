@@ -288,19 +288,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
             }
           }
         } else {
-          // User is not authenticated - check if we have last-used email and PIN so we can offer PIN-only sign-in
-          const persistedEmail = await AuthPersistenceService.loadEmail();
-          if (persistedEmail?.trim()) {
-            const pinData = await AuthPersistenceService.getPinLoginData(persistedEmail.trim());
-            if (pinData?.userId) {
-              logger.info('Returning user with email and PIN - offering PIN sign-in', {
-                email: persistedEmail.substring(0, 5) + '...',
-              }, 'SplashScreen');
-              setHasNavigated(true);
-              navigation.replace('PinLogin', { email: persistedEmail.trim() });
-              return;
-            }
-          }
+          // User is not authenticated - all returning users (including email) go through same flow: GetStarted → OTP verification
           logger.info('User not authenticated, navigating to GetStarted', null, 'SplashScreen');
           setHasNavigated(true);
           navigation.replace('GetStarted');

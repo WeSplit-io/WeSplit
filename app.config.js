@@ -108,6 +108,7 @@ module.exports = {
         ],
         NSCameraUsageDescription: "This app uses the camera to scan QR codes for payments, split invitations, and contact sharing.",
         NSPhotoLibraryUsageDescription: "This app accesses the photo library to let you select profile pictures.",
+        NSFaceIDUsageDescription: "WeSplit uses Face ID to securely unlock the app and protect your wallet.",
         ITSAppUsesNonExemptEncryption: false
       },
       // entitlements: {
@@ -251,6 +252,7 @@ module.exports = {
       "expo-secure-store",
       "expo-router",
       "expo-camera",
+      ["expo-local-authentication", { faceIDPermission: "WeSplit uses Face ID to securely unlock the app and protect your wallet." }],
       ...(process.env.EAS_BUILD_PROFILE !== 'development' ? ["expo-notifications"] : []),
       "expo-web-browser"
     ],

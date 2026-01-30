@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, Animated, Platform, ScrollView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { View, Text, TouchableOpacity, Image, Animated, ScrollView } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Container, Header } from '../../components/shared';
@@ -11,20 +11,24 @@ import { AuthPersistenceService } from '../../services/core/authPersistenceServi
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import { auth } from '../../config/firebase/firebase';
+import { secureVault } from '../../services/security/secureVault';
 
 const PIN_LENGTH = 6;
 
 /**
  * Shown when the user is already authenticated (auto-login) but has a PIN set.
- * Offers Face ID / fingerprint first, then PIN, with "Forgot your pin?" to log in with email.
+ * Login flow: Face ID / fingerprint first (via vault – one prompt, primes vault so Dashboard won't prompt again),
+ * then PIN entry, with "Forgot your pin?" to log in with email.
  */
 const HIT_SLOP = { top: 12, bottom: 12, left: 16, right: 16 };
 
 const PinUnlockScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const insets = useSafeAreaInsets();
   const { state, logoutUser } = useApp();
-  const userId = state.currentUser?.id;
+  // Prefer userId from route params (e.g. from "verified within 30 days" path) so we use the correct user before context updates
+  const userId = (route.params as { userId?: string } | undefined)?.userId ?? state.currentUser?.id;
   const userEmail = state.currentUser?.email;
   const [pin, setPin] = useState<string[]>([]);
   const [error, setError] = useState(false);
@@ -33,31 +37,18 @@ const PinUnlockScreen: React.FC = () => {
   const faceIdAttemptedRef = useRef(false);
   const shakeAnimation = useRef(new Animated.Value(0)).current;
 
-  const getBiometricPromptMessage = async (): Promise<string> => {
-    try {
-      const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-      if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) return 'Unlock WeSplit with Face ID';
-      if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) return Platform.OS === 'ios' ? 'Unlock WeSplit with Touch ID' : 'Verify your identity';
-    } catch (e) {
-      logger.warn('Could not get supported auth types', { error: e }, 'PinUnlockScreen');
-    }
-    return 'Verify your identity';
-  };
-
+  /**
+   * Login flow: use vault Face ID so one prompt both unlocks the app and primes the vault
+   * (Dashboard won't prompt again). Same Keychain/biometric used at signup in VerifyPin.
+   */
   const tryBiometricUnlock = async (): Promise<boolean> => {
     try {
       const compatible = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       if (!compatible || !enrolled) return false;
-      const promptMessage = await getBiometricPromptMessage();
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage,
-        cancelLabel: 'Cancel',
-        fallbackLabel: 'Use PIN',
-        disableDeviceFallback: false,
-      });
-      if (result.success) {
-        logger.info('Biometric unlock successful', { userId }, 'PinUnlockScreen');
+      const ok = await secureVault.preAuthenticate();
+      if (ok) {
+        logger.info('Biometric unlock successful (vault primed)', { userId }, 'PinUnlockScreen');
         (navigation as any).replace('Dashboard', { fromPinUnlock: true });
         return true;
       }
@@ -67,8 +58,8 @@ const PinUnlockScreen: React.FC = () => {
     return false;
   };
 
-  // If we don't have a user, go to GetStarted. If user has no PIN set, go straight to Dashboard.
-  // Use same userId source as VerifyPin (app context + Firebase Auth UID) so PIN key is consistent.
+  // If we don't have a user, go to GetStarted. If user has no PIN set, go straight to CreatePin/Dashboard.
+  // Use route.params.userId first (from "verified within 30 days" etc.), then context, then Firebase Auth so PIN key is consistent.
   useEffect(() => {
     const effectiveUserId = userId ?? auth?.currentUser?.uid;
     if (!effectiveUserId) {
@@ -92,7 +83,7 @@ const PinUnlockScreen: React.FC = () => {
         await tryBiometricUnlock();
       }
     })();
-  }, [userId, navigation]);
+  }, [userId, auth?.currentUser?.uid, navigation]);
 
 
   const handleNumberPress = (number: string) => {
@@ -243,7 +234,7 @@ const PinUnlockScreen: React.FC = () => {
                       key="biometric"
                       style={styles.keypadButtonFingerprint}
                       onPress={handleFaceIdPress}
-                      disabled={loading}
+                      disabled={loading || !biometricAvailable}
                       activeOpacity={0.7}
                     >
                       <PhosphorIcon name="Fingerprint" size={28} color="#fff" weight="regular" />

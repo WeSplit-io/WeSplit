@@ -12,6 +12,7 @@ import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { logger } from '../../services/analytics/loggingService';
 import { Container, Button } from '../../components/shared';
 import { generateTransferLink } from '../../services/core/deepLinkHandler';
+import { showTransactionConfirmation } from '../../utils/transactionConfirmation';
 
 interface CryptoTransferParams {
   targetWallet?: {
@@ -144,6 +145,16 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
+    showTransactionConfirmation({
+      title: 'Confirm transfer',
+      message: `Transfer ${amount} SOL to your app wallet?\n\nThis action cannot be undone.`,
+      confirmLabel: 'Yes, transfer',
+      cancelLabel: 'Cancel',
+      onConfirm: () => runTransferFromExternalWallet(amount),
+    });
+  };
+
+  const runTransferFromExternalWallet = async (amount: number) => {
     try {
       setIsTransferring(true);
       

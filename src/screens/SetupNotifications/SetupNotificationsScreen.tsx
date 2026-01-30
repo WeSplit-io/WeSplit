@@ -1,11 +1,20 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Linking, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, Image, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Container, Header, Button } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { colors, spacing, typography } from '../../theme';
 import { styles } from './styles';
 import * as Notifications from 'expo-notifications';
+
+/** System permission options for displaying and using notifications (alerts, sound, badge) */
+const NOTIFICATION_PERMISSION_OPTIONS: Notifications.NotificationPermissionsRequest = {
+  ios: {
+    allowAlert: true,
+    allowBadge: true,
+    allowSound: true,
+  },
+};
 
 const SetupNotificationsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -16,13 +25,30 @@ const SetupNotificationsScreen: React.FC = () => {
 
   const handleTurnOnNotifications = async () => {
     try {
-      // Request notification permissions
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status === 'granted') {
-        (navigation as any).replace('Dashboard', { fromPinUnlock: true });
-      } else {
-        (navigation as any).replace('Dashboard', { fromPinUnlock: true });
+      // Check current permission status first (no user-facing prompt)
+      const existing = await Notifications.getPermissionsAsync();
+      let status = existing.status;
+
+      if (status !== 'granted') {
+        // On Android 13+, create a default channel before requesting so the permission prompt can appear
+        if (Platform.OS === 'android') {
+          try {
+            await Notifications.setNotificationChannelAsync?.('default', {
+              name: 'WeSplit',
+              importance: Notifications.AndroidImportance.DEFAULT,
+              sound: true,
+              enableVibration: true,
+            });
+          } catch {
+            // setNotificationChannelAsync may be unavailable (e.g. web)
+          }
+        }
+        // Request system permission with explicit display/use options
+        const { status: requestedStatus } = await Notifications.requestPermissionsAsync(NOTIFICATION_PERMISSION_OPTIONS);
+        status = requestedStatus;
       }
+
+      (navigation as any).replace('Dashboard', { fromPinUnlock: true });
     } catch (error) {
       console.error('Notification permission error:', error);
       (navigation as any).replace('Dashboard', { fromPinUnlock: true });

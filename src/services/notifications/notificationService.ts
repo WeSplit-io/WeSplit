@@ -50,7 +50,7 @@ class NotificationServiceClass {
         return true;
       }
 
-      // Configure notification behavior
+      // Configure notification behavior (how to display and use notifications)
       await Notifications.setNotificationHandler({
         handleNotification: async () => ({
           shouldShowAlert: true,
@@ -61,8 +61,31 @@ class NotificationServiceClass {
         }),
       });
 
-      // Request permissions
-      const { status } = await Notifications.requestPermissionsAsync();
+      // Check current permission status first (no user-facing prompt)
+      const existing = await Notifications.getPermissionsAsync();
+      let status = existing.status;
+
+      if (status !== 'granted') {
+        // On Android 13+, create a default channel before requesting so the system permission prompt can appear
+        if (Platform.OS === 'android') {
+          try {
+            await Notifications.setNotificationChannelAsync?.('default', {
+              name: 'WeSplit',
+              importance: Notifications.AndroidImportance.DEFAULT,
+              sound: true,
+              enableVibration: true,
+            });
+          } catch {
+            // setNotificationChannelAsync may be unavailable (e.g. web)
+          }
+        }
+        // Request system permission with explicit display/use options (alerts, sound, badge)
+        const { status: requestedStatus } = await Notifications.requestPermissionsAsync({
+          ios: { allowAlert: true, allowBadge: true, allowSound: true },
+        });
+        status = requestedStatus;
+      }
+
       if (status !== 'granted') {
         logger.warn('Push notification permissions not granted', null, 'NotificationService');
         return false;
